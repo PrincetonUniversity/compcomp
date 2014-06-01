@@ -525,3 +525,33 @@ Proof.
   rewrite orb_true_iff in H. destruct H. rewrite H; auto. 
     rewrite orb_true_iff. right. solve[eapply IHvals; eauto].
 Qed.
+
+Lemma val_casted_has_type a t :
+  tys_nonvoid (Tcons t Tnil) = true -> 
+  val_casted_func a t = true -> 
+  val_has_type_func a (typ_of_type t) = true.
+Proof.
+intros H0 H.
+apply val_casted_funcE in H.
+induction H; try solve[auto].
+destruct H. destruct sz. simpl. 
+generalize (Float.singleoffloat_is_single n0).
+destruct (Float.is_single_dec (Float.singleoffloat n0)); auto. auto.
+simpl in H0. congruence.
+Qed.
+
+Lemma val_casted_has_type_list vals tys : 
+  tys_nonvoid tys = true ->
+  val_casted_list_func vals tys = true -> 
+  val_has_type_list_func vals (typlist_of_typelist tys) = true.
+Proof.
+revert vals; induction tys. simpl. intros vals.
+destruct vals. simpl; auto. simpl. solve[inversion 2].
+simpl; intros vals; revert tys IHtys; induction vals. simpl. 
+  intros; congruence.
+simpl; intros. rewrite andb_true_iff in H0; destruct H0 as [H0 H2].
+assert (H3: tys_nonvoid tys = true).
+{ destruct t; solve[congruence|auto]. }
+rewrite andb_true_iff. split; auto.
+apply val_casted_has_type; auto. destruct t; auto.
+Qed.

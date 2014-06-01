@@ -2304,7 +2304,8 @@ intros.
     eapply forall_inject_val_list_inject; eauto.
     eapply transl_fundef_sig2 in TR; eauto.
     rewrite TR. simpl. 
-    admit. (*TODO GS*) }
+    apply val_casted.val_casted_has_type_list; auto. }
+
   assert (val_casted.vals_defined vals2=true) as ->.
   { eapply val_casted.val_list_inject_defined.
     eapply forall_inject_val_list_inject; eauto.
