@@ -4,11 +4,11 @@ Require Import Coqlib.
 Require Import Integers.
 Require Import compcert.common.Values.
 Require Import Maps.
-Require Import msl.Axioms.
-
 Require Import FiniteMaps.
-Require Import sepcomp.mem_lemmas.
-Require Import sepcomp.mem_interpolation_defs.
+Require Import Axioms.
+
+Require Import core.mem_lemmas.
+Require Import core.mem_interpolation_defs.
 
 Fixpoint mkInjectionsN (N:nat)(n1 n2:block)(j k l: meminj) 
                      :  meminj * meminj * block * block := 

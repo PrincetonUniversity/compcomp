@@ -12,12 +12,12 @@ Require Import compcert.common.Globalenvs.
 
 Require Import compcert.lib.Axioms.
 
-Require Import sepcomp.mem_lemmas. (*needed for definition of mem_forward etc*)
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.effect_semantics.
-Require Import sepcomp.StructuredInjections.
-Require Import sepcomp.reach.
-Require Import sepcomp.mem_wd.
+Require Import core.mem_lemmas. (*needed for definition of mem_forward etc*)
+Require Import core.core_semantics.
+Require Import core.effect_semantics.
+Require Import core.StructuredInjections.
+Require Import core.reach.
+Require Import core.mem_wd.
 
 Module Wholeprog_simulation. Section Wholeprog_simulation.
 
@@ -49,7 +49,7 @@ Record Wholeprog_simulation :=
      Mem.valid_block m2 b) -> 
     mem_wd m2 -> 
     valid_genv ge2 m2 -> 
-    (*technically redundant with REACH condition -- will be best to require
+    (*TODO technically redundant with REACH condition -- will be best to require
       just val_valid and mem_wd*)
     Forall (fun v2 => val_valid v2 m2) vals2 -> 
     exists mu cd c2,

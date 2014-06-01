@@ -7,10 +7,10 @@ Require Import Maps.
 Require Import Integers.
 Require Import AST. 
 Require Import Globalenvs.
-Require Import msl.Axioms.
+Require Import Axioms.
 
-Require Import sepcomp.mem_lemmas.
-Require Import sepcomp.core_semantics.
+Require Import core.mem_lemmas.
+Require Import core.core_semantics.
 
 Definition corestep_fun {G C M : Type} (sem : CoreSemantics G C M) :=
   forall (m m' m'' : M) ge c c' c'',

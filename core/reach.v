@@ -5,16 +5,14 @@ Require Import compcert.common.Values.
 Require Import compcert.lib.Maps.
 Require Import compcert.lib.Integers.
 Require Import compcert.common.AST.
-Require Import msl.Extensionality.
-
 Require Import compcert.common.Globalenvs.
-
 Require Import compcert.lib.Axioms.
 
-Require Import sepcomp.mem_lemmas. (*needed for definition of mem_forward etc*)
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.effect_semantics.
-Require Import sepcomp.StructuredInjections.
+Require Import core.Extensionality.
+Require Import core.mem_lemmas. (*needed for definition of mem_forward etc*)
+Require Import core.core_semantics.
+Require Import core.effect_semantics.
+Require Import core.StructuredInjections.
 
 Definition vis mu := fun b => locBlocksSrc mu b || frgnBlocksSrc mu b.
 Definition visTgt mu := fun b => locBlocksTgt mu b || frgnBlocksTgt mu b.

@@ -6,21 +6,26 @@ Require Import Maps.
 Require Import Integers.
 Require Import AST.
 Require Import Globalenvs.
+Require Import Axioms.
 
-Require Import msl.Axioms.
-Require Import sepcomp.mem_lemmas. (*needed for definition of mem_forward etc*)
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.core_semantics_lemmas.
+Require Import core.mem_lemmas. (*needed for definition of mem_forward etc*)
+Require Import core.core_semantics.
+Require Import core.core_semantics_lemmas.
 Require Import effect_semantics.
 
-Require Import sepcomp.StructuredInjections.
-Require Import sepcomp.reach.
+Require Import core.StructuredInjections.
+Require Import core.reach.
 Require Import effect_simulations.
 Require Import effect_simulations_lemmas.
 Require Import effect_properties.
-Require Import sepcomp.forward_simulations_trans.
+
 Require Import Wellfounded.
 Require Import Relations.
+
+Definition entrypoints_compose 
+  (ep12 ep23 ep13 : list (val * val * signature)): Prop :=
+  forall v1 v3 sig, In (v1,v3,sig) ep13 =
+    exists v2, In (v1,v2,sig) ep12 /\ In (v2,v3,sig) ep23.
 
 Section CoreDiagrams_trans.
 Context {F1 V1 C1 F2 V2 C2 F3 V3 C3:Type}
@@ -32,6 +37,16 @@ Context {F1 V1 C1 F2 V2 C2 F3 V3 C3:Type}
         (g3 : Genv.t F3 V3) 
         epts12 epts23 epts13
         (EPC : entrypoints_compose epts12 epts23 epts13).
+
+Inductive sem_compose_ord_eq_eq {D12 D23:Type} 
+  (ord12: D12 -> D12 -> Prop) (ord23: D23 -> D23 -> Prop) (C2:Type):
+  (D12 * option C2 * D23) ->  (D12 * option C2 * D23) ->  Prop := 
+| sem_compose_ord1 :
+  forall (d12 d12':D12) (c2:C2) (d23:D23),
+    ord12 d12 d12' -> sem_compose_ord_eq_eq ord12 ord23 C2 (d12,Some c2,d23) (d12',Some c2,d23)
+| sem_compose_ord2 :
+  forall (d12 d12':D12) (c2 c2':C2) (d23 d23':D23),
+    ord23 d23 d23' -> sem_compose_ord_eq_eq ord12 ord23 C2 (d12,Some c2,d23) (d12',Some c2',d23').
 
 Lemma core_diagram_trans: forall
 (core_data12 : Type)

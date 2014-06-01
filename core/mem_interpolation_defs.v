@@ -5,9 +5,9 @@ Require Import Coqlib.
 Require Import Integers.
 Require Import compcert.common.Values.
 Require Import Maps.
-Require Import msl.Axioms.
+Require Import Axioms.
 
-Require Import sepcomp.mem_lemmas.
+Require Import core.mem_lemmas.
 
 Goal forall m b ofs p (H: ~ Mem.perm m b ofs p Nonempty), PMap.get b (Mem.mem_access m) ofs p = None.
 intros. unfold Mem.perm in *.

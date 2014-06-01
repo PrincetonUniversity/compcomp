@@ -6,18 +6,17 @@ Require Import Maps.
 Require Import Integers.
 Require Import AST.
 Require Import Globalenvs.
+Require Import Axioms.
 
-Require Import msl.Axioms.
-Require Import sepcomp.mem_lemmas. (*needed for definition of mem_forward etc*)
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.core_semantics_lemmas.
+Require Import core.mem_lemmas. (*needed for definition of mem_forward etc*)
+Require Import core.core_semantics.
+Require Import core.core_semantics_lemmas.
 
-Require Import sepcomp.StructuredInjections.
-Require Import sepcomp.reach.
+Require Import core.StructuredInjections.
+Require Import core.reach.
 Require Import effect_semantics.
 Require Import effect_simulations.
 Require Import effect_simulations_lemmas.
-Require Import sepcomp.forward_simulations_trans.
 Require Import Wellfounded.
 Require Import Relations.
 Require Import effect_corediagram_trans.
@@ -28,6 +27,33 @@ Require Import effect_interpolants.
 Declare Module EFFAX : EffectInterpolationAxioms.
 
 Import SM_simulation.
+
+Lemma empty_inj: Mem.inject (Mem.flat_inj 1%positive) Mem.empty Mem.empty.
+Proof.
+  split.
+    split. intros. destruct (flatinj_E _ _ _ _ H) as [? [? ?]]. subst.
+          rewrite Zplus_0_r. assumption.
+       intros. destruct (flatinj_E _ _ _ _ H) as [? [? ?]]. subst.
+          apply Z.divide_0_r.
+    intros. destruct (flatinj_E _ _ _ _ H) as [? [? ?]]. subst.
+         exfalso. xomega.
+     intros. unfold Mem.flat_inj.
+          remember (plt b 1).
+          destruct s; trivial. xomega.
+    intros. destruct (flatinj_E _ _ _ _ H) as [? [? ?]]. subst.
+         exfalso. xomega.
+    intros b; intros.
+      destruct (flatinj_E _ _ _ _ H0) as [? [? ?]]. subst.
+         exfalso. xomega.
+    intros.
+      destruct (flatinj_E _ _ _ _ H) as [? [? ?]]. subst.
+         exfalso. xomega.
+Qed.
+
+Lemma empty_fwd: forall m, mem_forward Mem.empty m.
+Proof. intros m b Vb.
+   unfold Mem.valid_block in Vb. simpl in Vb. exfalso. xomega.
+Qed.
 
 Lemma initial_inject_split: forall j m1 m3 (Inj:Mem.inject j m1 m3),
   exists m2 j1 j2, j = compose_meminj j1 j2 /\
@@ -47,7 +73,7 @@ Lemma initial_inject_split: forall j m1 m3 (Inj:Mem.inject j m1 m3),
                    Some (b3, ofs3))).
 Proof. intros.
   destruct (EFFAX.interpolate_II_strongHeqMKI _ _ _ 
-     Forward_simulation_trans.empty_inj _ (Forward_simulation_trans.empty_fwd m1) _ _ Forward_simulation_trans.empty_inj _ (Forward_simulation_trans.empty_fwd m3) _ Inj)
+     empty_inj _ (empty_fwd m1) _ _ empty_inj _ (empty_fwd m3) _ Inj)
   as [m2 [j1 [j2 [J [X [Y [Inc1 [Inc2 [Inj12 [_ [Inj23 AA]]]]]]]]]]].
 intros b; intros. 
   destruct (compose_meminjD_Some _ _ _ _ _ H) as [? [? [? [? [? ?]]]]].
@@ -177,6 +203,40 @@ Proof. intros. reflexivity. Qed.
 Lemma compose_sm_exportedTgt mu12 mu23 vals:
   exportedTgt (compose_sm mu12 mu23) vals = exportedTgt mu23 vals.
 Proof. intros. reflexivity. Qed.
+
+Lemma well_founded_sem_compose_ord_eq_eq: forall {D12 D23:Type}
+  (ord12: D12 -> D12 -> Prop) (ord23: D23 -> D23 -> Prop)  (C2:Type)
+  (WF12: well_founded ord12) (WF23: well_founded ord23),
+  well_founded (sem_compose_ord_eq_eq ord12 ord23 C2). 
+Proof. 
+  intros. intro. destruct a as [[d12 c2] d23].
+  revert d12. 
+  destruct c2. 
+  2: constructor; intros. 2: inv H.
+  revert c. 
+  induction d23 using (well_founded_induction WF23).
+  intros.
+  induction d12 using (well_founded_induction WF12).
+  constructor; intros. inv H1.
+  generalize (H0 d0). simpl. intros.
+  apply H1. auto.
+  generalize (H d1). 
+  intros. 
+  specialize (H1 H4). auto. 
+Qed.
+
+Lemma forall_val_inject_split: forall j1 j2 vals1 vals3 
+  (V: Forall2 (val_inject (compose_meminj j1 j2)) vals1 vals3),
+  exists vals2, Forall2 (val_inject j1) vals1 vals2
+             /\ Forall2 (val_inject j2) vals2 vals3.
+Proof. intros.
+  induction V; simpl.
+    exists nil; simpl. split; econstructor.
+  destruct IHV as [vals [Vals1 Vals2]].
+    destruct (val_inject_split _ _ _ _ H) as [z [VV1 VV2]].
+    exists (z::vals).
+    split; econstructor; eauto.
+Qed.
 
 Section Eff_sim_trans.
 Context {F1 V1 C1 F2 V2 C2 F3 V3 C3:Type}
@@ -437,7 +497,7 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
     destruct (initial_inject_split _ _ _ H1) 
        as [m2 [j1 [j2 [J [Inj12 [Inj23 [X [Y [XX YY]]]]]]]]].
     subst.
-    destruct (Forward_simulation_trans.forall_val_inject_split _ _ _ _ H2)
+    destruct (forall_val_inject_split _ _ _ _ H2)
        as [vals2 [ValsInj12 ValsInj23]].
     assert (PG1: meminj_preserves_globals g1 j1).
       clear - X Y XX YY H3 H4.

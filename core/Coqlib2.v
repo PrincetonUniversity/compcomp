@@ -1,7 +1,5 @@
-Require Export msl.Extensionality.
+Require Export core.Extensionality.
 Require Import Coqlib.
-Require Export msl.Coqlib2.
-
 
 Ltac spec H :=
   match type of H with ?a -> _ => 

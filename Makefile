@@ -15,10 +15,10 @@
 
 include Makefile.config
 
-DIRS=lib common $(ARCH)/$(VARIANT) $(ARCH) backend cfrontend driver \
+DIRS=lib common $(ARCH)/$(VARIANT) $(ARCH) backend cfrontend core driver \
   flocq/Core flocq/Prop flocq/Calc flocq/Appli exportclight
 
-RECDIRS=lib common backend cfrontend driver flocq exportclight
+RECDIRS=lib common backend cfrontend core driver flocq exportclight
 
 COQINCLUDES=$(foreach d, $(RECDIRS), -R $(d) -as compcert.$(d)) \
   -I $(ARCH)/$(VARIANT) -as compcert.$(ARCH).$(VARIANT) \
@@ -107,33 +107,22 @@ CFRONTEND=Ctypes.v Cop.v Csyntax.v Csem.v Cstrategy.v Cexec.v \
   Cshmgen.v Cshmgenproof.v \
   Csharpminor.v Cminorgen.v Cminorgenproof.v
 
-# Separate compilation modules (in sepcomp/)
+# Core separate compilation modules (in core/)
 
-SEPCOMP= \
-  Address.v step_lemmas.v Coqlib2.v extspec.v FiniteMaps.v \
-  mem_lemmas.v mem_wd.v mem_interpolants.v mem_interpolation_defs.v \
-  mem_interpolation_EE.v mem_interpolation_EI.v mem_interpolation_IE.v mem_interpolation_II.v \
-  mem_interpolation_proofs.v compiler_correctness.v \
-  core_semantics.v core_semantics_lemmas.v \
-  forward_simulations.v forward_simulations_trans.v \
-  forward_simulations_lemmas.v \
-  compiler_correctness_trans.v compiler_correctness_progless_trans.v \
-  safety_preservation.v \
-  StructuredInjections.v effect_semantics.v effect_simulations.v rg_lemmas.v \
-  effect_simulations_lemmas.v effect_corediagram_trans.v \
-  effect_properties.v effect_interpolants.v effect_simulations_trans.v \
-  effect_interpolation_II.v effect_interpolation_proofs.v \
-  arguments.v closed_safety.v compcert.v open_semantics_preservation.v \
-  reach.v \
-  trace_semantics.v \
-  arguments.v \
-  nucular_semantics.v \
+CORE=Extensionality.v base.v eq_dec.v Address.v \
+  Coqlib2.v mem_lemmas.v mem_wd.v \
+  core_semantics.v core_semantics_lemmas.v extspec.v step_lemmas.v \
+  StructuredInjections.v \
+  effect_semantics.v reach.v effect_simulations.v rg_lemmas.v \
+  effect_simulations_lemmas.v effect_properties.v effect_corediagram_trans.v \
+  effect_simulations_trans.v \
+  FiniteMaps.v mem_interpolation_defs.v mem_interpolation_II.v \
+  effect_interpolation_II.v effect_interpolants.v effect_interpolation_proofs.v \
   effect_simulationsEXP.v \
-  wholeprog_simulations.v \
-  wholeprog_lemmas.v \
-  barebones_simulations.v \
-  dep_effect_simulationsEXP.v \
-  dep_wholeprog_simulations.v 
+  arguments.v compcert.v \
+  closed_safety.v trace_semantics.v open_semantics_preservation.v \
+  nucular_semantics.v \
+  wholeprog_simulations.v wholeprog_lemmas.v barebones_simulations.v
 
 # Putting everything together (in driver/)
 
@@ -141,7 +130,7 @@ DRIVER=Compiler.v Complements.v
 
 # All source files
 
-FILES=$(LIB) $(COMMON) $(BACKEND) $(CFRONTEND) $(DRIVER) $(FLOCQ)
+FILES=$(LIB) $(COMMON) $(BACKEND) $(CFRONTEND) $(CORE:%.v=core/%.v) $(DRIVER) $(FLOCQ)
 
 # Symbolic links vs. copy
 
@@ -228,7 +217,7 @@ latexdoc:
 	@echo "COQC $*.v"
 	@$(COQC) -dump-glob doc/$(*F).glob $*.v
 
-%.v: %.vp tools/ndfun
+%.v: %.vp tools/ndfun.exe
 	@rm -f $*.v
 	@echo "Preprocessing $*.vp"
 	@tools/ndfun $*.vp > $*.v || { rm -f $*.v; exit 2; }

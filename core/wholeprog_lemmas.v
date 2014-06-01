@@ -7,14 +7,14 @@ Require Import Maps.
 Require Import Integers.
 Require Import AST.
 Require Import Globalenvs.
+Require Import Axioms.
 
-Require Import msl.Axioms.
-Require Import sepcomp.mem_lemmas. (*needed for definition of mem_forward etc*)
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.core_semantics_lemmas.
-Require Import sepcomp.wholeprog_simulations.
-Require Import sepcomp.closed_safety.
-Require Import sepcomp.effect_semantics.
+Require Import core.mem_lemmas. (*needed for definition of mem_forward etc*)
+Require Import core.core_semantics.
+Require Import core.core_semantics_lemmas.
+Require Import core.wholeprog_simulations.
+Require Import core.closed_safety.
+Require Import core.effect_semantics.
 
 Import Wholeprog_simulation.
 

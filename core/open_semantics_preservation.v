@@ -1,21 +1,21 @@
-Require Import sepcomp.compcert. Import CompcertAll.
+Require Import core.compcert. Import CompcertAll.
 
-Require Import msl.Axioms.
+Require Import Axioms.
 
-Require Import sepcomp.step_lemmas.
-Require Import sepcomp.mem_lemmas. (*needed for definition of mem_forward etc*)
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.core_semantics_lemmas.
-Require Import sepcomp.effect_semantics.
-Require Import sepcomp.trace_semantics.
-Require Import sepcomp.StructuredInjections.
-Require Import sepcomp.reach.
-Require Import sepcomp.effect_simulations.
-Require Import sepcomp.effect_properties.
-Require Import sepcomp.rg_lemmas.
-Require Import sepcomp.extspec. Import ExtSpecProperties.
-Require Import sepcomp.arguments.
-Require Import sepcomp.closed_safety.
+Require Import core.step_lemmas.
+Require Import core.mem_lemmas. (*needed for definition of mem_forward etc*)
+Require Import core.core_semantics.
+Require Import core.core_semantics_lemmas.
+Require Import core.effect_semantics.
+Require Import core.trace_semantics.
+Require Import core.StructuredInjections.
+Require Import core.reach.
+Require Import core.effect_simulations.
+Require Import core.effect_properties.
+Require Import core.rg_lemmas.
+Require Import core.extspec. Import ExtSpecProperties.
+Require Import core.arguments.
+Require Import core.closed_safety.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -143,7 +143,7 @@ Variable spec_ok :
     /\ Mem.unchanged_on (fun b ofs => 
          ~target_accessible j m tm args b ofs) tm tm'.
 
-(* copied from sepcomp.arguments -- argument declarations not activated 
+(* copied from core.arguments -- argument declarations not activated 
    otherwise for some reason *)
 Arguments core_data {F1 V1 C1 F2 V2 C2 Sem1 Sem2 ge1 ge2} _ _.
 Arguments core_ord  {F1 V1 C1 F2 V2 C2 Sem1 Sem2 ge1 ge2 entry_points} _ _ _.

@@ -7,9 +7,9 @@ Require Import Maps.
 Require Import Integers.
 Require Import AST. 
 Require Import Globalenvs.
-Require Import msl.Axioms.
+Require Import Axioms.
 
-Require Import sepcomp.mem_lemmas.
+Require Import core.mem_lemmas.
 
 (** * Core semantics *)
 

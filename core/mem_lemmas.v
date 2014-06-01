@@ -8,7 +8,7 @@ Require Import compcert.lib.Maps.
 Require Import compcert.lib.Integers.
 Require Import compcert.lib.Axioms.
 Require Import common.Globalenvs.
-Require Import msl.Extensionality.
+Require Import core.Extensionality.
 
 Lemma pos_succ_plus_assoc: forall n m,
     (Pos.succ n + m = n + Pos.succ m)%positive.

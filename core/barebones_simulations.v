@@ -1,8 +1,8 @@
-Require Import sepcomp.compcert. Import CompcertCommon.
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.core_semantics_lemmas.
+Require Import core.compcert. Import CompcertCommon.
+Require Import core.core_semantics.
+Require Import core.core_semantics_lemmas.
 
-Require Import sepcomp.mem_lemmas.
+Require Import core.mem_lemmas.
 
 (* Minimal whole program simulations *)
 

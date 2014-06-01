@@ -8,13 +8,13 @@ Require Import compcert.common.Memory.
 Require Import compcert.common.Globalenvs.
 Require Import compcert.common.Events.
 
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.core_semantics_lemmas.
-Require Import sepcomp.reach.
-Require Import sepcomp.effect_semantics.
-Require Import sepcomp.effect_simulations.
-Require Import sepcomp.extspec. 
-Require Import sepcomp.mem_lemmas.
+Require Import core.core_semantics.
+Require Import core.core_semantics_lemmas.
+Require Import core.reach.
+Require Import core.effect_semantics.
+Require Import core.effect_simulations.
+Require Import core.extspec. 
+Require Import core.mem_lemmas.
 
 Set Implicit Arguments.
 Unset Strict Implicit.

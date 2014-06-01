@@ -1,7 +1,7 @@
-Require Import sepcomp.compcert. Import CompcertLibraries.
+Require Import core.compcert. Import CompcertLibraries.
 
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.core_semantics_lemmas.
+Require Import core.core_semantics.
+Require Import core.core_semantics_lemmas.
 
 Set Implicit Arguments.
 Unset Strict Implicit.

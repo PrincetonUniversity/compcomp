@@ -2,9 +2,9 @@ Require Import Events.
 Require Import Memory.
 Require Import Coqlib.
 Require Import compcert.common.Values.
-Require Import msl.Axioms.
+Require Import Axioms.
 
-Require Import sepcomp.mem_lemmas.
+Require Import core.mem_lemmas.
 
 Lemma compose_meminjI_Some: forall j k b1 b2 d1 b3 d2
           (J:j b1 = Some(b2,d1)) (K:k b2 = Some(b3,d2)),

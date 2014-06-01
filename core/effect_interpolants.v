@@ -8,9 +8,9 @@ Require Import compcert.common.Values.
 Require Import Maps.
 Require Import Integers.
 
-Require Import sepcomp.mem_lemmas.
-Require Import sepcomp.StructuredInjections.
-Require Import sepcomp.reach.
+Require Import core.mem_lemmas.
+Require Import core.StructuredInjections.
+Require Import core.reach.
 Require Import effect_simulations.
 Require Import effect_simulations_lemmas.
 

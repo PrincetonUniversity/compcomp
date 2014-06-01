@@ -1,4 +1,4 @@
-Require Import msl.eq_dec.
+Require Import core.eq_dec.
 
 Require Import compcert.lib.Coqlib.
 Require Import compcert.common.Values.

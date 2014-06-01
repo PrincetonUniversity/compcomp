@@ -9,7 +9,7 @@ Require Import compcert.lib.Integers.
 Require Import compcert.lib.Axioms.
 Require Import common.Globalenvs.
 
-Require Import sepcomp.mem_lemmas.
+Require Import core.mem_lemmas.
 
 
 (*A value that is (if its a pointer) not dangling wrt m - a condition

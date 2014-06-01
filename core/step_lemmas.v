@@ -1,10 +1,9 @@
 Require Import AST.
 Require Import Coqlib.
 
-Require Import sepcomp.extspec.
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.core_semantics_lemmas.
-Require Import sepcomp.forward_simulations.
+Require Import core.extspec.
+Require Import core.core_semantics.
+Require Import core.core_semantics_lemmas.
 
 Section safety.
   Context {G C M D Z:Type}.
