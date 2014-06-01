@@ -1,18 +1,18 @@
-Require Import compcert.common.Events.
-Require Import compcert.common.Memory.
-Require Import compcert.lib.Coqlib.
-Require Import compcert.common.Values.
-Require Import compcert.lib.Maps.
-Require Import compcert.lib.Integers.
-Require Import compcert.common.AST.
-Require Import compcert.common.Globalenvs.
-Require Import compcert.lib.Axioms.
+Require Import Events.
+Require Import Memory.
+Require Import Coqlib.
+Require Import Values.
+Require Import Maps.
+Require Import Integers.
+Require Import AST.
+Require Import Globalenvs.
+Require Import Axioms.
 
-Require Import core.Extensionality.
-Require Import core.mem_lemmas. (*needed for definition of mem_forward etc*)
-Require Import core.core_semantics.
-Require Import core.effect_semantics.
-Require Import core.StructuredInjections.
+Require Import Extensionality.
+Require Import mem_lemmas. (*needed for definition of mem_forward etc*)
+Require Import core_semantics.
+Require Import effect_semantics.
+Require Import StructuredInjections.
 
 Definition vis mu := fun b => locBlocksSrc mu b || frgnBlocksSrc mu b.
 Definition visTgt mu := fun b => locBlocksTgt mu b || frgnBlocksTgt mu b.

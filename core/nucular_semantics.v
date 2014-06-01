@@ -1,10 +1,10 @@
-Require Import core.compcert. Import CompcertAll.
+Require Import compcert. Import CompcertAll.
 
-Require Import core.core_semantics.
-Require Import core.core_semantics_lemmas.
-Require Import core.mem_wd.
-Require Import core.mem_lemmas.
-Require Import core.reach.
+Require Import core_semantics.
+Require Import core_semantics_lemmas.
+Require Import mem_wd.
+Require Import mem_lemmas.
+Require Import reach.
 
 Set Implicit Arguments.
 Unset Strict Implicit.

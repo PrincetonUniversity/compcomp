@@ -13,10 +13,9 @@ Require Import Conventions.
 
 Require Import Linear.
 
-Require Import sepcomp.mem_lemmas. (*for mem_forward*)
+Require Import mem_lemmas. (*for mem_forward*)
 Require Import core_semantics.
-
-Require Import compcomp.val_casted.
+Require Import val_casted.
 
 (** Linear execution states. *)
 

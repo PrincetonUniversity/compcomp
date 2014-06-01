@@ -1,4 +1,4 @@
-Require Export lib.Axioms.
+Require Export Axioms.
 
 (*** NO AXIOMS AFTER THIS POINT ******************)
 

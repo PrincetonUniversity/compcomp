@@ -1,15 +1,15 @@
 Require Import Coqlib.
 Require Import AST.
 Require Import Integers.
-Require Import compcert.common.Values.
+Require Import Values.
 Require Import Memory.
 Require Export Maps.
 Require Import Events.
 Require Import Globalenvs.
 
-Require Import sepcomp.mem_lemmas. (*for mem_forward*)
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.effect_semantics.
+Require Import mem_lemmas. (*for mem_forward*)
+Require Import core_semantics.
+Require Import effect_semantics.
 
 Require Import Cop. (*for sem_cast*)
 Require Import Ctypes. (*for access_mode*)

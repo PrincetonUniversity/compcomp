@@ -6,12 +6,13 @@
 (** This library reexports portions of the Coq standard libraries used
     throughtout the proof.  It also defines some convenience tactics.
  *)
-Require Export core.Extensionality.
+
 Require Export List.
 Require Export Bool.
 Require Export Omega.
 Require Export Relations.
 
+Require Export Extensionality.
 
 Definition compose (A B C:Type) (g:B -> C) (f:A -> B) := fun x => g (f x).
 Implicit Arguments compose [A B C].

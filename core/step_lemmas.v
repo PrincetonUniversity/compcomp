@@ -1,9 +1,9 @@
 Require Import AST.
 Require Import Coqlib.
 
-Require Import core.extspec.
-Require Import core.core_semantics.
-Require Import core.core_semantics_lemmas.
+Require Import extspec.
+Require Import core_semantics.
+Require Import core_semantics_lemmas.
 
 Section safety.
   Context {G C M D Z:Type}.

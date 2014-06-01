@@ -10,17 +10,17 @@ Require Import Events.
 Require Import Smallstep.
 Require Import Op.
 Require Import Registers.
-Require Import sepcomp.Inlining.
-Require Import sepcomp.Inliningspec.
+Require Import Inlining.
+Require Import Inliningspec.
 Require Import RTL.
 
-Require Import sepcomp.mem_lemmas.
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.reach.
-Require Import sepcomp.effect_semantics.
+Require Import mem_lemmas.
+Require Import core_semantics.
+Require Import reach.
+Require Import effect_semantics.
 Require Import StructuredInjections.
 Require Import effect_simulations.
-Require Import sepcomp.effect_properties.
+Require Import effect_properties.
 Require Import effect_simulations_lemmas.
 
 
@@ -889,8 +889,8 @@ Theorem transl_program_correct:
 
 
   intros.
-  (*eapply sepcomp.effect_simulations_lemmas.inj_simulation_star_wf.*)
-  eapply sepcomp.effect_simulations_lemmas.inj_simulation_star with (match_states:= MATCH)(measure:= RTL_measure).
+  (*eapply effect_simulations_lemmas.inj_simulation_star_wf.*)
+  eapply effect_simulations_lemmas.inj_simulation_star with (match_states:= MATCH)(measure:= RTL_measure).
 
   Lemma environment_equality: (exists m0:mem, Genv.init_mem SrcProg = Some m0) -> 
                                      genvs_domain_eq ge tge.

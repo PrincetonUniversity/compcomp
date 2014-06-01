@@ -2,18 +2,18 @@ Require Import Events. (*is needed for some definitions (loc_unmapped etc*)
 Require Import Memory.
 Require Import Coqlib.
 Require Import Integers.
-Require Import compcert.common.Values.
+Require Import Values.
 Require Import Maps.
 Require Import Axioms.
 
-Require Import core.StructuredInjections.
-Require Import core.reach.
+Require Import StructuredInjections.
+Require Import reach.
 Require Import effect_simulations.
 Require Import effect_simulations_lemmas.
-Require Import core.mem_lemmas.
-Require Import core.mem_interpolation_defs.
-Require Import core.mem_interpolation_II.
-Require Import core.FiniteMaps.
+Require Import mem_lemmas.
+Require Import mem_interpolation_defs.
+Require Import mem_interpolation_II.
+Require Import FiniteMaps.
 
 
 (*Inserts the new injection entries into extern component, but not into foreign*)

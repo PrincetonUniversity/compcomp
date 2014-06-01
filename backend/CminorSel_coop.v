@@ -1,7 +1,7 @@
 Require Import Coqlib.
 Require Import AST.
 Require Import Integers.
-Require Import compcert.common.Values.
+Require Import Values.
 Require Import Memory.
 Require Import Events.
 Require Import Globalenvs.
@@ -11,10 +11,9 @@ Require Import Switch.
 
 Require Import CminorSel. 
 
-Require Import sepcomp.mem_lemmas. (*for mem_forward*)
-Require Import sepcomp.core_semantics.
-
-Require Import compcomp.val_casted.
+Require Import mem_lemmas. (*for mem_forward*)
+Require Import core_semantics.
+Require Import val_casted.
 
 Inductive CMinSel_core: Type :=
   | CMinSel_State:                      (**r execution within a function *)

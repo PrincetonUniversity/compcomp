@@ -3,11 +3,11 @@ Require Import Events. (*needed for standard definitions of
 Require Import Memory.
 Require Import Coqlib.
 Require Import Integers.
-Require Import compcert.common.Values.
+Require Import Values.
 Require Import Maps.
 Require Import Axioms.
 
-Require Import core.mem_lemmas.
+Require Import mem_lemmas.
 
 Goal forall m b ofs p (H: ~ Mem.perm m b ofs p Nonempty), PMap.get b (Mem.mem_access m) ofs p = None.
 intros. unfold Mem.perm in *.

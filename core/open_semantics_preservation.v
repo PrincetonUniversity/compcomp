@@ -1,21 +1,21 @@
-Require Import core.compcert. Import CompcertAll.
+Require Import compcert. Import CompcertAll.
 
 Require Import Axioms.
 
-Require Import core.step_lemmas.
-Require Import core.mem_lemmas. (*needed for definition of mem_forward etc*)
-Require Import core.core_semantics.
-Require Import core.core_semantics_lemmas.
-Require Import core.effect_semantics.
-Require Import core.trace_semantics.
-Require Import core.StructuredInjections.
-Require Import core.reach.
-Require Import core.effect_simulations.
-Require Import core.effect_properties.
-Require Import core.rg_lemmas.
-Require Import core.extspec. Import ExtSpecProperties.
-Require Import core.arguments.
-Require Import core.closed_safety.
+Require Import step_lemmas.
+Require Import mem_lemmas. (*needed for definition of mem_forward etc*)
+Require Import core_semantics.
+Require Import core_semantics_lemmas.
+Require Import effect_semantics.
+Require Import trace_semantics.
+Require Import StructuredInjections.
+Require Import reach.
+Require Import effect_simulations.
+Require Import effect_properties.
+Require Import rg_lemmas.
+Require Import extspec. Import ExtSpecProperties.
+Require Import arguments.
+Require Import closed_safety.
 
 Set Implicit Arguments.
 Unset Strict Implicit.

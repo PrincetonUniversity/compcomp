@@ -1,7 +1,7 @@
-Require Import core.core_semantics.
-Require Import core.StructuredInjections.
-Require Import core.effect_simulationsEXP.
-Require Import core.mem_lemmas.
+Require Import core_semantics.
+Require Import StructuredInjections.
+Require Import effect_simulationsEXP.
+Require Import mem_lemmas.
 
 Import SM_simulation.
 

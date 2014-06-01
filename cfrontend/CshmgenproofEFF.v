@@ -22,14 +22,14 @@ Require Import Clight_eff.
 Require Import Csharpminor_coop.
 Require Import Csharpminor_eff.
 
-Require Import sepcomp.mem_lemmas.
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.core_semantics_lemmas.
-Require Import sepcomp.effect_semantics.
+Require Import mem_lemmas.
+Require Import core_semantics.
+Require Import core_semantics_lemmas.
+Require Import effect_semantics.
 Require Import StructuredInjections.
 Require Import reach.
 Require Import effect_simulations.
-Require Import sepcomp.effect_properties.
+Require Import effect_properties.
 Require Import effect_simulations_lemmas.
 
 Require Import BuiltinEffects.
@@ -2267,33 +2267,55 @@ exists c2,
        (REACH m1 (fun b : block => isGlobalBlock ge b || getBlocks vals1 b))
        (REACH m2 (fun b : block => isGlobalBlock tge b || getBlocks vals2 b))
        j) c1 m1 c2 m2.
-Proof. intros. 
-  inversion Ini.
-  unfold  CL_initial_core in H0. unfold ge in *. unfold tge in *.
-  destruct v1; inv H0.
-  remember (Int.eq_dec i Int.zero) as z; destruct z; inv H1. clear Heqz.
-  remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz; inv H0. 
+Proof. 
+intros.
+  simpl in Ini.
+  unfold  CL_initial_core in Ini. unfold ge in *. unfold tge in *.
+  destruct v1; inv Ini.
+  remember (Int.eq_dec i Int.zero) as z; destruct z; inv H0. clear Heqz.
+  remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz.
     apply eq_sym in Heqzz.
-  remember (type_of_fundef f) as tof. destruct tof; try discriminate.
-  remember (val_casted.val_casted_list_func vals1 t) as cst.
-  remember (tys_nonvoid t) as tnv.
-  destruct cst; destruct tnv; try inv H1.
-  clear Ini. 
-  exploit function_ptr_translated; eauto. intros [tf [FP TF]].
-  exists (CSharpMin_Callstate tf vals2 Kstop).
-  split. 
-    destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
-    subst. inv A. rewrite C in Heqzz. inv Heqzz.
-    unfold tge in FP. rewrite D in FP. inv FP.
-    unfold csharpmin_eff_sem, csharpmin_coop_sem. simpl.
-    case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
-    solve[rewrite D; auto].
+  destruct f; try discriminate.
+  remember (type_of_fundef (Internal f)) as tf.
+  destruct tf; try solve[inv H1].
+  case_eq (val_casted.val_casted_list_func vals1 t).
+  2: solve[intros cast; rewrite cast in H1; inv H1].
+  intros cast. case_eq (val_casted.vals_defined vals1).
+  2: solve[intros def; rewrite cast, def, andb_comm in H1; inv H1].
+  intros def; rewrite cast,def in H1. simpl in H1. 
+  rewrite andb_comm in H1; simpl in H1.
+  case_eq (val_casted.tys_nonvoid t). 
+  2: solve[intros nvoid; rewrite nvoid in H1; inv H1].
+  intros nvoid; rewrite nvoid in H1. inv H1.
+  exploit function_ptr_translated; eauto. intros [tf' [FIND TR]].
+  exists (CSharpMin_Callstate tf' vals2 Kstop).
+  split.
+  simpl. 
+  destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
+  subst. inv A. rewrite C in Heqzz. inv Heqzz. 
+  unfold tge in FIND. rewrite D in FIND. inv FIND.
+  unfold CSharpMin_initial_core. 
+  case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
+  rewrite D.
 
-    intros CONTRA.
-    solve[elimtype False; auto].
-  assert (exists targs tres, type_of_fundef f = Tfunction targs tres).
-         destruct f; simpl. eexists; eexists. reflexivity.
-         eexists; eexists. reflexivity.
+  assert (val_casted.val_has_type_list_func vals2
+           (sig_args (funsig tf'))=true) as ->.
+  { eapply val_casted.val_list_inject_hastype; eauto.
+    eapply forall_inject_val_list_inject; eauto.
+    eapply transl_fundef_sig2 in TR; eauto.
+    rewrite TR. simpl. 
+    admit. (*TODO GS*) }
+  assert (val_casted.vals_defined vals2=true) as ->.
+  { eapply val_casted.val_list_inject_defined.
+    eapply forall_inject_val_list_inject; eauto.
+    destruct (val_casted.vals_defined vals1); auto. }
+  monadInv TR. rename x into tf'. solve[simpl; auto].
+
+  intros CONTRA.
+  solve[elimtype False; auto].
+
+  assert (H : exists targs tres, type_of_fundef (Internal f) = Tfunction targs tres).
+  { destruct f; simpl. eexists; eexists. reflexivity. }
   destruct H as [targs [tres Tfun]].
   destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
      VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
@@ -2322,6 +2344,7 @@ Proof. intros.
           apply orb_true_iff. left. apply genv2blocksBool_char1.
             simpl. exists id; eassumption.
     rewrite initial_SM_as_inj; assumption.
+  inv H1.
 Qed.
 
 Lemma MATCH_afterExternal: forall
@@ -4232,7 +4255,7 @@ assert (GDE: genvs_domain_eq ge tge).
      rewrite symbols_preserved in Hid.
        exists id; trivial.
     apply varinfo_preserved. 
- eapply sepcomp.effect_simulations_lemmas.inj_simulation_plus with
+ eapply effect_simulations_lemmas.inj_simulation_plus with
   (match_states:=MATCH) (measure:=fun x => O).
 (*genvs_dom_eq*)
   assumption.

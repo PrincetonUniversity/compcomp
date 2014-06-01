@@ -34,14 +34,14 @@ Require Import LTL.
 Require Import Linear.
 Require Import Linearize.
 
-Require Import sepcomp.mem_lemmas.
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.core_semantics_lemmas.
-Require Import sepcomp.reach.
-Require Import sepcomp.effect_semantics.
+Require Import mem_lemmas.
+Require Import core_semantics.
+Require Import core_semantics_lemmas.
+Require Import reach.
+Require Import effect_semantics.
 Require Import StructuredInjections.
 Require Import effect_simulations.
-Require Import sepcomp.effect_properties.
+Require Import effect_properties.
 Require Import effect_simulations_lemmas.
 
 Require Export Axioms.
@@ -2863,7 +2863,7 @@ SM_simulation.SM_simulation_inject LTL_eff_sem
 Proof.
 intros.
 assert (GDE:= GDE_lemma). 
- eapply sepcomp.effect_simulations_lemmas.inj_simulation_plus with
+ eapply effect_simulations_lemmas.inj_simulation_plus with
   (match_states:=fun x mu st m st' m' => MATCH mu st m st' m')
   (measure:=measure).
 (*genvs_dom_eq*)

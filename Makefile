@@ -76,11 +76,14 @@ COMMON=Errors.v AST.v Events.v Globalenvs.v Memdata.v Memtype.v Memory.v \
 # Back-end modules (in backend/, $(ARCH)/, $(ARCH)/$(VARIANT))
 
 BACKEND=\
-  Cminor.v Op.v CminorSel.v \
+  Cminor.v Cminor_coop.v Cminor_eff.v \
+  Op.v OpEFF.v \
+  CminorSel.v CminorSel_coop.v CminorSel_eff.v \
   SelectOp.v SelectDiv.v SelectLong.v Selection.v \
-  SelectOpproof.v SelectDivproof.v SelectLongproof.v Selectionproof.v \
-  Registers.v RTL.v \
-  RTLgen.v RTLgenspec.v RTLgenproof.v \
+  SelectOpproof.v SelectDivproof.v SelectLongproof.v \
+  Selectionproof.v SelectionproofEFF.v \
+  Registers.v RTL.v RTL_coop.v RTL_eff.v \
+  RTLgen.v RTLgenspec.v RTLgenproof.v RTLgenproofEFF.v \
   Tailcall.v Tailcallproof.v \
   Inlining.v Inliningspec.v Inliningproof.v \
   Renumber.v Renumberproof.v \
@@ -88,24 +91,30 @@ BACKEND=\
   Kildall.v Liveness.v \
   ConstpropOp.v Constprop.v ConstpropOpproof.v Constpropproof.v \
   CombineOp.v CSE.v CombineOpproof.v CSEproof.v \
-  Machregs.v Locations.v Conventions1.v Conventions.v LTL.v \
-  Allocation.v Allocproof.v \
+  Machregs.v Locations.v Conventions1.v Conventions.v \
+  LTL.v LTL_coop.v LTL_eff.v \
+  Allocation.v Allocproof.v AllocproofEFF.v \
   Tunneling.v Tunnelingproof.v \
-  Linear.v Lineartyping.v \
-  Linearize.v Linearizeproof.v \
+  Linear.v Linear_coop.v Linear_eff.v Lineartyping.v \
+  Linearize.v Linearizeproof.v LinearizeproofEFF.v \
   CleanupLabels.v CleanupLabelsproof.v \
-  Mach.v \
-  Bounds.v Stacklayout.v Stacking.v Stackingproof.v \
-  Asm.v Asmgen.v Asmgenproof0.v Asmgenproof1.v Asmgenproof.v
+  Mach.v Mach_coop.v Mach_eff.v \
+  Bounds.v Stacklayout.v Stacking.v Stackingproof.v StackingproofEFF.v \
+  Asm.v Asm_coop.v Asm_eff.v \
+  Asmgen.v Asmgenproof0.v Asmgenproof1.v Asmgenproof.v \
+  Asmgenproof0EFF.v Asmgenproof1EFF.v AsmgenproofEFF.v
 
 # C front-end modules (in cfrontend/)
 
 CFRONTEND=Ctypes.v Cop.v Csyntax.v Csem.v Cstrategy.v Cexec.v \
   Initializers.v Initializersproof.v \
   SimplExpr.v SimplExprspec.v SimplExprproof.v \
-  Clight.v ClightBigstep.v SimplLocals.v SimplLocalsproof.v \
-  Cshmgen.v Cshmgenproof.v \
-  Csharpminor.v Cminorgen.v Cminorgenproof.v
+  Clight.v Clight_coop.v Clight_eff.v ClightBigstep.v \
+  SimplLocals.v SimplLocalsproof.v SimplLocalsproofEFF.v \
+  Cshmgen.v Cshmgenproof.v CshmgenproofEFF.v \
+  Csharpminor.v Csharpminor_coop.v Csharpminor_eff.v \
+  Cminorgen.v Cminorgenproof.v \
+  CminorgenproofRestructured.v CminorgenproofSIM.v CminorgenproofEFF.v
 
 # Core separate compilation modules (in core/)
 
@@ -122,7 +131,8 @@ CORE=Extensionality.v base.v eq_dec.v Address.v \
   arguments.v compcert.v \
   closed_safety.v trace_semantics.v open_semantics_preservation.v \
   nucular_semantics.v \
-  wholeprog_simulations.v wholeprog_lemmas.v barebones_simulations.v
+  wholeprog_simulations.v wholeprog_lemmas.v barebones_simulations.v \
+  val_casted.v 
 
 # Putting everything together (in driver/)
 
@@ -130,7 +140,7 @@ DRIVER=Compiler.v Complements.v
 
 # All source files
 
-FILES=$(LIB) $(COMMON) $(BACKEND) $(CFRONTEND) $(CORE:%.v=core/%.v) $(DRIVER) $(FLOCQ)
+FILES=$(LIB) $(COMMON) $(BACKEND) $(CFRONTEND) $(CORE) $(DRIVER) $(FLOCQ)
 
 # Symbolic links vs. copy
 

@@ -14,9 +14,9 @@ Require Import Conventions.
 
 Require Import Asm. 
 
-Require Import sepcomp.mem_lemmas. (*for mem_forward*)
-Require Import sepcomp.core_semantics.
-Require Import compcomp.val_casted.
+Require Import mem_lemmas. (*for mem_forward*)
+Require Import core_semantics.
+Require Import val_casted.
 
 Notation SP := ESP (only parsing).
 

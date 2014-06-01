@@ -3,6 +3,8 @@
 */*/*.vo
 */*~
 */*/*~
+*/#*#
+*/*/#*#
 extraction/*.ml
 extraction/*.mli
 extraction/STAMP

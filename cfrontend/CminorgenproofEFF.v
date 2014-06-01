@@ -1,6 +1,6 @@
 (*First, construct the two effect semantics*)
 Require Import Coqlib.
-Require Import compcert.common.Values.
+Require Import Values.
 Require Import Memory.
 Require Export Axioms.
 Require Import Errors.
@@ -13,14 +13,14 @@ Require Import Csharpminor.
 Require Import Cminor.
 Require Import Cminorgen.
 
-Require Import sepcomp.mem_lemmas.
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.core_semantics_lemmas.
-Require Import sepcomp.effect_semantics.
+Require Import mem_lemmas.
+Require Import core_semantics.
+Require Import core_semantics_lemmas.
+Require Import effect_semantics.
 Require Import StructuredInjections.
-Require Import sepcomp.reach.
+Require Import reach.
 Require Import effect_simulations.
-Require Import sepcomp.effect_properties.
+Require Import effect_properties.
 Require Import effect_simulations_lemmas.
 
 Require Import Cminor_coop.
@@ -29,9 +29,9 @@ Require Import Csharpminor_coop.
 Require Import Csharpminor_eff.
 
 Require Import CminorgenproofRestructured.
+Require Import CminorgenproofSIM.
 
 Require Import Coq.Program.Equality.
-Require Import CminorgenproofSIM.
 Require Import BuiltinEffects.
 
 Section TRANSLATION.
@@ -40,6 +40,40 @@ Variable tprog: Cminor.program.
 Hypothesis TRANSL: transl_program prog = OK tprog.
 Let ge : Csharpminor.genv := Genv.globalenv prog.
 Let tge: genv := Genv.globalenv tprog.
+
+Lemma valid_init_is_global :
+  forall (R: list_norepet (map fst (prog_defs prog)))
+  m (G: Genv.init_mem prog = Some m)  
+  b (VB: Mem.valid_block m b), 
+  exists id, Genv.find_symbol (Genv.globalenv prog) id = Some b.
+Proof. intros.
+  unfold Genv.init_mem, Genv.globalenv in G. simpl in *.
+  destruct (add_globals_find_symbol _ R (@Genv.empty_genv _ _ ) _ _ G (eq_refl _) _ VB)
+    as [VBEmpty | X]; trivial.
+  exfalso. clear - VBEmpty. unfold Mem.valid_block in VBEmpty.
+    rewrite Mem.nextblock_empty in VBEmpty. xomega.
+Qed.
+    
+Lemma match_globalenvs_init':
+  forall (R: list_norepet (map fst (prog_defs prog)))
+  m j,
+  Genv.init_mem prog = Some m ->
+  meminj_preserves_globals ge j ->
+  match_globalenvs prog j (Mem.nextblock m).
+Proof.
+  intros. 
+  destruct H0 as [A [B C]].
+  constructor. 
+  intros b D. intros [[id E]|[[gv E]|[fptr E]]]; eauto.
+  cut (exists id, Genv.find_symbol (Genv.globalenv prog) id = Some b).
+  intros [id ID].
+  solve[eapply A; eauto].
+  eapply valid_init_is_global; eauto.
+  intros. symmetry. solve[eapply (C _ _ _ _ H0); eauto].
+  intros. eapply Genv.find_symbol_not_fresh; eauto.
+  intros. eapply Genv.find_funct_ptr_not_fresh ; eauto.
+  intros. eapply Genv.find_var_info_not_fresh; eauto. 
+Qed.
 
 Lemma GDE_lemma: genvs_domain_eq ge tge.
 Proof.
@@ -859,11 +893,11 @@ Proof. intros.
       unfold transl_program in TRANSL.
       solve[eapply Genv.init_mem_transf_partial in TRANSL; eauto].
       apply st_mcs_nil with (Mem.nextblock m0).
-    eapply (match_globalenvs_init' _ R _ _ INIT_MEM).
+    eapply (match_globalenvs_init' R _ _ INIT_MEM).
       rewrite initial_SM_as_inj.
       eapply restrict_preserves_globals; try eassumption.
       unfold vis, initial_SM; simpl; intros.
-      solve[apply REACH_nil; rewrite H0; auto].
+      apply REACH_nil. unfold ge in H0. solve[rewrite H0; auto].
     apply A. apply B.
     econstructor. simpl. trivial.
       rewrite initial_SM_as_inj.
@@ -2217,7 +2251,7 @@ Proof. intros.
      eapply val_inject_restrictD; try eassumption. 
   intros [tm' [tv' [EXEC [STORE' MINJ']]]].
   eexists. eexists. exists mu.
-  split. apply corestep_plus_one.  eapply EXEC.
+  split. apply corestep_plus_one. simpl. eapply EXEC.
   assert (SMV': sm_valid mu m' tm').
     destruct PRE as [_ [_ [_ [SMV _]]]].
     split; intros. 
@@ -4484,7 +4518,7 @@ SM_simulation.SM_simulation_inject csharpmin_eff_sem
 Proof.
 intros.
 assert (GDE:= GDE_lemma).
- eapply sepcomp.effect_simulations_lemmas.inj_simulation_star with
+ eapply effect_simulations_lemmas.inj_simulation_star with
   (match_states:=MATCH) (measure:=MC_measure).
 (*genvs_dom_eq*)
   apply GDE.

@@ -13,10 +13,9 @@ Require Import Conventions.
 
 Require Import LTL. 
 
-Require Import sepcomp.mem_lemmas. (*for mem_forward*)
-Require Import sepcomp.core_semantics.
-
-Require Import compcomp.val_casted.
+Require Import mem_lemmas. (*for mem_forward*)
+Require Import core_semantics.
+Require Import val_casted.
 
 Inductive LTL_core : Type :=
   | LTL_State:

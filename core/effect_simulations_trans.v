@@ -1,19 +1,19 @@
 Require Import Events.
 Require Import Memory.
 Require Import Coqlib.
-Require Import compcert.common.Values.
+Require Import Values.
 Require Import Maps.
 Require Import Integers.
 Require Import AST.
 Require Import Globalenvs.
 Require Import Axioms.
 
-Require Import core.mem_lemmas. (*needed for definition of mem_forward etc*)
-Require Import core.core_semantics.
-Require Import core.core_semantics_lemmas.
+Require Import mem_lemmas. (*needed for definition of mem_forward etc*)
+Require Import core_semantics.
+Require Import core_semantics_lemmas.
 
-Require Import core.StructuredInjections.
-Require Import core.reach.
+Require Import StructuredInjections.
+Require Import reach.
 Require Import effect_semantics.
 Require Import effect_simulations.
 Require Import effect_simulations_lemmas.

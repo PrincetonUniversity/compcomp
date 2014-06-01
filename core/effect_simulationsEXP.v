@@ -1,22 +1,20 @@
 Require Import Bool.
 
-Require Import compcert.common.Events.
-Require Import compcert.common.Memory.
-Require Import compcert.lib.Coqlib.
-Require Import compcert.common.Values.
-Require Import compcert.lib.Maps.
-Require Import compcert.lib.Integers.
-Require Import compcert.common.AST.
+Require Import Events.
+Require Import Memory.
+Require Import Coqlib.
+Require Import Values.
+Require Import Maps.
+Require Import Integers.
+Require Import AST.
+Require Import Globalenvs.
+Require Import Axioms.
 
-Require Import compcert.common.Globalenvs.
-
-Require Import compcert.lib.Axioms.
-
-Require Import core.mem_lemmas. (*needed for definition of mem_forward etc*)
-Require Import core.core_semantics.
-Require Import core.effect_semantics.
-Require Import core.StructuredInjections.
-Require Import core.reach.
+Require Import mem_lemmas. (*needed for definition of mem_forward etc*)
+Require Import core_semantics.
+Require Import effect_semantics.
+Require Import StructuredInjections.
+Require Import reach.
 
 Module SM_simulation. Section SharedMemory_simulation_inject. 
 

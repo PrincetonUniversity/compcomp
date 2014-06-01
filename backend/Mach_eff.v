@@ -1,7 +1,7 @@
 Require Import Coqlib.
 Require Import AST.
 Require Import Integers.
-Require Import compcert.common.Values.
+Require Import Values.
 Require Import Memory.
 Require Export Maps.
 Require Import Events.
@@ -16,9 +16,9 @@ Require Stacklayout.
 Require Import Mach. 
 Require Import Mach_coop. 
 
-Require Import sepcomp.mem_lemmas. (*for mem_forward*)
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.effect_semantics.
+Require Import mem_lemmas. (*for mem_forward*)
+Require Import core_semantics.
+Require Import effect_semantics.
 Require Import BuiltinEffects.
 
 Notation "a ## b" := (List.map a b) (at level 1).

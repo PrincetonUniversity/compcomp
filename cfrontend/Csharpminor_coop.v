@@ -1,7 +1,7 @@
 Require Import Coqlib.
 Require Import AST.
 Require Import Integers.
-Require Import compcert.common.Values.
+Require Import Values.
 Require Import Memory.
 Require Import Events.
 Require Import Globalenvs.
@@ -12,10 +12,9 @@ Require Import Cminor_coop.
 
 Require Import Csharpminor.
 
-Require Import sepcomp.mem_lemmas. (*for mem_forward*)
-Require Import sepcomp.core_semantics.
-
-Require Import compcomp.val_casted.
+Require Import mem_lemmas. (*for mem_forward*)
+Require Import core_semantics.
+Require Import val_casted.
 
 (*Obtained from Cminor.state by deleting the memory components.*)
 Inductive CSharpMin_core: Type :=

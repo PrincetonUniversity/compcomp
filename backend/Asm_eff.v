@@ -1,7 +1,7 @@
 Require Import Coqlib.
 Require Import AST.
 Require Import Integers.
-Require Import compcert.common.Values.
+Require Import Values.
 Require Import Memory.
 Require Export Maps.
 Require Import Events.
@@ -14,9 +14,9 @@ Require Import Conventions.
 Require Import Asm. 
 Require Import Asm_coop. 
 
-Require Import sepcomp.mem_lemmas. (*for mem_forward*)
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.effect_semantics.
+Require Import mem_lemmas. (*for mem_forward*)
+Require Import core_semantics.
+Require Import effect_semantics.
 Require Import BuiltinEffects.
 
 Notation SP := ESP (only parsing).

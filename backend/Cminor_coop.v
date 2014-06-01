@@ -1,7 +1,7 @@
 Require Import Coqlib.
 Require Import AST.
 Require Import Integers.
-Require Import compcert.common.Values.
+Require Import Values.
 Require Import Memory.
 Require Import Events.
 Require Import Maps.
@@ -10,10 +10,9 @@ Require Import Globalenvs.
 
 Require Import Cminor.
 
-Require Import sepcomp.mem_lemmas. (*for mem_forward and wd_mem*)
-Require Import sepcomp.core_semantics.
-
-Require Import compcomp.val_casted.
+Require Import mem_lemmas. (*for mem_forward and wd_mem*)
+Require Import core_semantics.
+Require Import val_casted.
 
 (*Obtained from Cminor.state by deleting the memory components.*)
 Inductive CMin_core: Type :=

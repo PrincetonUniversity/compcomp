@@ -23,14 +23,14 @@ Require Import SelectOpproof.
 Require Import SelectDivproof.
 Require Import SelectLongproof.
 
-Require Import sepcomp.mem_lemmas.
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.core_semantics_lemmas.
-Require Import sepcomp.effect_semantics.
+Require Import mem_lemmas.
+Require Import core_semantics.
+Require Import core_semantics_lemmas.
+Require Import effect_semantics.
 Require Import StructuredInjections.
-Require Import sepcomp.reach.
+Require Import reach.
 Require Import effect_simulations.
-Require Import sepcomp.effect_properties.
+Require Import effect_properties.
 Require Import effect_simulations_lemmas.
 
 Require Import BuiltinEffects.
@@ -40,7 +40,7 @@ Require Import CminorSel_coop.
 Require Import CminorSel_eff.
 Require Import Floats.
 
-(*Require Import sepcomp.Selectionproof.*)
+(*Require Import Selectionproof.*)
 
 Open Local Scope cminorsel_scope.
 
@@ -3047,7 +3047,7 @@ assert (GDE: genvs_domain_eq ge tge).
      rewrite symbols_preserved in Hid.
        exists id; trivial.
     rewrite varinfo_preserved. split; intros; trivial.
- eapply sepcomp.effect_simulations_lemmas.inj_simulation_star with
+ eapply effect_simulations_lemmas.inj_simulation_star with
   (match_states:=MATCH) (measure:=measure).
 (*genvs_dom_eq*)
   assumption.

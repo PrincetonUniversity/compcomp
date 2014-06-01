@@ -13,10 +13,10 @@ Require Import Ctypes.
 Require Import Cop.
 
 Require Import Clight. 
-Require Import sepcomp.mem_lemmas. (*for mem_forward*)
-Require Import sepcomp.core_semantics.
+Require Import mem_lemmas. (*for mem_forward*)
+Require Import core_semantics.
 
-Require Import compcomp.val_casted.
+Require Import val_casted.
 
 Inductive CL_core: Type :=
   | CL_State

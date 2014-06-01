@@ -35,15 +35,14 @@ Require Import Conventions.
 Require Import Stacklayout.
 Require Import Stacking.
 
-
-Require Import sepcomp.mem_lemmas.
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.core_semantics_lemmas.
-Require Import sepcomp.effect_semantics.
+Require Import mem_lemmas.
+Require Import core_semantics.
+Require Import core_semantics_lemmas.
+Require Import effect_semantics.
 Require Import StructuredInjections.
 Require Import reach.
 Require Import effect_simulations.
-Require Import sepcomp.effect_properties.
+Require Import effect_properties.
 Require Import effect_simulations_lemmas.
 
 Require Import Linear_coop.
@@ -6312,7 +6311,7 @@ SM_simulation.SM_simulation_inject Linear_eff_sem
 Proof.
 intros.
 assert (GDE:= GDE_lemma). 
- eapply sepcomp.effect_simulations_lemmas.inj_simulation_plus with
+ eapply effect_simulations_lemmas.inj_simulation_plus with
   (match_states:=MATCH) (measure:=fun x => O).
 (*genvs_dom_eq*)
   assumption.

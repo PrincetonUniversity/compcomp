@@ -138,8 +138,8 @@ Inductive RTL_corestep (ge:genv): RTL_core -> mem -> RTL_core -> mem -> Prop :=
         (RTL_State s f sp pc (rs#res <- vres)) m.
 End RELSEM.
 
-Require Import sepcomp.core_semantics.
-Require Import compcomp.val_casted.
+Require Import core_semantics.
+Require Import val_casted.
 
 (* New initial state *)
 Definition RTL_initial_core (ge: genv) (v:val)(args: list val): option RTL_core:=
@@ -231,7 +231,7 @@ Defined.
 
 (************************NOW SHOW THAT WE ALSO HAVE A COOPSEM******)
 
-Require Import sepcomp.mem_lemmas. (*for mem_forward*)
+Require Import mem_lemmas. (*for mem_forward*)
 
 Lemma rtl_coop_forward : forall g c m c' m' (CS: RTL_corestep g c m c' m'), 
       mem_forward m m'.

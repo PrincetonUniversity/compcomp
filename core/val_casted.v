@@ -16,16 +16,16 @@ Require Import Smallstep.
 Require Import Ctypes.
 Require Import Cop.
 Require Import Clight.
-Require Import compcomp.SimplLocals.
+Require Import SimplLocals.
 
-Require Import sepcomp.mem_lemmas.
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.core_semantics_lemmas.
-Require Import sepcomp.reach.
-Require Import sepcomp.effect_semantics.
+Require Import mem_lemmas.
+Require Import core_semantics.
+Require Import core_semantics_lemmas.
+Require Import reach.
+Require Import effect_semantics.
 Require Import StructuredInjections.
 Require Import effect_simulations.
-Require Import sepcomp.effect_properties.
+Require Import effect_properties.
 Require Import effect_simulations_lemmas.
 
 Require Export Axioms.

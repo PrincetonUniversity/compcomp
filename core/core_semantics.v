@@ -2,14 +2,14 @@
 Require Import Events.
 Require Import Memory.
 Require Import Coqlib.
-Require Import compcert.common.Values.
+Require Import Values.
 Require Import Maps.
 Require Import Integers.
 Require Import AST. 
 Require Import Globalenvs.
 Require Import Axioms.
 
-Require Import core.mem_lemmas.
+Require Import mem_lemmas.
 
 (** * Core semantics *)
 

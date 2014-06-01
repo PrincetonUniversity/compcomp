@@ -30,14 +30,14 @@ Require Import RTL.
 Require Import RTLgen.
 Require Import RTLgenspec.
 
-Require Import sepcomp.mem_lemmas.
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.core_semantics_lemmas.
-Require Import sepcomp.effect_semantics.
+Require Import mem_lemmas.
+Require Import core_semantics.
+Require Import core_semantics_lemmas.
+Require Import effect_semantics.
 Require Import StructuredInjections.
-Require Import sepcomp.reach.
+Require Import reach.
 Require Import effect_simulations.
-Require Import sepcomp.effect_properties.
+Require Import effect_properties.
 Require Import effect_simulations_lemmas.
 
 Require Export Axioms.
@@ -4313,7 +4313,7 @@ assert (GDE: genvs_domain_eq ge tge).
      rewrite symbols_preserved in Hid.
        exists id; trivial.
     rewrite varinfo_preserved. intuition. 
- apply sepcomp.effect_simulations_lemmas.inj_simulation_star_wf with
+ apply effect_simulations_lemmas.inj_simulation_star_wf with
   (match_states:=MATCH) (order :=lt_state).
 (*genvs_dom_eq*)
   assumption.

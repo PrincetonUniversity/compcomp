@@ -1,14 +1,15 @@
 (*CompCert imports*)
-Require Import compcert.common.AST.
-Require Import compcert.common.Events.
-Require Import compcert.common.Memory.
-Require Import compcert.lib.Coqlib.
-Require Import compcert.common.Values.
-Require Import compcert.lib.Maps.
-Require Import compcert.lib.Integers.
-Require Import compcert.lib.Axioms.
-Require Import common.Globalenvs.
-Require Import core.Extensionality.
+Require Import AST.
+Require Import Events.
+Require Import Memory.
+Require Import Coqlib.
+Require Import Values.
+Require Import Maps.
+Require Import Integers.
+Require Import Axioms.
+Require Import Globalenvs.
+
+Require Import Extensionality.
 
 Lemma pos_succ_plus_assoc: forall n m,
     (Pos.succ n + m = n + Pos.succ m)%positive.
