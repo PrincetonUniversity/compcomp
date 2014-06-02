@@ -5,6 +5,9 @@
 */*/*~
 */#*#
 */*/#*#
+runtime/*.o
+runtime/*.a
+tools/ndfun
 extraction/*.ml
 extraction/*.mli
 extraction/STAMP
