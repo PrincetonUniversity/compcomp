@@ -18,6 +18,5 @@ tools/*.exe
 tools/*.o
 ccomp
 _build
-.depend
 Makefile.config
 driver/Configuration.ml
