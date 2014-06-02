@@ -17,8 +17,4 @@ ccomp
 _build
 .depend
 Makefile.config
-ia32/ConstpropOp.v
-ia32/SelectOp.v
-backend/SelectDiv.v
-backend/SelectLong.v
 driver/Configuration.ml

@@ -227,7 +227,7 @@ latexdoc:
 	@echo "COQC $*.v"
 	@$(COQC) -dump-glob doc/$(*F).glob $*.v
 
-%.v: %.vp tools/ndfun.exe
+%.v: %.vp tools/ndfun
 	@rm -f $*.v
 	@echo "Preprocessing $*.vp"
 	@tools/ndfun $*.vp > $*.v || { rm -f $*.v; exit 2; }
