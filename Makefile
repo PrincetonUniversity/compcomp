@@ -84,9 +84,10 @@ BACKEND=\
   Selectionproof.v SelectionproofEFF.v \
   Registers.v RTL.v RTL_coop.v RTL_eff.v \
   RTLgen.v RTLgenspec.v RTLgenproof.v RTLgenproofEFF.v \
-  Tailcall.v Tailcallproof.v \
+  RTL2RTL_proofEFF.v \
+  Tailcall.v Tailcallproof.v  TailcallproofEFF.v \
   Inlining.v Inliningspec.v Inliningproof.v \
-  Renumber.v Renumberproof.v \
+  Renumber.v Renumberproof.v RenumberproofEFF.v \
   RTLtyping.v \
   Kildall.v Liveness.v \
   ConstpropOp.v Constprop.v ConstpropOpproof.v Constpropproof.v \
@@ -94,10 +95,10 @@ BACKEND=\
   Machregs.v Locations.v Conventions1.v Conventions.v \
   LTL.v LTL_coop.v LTL_eff.v \
   Allocation.v Allocproof.v AllocproofEFF.v \
-  Tunneling.v Tunnelingproof.v \
+  Tunneling.v Tunnelingproof.v  TunnelingproofEFF.v \
   Linear.v Linear_coop.v Linear_eff.v Lineartyping.v \
   Linearize.v Linearizeproof.v LinearizeproofEFF.v \
-  CleanupLabels.v CleanupLabelsproof.v \
+  CleanupLabels.v CleanupLabelsproof.v CleanupLabelsproofEFF.v \
   Mach.v Mach_coop.v Mach_eff.v \
   Bounds.v Stacklayout.v Stacking.v Stackingproof.v StackingproofEFF.v \
   Asm.v Asm_coop.v Asm_eff.v \
