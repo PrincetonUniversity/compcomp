@@ -28,14 +28,14 @@ Require Import RTL.
 Require Import Conventions.
 Require Import Tailcall.
 
-Require Import sepcomp.mem_lemmas.
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.core_semantics_lemmas.
-Require Import sepcomp.effect_semantics.
+Require Import mem_lemmas.
+Require Import core_semantics.
+Require Import core_semantics_lemmas.
+Require Import effect_semantics.
 Require Import StructuredInjections.
 Require Import reach.
 Require Import effect_simulations.
-Require Import sepcomp.effect_properties.
+Require Import effect_properties.
 Require Import effect_simulations_lemmas.
 
 Require Import RTL_coop.
@@ -2130,9 +2130,9 @@ SM_simulation.SM_simulation_inject rtl_eff_sem
 Proof.
 intros.
 assert (GDE:= GDE_lemma).
-apply sepcomp.effect_simulations_lemmas.inj_simulation_plus with
+apply effect_simulations_lemmas.inj_simulation_plus with
   (match_states:=MATCH)(measure :=measure).
-(*apply sepcomp.effect_simulations_lemmas.inj_simulation_star_wf with
+(*apply effect_simulations_lemmas.inj_simulation_star_wf with
   (match_states:=MATCH) (order :=measure).*)
 (*genvs_dom_eq*)
   assumption.
