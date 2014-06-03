@@ -32,82 +32,92 @@ Variable ge: genv.
 Inductive mach_effstep: (block -> Z -> bool) -> 
                         Mach_core -> mem -> Mach_core -> mem -> Prop :=
   | Mach_effexec_Mlabel:
-      forall s f sp lbl c rs m,
+      forall s f sp lbl c rs m lf,
       mach_effstep EmptyEffect 
-        (Mach_State s f sp (Mlabel lbl :: c) rs) m
-        (Mach_State s f sp c rs) m
+        (Mach_State s f sp (Mlabel lbl :: c) rs lf) m
+        (Mach_State s f sp c rs lf) m
   | Mach_effexec_Mgetstack:
-      forall s f sp ofs ty dst c rs m v,
+      forall s f sp ofs ty dst c rs m v lf,
       load_stack m sp ty ofs = Some v ->
       mach_effstep EmptyEffect 
-        (Mach_State s f sp (Mgetstack ofs ty dst :: c) rs) m
-        (Mach_State s f sp c (rs#dst <- v)) m
+        (Mach_State s f sp (Mgetstack ofs ty dst :: c) rs lf) m
+        (Mach_State s f sp c (rs#dst <- v) lf) m
   | Mach_effexec_Msetstack:
-      forall s f sp src ofs ty c rs m m' rs',
+      forall s f sp src ofs ty c rs m m' rs' lf,
       store_stack m sp ty ofs (rs src) = Some m' ->
       rs' = undef_regs (destroyed_by_setstack ty) rs ->
       mach_effstep 
         (StoreEffect (Val.add sp (Vint ofs)) (encode_val (chunk_of_type ty) (rs src)))
-        (Mach_State s f sp (Msetstack src ofs ty :: c) rs) m
-        (Mach_State s f sp c rs') m'
+        (Mach_State s f sp (Msetstack src ofs ty :: c) rs lf) m
+        (Mach_State s f sp c rs' lf) m'
   | Mach_effexec_Mgetparam:
-      forall s fb f sp ofs ty dst c rs m v rs',
+      forall s fb f sp ofs ty dst c rs m v rs' lf,
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       load_stack m sp Tint f.(fn_link_ofs) = Some (parent_sp s) ->
       load_stack m (parent_sp s) ty ofs = Some v ->
       rs' = (rs # temp_for_parent_frame <- Vundef # dst <- v) ->
       mach_effstep EmptyEffect 
-        (Mach_State s fb sp (Mgetparam ofs ty dst :: c) rs) m
-        (Mach_State s fb sp c rs') m
+        (Mach_State s fb sp (Mgetparam ofs ty dst :: c) rs lf) m
+        (Mach_State s fb sp c rs' lf) m
   | Mach_effexec_Mop:
-      forall s f sp op args res c rs m v rs',
+      forall s f sp op args res c rs m v rs' lf,
       eval_operation ge sp op rs##args m = Some v ->
       rs' = ((undef_regs (destroyed_by_op op) rs)#res <- v) ->
       mach_effstep EmptyEffect 
-        (Mach_State s f sp (Mop op args res :: c) rs) m
-        (Mach_State s f sp c rs') m
+        (Mach_State s f sp (Mop op args res :: c) rs lf) m
+        (Mach_State s f sp c rs' lf) m
   | Mach_effexec_Mload:
-      forall s f sp chunk addr args dst c rs m a v rs',
+      forall s f sp chunk addr args dst c rs m a v rs' lf,
       eval_addressing ge sp addr rs##args = Some a ->
       Mem.loadv chunk m a = Some v ->
       rs' = ((undef_regs (destroyed_by_load chunk addr) rs)#dst <- v) ->
       mach_effstep EmptyEffect 
-        (Mach_State s f sp (Mload chunk addr args dst :: c) rs) m
-        (Mach_State s f sp c rs') m
+        (Mach_State s f sp (Mload chunk addr args dst :: c) rs lf) m
+        (Mach_State s f sp c rs' lf) m
   | Mach_effexec_Mstore:
-      forall s f sp chunk addr args src c rs m m' a rs',
+      forall s f sp chunk addr args src c rs m m' a rs' lf,
       eval_addressing ge sp addr rs##args = Some a ->
       Mem.storev chunk m a (rs src) = Some m' ->
       rs' = undef_regs (destroyed_by_store chunk addr) rs ->
       mach_effstep 
         (StoreEffect a (encode_val chunk (rs src)))
-        (Mach_State s f sp (Mstore chunk addr args src :: c) rs) m
-        (Mach_State s f sp c rs') m'
+        (Mach_State s f sp (Mstore chunk addr args src :: c) rs lf) m
+        (Mach_State s f sp c rs' lf) m'
+  (*NOTE [loader]*)
+  | Mach_effexec_Minitialize_call: 
+      forall m args tys m1 stk m2 fb,
+      Mem.alloc m 0 (4*Zlength args) = (m1, stk) ->
+      let sp := Vptr stk Int.zero in
+      store_args sp 0 args tys m1 = Some m2 -> 
+      mach_effstep EmptyEffect 
+        (Mach_CallstateIn fb args tys) m
+        (Mach_Callstate nil fb (Regmap.init Vundef) (mk_load_frame stk args tys)) m2
   | Mach_effexec_Mcall_internal:
-      forall s fb sp sig ros c rs m f f' ra callee,
+      forall s fb sp sig ros c rs m f f' ra callee lf,
       find_function_ptr ge ros rs = Some f' ->
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       return_address_offset f c ra ->
       (*NEW: check that the block f' actually contains a function:*)
-         Genv.find_funct_ptr ge f' = Some (Internal callee) ->
+      Genv.find_funct_ptr ge f' = Some (Internal callee) ->
       mach_effstep EmptyEffect 
-        (Mach_State s fb sp (Mcall sig ros :: c) rs) m
+        (Mach_State s fb sp (Mcall sig ros :: c) rs lf) m
         (Mach_Callstate (Stackframe fb sp (Vptr fb ra) c :: s)
-                       f' rs) m
+                       f' rs lf) m
   | Mach_effexec_Mcall_external:
-      forall s fb sp sig ros c rs m f f' ra callee args,
+      forall s fb sp sig ros c rs m f f' ra callee args lf,
       find_function_ptr ge ros rs = Some f' ->
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       return_address_offset f c ra ->
-      (*NEW: check that the block f' actually contains a (external) function, and perform the "extra step":*)
-         Genv.find_funct_ptr ge f' = Some (External callee) ->
+      (*NEW: check that the block f' actually contains a (external) function, 
+             and perform the "extra step":*)
+      Genv.find_funct_ptr ge f' = Some (External callee) ->
       extcall_arguments rs m (parent_sp (Stackframe fb sp (Vptr fb ra) c ::s))
         (ef_sig callee) args ->
       mach_effstep EmptyEffect
-         (Mach_State s fb sp (Mcall sig ros :: c) rs) m
-         (Mach_CallstateArgs (Stackframe fb sp (Vptr fb ra) c :: s) f' callee args rs) m
+         (Mach_State s fb sp (Mcall sig ros :: c) rs lf) m
+         (Mach_CallstateOut (Stackframe fb sp (Vptr fb ra) c :: s) f' callee args rs lf) m
   | Mach_effexec_Mtailcall_internal:
-      forall s fb stk soff sig ros c rs m f f' m' callee,
+      forall s fb stk soff sig ros c rs m f f' m' callee lf,
       find_function_ptr ge ros rs = Some f' ->
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       load_stack m (Vptr stk soff) Tint f.(fn_link_ofs) = Some (parent_sp s) ->
@@ -116,10 +126,10 @@ Inductive mach_effstep: (block -> Z -> bool) ->
       (*NEW: check that the block f' actually contains a function:*)
          Genv.find_funct_ptr ge f' = Some (Internal callee) ->
       mach_effstep (FreeEffect m 0 (f.(fn_stacksize)) stk)
-        (Mach_State s fb (Vptr stk soff) (Mtailcall sig ros :: c) rs) m
-        (Mach_Callstate s f' rs) m'
+        (Mach_State s fb (Vptr stk soff) (Mtailcall sig ros :: c) rs lf) m
+        (Mach_Callstate s f' rs lf) m'
   | Mach_effexec_Mtailcall_external:
-      forall s fb stk soff sig ros c rs m f f' m' callee args,
+      forall s fb stk soff sig ros c rs m f f' m' callee args lf,
       find_function_ptr ge ros rs = Some f' ->
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       load_stack m (Vptr stk soff) Tint f.(fn_link_ofs) = Some (parent_sp s) ->
@@ -129,16 +139,16 @@ Inductive mach_effstep: (block -> Z -> bool) ->
          Genv.find_funct_ptr ge f' = Some (External callee) ->
       extcall_arguments rs m' (parent_sp s) (ef_sig callee) args ->
       mach_effstep (FreeEffect m 0 (f.(fn_stacksize)) stk)
-         (Mach_State s fb (Vptr stk soff) (Mtailcall sig ros :: c) rs) m
-         (Mach_CallstateArgs s f' callee args rs) m'
+         (Mach_State s fb (Vptr stk soff) (Mtailcall sig ros :: c) rs lf) m
+         (Mach_CallstateOut s f' callee args rs lf) m'
   | Mach_effexec_Mbuiltin:
-      forall s f sp rs m ef args res b t vl rs' m',
+      forall s f sp rs m ef args res b t vl rs' m' lf,
       external_call' ef ge rs##args m t vl m' ->
       rs' = set_regs res vl (undef_regs (destroyed_by_builtin ef) rs) ->
       mach_effstep 
          (BuiltinEffect ge ef (decode_longs (sig_args (ef_sig ef)) (rs##args)) m)
-         (Mach_State s f sp (Mbuiltin ef args res :: b) rs) m
-         (Mach_State s f sp b rs') m'
+         (Mach_State s f sp (Mbuiltin ef args res :: b) rs lf) m
+         (Mach_State s f sp b rs' lf) m'
 (*NO SUPPORT FOR ANNOT YET
   | Mach_effexec_Mannot:
       forall s f sp rs m ef args b vargs t v m',
@@ -147,49 +157,49 @@ Inductive mach_effstep: (block -> Z -> bool) ->
       mach_effstep (Mach_State s f sp (Mannot ef args :: b) rs) m
          t (Mach_State s f sp b rs) m'*)
   | Mach_effexec_Mgoto:
-      forall s fb f sp lbl c rs m c',
+      forall s fb f sp lbl c rs m c' lf,
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       find_label lbl f.(fn_code) = Some c' ->
       mach_effstep EmptyEffect 
-        (Mach_State s fb sp (Mgoto lbl :: c) rs) m
-        (Mach_State s fb sp c' rs) m
+        (Mach_State s fb sp (Mgoto lbl :: c) rs lf) m
+        (Mach_State s fb sp c' rs lf) m
   | Mach_effexec_Mcond_true:
-      forall s fb f sp cond args lbl c rs m c' rs',
+      forall s fb f sp cond args lbl c rs m c' rs' lf,
       eval_condition cond rs##args m = Some true ->
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       find_label lbl f.(fn_code) = Some c' ->
       rs' = undef_regs (destroyed_by_cond cond) rs ->
       mach_effstep EmptyEffect 
-        (Mach_State s fb sp (Mcond cond args lbl :: c) rs) m
-        (Mach_State s fb sp c' rs') m
+        (Mach_State s fb sp (Mcond cond args lbl :: c) rs lf) m
+        (Mach_State s fb sp c' rs' lf) m
   | Mach_effexec_Mcond_false:
-      forall s f sp cond args lbl c rs m rs',
+      forall s f sp cond args lbl c rs m rs' lf,
       eval_condition cond rs##args m = Some false ->
       rs' = undef_regs (destroyed_by_cond cond) rs ->
       mach_effstep EmptyEffect 
-        (Mach_State s f sp (Mcond cond args lbl :: c) rs) m
-        (Mach_State s f sp c rs') m
+        (Mach_State s f sp (Mcond cond args lbl :: c) rs lf) m
+        (Mach_State s f sp c rs' lf) m
   | Mach_effexec_Mjumptable:
-      forall s fb f sp arg tbl c rs m n lbl c' rs',
+      forall s fb f sp arg tbl c rs m n lbl c' rs' lf,
       rs arg = Vint n ->
       list_nth_z tbl (Int.unsigned n) = Some lbl ->
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       find_label lbl f.(fn_code) = Some c' ->
       rs' = undef_regs destroyed_by_jumptable rs ->
       mach_effstep EmptyEffect 
-        (Mach_State s fb sp (Mjumptable arg tbl :: c) rs) m
-        (Mach_State s fb sp c' rs') m
+        (Mach_State s fb sp (Mjumptable arg tbl :: c) rs lf) m
+        (Mach_State s fb sp c' rs' lf) m
   | Mach_effexec_Mreturn:
-      forall s fb stk soff c rs m f m',
+      forall s fb stk soff c rs m f m' lf,
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       load_stack m (Vptr stk soff) Tint f.(fn_link_ofs) = Some (parent_sp s) ->
       load_stack m (Vptr stk soff) Tint f.(fn_retaddr_ofs) = Some (parent_ra s) ->
       Mem.free m stk 0 f.(fn_stacksize) = Some m' ->
       mach_effstep (FreeEffect m 0 (f.(fn_stacksize)) stk)
-        (Mach_State s fb (Vptr stk soff) (Mreturn :: c) rs) m
-        (Mach_Returnstate s (sig_res (fn_sig f)) rs) m'
+        (Mach_State s fb (Vptr stk soff) (Mreturn :: c) rs lf) m
+        (Mach_Returnstate s (sig_res (fn_sig f)) rs lf) m'
   | Mach_effexec_function_internal:
-      forall s fb rs m f m1 m2 m3 stk rs',
+      forall s fb rs m f m1 m2 m3 stk rs' lf,
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       Mem.alloc m 0 f.(fn_stacksize) = (m1, stk) ->
       let sp := Vptr stk Int.zero in
@@ -197,31 +207,13 @@ Inductive mach_effstep: (block -> Z -> bool) ->
       store_stack m2 sp Tint f.(fn_retaddr_ofs) (parent_ra s) = Some m3 ->
       rs' = undef_regs destroyed_at_function_entry rs ->
       mach_effstep EmptyEffect 
-        (Mach_Callstate s fb rs) m
-        (Mach_State s fb sp f.(fn_code) rs') m3
-(*auxiliary step that extracts call arguments and invoked external function,
-  in accordance with the core semantics interface
-  | Mach_effexec_function_external:
-      forall s fb rs m ef args,
-      Genv.find_funct_ptr ge fb = Some (External ef) ->
-      extcall_arguments rs m (parent_sp s) (ef_sig ef) args ->
-      mach_effstep EmptyEffect 
-        (Mach_Callstate s fb rs) m
-        (Mach_CallstateArgs s (*(parent_sp s)*) fb ef args rs) m*)
-(*NO RULE FOR EXTERNAL CALLS
-  | Mach_effexec_function_external:
-      forall s fb rs m t rs' ef args res m',
-      Genv.find_funct_ptr ge fb = Some (External ef) ->
-      extcall_arguments rs m (parent_sp s) (ef_sig ef) args ->
-      external_call' ef ge args m t res m' ->
-      rs' = set_regs (loc_result (ef_sig ef)) res rs ->
-      mach_effstep (Callstate s fb rs) m
-         t (Mach_Returnstate s rs') m'*)
+        (Mach_Callstate s fb rs lf) m
+        (Mach_State s fb sp f.(fn_code) rs' lf) m3
   | Mach_effexec_return:
-      forall s f sp ra c retty rs m,
+      forall s f sp ra c retty rs m lf,
       mach_effstep EmptyEffect 
-        (Mach_Returnstate (Stackframe f sp ra c :: s) retty rs) m
-        (Mach_State s f sp c rs) m.
+        (Mach_Returnstate (Stackframe f sp ra c :: s) retty rs lf) m
+        (Mach_State s f sp c rs lf) m.
 
 End EFFSEM.
 
@@ -250,6 +242,16 @@ intros.
          apply Mem.unchanged_on_refl.
   split. econstructor; eassumption.
          eapply StoreEffect_Storev; eassumption. 
+  split. econstructor; eassumption. 
+    { assert (sp_fresh: ~Mem.valid_block m stk).
+      { eapply Mem.fresh_block_alloc; eauto. }
+      eapply mem_unchanged_on_sub_strong.
+      eapply unchanged_on_trans with (m2 := m1).
+      solve[eapply Mem.alloc_unchanged_on; eauto].
+      solve[eapply store_args_unch_on; eauto].
+      solve[apply alloc_forward in H; auto].
+      simpl. intros b ofs H2 _ H3. subst. 
+      solve[apply sp_fresh; auto]. } 
   split. eapply Mach_exec_Mcall_internal; eassumption.
          apply Mem.unchanged_on_refl.
   split. eapply Mach_exec_Mcall_external; eassumption.
@@ -273,7 +275,8 @@ intros.
          eapply FreeEffect_free; eassumption.
   split. econstructor; eassumption. subst sp.
     subst. 
-    unfold store_stack, Val.add in *. rewrite Int.add_zero_l in *.
+    unfold store_stack, Val.add in *. 
+    rewrite Int.add_zero_l in *.
     simpl in *. 
     remember (Int.unsigned (fn_link_ofs f)) as z1.
     remember (Int.unsigned (fn_retaddr_ofs f)) as z2.
@@ -281,22 +284,24 @@ intros.
     remember (parent_ra s) as v2. 
     clear Heqz1 H Heqz2 Heqv1 Heqv2.
     split; intros.
-      split; intros.
+    { split; intros.
         eapply Mem.perm_store_1; try eassumption.
         eapply Mem.perm_store_1; try eassumption.
         eapply Mem.perm_alloc_1; eassumption.
       apply (Mem.perm_store_2 _ _ _ _ _ _ H2) in H4.
         apply (Mem.perm_store_2 _ _ _ _ _ _ H1) in H4.
         eapply Mem.perm_alloc_4; try eassumption.
-         intros N; subst. apply Mem.fresh_block_alloc in H0. contradiction.
-      rewrite (Mem.store_mem_contents _ _ _ _ _ _ H2).
+         intros N; subst. apply Mem.fresh_block_alloc in H0. 
+         contradiction. }
+    { rewrite (Mem.store_mem_contents _ _ _ _ _ _ H2).
         rewrite (Mem.store_mem_contents _ _ _ _ _ _ H1).
-        assert (BB: b <> stk). intros N. subst. apply Mem.fresh_block_alloc in H0. apply Mem.perm_valid_block in H3. contradiction.
+        assert (BB: b <> stk). 
+        { intros N. subst. 
+          apply Mem.fresh_block_alloc in H0. 
+          apply Mem.perm_valid_block in H3. contradiction. }
         rewrite PMap.gso; trivial. 
         rewrite PMap.gso; trivial. 
-        eapply EmptyEffect_alloc; eassumption.
-(*  split. econstructor; eassumption.
-         apply Mem.unchanged_on_refl.*)
+        eapply EmptyEffect_alloc; eassumption. }
   split. econstructor; eassumption.
          apply Mem.unchanged_on_refl.
 Qed.
@@ -314,6 +319,7 @@ Proof.
     eexists. eapply Mach_effexec_Mop; try eassumption; trivial.
     eexists. eapply Mach_effexec_Mload; try eassumption; trivial.
     eexists. eapply Mach_effexec_Mstore; try eassumption; trivial.
+    eexists. eapply Mach_effexec_Minitialize_call; try eassumption; trivial.
     eexists. eapply Mach_effexec_Mcall_internal; try eassumption; trivial.
     eexists. eapply Mach_effexec_Mcall_external; try eassumption; trivial.
     eexists. eapply Mach_effexec_Mtailcall_internal; try eassumption; trivial.

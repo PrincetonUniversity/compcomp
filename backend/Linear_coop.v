@@ -23,19 +23,19 @@ Inductive Linear_core: Type :=
   | Linear_State:
       forall (stack: list Linear.stackframe) (**r call stack *)
              (f: Linear.function)            (**r function currently executing *)
-             (sp: val)                (**r stack pointer *)
+             (sp: val)                       (**r stack pointer *)
              (c: Linear.code)                (**r current program point *)
-             (rs: Linear.locset),             (**r location state *)
+             (rs: Linear.locset),            (**r location state *)
       Linear_core
   | Linear_Callstate:
       forall (stack: list Linear.stackframe) (**r call stack *)
              (f: Linear.fundef)              (**r function to call *)
-             (rs: Linear.locset),             (**r location state at point of call *)
+             (rs: Linear.locset),            (**r location state at point of call *)
       Linear_core
   | Linear_Returnstate:
       forall (stack: list Linear.stackframe) (**r call stack *)
              (retty: option typ)      (**r optional return register int-floatness *)
-             (rs: Linear.locset),             (**r location state at point of return *)
+             (rs: Linear.locset),            (**r location state at point of return *)
       Linear_core.
 
 Section RELSEM.
