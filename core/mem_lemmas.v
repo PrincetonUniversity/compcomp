@@ -30,6 +30,18 @@ solve[apply (H1 b ofs k p (H3 b ofs H)); auto].
 solve[apply (H2 b ofs); auto]. 
 Qed.
 
+Lemma mem_unchanged_on_sub_strong: forall (P Q: block -> BinInt.Z -> Prop) m m',
+  Mem.unchanged_on Q m m' -> 
+  (forall b ofs, Mem.valid_block m b -> P b ofs -> Q b ofs) -> 
+  Mem.unchanged_on P m m'.
+Proof.
+intros until m'; intros [H1 H2] H3.
+split; intros.
+solve[apply (H1 b ofs k p (H3 b ofs H0 H) H0)].
+apply (H2 b ofs); auto. apply H3; auto. 
+solve[eapply Mem.perm_valid_block; eauto].
+Qed.
+
 Lemma inject_separated_same_meminj: forall j m m', 
   Events.inject_separated j j m m'.
 Proof. intros j m m' b; intros. congruence. Qed.
