@@ -4901,8 +4901,29 @@ induction CS;
        Focus 2. intros. rewrite Int.add_unsigned in H3.
        rewrite URdelta in H3. rewrite H3.
        rewrite <- Zplus_assoc. rewrite (Zplus_comm delta), Zplus_assoc.
-       rewrite UR4. 
-       admit. (*long address representability*)       
+       rewrite UR4.  
+       assert (FOUR: Int.unsigned i + 4 = 
+                     Int.unsigned (Int.add i (Int.repr 4))).
+         rewrite Int.add_unsigned.
+         remember (Int.unsigned i) as II.
+         rewrite Int.unsigned_repr.
+            rewrite UR4; trivial.
+         rewrite UR4. clear AA BB.
+         specialize (Int.unsigned_range i). rewrite <- HeqII.
+         intros [IINONNEG IIMOD].
+         split. omega. 
+         clear - H0 IINONNEG IIMOD. 
+           unfold Int.max_unsigned.
+           destruct H0. subst.
+           assert (exists K, Int.modulus = K * 8 /\ 0 <= K).
+             exists (two_power_nat (Int.wordsize -3)).
+             unfold Int.modulus, Int.wordsize, Wordsize_32.wordsize.
+             rewrite two_power_nat_equiv. rewrite two_power_nat_equiv. 
+             simpl. unfold Z.pow_pos. simpl. split. reflexivity. omega.
+           destruct H as [K [HK Kpos]]. omega. 
+       rewrite FOUR in VAL.
+       exploit Mem.valid_pointer_inject_no_overflow; try eassumption.
+       intros. rewrite <- FOUR, URdelta in H4. apply H4.
        eapply (H (Int.unsigned i)). omega.
      
 (* call *)
