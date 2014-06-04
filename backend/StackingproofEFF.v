@@ -50,6 +50,7 @@ Require Import Linear_eff.
 Require Import Mach_coop.
 Require Import BuiltinEffects.
 Require Import Mach_eff.
+Require Import val_casted.
 
 (** * Properties of frame offsets *)
 
@@ -65,34 +66,65 @@ Proof.
   destruct ty; reflexivity.
 Qed.
 
-(** Agreement over initial args *)
+(** Agreement over initial (Mach) args *)
 
-Fixpoint agree_args_match_aux (ls: locset) ofs args tys : Prop :=
-  match args,tys with
-    | nil,nil => True
-    | a::args',ty::tys' => 
-      ls (S Incoming ofs ty)=a 
-      /\ agree_args_match_aux ls (ofs+1) args' tys'
-    | _,_ => False
+Fixpoint agree_args_match_aux j (ls: locset) ofs args tys : Prop :=
+  match tys with
+    | nil => args=nil
+    | ty'::tys' => 
+      match args with 
+        | nil => False
+        | a'::args' => 
+          match ty' with
+            | Tlong => 
+              match a' with
+                | Vlong n => 
+                  ls (S Incoming (ofs+1) Tint) = Vint (Int64.hiword n)
+                  /\ ls (S Incoming ofs Tint) = Vint (Int64.loword n)
+                  /\ agree_args_match_aux j ls (ofs+2) args' tys'
+                | _ => False
+              end
+            | _ =>  
+              exists a, 
+                ls (S Incoming ofs ty')=a 
+                /\ val_inject j a a' 
+                /\ agree_args_match_aux j ls (ofs+typesize ty') args' tys'
+          end
+      end
   end.
 
-Fixpoint agree_args_match_out (ls: locset) ofs args tys : Prop :=
-  match args,tys with
-    | nil,nil => True
-    | a::args',ty::tys' => 
-      ls (S Outgoing ofs ty)=a 
-      /\ agree_args_match_out ls (ofs+1) args' tys'
-    | _,_ => False
-  end.
+(*TODO: should go in core/mem_lemmas.v*)
+Lemma val_inject_restrict_sub X Y j v1 v2 :
+  val_inject (restrict j X) v1 v2 -> 
+  (forall b, X b=true -> Y b=true) ->
+  val_inject (restrict j Y) v1 v2.
+Proof.
+inversion 1; subst; auto. intros sub. econstructor; eauto.
+apply restrictD_Some in H0. destruct H0 as [H4 H7].
+unfold restrict. rewrite (sub _ H7); auto.
+Qed.
 
-Fixpoint agree_args_contains_aux j m' sp' ofs args tys : Prop :=
+Lemma agree_args_match_aux_sub j X Y ls ofs args tys :
+  (forall b, X b=true -> Y b=true) -> 
+  agree_args_match_aux (restrict j X) ls ofs args tys -> 
+  agree_args_match_aux (restrict j Y) ls ofs args tys.
+Proof.
+revert args ofs ls. induction tys. destruct args; auto.
+intros ? ? ? sub. destruct args. auto. simpl.
+destruct a;
+try solve[intros [a0 [H2 [H H3]]]; exists a0; split; auto;
+          split; auto; eapply val_inject_restrict_sub; eauto]. 
+destruct v; auto.
+intros [? [? ?]].
+split; auto.
+Qed.
+
+Fixpoint agree_args_contains_aux m' sp' ofs args tys : Prop :=
   match args,tys with
     | nil,nil => True
     | a::args',ty::tys' => 
-      exists a', 
-        Mem.load (chunk_of_type ty) m' sp' (fe_ofs_arg + 4*ofs) = Some a'
-        /\ val_inject j a a' 
-        /\ agree_args_contains_aux j m' sp' (ofs+1) args' tys'
+        Mem.load (chunk_of_type ty) m' sp' (fe_ofs_arg + 4*ofs) = Some a
+        /\ agree_args_contains_aux m' sp' (ofs+1) args' tys'
     | _,_ => False
   end.
 
@@ -105,14 +137,14 @@ Record agree_args (j: meminj) (args: list val) (tys: list typ)
         Values in incoming stack slots (on the Linear side) match 
         the initial arguments args. *)
     agree_args_match: 
-      stack=nil -> agree_args_match_aux ls 0 args tys;
+      stack=nil -> agree_args_match_aux j ls 0 args tys;
 
     (** Unconditionally: 
         Values loaded from the Mach stack frame at pointer sp match 
         the initial arguments args. Arguments are pushed RTL, 
         which means argument 0 in args is at offset 0. *)
     agree_args_contains: 
-      agree_args_contains_aux j m' sp' 0 args tys 
+      agree_args_contains_aux m' sp' 0 args tys 
   }.
 
 Section PRESERVATION.
@@ -3787,7 +3819,8 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
       forall f tf fb ls args tys m m'
         (TRANSL: transf_function f = OK tf)
         (FIND: Genv.find_funct_ptr tge fb = Some (Internal tf))
-        (AGREGS: agree_args_match_out ls 0 args tys),
+        (AGREGS: agree_args_match_aux (restrict (as_inj mu) (vis mu)) 
+                                      (call_regs ls) 0 args tys),
       match_states mu (Linear_Callstate nil (Internal f) ls) m 
                       (Mach_CallstateIn fb args tys) m'
 
@@ -3849,6 +3882,8 @@ econstructor; try eassumption.
   rewrite vis_restrict_sm. rewrite restrict_sm_all.
     rewrite restrict_nest; assumption.
 econstructor; try eassumption.
+  rewrite vis_restrict_sm. rewrite restrict_sm_all.
+    rewrite restrict_nest; assumption.
 econstructor; try eassumption.
   eapply match_stacks_restrict; eassumption. 
   rewrite vis_restrict_sm. rewrite restrict_sm_all.
@@ -3949,9 +3984,11 @@ destruct a; simpl; intros.
   eapply IHl. eapply wt_setstack. trivial.
 Qed. 
 
-Lemma setlist_encode_long_regs: forall r sgargs LM vals i, Locmap.setlist (loc_arguments_rec sgargs i)
-  (val_casted.encode_longs sgargs vals) LM (Locations.R r) =
-  LM (Locations.R r).
+Lemma setlist_encode_long_regs: 
+  forall r sgargs LM vals i, 
+    Locmap.setlist (loc_arguments_rec sgargs i)
+                   (val_casted.encode_longs sgargs vals) LM (Locations.R r) 
+    = LM (Locations.R r).
 Proof. intros r sgargs.
 induction sgargs; simpl; intros. reflexivity.
 destruct a; simpl. 
@@ -3969,6 +4006,176 @@ destruct a; simpl.
   rewrite IHsgargs. rewrite Locmap.gso; trivial. constructor.  
   rewrite IHsgargs. rewrite Locmap.gso; trivial. constructor.  
   destruct vals; auto. rewrite IHsgargs. rewrite Locmap.gso; trivial. constructor.  
+Qed.
+
+Lemma getBlocks_cons v l b :
+  getBlocks (v::nil) b=true -> 
+  getBlocks (v::l) b=true.
+Proof.
+rewrite !getBlocks_getBlocks'. simpl. destruct v; auto; try congruence.
+rewrite orb_true_iff. inversion 1; try congruence. rewrite H0; auto.
+Qed.
+
+Lemma getBlocks_tail v l b :
+  getBlocks l b=true -> 
+  getBlocks (v::l) b=true.
+Proof.
+rewrite !getBlocks_getBlocks'. simpl. destruct v; auto; try congruence.
+rewrite orb_true_iff. inversion 1. right; auto.
+Qed.
+
+Lemma loc_arguments_gso z z' vl tys ty v ls :
+  z' >= typesize ty ->
+  Val.has_type v ty ->
+  Locmap.setlist (loc_arguments_rec tys (z + z')) vl
+    (Locmap.set (S Outgoing z ty) v ls) (S Outgoing z ty) = v.
+Proof.
+intros size.
+rewrite Locmap.gsetlisto.
+rewrite Locmap.gss.
+solve[apply Val.load_result_same].
+rewrite Loc.notin_iff; intros l' IN.
+apply loc_arguments_rec_charact in IN.
+destruct l'; try solve[inv IN]. 
+destruct sl; try solve[inv IN]. destruct IN as [H H0].
+right. omega.
+Qed.
+
+Lemma locmap_set_comm l1 l2 v1 v2 ls :
+  Loc.diff l1 l2 -> 
+  Locmap.set l1 v1 (Locmap.set l2 v2 ls) 
+  = Locmap.set l2 v2 (Locmap.set l1 v1 ls).
+Proof.
+intros diff.
+apply extensionality; intros l.
+destruct (Loc.diff_dec l1 l). 
+rewrite Locmap.gso.
+Admitted. (*TODO*)
+
+Lemma agree_args_match_init vals1 vals2 tys j m1 m2 DomS DomT z : 
+   vals_defined vals1=true -> 
+   val_list_inject j vals1 vals2 ->
+   val_has_type_list_func vals1 tys = true ->
+   agree_args_match_aux
+     (restrict j
+        (vis
+           (initial_SM DomS DomT
+              (REACH m1
+                 (fun b0 : block =>
+                  isGlobalBlock (Genv.globalenv prog) b0
+                  || getBlocks vals1 b0))
+              (REACH m2
+                 (fun b0 : block =>
+                  isGlobalBlock (Genv.globalenv tprog) b0
+                  || getBlocks vals2 b0)) j)))
+     (call_regs
+        (Locmap.setlist (loc_arguments_rec tys z) (encode_longs tys vals1)
+           (Locmap.init Vundef))) z vals2 tys.
+Proof.
+intros DEF INJ' TY. 
+generalize INJ' as INJ; intro. 
+apply encode_longs_inject with (tyl := tys) in INJ.
+revert z tys vals1 DEF TY INJ INJ'. 
+generalize (Locmap.init Vundef) as ls. induction vals2.
+intros. inv INJ'. simpl in TY. destruct tys; [|congruence]. 
+  solve[simpl; auto].
+intros. inv INJ'. destruct tys. inv TY. simpl.
+set (X := vis
+  (initial_SM DomS DomT
+              (REACH m1
+                     (fun b0 : block =>
+                        isGlobalBlock (Genv.globalenv prog) b0
+                                      || getBlocks vl b0))
+              (REACH m2
+                     (fun b0 : block =>
+                        isGlobalBlock (Genv.globalenv tprog) b0
+                                      || getBlocks vals2 b0)) j)).
+destruct t. 
++ exists v. split. simpl. 
+change 1 with (typesize Tint); rewrite loc_arguments_gso; auto. omega.
+simpl in TY. rewrite andb_true_iff in TY. destruct TY as [TY _].
+solve[rewrite val_has_type_funcP; auto].
+split. apply restrict_val_inject; auto.
+       intros b G. unfold vis. rewrite orb_true_iff. right. simpl.
+       apply REACH_nil. rewrite orb_true_iff. right.
+       solve[apply getBlocks_cons; auto].
+apply agree_args_match_aux_sub with (X := X).
+intros b; unfold X. unfold vis. rewrite !orb_true_iff. intros [?|?].
+simpl in H. congruence.
+simpl in H|-*. right. eapply REACH_mono; eauto.
+  simpl. intros b0. rewrite !orb_true_iff. intros [?|?]. solve[left; auto].
+  simpl. right. solve[apply getBlocks_tail; auto].
+apply IHvals2; auto.
+simpl in DEF. solve[destruct v; try congruence; auto].
+simpl in TY. rewrite andb_true_iff in TY. solve[destruct TY; auto].
+simpl in INJ. solve[inv INJ; auto].
++ exists v. split. simpl. 
+change 2 with (typesize Tfloat); rewrite loc_arguments_gso; auto. omega.
+simpl in TY. rewrite andb_true_iff in TY. destruct TY as [TY _].
+solve[rewrite val_has_type_funcP; auto].
+split. apply restrict_val_inject; auto. 
+       intros b G. unfold vis. rewrite orb_true_iff. right. simpl.
+       apply REACH_nil. rewrite orb_true_iff. right.
+       solve[apply getBlocks_cons; auto].
+apply agree_args_match_aux_sub with (X := X).
+intros b; unfold X. unfold vis. rewrite !orb_true_iff. intros [?|?].
+simpl in H. congruence.
+simpl in H|-*. right. eapply REACH_mono; eauto.
+  simpl. intros b0. rewrite !orb_true_iff. intros [?|?]. solve[left; auto].
+  simpl. right. solve[apply getBlocks_tail; auto].
+apply IHvals2; auto.
+simpl in DEF. solve[destruct v; try congruence; auto].
+simpl in TY. rewrite andb_true_iff in TY. solve[destruct TY; auto].
+simpl in INJ. solve[inv INJ; auto].
++ assert (R: exists n, v = Vlong n).
+{ simpl in TY. rewrite andb_true_iff in TY. destruct TY as [TY _].
+  rewrite <-val_has_type_funcP in TY. unfold Val.has_type in TY.
+  simpl in DEF. destruct v; try solve[inversion TY|inversion DEF].
+  exists i; auto. }
+destruct R as [n' R]. rewrite R in *. simpl.  
+assert (L: exists n, a = Vlong n). 
+{ inv H2. exists n'. auto. }
+destruct L as [n L]. rewrite L in *. simpl in TY, DEF. 
+split. inv H2.
+  rewrite locmap_set_comm. 
+  generalize (Locmap.set (S Outgoing z Tint) (Vint (Int64.loword n)) ls)
+    as ls'.
+  assert (z+2 = (z+1)+1) as -> by omega.
+  generalize (z+1) as z'.
+  change 1 with (typesize Tint). 
+  intros z' ls'. rewrite loc_arguments_gso; auto. simpl; auto.
+  omega. simpl. auto.
+  simpl. right; omega.
+split. inv H2. 
+  generalize (Locmap.set (S Outgoing (z+1) Tint) (Vint (Int64.hiword n)) ls)
+    as ls'.
+  intros ls'. rewrite loc_arguments_gso; auto. simpl; omega. simpl; auto.
+apply agree_args_match_aux_sub with (X := X).
+intros b; unfold X. unfold vis. rewrite !orb_true_iff. intros [?|?].
+simpl in H. congruence.
+simpl in H|-*. right. eapply REACH_mono; eauto.
+  simpl. intros b0. rewrite !orb_true_iff. intros [?|?]. solve[left; auto].
+  simpl. right. solve[apply getBlocks_tail; auto].
+apply IHvals2; auto.
+simpl in INJ. inv INJ. inv H6. solve[auto].
++ exists v. split. simpl. 
+change 1 with (typesize Tsingle); rewrite loc_arguments_gso; auto. omega.
+simpl in TY. rewrite andb_true_iff in TY. destruct TY as [TY _].
+solve[rewrite val_has_type_funcP; auto].
+split. apply restrict_val_inject; auto. 
+       intros b G. unfold vis. rewrite orb_true_iff. right. simpl.
+       apply REACH_nil. rewrite orb_true_iff. right.
+       solve[apply getBlocks_cons; auto].
+apply agree_args_match_aux_sub with (X := X).
+intros b; unfold X. unfold vis. rewrite !orb_true_iff. intros [?|?].
+simpl in H. congruence.
+simpl in H|-*. right. eapply REACH_mono; eauto.
+  simpl. intros b0. rewrite !orb_true_iff. intros [?|?]. solve[left; auto].
+  simpl. right. solve[apply getBlocks_tail; auto].
+apply IHvals2; auto.
+simpl in DEF. solve[destruct v; try congruence; auto].
+simpl in TY. rewrite andb_true_iff in TY. solve[destruct TY; auto].
+simpl in INJ. solve[inv INJ; auto].
 Qed.
 
 Lemma MATCH_initial: forall (v1 v2 : val) (sig : signature) entrypoints
@@ -4030,10 +4237,12 @@ Proof. intros.
   2: solve[intros CONTRA; elimtype False; auto].
   intros ? e.
   exists (Mach_CallstateIn b
-          (val_casted.encode_longs (sig_args (funsig tf)) vals2)
-          (sig_args (funsig tf))).
+          (encode_longs (sig_args (funsig tf)) vals2)
+          (encode_typs (sig_args (funsig tf)))).
   split. simpl. rewrite e, D. 
-  assert (val_casted.val_has_type_list_func vals2 (sig_args (funsig tf))=true) as ->.
+
+  assert (val_casted.val_has_type_list_func vals2 (sig_args (funsig tf))=true) 
+    as ->.
   { eapply val_casted.val_list_inject_hastype; eauto.
     eapply forall_inject_val_list_inject; eauto.
     destruct (val_casted.vals_defined vals1); auto.
@@ -4043,58 +4252,41 @@ Proof. intros.
     { erewrite sig_preserved; eauto. }
     destruct (val_casted.val_has_type_list_func vals1
       (sig_args (Linear.funsig (Internal f)))); auto. }
+
   assert (val_casted.vals_defined vals2=true) as ->.
   { eapply val_casted.val_list_inject_defined.
     eapply forall_inject_val_list_inject; eauto.
     destruct (val_casted.vals_defined vals1); auto.
     rewrite andb_comm in H2; inv H2. }
+
   monadInv TF. rename x into tf. simpl. 
   solve[simpl; auto].
 
   destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
      VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
-    as [AA [BB [CC [DD [EE [FF GG]]]]]].
-  simpl in *.  
+    as [AA [BB [CC [DD [EE [FF GG]]]]]]. simpl in *.  
   destruct InitMem as [m0 [INIT [? ?]]].
+
   assert (InitBlocks: forall b, Plt b (Mem.nextblock m0) -> 
             isGlobalBlock ge b = true).    
-  { intros bb LT.    
-    unfold ge. 
+  { intros bb LT. unfold ge. 
     apply valid_init_is_global with (b0 := bb) in INIT.
-    destruct INIT. eapply find_symbol_isGlobal; eassumption.
-    assumption. 
-    apply LT. }
+    destruct INIT. eapply find_symbol_isGlobal; eassumption. auto. apply LT. }
+
   split. 2: rewrite initial_SM_as_inj; intuition.
   apply bind_inversion in TF. destruct TF as [x [TF X]]. inv X.
-  eapply match_states_init; eauto.
-  simpl. 
-  admit. (*TODO*)
-  (* eapply match_states_call_intern; try eassumption.
-     eapply match_stacks_empty. eassumption. eassumption.
-        rewrite initial_SM_as_inj. unfold vis; simpl.
-        unfold extern_of in DD; simpl in DD. simpl in EE.
-        specialize (restrict_preserves_globals _ _ _ DD EE). intros.
-        destruct H1 as [DD1 [DD2 DD3]].
-        econstructor; intros.
-          eapply restrictI_Some.
-            eapply meminj_preserves_globals_isGlobalBlock. eapply DD.
-            eauto.
-            apply REACH_nil. generalize (InitBlocks _ H1). unfold ge. intros ->; auto.
-          symmetry. eapply DD3. eassumption. eauto.
-          eapply Genv.find_symbol_not_fresh. eassumption. eassumption. 
-          eapply Genv.find_funct_ptr_not_fresh. eassumption. eassumption.
-          eapply Genv.find_var_info_not_fresh. eassumption. eassumption.
-  red; intros. unfold loc_arguments in H1. 
-     apply loc_arguments_rec_charact in H1.
-     destruct l; try contradiction.
-     destruct sl; try contradiction.
-  simpl. unfold bind. rewrite TF. trivial. 
-  eapply wt_locset_setlist_loc_arguments. apply wt_init.
-  red; intros. unfold loc_arguments. simpl.
-    rewrite setlist_encode_long_regs. constructor.  
-  red; intros. unfold loc_arguments. simpl.
-    destruct l.
-      rewrite setlist_encode_long_regs. constructor.*)
+  eapply match_states_init; eauto. simpl.
+
+  assert (Linear.fn_sig f=fn_sig x) as ->.
+  { apply unfold_transf_function in TF; rewrite TF; auto. }
+
+  unfold loc_arguments.
+  rewrite initial_SM_as_inj.
+  rewrite andb_true_iff in H2. destruct H2 as [H2 H3]. revert H2.
+  generalize (sig_args (fn_sig x)) as tys.
+  apply forall_inject_val_list_inject in VInj. intros tys.
+  generalize (encode_longs_inject _ tys vals1 vals2 VInj).
+  solve[intros H2 H4; apply agree_args_match_init; auto].
 Qed.
 
 Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig

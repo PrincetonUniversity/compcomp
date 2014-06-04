@@ -51,14 +51,15 @@ Inductive mach_effstep: (block -> Z -> bool) ->
         (Mach_State s f sp (Msetstack src ofs ty :: c) rs lf) m
         (Mach_State s f sp c rs' lf) m'
   | Mach_effexec_Mgetparam:
-      forall s fb f sp ofs ty dst c rs m v rs' lf,
+      forall s fb f sp ofs ty dst c rs m v rs' args0 tys0 sp0,
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
-      load_stack m sp Tint f.(fn_link_ofs) = Some (parent_sp s) ->
-      load_stack m (parent_sp s) ty ofs = Some v ->
+      load_stack m sp Tint f.(fn_link_ofs) = Some (parent_sp0 sp0 s) ->
+      load_stack m (parent_sp0 sp0 s) ty ofs = Some v ->
       rs' = (rs # temp_for_parent_frame <- Vundef # dst <- v) ->
       mach_effstep EmptyEffect 
-        (Mach_State s fb sp (Mgetparam ofs ty dst :: c) rs lf) m
-        (Mach_State s fb sp c rs' lf) m
+                   (Mach_State s fb sp (Mgetparam ofs ty dst :: c) rs 
+                                       (mk_load_frame sp0 args0 tys0)) m
+                   (Mach_State s fb sp c rs' (mk_load_frame sp0 args0 tys0)) m
   | Mach_effexec_Mop:
       forall s f sp op args res c rs m v rs' lf,
       eval_operation ge sp op rs##args m = Some v ->
@@ -79,8 +80,7 @@ Inductive mach_effstep: (block -> Z -> bool) ->
       eval_addressing ge sp addr rs##args = Some a ->
       Mem.storev chunk m a (rs src) = Some m' ->
       rs' = undef_regs (destroyed_by_store chunk addr) rs ->
-      mach_effstep 
-        (StoreEffect a (encode_val chunk (rs src)))
+      mach_effstep (StoreEffect a (encode_val chunk (rs src)))
         (Mach_State s f sp (Mstore chunk addr args src :: c) rs lf) m
         (Mach_State s f sp c rs' lf) m'
   (*NOTE [loader]*)
@@ -101,8 +101,7 @@ Inductive mach_effstep: (block -> Z -> bool) ->
       Genv.find_funct_ptr ge f' = Some (Internal callee) ->
       mach_effstep EmptyEffect 
         (Mach_State s fb sp (Mcall sig ros :: c) rs lf) m
-        (Mach_Callstate (Stackframe fb sp (Vptr fb ra) c :: s)
-                       f' rs lf) m
+        (Mach_Callstate (Stackframe fb sp (Vptr fb ra) c :: s) f' rs lf) m
   | Mach_effexec_Mcall_external:
       forall s fb sp sig ros c rs m f f' ra callee args lf,
       find_function_ptr ge ros rs = Some f' ->
@@ -111,42 +110,40 @@ Inductive mach_effstep: (block -> Z -> bool) ->
       (*NEW: check that the block f' actually contains a (external) function, 
              and perform the "extra step":*)
       Genv.find_funct_ptr ge f' = Some (External callee) ->
-      extcall_arguments rs m (parent_sp (Stackframe fb sp (Vptr fb ra) c ::s))
-        (ef_sig callee) args ->
+      extcall_arguments rs m sp (ef_sig callee) args ->
       mach_effstep EmptyEffect
          (Mach_State s fb sp (Mcall sig ros :: c) rs lf) m
          (Mach_CallstateOut (Stackframe fb sp (Vptr fb ra) c :: s) f' callee args rs lf) m
   | Mach_effexec_Mtailcall_internal:
-      forall s fb stk soff sig ros c rs m f f' m' callee lf,
+      forall s fb stk soff sig ros c rs m f f' m' callee sp0 args0 tys0,
       find_function_ptr ge ros rs = Some f' ->
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
-      load_stack m (Vptr stk soff) Tint f.(fn_link_ofs) = Some (parent_sp s) ->
+      load_stack m (Vptr stk soff) Tint f.(fn_link_ofs) = Some (parent_sp0 sp0 s) ->
       load_stack m (Vptr stk soff) Tint f.(fn_retaddr_ofs) = Some (parent_ra s) ->
       Mem.free m stk 0 f.(fn_stacksize) = Some m' ->
       (*NEW: check that the block f' actually contains a function:*)
-         Genv.find_funct_ptr ge f' = Some (Internal callee) ->
+      Genv.find_funct_ptr ge f' = Some (Internal callee) ->
       mach_effstep (FreeEffect m 0 (f.(fn_stacksize)) stk)
-        (Mach_State s fb (Vptr stk soff) (Mtailcall sig ros :: c) rs lf) m
-        (Mach_Callstate s f' rs lf) m'
+        (Mach_State s fb (Vptr stk soff) (Mtailcall sig ros :: c) rs (mk_load_frame sp0 args0 tys0)) m
+        (Mach_Callstate s f' rs (mk_load_frame sp0 args0 tys0)) m'
   | Mach_effexec_Mtailcall_external:
-      forall s fb stk soff sig ros c rs m f f' m' callee args lf,
+      forall s fb stk soff sig ros c rs m f f' m' callee args sp0 args0 tys0,
       find_function_ptr ge ros rs = Some f' ->
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
-      load_stack m (Vptr stk soff) Tint f.(fn_link_ofs) = Some (parent_sp s) ->
+      load_stack m (Vptr stk soff) Tint f.(fn_link_ofs) = Some (parent_sp0 sp0 s) ->
       load_stack m (Vptr stk soff) Tint f.(fn_retaddr_ofs) = Some (parent_ra s) ->
       Mem.free m stk 0 f.(fn_stacksize) = Some m' ->
       (*NEW: check that the block f' actually contains a function:*)
-         Genv.find_funct_ptr ge f' = Some (External callee) ->
-      extcall_arguments rs m' (parent_sp s) (ef_sig callee) args ->
+       Genv.find_funct_ptr ge f' = Some (External callee) ->
+      extcall_arguments rs m' (parent_sp0 sp0 s) (ef_sig callee) args ->
       mach_effstep (FreeEffect m 0 (f.(fn_stacksize)) stk)
-         (Mach_State s fb (Vptr stk soff) (Mtailcall sig ros :: c) rs lf) m
-         (Mach_CallstateOut s f' callee args rs lf) m'
+         (Mach_State s fb (Vptr stk soff) (Mtailcall sig ros :: c) rs (mk_load_frame sp0 args0 tys0)) m
+         (Mach_CallstateOut s f' callee args rs (mk_load_frame sp0 args0 tys0)) m'
   | Mach_effexec_Mbuiltin:
       forall s f sp rs m ef args res b t vl rs' m' lf,
       external_call' ef ge rs##args m t vl m' ->
       rs' = set_regs res vl (undef_regs (destroyed_by_builtin ef) rs) ->
-      mach_effstep 
-         (BuiltinEffect ge ef (decode_longs (sig_args (ef_sig ef)) (rs##args)) m)
+      mach_effstep (BuiltinEffect ge ef (decode_longs (sig_args (ef_sig ef)) (rs##args)) m)
          (Mach_State s f sp (Mbuiltin ef args res :: b) rs lf) m
          (Mach_State s f sp b rs' lf) m'
 (*NO SUPPORT FOR ANNOT YET
@@ -190,25 +187,25 @@ Inductive mach_effstep: (block -> Z -> bool) ->
         (Mach_State s fb sp (Mjumptable arg tbl :: c) rs lf) m
         (Mach_State s fb sp c' rs' lf) m
   | Mach_effexec_Mreturn:
-      forall s fb stk soff c rs m f m' lf,
+      forall s fb stk soff c rs m f m' sp0 args0 tys0,
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
-      load_stack m (Vptr stk soff) Tint f.(fn_link_ofs) = Some (parent_sp s) ->
+      load_stack m (Vptr stk soff) Tint f.(fn_link_ofs) = Some (parent_sp0 sp0 s) ->
       load_stack m (Vptr stk soff) Tint f.(fn_retaddr_ofs) = Some (parent_ra s) ->
       Mem.free m stk 0 f.(fn_stacksize) = Some m' ->
       mach_effstep (FreeEffect m 0 (f.(fn_stacksize)) stk)
-        (Mach_State s fb (Vptr stk soff) (Mreturn :: c) rs lf) m
-        (Mach_Returnstate s (sig_res (fn_sig f)) rs lf) m'
+        (Mach_State s fb (Vptr stk soff) (Mreturn :: c) rs (mk_load_frame sp0 args0 tys0)) m
+        (Mach_Returnstate s (sig_res (fn_sig f)) rs (mk_load_frame sp0 args0 tys0)) m'
   | Mach_effexec_function_internal:
-      forall s fb rs m f m1 m2 m3 stk rs' lf,
+      forall s fb rs m f m1 m2 m3 stk rs' sp0 args0 tys0,
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       Mem.alloc m 0 f.(fn_stacksize) = (m1, stk) ->
       let sp := Vptr stk Int.zero in
-      store_stack m1 sp Tint f.(fn_link_ofs) (parent_sp s) = Some m2 ->
+      store_stack m1 sp Tint f.(fn_link_ofs) (parent_sp0 sp0 s) = Some m2 ->
       store_stack m2 sp Tint f.(fn_retaddr_ofs) (parent_ra s) = Some m3 ->
       rs' = undef_regs destroyed_at_function_entry rs ->
       mach_effstep EmptyEffect 
-        (Mach_Callstate s fb rs lf) m
-        (Mach_State s fb sp f.(fn_code) rs' lf) m3
+        (Mach_Callstate s fb rs (mk_load_frame sp0 args0 tys0)) m
+        (Mach_State s fb sp f.(fn_code) rs' (mk_load_frame sp0 args0 tys0)) m3
   | Mach_effexec_return:
       forall s f sp ra c retty rs m lf,
       mach_effstep EmptyEffect 
@@ -280,9 +277,8 @@ intros.
     simpl in *. 
     remember (Int.unsigned (fn_link_ofs f)) as z1.
     remember (Int.unsigned (fn_retaddr_ofs f)) as z2.
-    remember (parent_sp s) as v1. 
     remember (parent_ra s) as v2. 
-    clear Heqz1 H Heqz2 Heqv1 Heqv2.
+    clear Heqz1 H Heqz2 Heqv2.
     split; intros.
     { split; intros.
         eapply Mem.perm_store_1; try eassumption.
