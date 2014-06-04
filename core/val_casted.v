@@ -451,6 +451,23 @@ Fixpoint encode_longs (tyl : list typ) (vl : list val) :=
       end
   end.
 
+Fixpoint encode_typs (tyl : list typ) : list typ :=
+  match tyl with
+    | nil => nil
+    | AST.Tlong :: tyl' => AST.Tint :: AST.Tint :: encode_typs tyl'
+    | t :: tyl' => t :: encode_typs tyl'
+  end.
+
+Lemma encode_longs_has_type tyl vl :  
+  Val.has_type_list vl tyl -> 
+  Val.has_type_list (encode_longs tyl vl) (encode_typs tyl).
+Proof.
+revert vl; induction tyl. simpl; auto. 
+destruct vl. intros; contradiction. intros [H H2]. simpl.
+destruct a; try solve[split; auto].
+destruct v; simpl; auto.
+Qed.
+
 Lemma decode_encode_longs tyl vl : 
   Val.has_type_list vl tyl -> 
   decode_longs tyl (encode_longs tyl vl) = vl.
