@@ -4041,16 +4041,26 @@ destruct sl; try solve[inv IN]. destruct IN as [H H0].
 right. omega.
 Qed.
 
-Lemma locmap_set_comm l1 l2 v1 v2 ls :
-  Loc.diff l1 l2 -> 
-  Locmap.set l1 v1 (Locmap.set l2 v2 ls) 
-  = Locmap.set l2 v2 (Locmap.set l1 v1 ls).
+Lemma loc_arguments_gso' z z' vl tys ty1 ty2 v1 v2 ls :
+  z' >= typesize ty1 + typesize ty2 ->
+  Val.has_type v2 ty2 ->
+  Locmap.setlist (loc_arguments_rec tys (z + z')) vl
+     (Locmap.set (S Outgoing z ty1) v1
+        (Locmap.set (S Outgoing (z + typesize ty1) ty2) v2 ls))
+     (S Outgoing (z + typesize ty1) ty2) = v2.
 Proof.
-intros diff.
-apply extensionality; intros l.
-destruct (Loc.diff_dec l1 l). 
+intros size.
+rewrite Locmap.gsetlisto.
 rewrite Locmap.gso.
-Admitted. (*TODO*)
+rewrite Locmap.gss.
+solve[apply Val.load_result_same].
+simpl. right; omega.
+rewrite Loc.notin_iff; intros l' IN.
+apply loc_arguments_rec_charact in IN.
+destruct l'; try solve[inv IN]. 
+destruct sl; try solve[inv IN]. destruct IN as [H H0].
+right. omega.
+Qed.
 
 Lemma agree_args_match_init vals1 vals2 tys j m1 m2 DomS DomT z : 
    vals_defined vals1=true -> 
@@ -4137,15 +4147,13 @@ assert (L: exists n, a = Vlong n).
 { inv H2. exists n'. auto. }
 destruct L as [n L]. rewrite L in *. simpl in TY, DEF. 
 split. inv H2.
-  rewrite locmap_set_comm. 
   generalize (Locmap.set (S Outgoing z Tint) (Vint (Int64.loword n)) ls)
     as ls'.
-  assert (z+2 = (z+1)+1) as -> by omega.
-  generalize (z+1) as z'.
+  assert (z+2 = z+(1+1)) as -> by omega.
   change 1 with (typesize Tint). 
-  intros z' ls'. rewrite loc_arguments_gso; auto. simpl; auto.
-  omega. simpl. auto.
-  simpl. right; omega.
+  remember (typesize Tint+typesize Tint) as z'.
+  intros ls'. rewrite loc_arguments_gso'; auto. simpl; auto.
+  subst z'. simpl. omega. solve[simpl; auto].
 split. inv H2. 
   generalize (Locmap.set (S Outgoing (z+1) Tint) (Vint (Int64.hiword n)) ls)
     as ls'.
