@@ -132,6 +132,20 @@ destruct l'; auto.
 apply IHl; auto.
 Qed.
 
+Lemma agree_args_match_aux_setreg j ls ofs args tys reg v :
+  agree_args_match_aux j ls ofs args tys -> 
+  agree_args_match_aux j (Locmap.set (R reg) v ls) ofs args tys.
+Proof.
+revert ofs args ls; induction tys; simpl; auto.
+destruct args; simpl; auto.
+destruct args; simpl; auto.
+intros ls. destruct a. 
+simpl. intros [a [H [H2 H3]]]. solve[exists a; split; auto].
+simpl. intros [a [H [H2 H3]]]. solve[exists a; split; auto].
+simpl. destruct v0; auto. intros [H [H2 H3]]. solve[split; auto].
+simpl. intros [a [H [H2 H3]]]. solve[exists a; split; auto].
+Qed.
+
 Lemma agree_args_match_aux_setregs j ls ofs args tys rtys rvals :
   agree_args_match_aux j ls ofs args tys -> 
   agree_args_match_aux j (Locmap.setlist R ## (loc_result rtys) rvals ls) ofs args tys.
@@ -149,6 +163,62 @@ simpl. destruct v; auto. intros [H [H2 H3]]. split; auto.
   solve[rewrite loc_setregs_eq; auto].
 simpl. intros [a [H [H2 H3]]]. exists a; split; auto.
   solve[rewrite loc_setregs_eq; auto].
+Qed.
+
+Lemma agree_args_match_aux_set_writable j ls ofs args tys slt z ty v :
+  slot_writable slt=true -> 
+  agree_args_match_aux j ls ofs args tys -> 
+  agree_args_match_aux j (Locmap.set (S slt z ty) v ls) ofs args tys.
+Proof.
+revert ofs args ls; induction tys; simpl; auto.
+destruct args; simpl; auto.
+destruct args; simpl; auto.
+intros ls. destruct a. 
+simpl. intros WR [a [H [H2 H3]]]. 
+  exists a; split; auto. revert WR. destruct slt; try solve[inversion 1].
+  rewrite Locmap.gso; auto. simpl. solve[left; intros C; congruence].
+  rewrite Locmap.gso; auto. simpl. solve[left; intros C; congruence].
+simpl. intros WR [a [H [H2 H3]]]. 
+  exists a; split; auto. revert WR. destruct slt; try solve[inversion 1].
+  rewrite Locmap.gso; auto. simpl. solve[left; intros C; congruence].
+  rewrite Locmap.gso; auto. simpl. solve[left; intros C; congruence].
+simpl. destruct v0; auto. intros WR [H [H2 H3]]. 
+  split. revert WR. destruct slt; try solve[inversion 1].
+  rewrite Locmap.gso; auto. simpl. solve[left; intros C; congruence].
+  rewrite Locmap.gso; auto. simpl. solve[left; intros C; congruence].
+  split. revert WR. destruct slt; try solve[inversion 1].
+  rewrite Locmap.gso; auto. simpl. solve[left; intros C; congruence].
+  rewrite Locmap.gso; auto. simpl. solve[left; intros C; congruence].
+  solve[auto].
+simpl. intros WR [a [H [H2 H3]]]. 
+  exists a; split; auto. revert WR. destruct slt; try solve[inversion 1].
+  rewrite Locmap.gso; auto. simpl. solve[left; intros C; congruence].
+  rewrite Locmap.gso; auto. simpl. solve[left; intros C; congruence].
+Qed.
+
+Lemma undef_regs_get regs ls slt ofs ty :
+   LTL.undef_regs regs ls (S slt ofs ty) = ls (S slt ofs ty).
+Proof.
+revert ls slt ofs ty. induction regs; auto.
+Qed.
+
+Lemma agree_args_match_aux_undef_regs j ls ofs args tys regs :
+  agree_args_match_aux j ls ofs args tys -> 
+  agree_args_match_aux j (LTL.undef_regs regs ls) ofs args tys.
+Proof.
+revert ofs args ls; induction tys; simpl; auto.
+destruct args; simpl; auto.
+destruct args; simpl; auto.
+intros ls. destruct a. 
+simpl. intros [a [H [H2 H3]]]. 
+  exists a; split; auto. solve[rewrite undef_regs_get; auto].
+simpl. intros [a [H [H2 H3]]]. 
+  exists a; split; auto. solve[rewrite undef_regs_get; auto].
+simpl. destruct v; auto. intros [H [H2 H3]]. 
+  split. rewrite undef_regs_get; auto. split; auto.
+  solve[rewrite undef_regs_get; auto].
+simpl. intros [a [H [H2 H3]]]. 
+  exists a; split; auto. solve[rewrite undef_regs_get; auto].
 Qed.
 
 Lemma val_inject_extern_incr mu mu' v1 v2 (WD': SM_wd mu') :
@@ -193,6 +263,9 @@ Fixpoint agree_args_contains_aux m' sp' ofs args tys : Prop :=
         /\ agree_args_contains_aux m' sp' (ofs+1) args' tys'
     | _,_ => False
   end.
+
+(* agree_args. sp' is a pointer to the dummy stack frame initialized 
+   at program startup. *)
 
 Record agree_args (mu: SM_Injection) (args: list val) (tys: list typ)
                   (stack: list Linear.stackframe)
@@ -1132,7 +1205,7 @@ Qed.
 
 Lemma agree_args_invariant:
   forall mu args tys stack ls m' sp' m1' (WD : SM_wd mu),
-  agree_args mu args tys stack ls m' sp' -> 
+  agree_args mu args tys stack ls m' sp' ->
   Mem.unchanged_on (fun b ofs => b=sp') m' m1' ->
   agree_args mu args tys stack ls m1' sp'.
 Proof.
@@ -1169,7 +1242,7 @@ intros b0 z lOf. inv H. apply local_in_all in lOf; auto. exfalso; eauto.
 Qed.
 
 Lemma agree_args_replace_locals mu args tys stack ls m' sp' PS PT :
-  agree_args mu args tys stack ls m' sp' -> 
+  agree_args mu args tys stack ls m' sp' ->
   agree_args (replace_locals mu PS PT) args tys stack ls m' sp'.
 Proof.
 inversion 1; subst.
@@ -1181,7 +1254,7 @@ Qed.
 
 Lemma agree_args_replace_externs mu args tys stack ls m' sp' FS FT 
     (HFS: forall b, vis mu b = true -> locBlocksSrc mu b || FS b = true) :
-  agree_args mu args tys stack ls m' sp' -> 
+  agree_args mu args tys stack ls m' sp' ->
   agree_args (replace_externs mu FS FT) args tys stack ls m' sp'.
 Proof.
 inversion 1; subst.
@@ -1193,19 +1266,43 @@ solve[rewrite replace_externs_as_inj; intros ? ? INJ; eauto].
 solve[rewrite replace_externs_locBlocksTgt; auto].
 Qed.
 
+Lemma agree_args_setreg mu args tys stack ls m' sp' reg v :
+  agree_args mu args tys stack ls m' sp' ->
+  agree_args mu args tys stack (Locmap.set (R reg) v ls) m' sp'.
+Proof.
+inversion 1; subst. constructor; auto.
+intros. subst stack. apply agree_args_match_aux_setreg; auto.
+Qed.
+
 Lemma agree_args_setregs mu args tys stack ls m' sp' rtys rvals :
   agree_args mu args tys stack ls m' sp' ->
   agree_args mu args tys stack (Locmap.setlist R ## (loc_result rtys) rvals ls) m' sp'.
 Proof.
-inversion 1; subst.
-constructor; auto.
+inversion 1; subst. constructor; auto.
 intros. subst stack. apply agree_args_match_aux_setregs; auto.
+Qed.
+
+Lemma agree_args_set_writable mu args tys stack ls m' sp' slt z ty v :
+  slot_writable slt=true ->
+  agree_args mu args tys stack ls m' sp' ->
+  agree_args mu args tys stack (Locmap.set (S slt z ty) v ls) m' sp'.
+Proof.
+intros WR; inversion 1; subst. constructor; auto.
+intros. subst stack. apply agree_args_match_aux_set_writable; auto.
+Qed.
+
+Lemma agree_args_undef_regs mu args tys stack ls m' sp' regs :
+  agree_args mu args tys stack ls m' sp' ->
+  agree_args mu args tys stack (LTL.undef_regs regs ls) m' sp'.
+Proof.
+inversion 1; subst. constructor; auto.
+intros. subst stack. apply agree_args_match_aux_undef_regs; auto.
 Qed.
 
 Lemma agree_args_extern_incr mu mu' args tys stack ls m1 m2 m2' sp' (WD' : SM_wd mu') :
   extern_incr mu mu' ->
   sm_inject_separated mu mu' m1 m2 ->
-  agree_args mu args tys stack ls m2' sp' -> 
+  agree_args mu args tys stack ls m2' sp' ->
   agree_args mu' args tys stack ls m2' sp'.
 Proof.
 inversion 1; subst. constructor; auto. intros. subst stack. 
@@ -3034,13 +3131,13 @@ Inductive match_globalenvs (j: meminj) (bound: block) : Prop :=
 (*Lenb: replaced (j:meminj) by mu, to enable the addition of (SPlocal:
   locBlocksTgt mu sp = true)*)
 
-Inductive match_stacks mu (m m': mem): 
+Inductive match_stacks mu (m m': mem) (sp0: block) : 
        list Linear.stackframe -> list stackframe -> signature -> block -> block -> Prop :=
   | match_stacks_empty: forall sg hi bound bound',
       Ple hi bound -> Ple hi bound' ->
       match_globalenvs (restrict (as_inj mu) (vis mu)) hi ->
       tailcall_possible sg ->
-      match_stacks mu m m' nil nil sg bound bound'
+      match_stacks mu m m' sp0 nil nil sg bound bound'
   | match_stacks_cons: forall f sp ls c cs fb sp' ra c' cs' sg bound bound' trf
         (TAIL: is_tail c (Linear.fn_code f))
         (WTF: wt_function f = true)
@@ -3049,15 +3146,15 @@ Inductive match_stacks mu (m m': mem):
         (TRC: transl_code (make_env (function_bounds f)) c = c')
         (TY_RA: Val.has_type ra Tint)
         (FRM: agree_frame f (restrict (as_inj mu) (vis mu)) ls 
-                          (parent_locset cs) m sp m' sp' (parent_sp cs') (parent_ra cs'))
+                          (parent_locset cs) m sp m' sp' (parent_sp0 sp0 cs') (parent_ra cs'))
         (ARGS: forall ofs ty,
            In (S Outgoing ofs ty) (loc_arguments sg) ->
            slot_within_bounds (function_bounds f) Outgoing ofs ty)
-        (STK: match_stacks mu m m' cs cs' (Linear.fn_sig f) sp sp')
+        (STK: match_stacks mu m m' sp0 cs cs' (Linear.fn_sig f) sp sp')
         (BELOW: Plt sp bound)
         (BELOW': Plt sp' bound')
         (SPlocalTgt: locBlocksTgt mu sp' = true) (*NEW*),
-      match_stacks mu m m'
+      match_stacks mu m m' sp0
                    (Linear.Stackframe f (Vptr sp Int.zero) ls c :: cs)
                    (Stackframe fb (Vptr sp' Int.zero) ra c' :: cs')
                    sg bound bound'.
@@ -3065,11 +3162,11 @@ Inductive match_stacks mu (m m': mem):
 (** Invariance with respect to change of bounds. *)
 
 Lemma match_stacks_change_bounds:
-  forall j m1 m' cs cs' sg bound bound',
-  match_stacks j m1 m' cs cs' sg bound bound' ->
+  forall j m1 m' sp0 cs cs' sg bound bound',
+  match_stacks j m1 m' sp0 cs cs' sg bound bound' ->
   forall xbound xbound',
   Ple bound xbound -> Ple bound' xbound' ->
-  match_stacks j m1 m' cs cs' sg xbound xbound'.
+  match_stacks j m1 m' sp0 cs cs' sg xbound xbound'.
 Proof.
   induction 1; intros. 
   apply match_stacks_empty with hi; auto. apply Ple_trans with bound; eauto. 
@@ -3080,11 +3177,11 @@ Qed.
 (** Invariance with respect to change of [m]. *)
 
 Lemma match_stacks_change_linear_mem:
-  forall j m1 m2 m' cs cs' sg bound bound',
-  match_stacks j m1 m' cs cs' sg bound bound' ->
+  forall j m1 m2 m' sp0 cs cs' sg bound bound',
+  match_stacks j m1 m' sp0 cs cs' sg bound bound' ->
   (forall b, Plt b bound -> Mem.valid_block m1 b -> Mem.valid_block m2 b) ->
   (forall b ofs p, Plt b bound -> Mem.perm m2 b ofs Max p -> Mem.perm m1 b ofs Max p) ->
-  match_stacks j m2 m' cs cs' sg bound bound'.
+  match_stacks j m2 m' sp0 cs cs' sg bound bound'.
 Proof.
   induction 1; intros.
   econstructor; eauto.
@@ -3098,15 +3195,15 @@ Qed.
 (** Invariance with respect to change of [m']. *)
 
 Lemma match_stacks_change_mach_mem:
-  forall mu m m1' m2' cs cs' sg bound bound',
-  match_stacks mu m m1' cs cs' sg bound bound' ->
+  forall mu m m1' sp0 m2' cs cs' sg bound bound',
+  match_stacks mu m m1' sp0 cs cs' sg bound bound' ->
   (forall b, Plt b bound' -> Mem.valid_block m1' b -> Mem.valid_block m2' b) ->
   (forall b ofs k p, Plt b bound' -> Mem.perm m1' b ofs k p -> Mem.perm m2' b ofs k p) ->
   (forall chunk b ofs v, 
      Plt b bound' -> 
      Mem.load chunk m1' b ofs = Some v -> 
      Mem.load chunk m2' b ofs = Some v) ->
-  match_stacks mu m m2' cs cs' sg bound bound'.
+  match_stacks mu m m2' sp0 cs cs' sg bound bound'.
 Proof.
   induction 1; intros.
   econstructor; eauto.
@@ -3121,14 +3218,14 @@ Qed.
 (** A variant of the latter, for use with external calls *)
 
 Lemma match_stacks_change_mem_extcall:
-  forall mu m1 m2 m1' m2' cs cs' sg bound bound',
-  match_stacks mu m1 m1' cs cs' sg bound bound' ->
+  forall mu m1 m2 m1' sp0 m2' cs cs' sg bound bound',
+  match_stacks mu m1 m1' sp0 cs cs' sg bound bound' ->
   (forall b, Plt b bound -> Mem.valid_block m1 b -> Mem.valid_block m2 b) ->
   (forall b ofs p, Plt b bound -> Mem.perm m2 b ofs Max p -> Mem.perm m1 b ofs Max p) ->
   (forall b, Plt b bound' -> Mem.valid_block m1' b -> Mem.valid_block m2' b) ->
   Mem.unchanged_on (local_out_of_reach mu m1) m1' m2' ->
   (*LENB: added:*) SM_wd mu ->
-  match_stacks mu m2 m2' cs cs' sg bound bound'.
+  match_stacks mu m2 m2' sp0 cs cs' sg bound bound'.
 Proof.
   induction 1; intros.
   econstructor; eauto.
@@ -3159,14 +3256,14 @@ Proof.
 Qed.
 
 Lemma match_stacks_change_mem_extcall':
-  forall mu m1 m2 m1' m2' cs cs' sg bound bound',
-  match_stacks mu m1 m1' cs cs' sg bound bound' ->
+  forall mu m1 m2 m1' sp0 m2' cs cs' sg bound bound',
+  match_stacks mu m1 m1' sp0 cs cs' sg bound bound' ->
   (forall b, Plt b bound -> Mem.valid_block m1 b -> Mem.valid_block m2 b) ->
   (forall b ofs p, Plt b bound -> Mem.perm m2 b ofs Max p -> Mem.perm m1 b ofs Max p) ->
   (forall b, Plt b bound' -> Mem.valid_block m1' b -> Mem.valid_block m2' b) ->
   Mem.unchanged_on (loc_out_of_reach (restrict (as_inj mu) (vis mu)) m1) m1' m2' ->
   (*LENB: added:*) SM_wd mu ->
-  match_stacks mu m2 m2' cs cs' sg bound bound'.
+  match_stacks mu m2 m2' sp0 cs cs' sg bound bound'.
 Proof.
   induction 1; intros.
   econstructor; eauto.
@@ -3188,9 +3285,9 @@ Qed.
 (** Invariance with respect to change of [j]. *)
 
 Lemma match_stacks_replace_locals PS PT:
-  forall mu  m m' cs cs' sg bound bound',
-  match_stacks mu  m m' cs cs' sg bound bound' ->
-  match_stacks (replace_locals mu PS PT) m m' cs cs' sg bound bound'.
+  forall mu m m' sp0 cs cs' sg bound bound',
+  match_stacks mu m m' sp0 cs cs' sg bound bound' ->
+  match_stacks (replace_locals mu PS PT) m m' sp0 cs cs' sg bound bound'.
 Proof.
   intros.
    induction H; try econstructor; eauto.
@@ -3200,13 +3297,13 @@ Proof.
 Qed.
 
 Lemma match_stacks_change_meminj_intern:
-  forall mu mu' m m' m1 m1',
+  forall mu mu' m m' sp0 m1 m1',
   intern_incr mu mu' ->
   sm_inject_separated mu mu' m1 m1' ->
   forall cs cs' sg bound bound',
-  match_stacks mu m m' cs cs' sg bound bound' ->
+  match_stacks mu m m' sp0 cs cs' sg bound bound' ->
   Ple bound' (Mem.nextblock m1') -> SM_wd mu -> SM_wd mu' ->
-  match_stacks mu' m m' cs cs' sg bound bound'.
+  match_stacks mu' m m' sp0 cs cs' sg bound bound'.
 Proof.
   induction 3; intros.
   apply match_stacks_empty with hi; auto.
@@ -3252,13 +3349,13 @@ Proof.
 Qed.
 
 Lemma match_stacks_change_meminj_extern:
-  forall mu mu' m m' m1 m1',
+  forall mu mu' m m' sp0 m1 m1',
   extern_incr mu mu' ->
   sm_inject_separated mu mu' m1 m1' ->
   forall cs cs' sg bound bound',
-  match_stacks mu m m' cs cs' sg bound bound' ->
+  match_stacks mu m m' sp0 cs cs' sg bound bound' ->
   Ple bound' (Mem.nextblock m1') -> SM_wd mu -> SM_wd mu' ->
-  match_stacks mu' m m' cs cs' sg bound bound'.
+  match_stacks mu' m m' sp0 cs cs' sg bound bound'.
 Proof.
   induction 3; intros.
   apply match_stacks_empty with hi; auto.
@@ -3286,7 +3383,6 @@ Proof.
                rewrite (extern_incr_vis _ _ H) in H13.
                rewrite H13 in H10.
                discriminate.  
-  (*apply Plt_le_trans with hi. auto. apply Ple_trans with bound'; auto.*)
   econstructor; eauto. 
   eapply agree_frame_inject_incr; eauto.
     eapply extern_incr_restrict; eassumption.
@@ -3310,14 +3406,14 @@ Qed.
 (** Preservation by parallel stores in Linear and Mach. *)
 
 Lemma match_stacks_parallel_stores:
-  forall j m m' chunk addr addr' v v' m1 m1',
+  forall j m m' sp0 chunk addr addr' v v' m1 m1',
   Mem.inject (restrict (as_inj j) (vis j)) m m' ->
   val_inject (restrict (as_inj j) (vis j)) addr addr' ->
   Mem.storev chunk m addr v = Some m1 ->
   Mem.storev chunk m' addr' v' = Some m1' ->
   forall cs cs' sg bound bound',
-  match_stacks j m m' cs cs' sg bound bound' ->
-  match_stacks j m1 m1' cs cs' sg bound bound'.
+  match_stacks j m m' sp0 cs cs' sg bound bound' ->
+  match_stacks j m1 m1' sp0 cs cs' sg bound bound'.
 Proof.
   intros until m1'. intros MINJ VINJ STORE1 STORE2.
   induction 1.
@@ -3328,7 +3424,7 @@ Qed.
 
 (** Invariance by external calls. *)
 Lemma match_stack_change_extcall:
-  forall m1 m2 m1' m2' j j',
+  forall m1 m2 m1' m2' sp0 j j',
 (*  external_call ec ge args m1 t res m2 
     replaced by forward:*) mem_forward m1 m2 ->
 (*  external_call ec ge args' m1' t' res' m2'
@@ -3337,9 +3433,9 @@ Lemma match_stack_change_extcall:
   sm_inject_separated j j' m1 m1' ->
   Mem.unchanged_on (local_out_of_reach j m1) m1' m2' ->
   forall cs cs' sg bound bound',
-  match_stacks j m1 m1' cs cs' sg bound bound' ->
+  match_stacks j m1 m1' sp0 cs cs' sg bound bound' ->
   Ple bound (Mem.nextblock m1) -> Ple bound' (Mem.nextblock m1') ->
-  match_stacks j' m2 m2' cs cs' sg bound bound'.
+  match_stacks j' m2 m2' sp0 cs cs' sg bound bound'.
 Proof.
   intros. 
   eapply match_stacks_change_meminj_extern; eauto. 
@@ -3351,7 +3447,7 @@ Proof.
 Qed.
 
 Lemma match_stack_change_extcall_intern:
-  forall m1 m2 m1' m2' mu mu',
+  forall m1 m2 m1' m2' sp0 mu mu',
 (*  external_call ec ge args m1 t res m2 
     replaced by forward:*) mem_forward m1 m2 ->
 (*  external_call ec ge args' m1' t' res' m2'
@@ -3360,9 +3456,9 @@ Lemma match_stack_change_extcall_intern:
   sm_inject_separated mu mu' m1 m1' ->
   Mem.unchanged_on (loc_out_of_reach (restrict (as_inj mu) (vis mu)) m1) m1' m2' ->
   forall cs cs' sg bound bound',
-  match_stacks mu m1 m1' cs cs' sg bound bound' ->
+  match_stacks mu m1 m1' sp0 cs cs' sg bound bound' ->
   Ple bound (Mem.nextblock m1) -> Ple bound' (Mem.nextblock m1') ->
-  match_stacks mu' m2 m2' cs cs' sg bound bound'.
+  match_stacks mu' m2 m2' sp0 cs cs' sg bound bound'.
 Proof.
   intros. 
   eapply match_stacks_change_meminj_intern; eauto. 
@@ -3376,10 +3472,10 @@ Qed.
 (** Invariance with respect to change of signature *)
 
 Lemma match_stacks_change_sig:
-  forall sg1 j m m' cs cs' sg bound bound',
-  match_stacks j m m' cs cs' sg bound bound' ->
+  forall sg1 j m m' sp0 cs cs' sg bound bound',
+  match_stacks j m m' sp0 cs cs' sg bound bound' ->
   tailcall_possible sg1 ->
-  match_stacks j m m' cs cs' sg1 bound bound'.
+  match_stacks j m m' sp0 cs cs' sg1 bound bound'.
 Proof.
   induction 1; intros.
   econstructor; eauto. 
@@ -3389,16 +3485,16 @@ Qed.
 (** [match_stacks] implies [match_globalenvs], which implies [meminj_preserves_globals]. *)
 
 Lemma match_stacks_globalenvs:
-  forall mu m m' cs cs' sg bound bound',
-  match_stacks mu m m' cs cs' sg bound bound' ->
+  forall mu m m' sp0 cs cs' sg bound bound',
+  match_stacks mu m m' sp0 cs cs' sg bound bound' ->
   exists hi, match_globalenvs (restrict (as_inj mu) (vis mu)) hi.
 Proof.
   induction 1. exists hi; auto. auto.
 Qed.
 
 Lemma match_stacks_preserves_globals:
-  forall j m m' cs cs' sg bound bound',
-  match_stacks j m m' cs cs' sg bound bound' ->
+  forall j m m' sp0 cs cs' sg bound bound',
+  match_stacks j m m' sp0 cs cs' sg bound bound' ->
   meminj_preserves_globals ge (restrict (as_inj j) (vis j)).
 Proof.
   intros. exploit match_stacks_globalenvs; eauto. intros [hi MG]. inv MG.
@@ -3408,8 +3504,8 @@ Qed.
 (** Typing properties of [match_stacks]. *)
 
 Lemma match_stacks_wt_locset:
-  forall j m m' cs cs' sg bound bound',
-  match_stacks j m m' cs cs' sg bound bound' ->
+  forall j m m' sp0 cs cs' sg bound bound',
+  match_stacks j m m' sp0 cs cs' sg bound bound' ->
   wt_locset (parent_locset cs).
 Proof.
   induction 1; simpl.
@@ -3418,16 +3514,16 @@ Proof.
 Qed.
 
 Lemma match_stacks_type_sp:
-  forall j m m' cs cs' sg bound bound',
-  match_stacks j m m' cs cs' sg bound bound' ->
-  Val.has_type (parent_sp cs') Tint.
+  forall j m m' sp0 cs cs' sg bound bound',
+  match_stacks j m m' sp0 cs cs' sg bound bound' ->
+  Val.has_type (parent_sp0 sp0 cs') Tint.
 Proof.
   induction 1; simpl; auto.
 Qed.
 
 Lemma match_stacks_type_retaddr:
-  forall j m m' cs cs' sg bound bound',
-  match_stacks j m m' cs cs' sg bound bound' ->
+  forall j m m' sp0 cs cs' sg bound bound',
+  match_stacks j m m' sp0 cs cs' sg bound bound' ->
   Val.has_type (parent_ra cs') Tint.
 Proof.
   induction 1; simpl; auto.
@@ -3435,11 +3531,11 @@ Qed.
 
 (** Preservation by restriction *)
   
-Lemma match_stacks_restrict mu m m' cs cs' sg bound bound' X:
-  forall (MS: match_stacks mu m m' cs cs' sg bound bound')
+Lemma match_stacks_restrict mu m m' sp0 cs cs' sg bound bound' X:
+  forall (MS: match_stacks mu m m' sp0 cs cs' sg bound bound')
          (HX : forall b : block, vis mu b = true -> X b = true)
          (WDR : SM_wd (restrict_sm mu X)),
-      match_stacks (restrict_sm mu X) m m' cs cs' sg bound bound'.
+      match_stacks (restrict_sm mu X) m m' sp0 cs cs' sg bound bound'.
 Proof.
   induction 1; simpl; econstructor; try eassumption.
   rewrite vis_restrict_sm. rewrite restrict_sm_all.
@@ -3655,9 +3751,9 @@ Proof.
 Qed.
 
 Lemma find_function_translated:
-  forall mu ls rs m m' cs cs' sg bound bound' ros f,
+  forall mu ls rs m m' sp0 cs cs' sg bound bound' ros f,
   agree_regs (restrict (as_inj mu) (vis mu)) ls rs ->
-  match_stacks mu m m' cs cs' sg bound bound' ->
+  match_stacks mu m m' sp0 cs cs' sg bound bound' ->
   Linear.find_function ge ros ls = Some f ->
   exists bf, exists tf,
      find_function_ptr tge ros rs = Some bf
@@ -3706,12 +3802,12 @@ Variable m2: mem.
 
 (*NEW*)
 Lemma transl_external_argument_fun:
-  forall l (Hl: In l (loc_arguments sg))
+  forall l (Hl: In l (loc_arguments sg)) sp0
   (HH: forall ofs ty ch, In (S Outgoing ofs ty) (loc_arguments sg) ->
-          Mem.loadv ch m1 (Val.add (parent_sp cs') (Vint (Int.repr (fe_ofs_arg + 4 * ofs)))) =
-          Mem.loadv ch m2 (Val.add (parent_sp cs') (Vint (Int.repr (fe_ofs_arg + 4 * ofs)))))
-  v1 (EC1: extcall_arg rs m1 (parent_sp cs') l v1)
-  v2 (EC2: extcall_arg rs m2 (parent_sp cs') l v2), v1=v2. 
+          Mem.loadv ch m1 (Val.add (parent_sp0 sp0 cs') (Vint (Int.repr (fe_ofs_arg + 4 * ofs)))) =
+          Mem.loadv ch m2 (Val.add (parent_sp0 sp0 cs') (Vint (Int.repr (fe_ofs_arg + 4 * ofs)))))
+  v1 (EC1: extcall_arg rs m1 (parent_sp0 sp0 cs') l v1)
+  v2 (EC2: extcall_arg rs m2 (parent_sp0 sp0 cs') l v2), v1=v2. 
 Proof.
   intros.
   assert (loc_argument_acceptable l). apply loc_arguments_acceptable with sg; auto.
@@ -3723,12 +3819,12 @@ Qed.
 
 (*NEW*)
 Lemma transl_external_arguments_rec_fun:
-  forall locs (Hlocs: incl locs (loc_arguments sg))
+  forall locs (Hlocs: incl locs (loc_arguments sg)) sp0
   (HH: forall ofs ty ch, In (S Outgoing ofs ty) (loc_arguments sg) ->
-          Mem.loadv ch m1 (Val.add (parent_sp cs') (Vint (Int.repr (fe_ofs_arg + 4 * ofs)))) =
-          Mem.loadv ch m2 (Val.add (parent_sp cs') (Vint (Int.repr (fe_ofs_arg + 4 * ofs)))))
-  vl1 (VL1: list_forall2 (extcall_arg rs m1 (parent_sp cs')) locs vl1)
-  vl2 (VL2: list_forall2 (extcall_arg rs m2 (parent_sp cs')) locs vl2),
+          Mem.loadv ch m1 (Val.add (parent_sp0 sp0 cs') (Vint (Int.repr (fe_ofs_arg + 4 * ofs)))) =
+          Mem.loadv ch m2 (Val.add (parent_sp0 sp0 cs') (Vint (Int.repr (fe_ofs_arg + 4 * ofs)))))
+  vl1 (VL1: list_forall2 (extcall_arg rs m1 (parent_sp0 sp0 cs')) locs vl1)
+  vl2 (VL2: list_forall2 (extcall_arg rs m2 (parent_sp0 sp0 cs')) locs vl2),
   vl1 = vl2.  
 Proof.
   induction locs; simpl; intros.
@@ -3737,18 +3833,19 @@ Proof.
   f_equal. 
     eapply transl_external_argument_fun.
     instantiate (1:=a). eapply Hlocs. left; trivial.
-    assumption. assumption. assumption. 
+    eauto. assumption. assumption. 
   eapply IHlocs; trivial.
     red; intros. eapply Hlocs. right; trivial.
+    eauto. auto. auto.
 Qed.
 
 (*NEW*)
-Lemma transl_external_arguments_fun: forall vl1 vl2
+Lemma transl_external_arguments_fun: forall vl1 vl2 sp0
       (HH: forall ofs ty ch, In (S Outgoing ofs ty) (loc_arguments sg) ->
-        Mem.loadv ch m1 (Val.add (parent_sp cs') (Vint (Int.repr (fe_ofs_arg + 4 * ofs)))) =
-        Mem.loadv ch m2 (Val.add (parent_sp cs') (Vint (Int.repr (fe_ofs_arg + 4 * ofs)))))
-      (EA1: extcall_arguments rs m1 (parent_sp cs') sg vl1)
-      (EA2: extcall_arguments rs m2 (parent_sp cs') sg vl2), vl1=vl2.
+        Mem.loadv ch m1 (Val.add (parent_sp0 sp0 cs') (Vint (Int.repr (fe_ofs_arg + 4 * ofs)))) =
+        Mem.loadv ch m2 (Val.add (parent_sp0 sp0 cs') (Vint (Int.repr (fe_ofs_arg + 4 * ofs)))))
+      (EA1: extcall_arguments rs m1 (parent_sp0 sp0 cs') sg vl1)
+      (EA2: extcall_arguments rs m2 (parent_sp0 sp0 cs') sg vl2), vl1=vl2.
 Proof.
   unfold extcall_arguments. intros. 
   eapply transl_external_arguments_rec_fun; try eassumption.
@@ -3765,7 +3862,8 @@ Variable cs: list Linear.stackframe.
 Variable cs': list stackframe.
 Variable sg: signature.
 Variables bound bound': block.
-Hypothesis MS: match_stacks mu m m' cs cs' sg bound bound'.
+Variable sp0: block.
+Hypothesis MS: match_stacks mu m m' sp0 cs cs' sg bound bound'.
 Variable ls: locset.
 Variable rs: regset.
 Hypothesis AGR: agree_regs (restrict (as_inj mu) (vis mu)) ls rs.
@@ -3774,7 +3872,7 @@ Hypothesis AGCS: agree_callee_save ls (parent_locset cs).
 Lemma transl_external_argument:
   forall l,
   In l (loc_arguments sg) ->
-  exists v, extcall_arg rs m' (parent_sp cs') l v /\ val_inject (restrict (as_inj mu) (vis mu)) (ls l) v.
+  exists v, extcall_arg rs m' (parent_sp0 sp0 cs') l v /\ val_inject (restrict (as_inj mu) (vis mu)) (ls l) v.
 Proof.
   intros.
   assert (loc_argument_acceptable l). apply loc_arguments_acceptable with sg; auto.
@@ -3801,7 +3899,7 @@ Lemma transl_external_arguments_rec:
   forall locs,
   incl locs (loc_arguments sg) ->
   exists vl,
-  list_forall2 (extcall_arg rs m' (parent_sp cs')) locs vl
+  list_forall2 (extcall_arg rs m' (parent_sp0 sp0 cs')) locs vl
   /\ val_list_inject (restrict (as_inj mu) (vis mu)) ls##locs vl.
 Proof.
   induction locs; simpl; intros.
@@ -3813,7 +3911,7 @@ Qed.
 
 Lemma transl_external_arguments:
   exists vl,
-  extcall_arguments rs m' (parent_sp cs') sg vl /\
+  extcall_arguments rs m' (parent_sp0 sp0 cs') sg vl /\
   val_list_inject (restrict (as_inj mu) (vis mu)) (ls ## (loc_arguments sg)) vl.
 Proof.
   unfold extcall_arguments. 
@@ -3907,16 +4005,18 @@ End ANNOT_ARGUMENTS.
 Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
   | match_states_intro:
       forall cs f sp c ls m cs' fb sp' rs m' tf args0 tys0 sp0
-        (STACKS: match_stacks mu m m' cs cs' f.(Linear.fn_sig) sp sp')
+        (STACKS: match_stacks mu m m' sp0 cs cs' f.(Linear.fn_sig) sp sp')
         (TRANSL: transf_function f = OK tf)
         (FIND: Genv.find_funct_ptr tge fb = Some (Internal tf))
         (WTF: wt_function f = true)
         (AGREGS: agree_regs (restrict (as_inj mu) (vis mu)) ls rs)
         (AGFRAME: agree_frame f (restrict (as_inj mu) (vis mu)) ls 
-                              (parent_locset cs) m sp m' sp' (parent_sp cs') (parent_ra cs'))
+                              (parent_locset cs) m sp m' sp' 
+                              (parent_sp0 sp0 cs') (parent_ra cs'))
         (TAIL: is_tail c (Linear.fn_code f))
         (SPlocalTgt: locBlocksTgt mu sp' = true) (*NEW*)
-        (AGARGS: agree_args mu args0 tys0 cs ls m' sp0), 
+        (AGARGS: agree_args mu args0 tys0 cs ls m' sp0)
+        (SPNEQ: sp0<>sp'),
       match_states mu
         (Linear_State cs f (Vptr sp Int.zero) c ls) m
         (Mach_State cs' fb (Vptr sp' Int.zero) 
@@ -3934,7 +4034,7 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
 
   | match_states_call_intern:
       forall cs f ls m cs' fb rs m' tf args0 tys0 sp0
-        (STACKS: match_stacks mu m m' cs cs' 
+        (STACKS: match_stacks mu m m' sp0 cs cs' 
                    (Linear.funsig f) (Mem.nextblock m) (Mem.nextblock m'))
         (TRANSL: transf_fundef f = OK (Internal tf))
         (FIND: Genv.find_funct_ptr tge fb = Some (Internal tf))
@@ -3947,14 +4047,14 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
 
   | match_states_call_extern:
       forall cs f ls m cs' fb rs m' tf args0 tys0 sp0
-        (STACKS: match_stacks mu m m' cs cs' 
+        (STACKS: match_stacks mu m m' sp0 cs cs' 
                    (Linear.funsig f) (Mem.nextblock m) (Mem.nextblock m'))
         (TRANSL: transf_fundef f = OK (External tf))
         (FIND: Genv.find_funct_ptr tge fb = Some (External tf))
         (WTLS: wt_locset ls)
         (AGREGS: agree_regs (restrict (as_inj mu) (vis mu)) ls rs)
         (AGLOCS: agree_callee_save ls (parent_locset cs))
-        args (GETARGS: extcall_arguments rs m' (parent_sp cs') (ef_sig tf) args)
+        args (GETARGS: extcall_arguments rs m' (parent_sp0 sp0 cs') (ef_sig tf) args)
         (AGARGS: agree_args mu args0 tys0 cs ls m' sp0),
       match_states mu (Linear_Callstate cs f ls) m
                      (Mach_CallstateOut cs' fb tf args rs 
@@ -3963,7 +4063,7 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
   | match_states_return:
       forall cs ls m cs' retty rs m' sg args0 tys0 sp0
         (*(MINJ: Mem.inject j m m')*)
-        (STACKS: match_stacks mu m m' cs cs'
+        (STACKS: match_stacks mu m m' sp0 cs cs'
                               sg (Mem.nextblock m) (Mem.nextblock m'))
         (WTLS: wt_locset ls)
         (AGREGS: agree_regs (restrict (as_inj mu) (vis mu)) ls rs)
@@ -4490,11 +4590,11 @@ induction args; simpl.
 Qed. 
 
 Lemma match_stacks_replace_externs FSrc FTgt:
-  forall mu  m m' cs cs' sg bound bound'
+  forall mu m m' sp0 cs cs' sg bound bound'
   (PGmu: meminj_preserves_globals (Genv.globalenv prog) (as_inj mu))
   (HFSrc: forall b, vis mu b = true -> locBlocksSrc mu b || FSrc b = true),
-  match_stacks mu  m m' cs cs' sg bound bound' -> SM_wd mu ->
-  match_stacks (replace_externs mu FSrc FTgt) m m' cs cs' sg bound bound'.
+  match_stacks mu m m' sp0 cs cs' sg bound bound' -> SM_wd mu ->
+  match_stacks (replace_externs mu FSrc FTgt) m m' sp0 cs cs' sg bound bound'.
 Proof.
   intros.
    induction H; try econstructor; eauto.
@@ -4865,13 +4965,14 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   try (generalize (function_is_within_bounds f _ (is_tail_in TAIL));
        intro BOUND; simpl in BOUND);
   unfold transl_instr.
-(* Lgetstack *)
+
+  (* Lgetstack *)
   destruct BOUND. unfold destroyed_by_getstack; destruct sl.
   (* Lgetstack, local *)
   exploit agree_locals; eauto. intros [v [A B]].
   eexists; eexists; split.
     apply corestep_plus_one. apply Mach_exec_Mgetstack. 
-    eapply index_contains_load_stack; eauto.
+    solve[eapply index_contains_load_stack; eauto].
   exists mu.
   split. apply intern_incr_refl. 
   split. apply sm_inject_separated_same_sminj.
@@ -4880,12 +4981,16 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). solve[intuition].
   constructor.
     econstructor; eauto with coqlib.
     apply agree_regs_set_reg; auto.
-    apply agree_frame_set_reg; auto. simpl. eapply Val.has_subtype; eauto. eapply agree_wt_ls; eauto.
-  intuition.
+    apply agree_frame_set_reg; auto. simpl. eapply Val.has_subtype; eauto. 
+      solve[eapply agree_wt_ls; eauto].
+    (* agree_args *)
+    solve[apply agree_args_setreg; auto].
+  solve[intuition].
+
   (* Lgetstack, incoming *)
   unfold slot_valid in H0. InvBooleans.
   exploit incoming_slot_in_parameters; eauto. intros IN_ARGS.
@@ -4900,8 +5005,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   eexists; eexists; split.
     apply corestep_plus_one. eapply Mach_exec_Mgetparam; eauto. 
     rewrite (unfold_transf_function _ _ TRANSL). unfold fn_link_ofs. 
-    eapply index_contains_load_stack with (idx := FI_link). eapply TRANSL. eapply agree_link; eauto.
-    simpl parent_sp.
+    eapply index_contains_load_stack with (idx := FI_link). eapply TRANSL. 
+      eapply agree_link; eauto.
+    simpl parent_sp0.
     change (offset_of_index (make_env (function_bounds f)) (FI_arg ofs ty))
       with (offset_of_index (make_env (function_bounds f0)) (FI_arg ofs ty)).
     eapply index_contains_load_stack with (idx := FI_arg ofs ty). eauto. eauto.
@@ -4922,7 +5028,10 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     apply caller_save_reg_within_bounds. 
     apply temp_for_parent_frame_caller_save.
     simpl. eapply Val.has_subtype; eauto. eapply agree_wt_ls; eauto.
-  intuition.
+    (* agree_args *)
+    { inv AGARGS. simpl. constructor; auto. inversion 1. }
+  solve[intuition].
+
   (* Lgetstack, outgoing *)
   exploit agree_outgoing; eauto. intros [v [A B]].
   eexists; eexists; split.
@@ -4942,7 +5051,13 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     apply agree_regs_set_reg; auto.
     apply agree_frame_set_reg; auto.
     simpl. eapply Val.has_subtype; eauto. eapply agree_wt_ls; eauto.
-  intuition.
+    (* agree_args *)
+    { inv STACKS. inv AGARGS. simpl. constructor; auto. intros _.
+      generalize (agree_args_match0 (eq_refl _)). 
+      solve[apply agree_args_match_aux_setreg].
+      inv AGARGS. constructor; auto. solve[inversion 1]. }
+  solve[intuition].
+
 (* Lsetstack *)
   set (idx := match sl with
               | Local => FI_local ofs ty
@@ -4992,6 +5107,13 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       assumption.  
     eauto with coqlib.
     assumption.
+    (* agree_args *)
+    { apply agree_args_invariant with (m' := m2).
+      solve[destruct PRE as [? [? [? [? ?]]]]; auto].
+      apply agree_args_set_writable; auto.
+      apply agree_args_undef_regs; auto.
+      eapply Mem.store_unchanged_on; eauto. }
+    solve[auto].
 
   intuition.
   eapply Mem.store_outside_inject; eauto. 
@@ -5024,7 +5146,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     destruct args; simpl in H. discriminate. destruct args. discriminate. simpl in H. discriminate.
     rewrite TYOP; auto. 
   assert (exists v',
-          eval_operation ge (Vptr sp' Int.zero) (transl_op (make_env (function_bounds f)) op) rs0##args m2 = Some v'
+          eval_operation ge (Vptr sp' Int.zero) 
+                         (transl_op (make_env (function_bounds f)) op) rs0##args m2 
+          = Some v'
        /\ val_inject (restrict (as_inj mu) (vis mu)) v v').
   eapply eval_operation_inject; eauto.
   eapply match_stacks_preserves_globals; eauto.
@@ -5050,11 +5174,14 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     rewrite transl_destroyed_by_op.  apply agree_regs_undef_regs; auto. 
     apply agree_frame_set_reg; auto. apply agree_frame_undef_locs; auto.
     apply destroyed_by_op_caller_save.
-  intuition.
+    solve[apply agree_args_setreg; apply agree_args_undef_regs; auto].
+  solve[intuition].
 
   (* Lload *)
   assert (exists a',
-          eval_addressing ge (Vptr sp' Int.zero) (transl_addr (make_env (function_bounds f)) addr) rs0##args = Some a'
+          eval_addressing ge (Vptr sp' Int.zero) 
+                          (transl_addr (make_env (function_bounds f)) addr) rs0##args 
+          = Some a'
        /\ val_inject (restrict (as_inj mu) (vis mu)) a a').
   eapply eval_addressing_inject; eauto. 
   eapply match_stacks_preserves_globals; eauto.
@@ -5079,15 +5206,20 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
   constructor.    
     econstructor; eauto with coqlib.
-    apply agree_regs_set_reg. rewrite transl_destroyed_by_load. apply agree_regs_undef_regs; auto. auto. 
+    apply agree_regs_set_reg. rewrite transl_destroyed_by_load. 
+      apply agree_regs_undef_regs; auto. auto. 
     apply agree_frame_set_reg. apply agree_frame_undef_locs; auto.
     apply destroyed_by_load_caller_save. auto. 
-    simpl. eapply Val.has_subtype; eauto. destruct a; simpl in H0; try discriminate. eapply Mem.load_type; eauto.
+    simpl. eapply Val.has_subtype; eauto. destruct a; simpl in H0; try discriminate. 
+      eapply Mem.load_type; eauto.
+    solve[apply agree_args_setreg; apply agree_args_undef_regs; auto].
   intuition.
 
   (* Lstore *)
   assert (exists a',
-          eval_addressing ge (Vptr sp' Int.zero) (transl_addr (make_env (function_bounds f)) addr) rs0##args = Some a'
+          eval_addressing ge (Vptr sp' Int.zero) 
+                          (transl_addr (make_env (function_bounds f)) addr) rs0##args 
+          = Some a'
        /\ val_inject (restrict (as_inj mu) (vis mu))  a a').
   eapply eval_addressing_inject; eauto. 
   eapply match_stacks_preserves_globals; eauto.
@@ -5105,7 +5237,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   intros [m1' [C D]].
   eexists; eexists; split.   
     apply corestep_plus_one. econstructor. 
-    instantiate (1 := a'). rewrite <- A. apply eval_addressing_preserved. exact symbols_preserved.
+    instantiate (1 := a'). rewrite <- A. apply eval_addressing_preserved. 
+      exact symbols_preserved.
     eexact C. eauto.
   assert (SMV': sm_valid mu m' m1').
     destruct PRE as [RC [PG [ Glob [SMV WD]]]].
@@ -5134,13 +5267,21 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     apply agree_frame_undef_locs; auto.
     eapply agree_frame_parallel_stores; eauto.
     apply destroyed_by_store_caller_save. 
+    apply agree_args_undef_regs.
+    assert (NEQ: b1 <> sp1).
+    { intros C. subst b1. inv B. 
+      apply restrictD_Some in H3. destruct H3 as [H3 H4].
+      inv AGARGS. apply agree_sp_fresh0 in H3; auto. }
+    eapply agree_args_invariant; eauto.
+    destruct PRE as [? [? [? [? ?]]]]; auto.
+    solve[eapply Mem.store_unchanged_on; eauto].
   intuition.
   eapply REACH_Store; try eassumption. 
     inv B. destruct (restrictD_Some _ _ _ _ _ H8); trivial.
     intros b' Hb'. rewrite getBlocks_char in Hb'. destruct Hb' as [off Hoff].
        destruct Hoff; try contradiction. subst.   
        rewrite H4 in VINJR. inv VINJR.
-       destruct (restrictD_Some _ _ _ _ _ H9); trivial.
+       solve[destruct (restrictD_Some _ _ _ _ _ H9); trivial].
 
   (* Lcall *)
   exploit find_function_translated; eauto. intros [bf [tf' [A [B C]]]].
@@ -5149,7 +5290,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   exploit return_address_offset_exists. eexact IST.
   intros [ra D].
   assert (mtch_stack_intermediate: 
-    match_stacks mu m m2 (Linear.Stackframe f (Vptr sp0 Int.zero) rs b :: s)
+    match_stacks mu m m2 sp1
+                         (Linear.Stackframe f (Vptr sp0 Int.zero) rs b :: s)
                          (Stackframe fb (Vptr sp' Int.zero) (Vptr fb ra)
                            (transl_code (make_env (function_bounds f)) b) :: cs')
                          (Linear.funsig f') (Mem.nextblock m) (Mem.nextblock m2)).
@@ -5160,7 +5302,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       apply loc_arguments_bounded; auto.
     eapply agree_valid_linear; eauto.
     eapply agree_valid_mach; eauto.
-  assert (AGCS: agree_callee_save rs (parent_locset (Linear.Stackframe f (Vptr sp0 Int.zero) rs b :: s))). 
+  assert (AGCS: agree_callee_save rs 
+                  (parent_locset (Linear.Stackframe f (Vptr sp0 Int.zero) rs b :: s))). 
     simpl; red; auto.
 
   (*New: distinguish whether invoked function is internal or external - 
@@ -5182,7 +5325,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   constructor.
     econstructor; eauto.
       eapply agree_wt_ls; eauto.
-  intuition.
+      inv AGARGS. constructor; auto. inversion 1. 
+  solve[intuition].
 
   (*Lcall: case external function call. *)
   exploit transl_external_arguments; try eapply mtch_stack_intermediate; try eassumption.
@@ -5190,13 +5334,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   assert (SG: ef_sig e = Linear.funsig f'). apply sig_preserved in C; apply C.
   rewrite <- SG in ExtArgs'.
   eexists; eexists.
-  split. (*eapply corestep_plus_two.
-         econstructor.
-           eapply A. eapply FIND. eapply D. eapply B.
-
-         (*Here's the extra step: *)
-         eapply Mach_exec_function_external. 
-           eapply B. apply ExtArgs' .*)
+  split. 
      eapply corestep_plus_one.
        eapply Mach_exec_Mcall_external; eauto.
   exists mu.
@@ -5211,30 +5349,33 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   split.
     eapply match_states_call_extern; eauto.
       eapply agree_wt_ls; eauto.
-  intuition.
+      inv AGARGS. constructor; auto. inversion 1.       
+  solve[intuition].
 
   (* Ltailcall_internal *)
   destruct PRE as [RC [PG [ Glob [SMV WD]]]].
   exploit function_epilogue_correct; eauto.
   intros [rs1 [m1' [P [Q [R [S [T [U V]]]]]]]].
   exploit find_function_translated; eauto. intros [bf [tf' [A [B C]]]].
-  assert (MSF':  match_stacks mu m m2 s cs' (Linear.funsig f') stk sp').
+  assert (MSF': match_stacks mu m m2 sp0 s cs' (Linear.funsig f') stk sp').
       eapply match_stacks_change_sig. eassumption.
-      apply zero_size_arguments_tailcall_possible; auto.
+      solve[apply zero_size_arguments_tailcall_possible; auto].
   clear STACKS.
-  assert (MS: match_stacks mu m' m1' s cs' (Linear.funsig f') 
+  assert (MS: match_stacks mu m' m1' sp0 s cs' (Linear.funsig f') 
            (Mem.nextblock m') (Mem.nextblock m1')).
-    (*apply match_stacks_change_sig with (Linear.fn_sig f); auto.*)
-    apply match_stacks_change_bounds with stk sp'.
+  { apply match_stacks_change_bounds with stk sp'.
     apply match_stacks_change_linear_mem with m. 
     apply match_stacks_change_mach_mem with m2.
     apply MSF'.
     eauto with mem. intros. eapply Mem.perm_free_1; eauto. 
     intros. rewrite <- H3. eapply Mem.load_free; eauto. 
     eauto with mem. intros. eapply Mem.perm_free_3; eauto. 
-    apply Plt_Ple. change (Mem.valid_block m' stk). eapply Mem.valid_block_free_1; eauto. eapply agree_valid_linear; eauto. 
-    apply Plt_Ple. change (Mem.valid_block m1' sp'). eapply Mem.valid_block_free_1; eauto. eapply agree_valid_mach; eauto. 
-    (*apply zero_size_arguments_tailcall_possible; auto.*)
+    apply Plt_Ple. change (Mem.valid_block m' stk). 
+      eapply Mem.valid_block_free_1; eauto. eapply agree_valid_linear; eauto. 
+    apply Plt_Ple. change (Mem.valid_block m1' sp'). 
+    eapply Mem.valid_block_free_1; eauto. 
+    eapply agree_valid_mach; eauto. }
+
   (*New: distinguish whether invoked function is internal or external - 
     in the latter case, we now perform an additional step*)
   destruct f'.
@@ -5246,7 +5387,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     eapply corestep_star_plus_trans.
       eexact S.
       eapply corestep_plus_one.
-       eapply Mach_exec_Mtailcall_internal; eauto.
+       solve[eapply Mach_exec_Mtailcall_internal; eauto].
   exists mu.
   split. apply intern_incr_refl. 
   split. apply sm_inject_separated_same_sminj.
@@ -5259,14 +5400,18 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   split.
     eapply match_states_call_intern; eauto.
     simpl. unfold bind. rewrite EQ. reflexivity.
-    apply wt_return_regs; auto. eapply match_stacks_wt_locset; eauto. eapply agree_wt_ls; eauto.
+    apply wt_return_regs; auto. 
+    eapply match_stacks_wt_locset; eauto. 
+    eapply agree_wt_ls; eauto.
+    revert AGARGS.
+    admit. (*TODO*)
   intuition.
     eapply REACH_closed_free; try eassumption.
     split; intros. 
       eapply Mem.valid_block_free_1; try eassumption.
         eapply SMV; assumption.
       eapply Mem.valid_block_free_1; try eassumption.
-        eapply SMV; assumption.
+        solve[eapply SMV; assumption].
   
   (*Mtailcall: case f' = External e*)
   exploit transl_external_arguments.
@@ -5281,10 +5426,6 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   eexists; eexists; split.
     eapply corestep_star_plus_trans.
       eexact S.
-    (*eapply corestep_plus_two.
-      econstructor; eauto.
-      (*Here's the extra step:*)
-      eapply Mach_exec_function_external. eassumption. eapply ExtCallArgs.*)
      eapply corestep_plus_one.
       eapply Mach_exec_Mtailcall_external; eassumption. 
   exists mu.
@@ -5297,28 +5438,17 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       apply extensionality; intros; rewrite (freshloc_free _ _ _ _ _ H2). intuition.
       apply extensionality; intros; rewrite (freshloc_free _ _ _ _ _ R). intuition.
   split.
-(*    exploit transl_external_arguments. eapply MS.
-       eassumption. assumption.
-    intros [targs1 [ExtCallArgs1 ArgsInj1]].
-    exploit transl_external_arguments_fun.
-        2:eapply ExtCallArgs. 2:eapply ExtCallArgs1. 
-       intros. clear S ExtCallArgs ArgsInj ExtCallArgs1 ArgsInj1.
-      unfold size_arguments in H. unfold loc_arguments in H1. 
-       remember (sig_args (funsig (External e))) as args.  
-       destruct (size_arguments_id args 0). apply H3 in H.
-       rewrite H in *. simpl in H1. contradiction.
-    intros. subst. clear ArgsInj1 ExtCallArgs.*)
     eapply match_states_call_extern; eauto. 
     apply wt_return_regs; auto. eapply match_stacks_wt_locset; eauto.
      eapply agree_wt_ls; eauto.
+     admit. (*TODO*)
   intuition.
     eapply REACH_closed_free; try eassumption.
     split; intros. 
       eapply Mem.valid_block_free_1; try eassumption.
         eapply SMV; assumption.
       eapply Mem.valid_block_free_1; try eassumption.
-        eapply SMV; assumption.
-
+        solve[eapply SMV; assumption].
 
   (* Mbuiltin*)
   destruct PRE as [RC [PG [Glob [SMV WD]]]].
@@ -5340,7 +5470,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   intuition.
   split.
     econstructor; eauto with coqlib. 
-    eapply (match_stack_change_extcall_intern m m' m2 tm' mu); try assumption.
+    eapply (match_stack_change_extcall_intern m m' m2 tm' sp1 mu); try assumption.
         eapply external_call_mem_forward; eassumption.
         eapply external_call_mem_forward; eassumption.
       apply Plt_Ple. change (Mem.valid_block m sp0). eapply agree_valid_linear; eauto.
@@ -5377,14 +5507,18 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
                       rewrite (intern_incr_vis_inv _ _ WD WD' INCR _ _ _ AI1 H4) in Vis. discriminate.
                     assumption.
               eapply AGFRAME.
-        rewrite list_Loc_type_mreg. eapply Val.has_subtype_list. eassumption. eapply external_call_well_typed'. econstructor. eapply H0. trivial.
+        rewrite list_Loc_type_mreg. eapply Val.has_subtype_list. eassumption. 
+          eapply external_call_well_typed'. econstructor. eapply H0. trivial.
     eapply INCR. assumption.
+    (* agree_args *)
+    { admit. }
   intuition.
   eapply meminj_preserves_incr_sep. eapply PG. eassumption. 
              apply intern_incr_as_inj; trivial.
              apply sm_inject_separated_mem; eassumption.
   assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
           rewrite <- FRG. eapply (Glob _ H1).  
+
   (* Llabel *)
   eexists; eexists; split.
     apply corestep_plus_one; apply Mach_exec_Mlabel.
@@ -5400,6 +5534,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   split.
     econstructor; eauto with coqlib.
     intuition.
+
   (* Lgoto *)
   eexists; eexists; split.
     apply corestep_plus_one; eapply Mach_exec_Mgoto; eauto.
@@ -5417,6 +5552,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     econstructor; eauto. 
       eapply find_label_tail; eauto.
     intuition.
+
   (* Lcond, true *)
   assert (INJR: Mem.inject (restrict (as_inj mu) (vis mu)) m m2).
     eapply inject_restrict; try eassumption. eapply PRE.
@@ -5436,11 +5572,13 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
   split.
     econstructor. eauto. eauto. eauto. eauto. eauto. 
-(*    apply agree_regs_undef_regs; auto. *)
     apply agree_frame_undef_locs; auto. apply destroyed_by_cond_caller_save. 
     eapply find_label_tail; eauto.
     assumption.
-  intuition.
+    solve[apply agree_args_undef_regs; auto].
+    solve[auto].
+  solve[intuition].
+
   (* Lcond, false *)
   assert (INJR: Mem.inject (restrict (as_inj mu) (vis mu)) m m2).
     eapply inject_restrict; try eassumption. eapply PRE.
@@ -5459,11 +5597,12 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
   split.
     econstructor. eauto. eauto. eauto. eauto. eauto. 
-    (*  apply agree_regs_undef_regs; auto. *)
     apply agree_frame_undef_locs; auto. apply destroyed_by_cond_caller_save. 
     eauto with coqlib.
     assumption.
-  intuition.
+    solve[apply agree_args_undef_regs; auto].
+    solve[auto].
+  solve[intuition].
 
   (* Ljumptable *)
   assert (rs0 arg = Vint n).
@@ -5482,13 +5621,15 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
   split.  
     econstructor. eauto. eauto. eauto. eauto. eauto.
-    (*apply agree_regs_undef_regs; auto.*)
     apply agree_frame_undef_locs; auto. apply destroyed_by_jumptable_caller_save.
     eapply find_label_tail; eauto.
     assumption.
-  intuition.
+    solve[apply agree_args_undef_regs; auto].
+    solve[auto].
+  solve[intuition].
+
   (* Lreturn *)
-  destruct PRE as [RC [PG [ Glob [SMV WD]]]].
+  destruct PRE as [RC [PG [Glob [SMV WD]]]].
   assert (INJR: Mem.inject (restrict (as_inj mu) (vis mu)) m m2).
     eapply inject_restrict; eassumption. 
   exploit function_epilogue_correct; eauto.
@@ -5516,9 +5657,13 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     eauto with mem. intros. eapply Mem.perm_free_1; eauto. 
     intros. rewrite <- H1. eapply Mem.load_free; eauto. 
     eauto with mem. intros. eapply Mem.perm_free_3; eauto. 
-    apply Plt_Ple. change (Mem.valid_block m' stk). eapply Mem.valid_block_free_1; eauto. eapply agree_valid_linear; eauto. 
-    apply Plt_Ple. change (Mem.valid_block m1' sp'). eapply Mem.valid_block_free_1; eauto. eapply agree_valid_mach; eauto. 
-    apply wt_return_regs; auto. eapply match_stacks_wt_locset; eauto. eapply agree_wt_ls; eauto.
+    apply Plt_Ple. change (Mem.valid_block m' stk). 
+      eapply Mem.valid_block_free_1; eauto. eapply agree_valid_linear; eauto. 
+    apply Plt_Ple. change (Mem.valid_block m1' sp'). 
+      eapply Mem.valid_block_free_1; eauto. eapply agree_valid_mach; eauto. 
+    apply wt_return_regs; auto. eapply match_stacks_wt_locset; eauto. 
+      eapply agree_wt_ls; eauto.
+    admit. (*TODO*)
   intuition.
     eapply REACH_closed_free; try eassumption.
     split; intros. 
@@ -5526,8 +5671,12 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
         eapply SMV; assumption.
       eapply Mem.valid_block_free_1; try eassumption.
         eapply SMV; assumption.
+
+(* initial function *)
+  admit. (*TODO*)
+
 (* internal function *)
-  destruct PRE as [RC [PG [ Glob [SMV WD]]]]. 
+  destruct PRE as [RC [PG [Glob [SMV WD]]]]. 
   revert TRANSL. unfold transf_fundef, transf_partial_fundef.
   caseEq (transf_function f); simpl; try congruence.
   intros tfn TRANSL EQ. inversion EQ; clear EQ; subst tf.
@@ -5555,17 +5704,22 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       rewrite dec_eq_false; auto. 
       intros. eapply stores_in_frame_valid; eauto with mem. 
       intros. eapply stores_in_frame_perm; eauto with mem.
-      intros. rewrite <- H1. transitivity (Mem.load chunk m2' b ofs). eapply stores_in_frame_contents; eauto.
+      intros. rewrite <- H1. transitivity (Mem.load chunk m2' b ofs). 
+        eapply stores_in_frame_contents; eauto.
       eapply Mem.load_alloc_unchanged; eauto. red. congruence.
       eapply transf_function_well_typed; eauto.
       auto with coqlib.
+      admit. (*TODO*)
+      admit. (*TODO*)
     intuition.
     eapply (intern_incr_meminj_preserves_globals_as_inj _ mu); trivial.
       split; assumption.
     eapply (intern_incr_meminj_preserves_globals_as_inj ge mu); trivial.
       split; assumption.
+
 (* external function *) apply bind_inversion in TRANSL. 
     destruct TRANSL as [ff [FT X]]. discriminate. 
+
 (* return *)
   inv STACKS. simpl in AGLOCS.  
   eexists; eexists; split.
@@ -5582,7 +5736,13 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   split.  
     econstructor; eauto.
     apply agree_frame_return with rs0; auto.
-  intuition. 
+    inv AGARGS. 
+    constructor; auto. intros Heq. subst s. 
+    admit. (*TODO: will need to know that 
+             agree_args_match_aux is invariant under agree_callee_save (AGLOCS)*)
+    inv FRM.
+    admit. (*by agree_inj0*)
+  solve[intuition]. 
 Qed.
 
 Lemma MATCH_eff_diagram: forall st1 m1 st1' m1' (U1 : block -> Z -> bool)
