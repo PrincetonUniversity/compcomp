@@ -356,6 +356,10 @@ Inductive mach_step: Mach_core -> mem -> Mach_core -> mem -> Prop :=
 
 End RELSEM.
 
+(*NOTE value encoding, which was formerly done here, in Mach_initial_core, 
+  is now handled by the simulation invariant [agree_args_match_aux] 
+  (cf. StackingproofEFF.v). *)
+
 Definition Mach_initial_core (ge:genv) (v: val) (args:list val)
            : option Mach_core := 
   match v with
@@ -369,7 +373,7 @@ Definition Mach_initial_core (ge:genv) (v: val) (args:list val)
                    let tyl := sig_args (funsig f) in
                    if val_has_type_list_func args (sig_args (funsig f))
                       && vals_defined args
-                   then Some (Mach_CallstateIn b (encode_longs tyl args) (encode_typs tyl))
+                   then Some (Mach_CallstateIn b args tyl)
                    else None
                  | External _ => None
                end

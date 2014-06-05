@@ -4244,9 +4244,7 @@ Proof. intros.
   case_eq (Int.eq_dec Int.zero Int.zero).
   2: solve[intros CONTRA; elimtype False; auto].
   intros ? e.
-  exists (Mach_CallstateIn b
-          (encode_longs (sig_args (funsig tf)) vals2)
-          (encode_typs (sig_args (funsig tf)))).
+  exists (Mach_CallstateIn b vals2 (sig_args (funsig tf))).
   split. simpl. rewrite e, D. 
 
   assert (val_casted.val_has_type_list_func vals2 (sig_args (funsig tf))=true) 
