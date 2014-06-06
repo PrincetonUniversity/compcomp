@@ -4027,7 +4027,8 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
       forall f tf fb ls args tys m m'
         (TRANSL: transf_function f = OK tf)
         (FIND: Genv.find_funct_ptr tge fb = Some (Internal tf))
-        (AGREGS: agree_args_match_aux (restrict (as_inj mu) (vis mu)) 
+        (WTLS: wt_locset ls)
+        (AGARGS: agree_args_match_aux (restrict (as_inj mu) (vis mu)) 
                                       (call_regs ls) 0 args tys),
       match_states mu (Linear_Callstate nil (Internal f) ls) m 
                       (Mach_CallstateIn fb args tys) m'
@@ -4287,6 +4288,16 @@ destruct sl; try solve[inv IN]. destruct IN as [H H0].
 right. omega.
 Qed.
 
+Lemma wt_setlist_loc_arguments sig vals :
+  wt_locset
+    (Locmap.setlist (loc_arguments sig)
+                    (encode_longs (sig_args sig) vals)
+                    (Locmap.init Vundef)).
+Proof.
+apply wt_locset_setlist_loc_arguments.
+apply wt_init.
+Qed.
+
 Lemma agree_args_match_init vals1 vals2 tys j m1 m2 DomS DomT z : 
    vals_defined vals1=true -> 
    val_list_inject j vals1 vals2 ->
@@ -4508,6 +4519,9 @@ Proof. intros.
   apply bind_inversion in TF. destruct TF as [x [TF X]]. inv X.
   eapply match_states_init; eauto. simpl.
 
+  solve[apply wt_setlist_loc_arguments].
+
+  simpl. 
   assert (Linear.fn_sig f=fn_sig x) as ->.
   { apply unfold_transf_function in TF; rewrite TF; auto. }
 
@@ -5673,6 +5687,79 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
         eapply SMV; assumption.
 
 (* initial function *)
+{ destruct PRE as [RC [PG [Glob [SMV WD]]]]. 
+  revert TRANSL. unfold transf_fundef, transf_partial_fundef.
+  caseEq (transf_function f); simpl; try congruence.
+  intros tfn TRANSL EQ. inversion EQ; clear EQ; subst tf.
+  case_eq (Mem.alloc m2 0 (4*Zlength args)). intros m3 sp0 ALLOC.
+  assert (STORE: exists m4, store_args (Vptr sp0 Int.zero) 0 args tys m3 = Some m4).
+  { admit. }
+  destruct STORE as [m4 STORE].
+  case_eq (Mem.alloc m4 0 (fn_stacksize tfn)). intros m5 tstk.
+  assert (STORE5: exists m6, 
+            store_stack m5 (Vptr tstk Int.zero) 
+                        Tint (fn_link_ofs tfn) (parent_sp0 sp0 nil) 
+            = Some m6).
+    admit.
+  destruct STORE5 as [m6 STORE5].
+  assert (STORE6: exists m7, 
+            store_stack m6 (Vptr tstk Int.zero) 
+                        Tint (fn_retaddr_ofs tfn) (parent_ra nil) 
+            = Some m7).
+    admit.
+  destruct STORE6 as [m7 STORE6].
+  eexists; eexists; split.
+    eapply corestep_plus_star_trans.
+    eapply corestep_plus_one. simpl. econstructor; eauto.
+    eapply corestep_star_one. econstructor; eauto.
+    eexists.
+    split.
+    Focus 2.
+    split.
+    Focus 2.
+    split.
+    Focus 2.
+    split.
+    
+
+    exploit (function_prologue_correct 
+              f tfn TRANSL mu rs rs (call_regs rs) 
+              (Regmap.init Vundef) (Regmap.init Vundef) m m2 m' 
+              stk (Vptr sp0 Int.zero) Vzero nil fb nil (mk_load_frame sp0 args tys)); 
+      eauto.
+    admit.
+    admit.
+    admit.
+    admit.
+    solve[constructor].
+    solve[constructor].
+  intros [mu' [rs' [m2' [sp' [m3' [m4' [m5' [A [B [C [D [E [F [G 
+            [J [K [L [LOCALLOC' [WD' [SMV' [spLocalTgt' RC']]]]]]]]]]]]]]]]]]]]].
+  exists mu'.
+  intuition. 
+  split. 
+    econstructor; eauto. 
+      apply match_stacks_change_mach_mem with m2.
+      apply match_stacks_change_linear_mem with m.
+      rewrite SP_EQ; rewrite SP'_EQ.
+      eapply match_stacks_change_meminj_intern; eauto. apply Ple_refl. 
+      eauto with mem. intros. exploit Mem.perm_alloc_inv. eexact H. eauto. 
+      rewrite dec_eq_false; auto. 
+      intros. eapply stores_in_frame_valid; eauto with mem. 
+      intros. eapply stores_in_frame_perm; eauto with mem.
+      intros. rewrite <- H1. transitivity (Mem.load chunk m2' b ofs). 
+        eapply stores_in_frame_contents; eauto.
+      eapply Mem.load_alloc_unchanged; eauto. red. congruence.
+      eapply transf_function_well_typed; eauto.
+      auto with coqlib.
+      admit. (*TODO*)
+      admit. (*TODO*)
+    intuition.
+    eapply (intern_incr_meminj_preserves_globals_as_inj _ mu); trivial.
+      split; assumption.
+    eapply (intern_incr_meminj_preserves_globals_as_inj ge mu); trivial.
+      split; assumption.*)
+
   admit. (*TODO*)
 
 (* internal function *)
