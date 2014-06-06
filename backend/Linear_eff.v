@@ -78,6 +78,7 @@ Inductive linear_effstep: (block -> Z -> bool) -> Linear_core -> mem -> Linear_c
   | lin_effexec_Lbuiltin:
       forall s f sp rs m ef args res b t vl rs' m',
       external_call' ef ge (reglist rs args) m t vl m' ->
+      observableEF ef = false ->
       rs' = Locmap.setlist (map R res) vl (undef_regs (destroyed_by_builtin ef) rs) ->
       linear_effstep (BuiltinEffect ge ef (decode_longs (sig_args (ef_sig ef)) (reglist rs args)) m)
          (Linear_State s f sp (Lbuiltin ef args res :: b) rs) m
@@ -175,7 +176,7 @@ intros.
          eapply FreeEffect_free; eassumption.
   split. unfold corestep, coopsem; simpl. econstructor; eassumption.
          inv H.
-         eapply BuiltinEffect_unchOn. eassumption.
+         eapply BuiltinEffect_unchOn; eassumption.
 (*  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
          inv H. eapply ec_builtinEffectPolymorphic; eassumption.
   split. unfold corestep, coopsem; simpl. econstructor; eassumption.

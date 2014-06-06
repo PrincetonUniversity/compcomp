@@ -27,14 +27,14 @@ Require Import LTL.
 Require Import Tunneling.
 
 Require Import Integers.
-Require Import sepcomp.mem_lemmas.
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.core_semantics_lemmas.
-Require Import sepcomp.reach.
-Require Import sepcomp.effect_semantics.
+Require Import mem_lemmas.
+Require Import core_semantics.
+Require Import core_semantics_lemmas.
+Require Import reach.
+Require Import effect_semantics.
 Require Import StructuredInjections.
 Require Import effect_simulations.
-Require Import sepcomp.effect_properties.
+Require Import effect_properties.
 Require Import effect_simulations_lemmas.
 
 Require Export Axioms.
@@ -733,6 +733,7 @@ destruct MTCH as [MC [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
 inv MC; simpl in AtExtSrc; inv AtExtSrc.
 destruct f; simpl in *; inv H1.
 split; trivial. 
+destruct (observableEF e0); inv H2.
 assert (ValsInj: Forall2 (val_inject (restrict (as_inj mu) (vis mu)))
   (decode_longs (sig_args (ef_sig e)) (map ls (Conventions1.loc_arguments (ef_sig e))))
   (decode_longs (sig_args (ef_sig e)) (map tls (Conventions1.loc_arguments (ef_sig e))))).
@@ -943,6 +944,7 @@ simpl.
  simpl in *. inv MC; simpl in *; inv AtExtSrc.
  destruct f; inv H1. 
  simpl in AtExtTgt. inv AtExtTgt.
+ destruct (observableEF e0); inv H1; inv H2.
  eexists. eexists.
     split. reflexivity.
     split. reflexivity.
@@ -1609,11 +1611,11 @@ Proof. intros.
       apply intern_incr_as_inj in INC; trivial.
         apply sm_inject_separated_mem in SEP; trivial.
         eapply meminj_preserves_incr_sep; eassumption. 
-      red; intros. destruct (GFP _ _ H1).
+      red; intros b fb Hb. destruct (GFP _ _ Hb).
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
       assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (Glob _ H1).
+          rewrite <- FRG. eapply (Glob _ H2).
 
   (* Lannot 
   left; simpl; econstructor; split.
@@ -2151,11 +2153,11 @@ Proof. intros.
       apply intern_incr_as_inj in INC; trivial.
         apply sm_inject_separated_mem in SEP; trivial.
         eapply meminj_preserves_incr_sep; eassumption. 
-      red; intros. destruct (GFP _ _ H1).
+      red; intros b fb Hb. destruct (GFP _ _ Hb).
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
       assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (Glob _ H1).
+          rewrite <- FRG. eapply (Glob _ H2).
   intros.
     eapply BuiltinEffect_Propagate; try eassumption.
 

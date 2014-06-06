@@ -27,14 +27,14 @@ Require Import Registers.
 Require Import RTL.
 Require Import Renumber.
 
-Require Import sepcomp.mem_lemmas.
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.core_semantics_lemmas.
-Require Import sepcomp.reach.
-Require Import sepcomp.effect_semantics.
+Require Import mem_lemmas.
+Require Import core_semantics.
+Require Import core_semantics_lemmas.
+Require Import reach.
+Require Import effect_semantics.
 Require Import StructuredInjections.
 Require Import effect_simulations.
-Require Import sepcomp.effect_properties.
+Require Import effect_properties.
 Require Import effect_simulations_lemmas.
 
 Require Export Axioms.
@@ -664,11 +664,11 @@ Proof. intros.
       apply intern_incr_as_inj in INC; trivial.
         apply sm_inject_separated_mem in SEP; trivial.
         eapply meminj_preserves_incr_sep; eassumption. 
-      red; intros. destruct (GFP _ _ H2).
+      red; intros b fb Hb. destruct (GFP _ _ Hb).
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
       assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (Glob _ H2).
+          rewrite <- FRG. eapply (Glob _ H3).
         
 (* cond *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
@@ -1068,11 +1068,11 @@ Proof. intros.
       apply intern_incr_as_inj in INC; trivial.
         apply sm_inject_separated_mem in SEP; trivial.
         eapply meminj_preserves_incr_sep; eassumption. 
-      red; intros. destruct (GFP _ _ H2).
+      red; intros b fb Hb. destruct (GFP _ _ Hb).
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
       assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (Glob _ H2).
+          rewrite <- FRG. eapply (Glob _ H3).
   split; trivial.
   split; trivial.
   intros.
@@ -1243,6 +1243,7 @@ Proof. intros.
 destruct MTCH as [MC [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
 inv MC; simpl in AtExtSrc; inv AtExtSrc.
 destruct f; simpl in *; inv H0.
+destruct (observableEF e0); inv H1.
 split; trivial.
 rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in ARGS; trivial.
 exploit val_list_inject_forall_inject; try eassumption. intros ARGS'.
@@ -1443,6 +1444,7 @@ simpl.
  simpl in *. inv MC; simpl in *; inv AtExtSrc.
  destruct f; inv H0. simpl.
  simpl in AtExtTgt. inv AtExtTgt.
+ destruct (observableEF e0); inv H0; inv H1.
  eexists. eexists.
     split. reflexivity.
     split. reflexivity.
@@ -1779,7 +1781,7 @@ SM_simulation.SM_simulation_inject rtl_eff_sem
 Proof.
 intros.
 assert (GDE:= GDE_lemma).
- eapply sepcomp.effect_simulations_lemmas.inj_simulation_plus with
+ eapply effect_simulations_lemmas.inj_simulation_plus with
   (match_states:=fun x mu st m st' m' => MATCH mu st m st' m')
   (measure:=fun x => O).
 (*genvs_dom_eq*)

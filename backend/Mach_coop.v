@@ -17,6 +17,7 @@ Require Import Mach.
 Require Import mem_lemmas. (*for mem_forward*)
 Require Import core_semantics.
 Require Import val_casted.
+Require Import BuiltinEffects.
 
 Definition genv := Genv.t fundef unit.
 
@@ -149,6 +150,7 @@ Inductive mach_step: Mach_core -> mem -> Mach_core -> mem -> Prop :=
   | Mach_exec_Mbuiltin:
       forall s f sp rs m ef args res b t vl rs' m',
       external_call' ef ge rs##args m t vl m' ->
+      observableEF ef = false ->
       rs' = set_regs res vl (undef_regs (destroyed_by_builtin ef) rs) ->
       mach_step (Mach_State s f sp (Mbuiltin ef args res :: b) rs) m
          (Mach_State s f sp b rs') m'
@@ -206,14 +208,6 @@ Inductive mach_step: Mach_core -> mem -> Mach_core -> mem -> Prop :=
       rs' = undef_regs destroyed_at_function_entry rs ->
       mach_step (Mach_Callstate s fb rs) m
         (Mach_State s fb sp f.(fn_code) rs') m3
-(*auxiliary step that extracts call arguments and invoked external function,
-  in accordance with the core semantics interface
-  | Mach_exec_function_external:
-      forall s fb rs m ef args,
-      Genv.find_funct_ptr ge fb = Some (External ef) ->
-      extcall_arguments rs m (parent_sp s) (ef_sig ef) args ->
-      mach_step (Mach_Callstate s fb rs) m
-         (Mach_CallstateArgs s (*(parent_sp s)*) fb ef args rs) m*)
 (*NO RULE FOR EXTERNAL CALLS
   | Mach_exec_function_external:
       forall s fb rs m t rs' ef args res m',
@@ -308,15 +302,9 @@ Definition Mach_at_external (c: Mach_core):
   | Mach_State _ _ _ _ _ => None
   | Mach_Callstate _ _ _ => None
   | Mach_CallstateArgs s (*sp*) fb ef args rs => 
-          Some (ef, ef_sig ef, decode_longs (sig_args (ef_sig ef)) args)
-(*
-  | Mach_CallstateArgs s (*sp*) fb args rs => 
-      match Genv.find_funct_ptr ge fb with
-        None => None
-      | Some (External ef) => Some (ef, ef_sig ef, decode_longs (sig_args (ef_sig ef)) args)
-      end*)
-(*  | Mach_CallstateArgs s (*sp*) ef args rs => 
-          Some (ef, ef_sig ef, decode_longs (sig_args (ef_sig ef)) args)*)
+        if observableEF ef
+        then Some (ef, ef_sig ef, decode_longs (sig_args (ef_sig ef)) args)
+        else None
   | Mach_Returnstate _ _ _ => None
  end.
 (*CompCert:

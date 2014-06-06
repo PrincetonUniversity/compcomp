@@ -2194,6 +2194,7 @@ Proof. intros.
  simpl in *. inv MC; simpl in *; inv ATEXT.
  destruct f; inv H0. 
  destruct tf; inv TF.
+ destruct (observableEF e1); inv H1.
  rename targs into vals2.
  eexists.
     split. eapply val_list_inject_forall_inject. eassumption.
@@ -2439,11 +2440,12 @@ simpl.
  simpl in *. inv MC; simpl in *; inv AtExtSrc.
  destruct f; inv H0. 
  destruct tf; inv AtExtTgt.
+ inv TF.
+ destruct (observableEF e1); inv H0; inv H1.
  eexists. eexists.
     split. reflexivity.
     split. reflexivity.
  simpl in *.
- inv TF.
  assert (INCvisNu': inject_incr
   (restrict (as_inj nu')
      (vis
@@ -2996,7 +2998,8 @@ Proof. intros.
   exploit transl_exprlist_correct; try eapply MINJ; try eassumption.
   intros [rs' [m2' [TCS [E [F [G [J K]]]]]]]. subst.
   exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply F.
-        eassumption. eassumption. eassumption. eassumption. eassumption. assumption.
+        eassumption. eassumption. eassumption. eassumption. 
+        eassumption. eassumption. assumption.
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
   eexists; eexists; eexists mu'. 
@@ -3004,6 +3007,7 @@ Proof. intros.
     eapply corestep_star_plus_trans. eapply TCS.
       eapply corestep_plus_one.
       eapply rtl_corestep_exec_Ibuiltin. eauto. eassumption.
+      assumption.
   intuition.
   split. econstructor; eauto.
     constructor.
@@ -3020,11 +3024,11 @@ Proof. intros.
   eapply meminj_preserves_incr_sep. eapply PG. eassumption. 
              apply intern_incr_as_inj; trivial.
              apply sm_inject_separated_mem; eassumption.
-  red in GFP. red. intros. destruct (GFP _ _ H2).
+  red; intros b fb Hb. destruct (GFP _ _ Hb).
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
   assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-          rewrite <- FRG. eapply (Glob _ H2).  
+          rewrite <- FRG. eapply (Glob _ H3).  
 
   (* seq *)
   inv TS.
@@ -3726,7 +3730,8 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   exploit Efftransl_exprlist_correct; try eapply MINJ; try eassumption.
   intros [rs' [m2' [TCS [E [F [G [J K]]]]]]]. subst.
   exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply F.
-        eassumption. eassumption. eassumption. eassumption. eassumption. assumption.
+        eassumption. eassumption. eassumption. eassumption. 
+        eassumption. eassumption. assumption.
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
   eexists; eexists; eexists mu'; eexists. 
@@ -3734,6 +3739,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
     eapply effstep_star_plus_trans. eapply TCS.
       eapply effstep_plus_one.
       eapply rtl_effstep_exec_Ibuiltin. eauto. eassumption.
+        assumption.
   split; trivial. split; trivial. split; trivial. 
   split.
     split. econstructor; eauto.
@@ -3752,12 +3758,12 @@ Proof. intros st1 m1 st1' m1' U1 CS.
     eapply meminj_preserves_incr_sep. eapply PG. eassumption. 
              apply intern_incr_as_inj; trivial.
              apply sm_inject_separated_mem; eassumption.
-    red in GFP. red. intros. destruct (GFP _ _ H2).
+    red; intros b fb Hb. destruct (GFP _ _ Hb).
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
     assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-          rewrite <- FRG. eapply (Glob _ H2).
-  simpl. intros.  apply andb_true_iff in H1; destruct H1.
+          rewrite <- FRG. eapply (Glob _ H3).
+  simpl. intros.  apply andb_true_iff in H2; destruct H2.
     eapply BuiltinEffect_Propagate; eassumption. 
 
   (* seq *)

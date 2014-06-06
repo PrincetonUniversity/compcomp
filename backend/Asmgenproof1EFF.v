@@ -23,8 +23,8 @@ Require Import Globalenvs.
 Require Import Op.
 Require Import Locations.
 Require Import Mach.
-Require Import Asm.
-Require Import Asmgen.
+Require Import AsmEFF.
+Require Import AsmgenEFF.
 Require Import Asmgenproof0EFF.
 Require Import Conventions.
 Require Import Axioms.
@@ -36,7 +36,7 @@ Require Import Asm_eff.
 Open Local Scope error_monad_scope.
 
 Lemma effect_instr_floatcomp g c cmp r1 r2 rs m:
-      effect_instr g c (Asmgen.floatcomp cmp r1 r2) rs m = EmptyEffect.
+      effect_instr g c (AsmgenEFF.floatcomp cmp r1 r2) rs m = EmptyEffect.
 Proof. intros.
   destruct cmp; reflexivity. 
 Qed. 
@@ -108,8 +108,8 @@ Ltac Simplifs := repeat Simplif.
 Section CONSTRUCTORS.
 
 Variable ge: genv.
-Variable fn: code.
-
+(*Variable fn: code.*)
+Variable fn: function.
 (** Smart constructor for moves. *)
 
 Lemma mk_mov_correct:
@@ -226,7 +226,13 @@ Proof.
   intros. unfold rs5. Simplifs. unfold rs4. Simplifs. 
   transitivity (rs3#r). destruct (Int.lt x Int.zero). Simplifs. auto. 
   unfold rs3. Simplifs. unfold rs2. Simplifs.  
-  unfold compare_ints. Simplifs.  
+  unfold compare_ints. Simplifs.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    trivial. 
 Qed.
 
 Lemma mk_shrximm_correct_eff:
@@ -263,12 +269,18 @@ Proof.
         reflexivity.
         reflexivity.
         reflexivity.
-  split. unfold rs5. Simplifs. unfold rs4. rewrite nextinstr_inv; auto with asmgen.
+  split. unfold rs5. Simplifs. unfold rs4. rewrite nextinstr_inv; auto with asmgenEFF.
   destruct (Int.lt x Int.zero). rewrite Pregmap.gss. rewrite A; auto. rewrite A; rewrite H; auto.
   intros. unfold rs5. Simplifs. unfold rs4. Simplifs. 
   transitivity (rs3#r). destruct (Int.lt x Int.zero). Simplifs. auto. 
   unfold rs3. Simplifs. unfold rs2. Simplifs.  
   unfold compare_ints. Simplifs.  
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    trivial.
 Qed.
 
 (** Smart constructor for integer conversions *)
@@ -304,13 +316,13 @@ Lemma mk_intconv_correct_eff:
 Proof.
   unfold mk_intconv; intros. destruct (low_ireg rs); monadInv H.
   econstructor. 
-    destruct (H0 fn rd rs rs1 m) as [NN EFF]; clear H0.
+    destruct (H0 (fn_code fn) rd rs rs1 m) as [NN EFF]; clear H0.
     split. apply eff_exec_straight_one. rewrite NN. eauto. auto.
            trivial. 
     split. Simplifs. intros. Simplifs.
   econstructor. split. eapply eff_exec_straight_two. 
     simpl. eauto. apply H0. auto. auto.
-    destruct (H0 fn rd EAX  (nextinstr rs1 # EAX <- (rs1 rs)) m).
+    destruct (H0 (fn_code fn) rd EAX  (nextinstr rs1 # EAX <- (rs1 rs)) m).
     rewrite <- H1. clear H H0 H1.
     simpl. reflexivity.
     split. Simplifs.
@@ -390,7 +402,7 @@ Lemma mk_smallstore_correct_eff:
      effect_instr ge c (sto addr r) rs m = 
      StoreEffect (eval_addrmode ge addr rs) (encode_val chunk (rs r))),
   exists rs2,
-     eff_exec_straight ge fn (effect_instr ge fn (sto addr r) rs1 m1) c rs1 m1 k rs2 m2
+     eff_exec_straight ge fn (effect_instr ge (fn_code fn) (sto addr r) rs1 m1) c rs1 m1 k rs2 m2
   /\ (forall r, data_preg r = true -> r <> EAX /\ r <> ECX -> rs2#r = rs1#r).
 (*  /\ exists b z, eval_addrmode ge addr rs1 = Vptr b z /\
      U = StoreEffect (eval_addrmode ge addr rs1) (encode_val chunk (rs1 r)).*)
@@ -691,6 +703,12 @@ Proof.
   split. auto.
   split. auto.
   intros. Simplifs.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    trivial.
 Qed.
 
 Lemma int_signed_eq:
@@ -822,6 +840,12 @@ Proof.
   split. auto.
   split. auto.
   intros. Simplifs.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    trivial.
 Qed.
 
 Definition eval_extcond (xc: extcond) (rs: regset) : option bool :=
@@ -978,28 +1002,58 @@ Proof.
   split. destruct (Val.cmp_bool c0 (rs x) (rs x0)) eqn:?; auto.
   eapply testcond_for_signed_comparison_correct; eauto. 
   intros. unfold compare_ints. Simplifs.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    trivial.
 (* compu *)
   simpl. rewrite (ireg_of_eq _ _ EQ). rewrite (ireg_of_eq _ _ EQ1).
   econstructor. split. apply exec_straight_one. simpl. eauto. auto.
   split. destruct (Val.cmpu_bool (Mem.valid_pointer m) c0 (rs x) (rs x0)) eqn:?; auto.
   eapply testcond_for_unsigned_comparison_correct; eauto. 
   intros. unfold compare_ints. Simplifs.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    trivial.
 (* compimm *)
   simpl. rewrite (ireg_of_eq _ _ EQ). destruct (Int.eq_dec i Int.zero).
   econstructor; split. apply exec_straight_one. simpl; eauto. auto. 
   split. destruct (rs x); simpl; auto. subst. rewrite Int.and_idem.
   eapply testcond_for_signed_comparison_correct; eauto. 
   intros. unfold compare_ints. Simplifs.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    trivial.
   econstructor; split. apply exec_straight_one. simpl; eauto. auto. 
   split. destruct (Val.cmp_bool c0 (rs x) (Vint i)) eqn:?; auto.
   eapply testcond_for_signed_comparison_correct; eauto. 
   intros. unfold compare_ints. Simplifs.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    trivial.
 (* compuimm *)
   simpl. rewrite (ireg_of_eq _ _ EQ).
   econstructor. split. apply exec_straight_one. simpl. eauto. auto.
   split. destruct (Val.cmpu_bool (Mem.valid_pointer m) c0 (rs x) (Vint i)) eqn:?; auto.
   eapply testcond_for_unsigned_comparison_correct; eauto. 
   intros. unfold compare_ints. Simplifs.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    trivial.
 (* compf *)
   simpl. rewrite (freg_of_eq _ _ EQ). rewrite (freg_of_eq _ _ EQ1).
   exists (nextinstr (compare_floats (swap_floats c0 (rs x) (rs x0)) (swap_floats c0 (rs x0) (rs x)) rs)).
@@ -1008,7 +1062,7 @@ Proof.
   unfold nextinstr. rewrite Pregmap.gss. rewrite compare_floats_inv; auto with asmgen. 
   split. destruct (rs x); destruct (rs x0); simpl; auto.
   repeat rewrite swap_floats_commut. apply testcond_for_float_comparison_correct.
-  intros. Simplifs. apply compare_floats_inv; auto with asmgen. 
+  intros. Simplifs. apply compare_floats_inv; try solve [intros N; subst; discriminate]. (*auto with asmgen. *)
 (* notcompf *)
   simpl. rewrite (freg_of_eq _ _ EQ). rewrite (freg_of_eq _ _ EQ1).
   exists (nextinstr (compare_floats (swap_floats c0 (rs x) (rs x0)) (swap_floats c0 (rs x0) (rs x)) rs)).
@@ -1017,7 +1071,7 @@ Proof.
   unfold nextinstr. rewrite Pregmap.gss. rewrite compare_floats_inv; auto with asmgen. 
   split. destruct (rs x); destruct (rs x0); simpl; auto.
   repeat rewrite swap_floats_commut. apply testcond_for_neg_float_comparison_correct.
-  intros. Simplifs. apply compare_floats_inv; auto with asmgen. 
+  intros. Simplifs. apply compare_floats_inv; try solve [intros N; subst; discriminate]. (*auto with asmgen. *)
 (* maskzero *)
   simpl. rewrite (ireg_of_eq _ _ EQ).
   econstructor. split. apply exec_straight_one. simpl; eauto. auto.
@@ -1025,6 +1079,12 @@ Proof.
   generalize (compare_ints_spec rs (Vint (Int.and i0 i)) Vzero m).
   intros [A B]. rewrite A. unfold Val.cmpu; simpl. destruct (Int.eq (Int.and i0 i) Int.zero); auto.
   intros. unfold compare_ints. Simplifs.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    trivial.
 (* masknotzero *)
   simpl. rewrite (ireg_of_eq _ _ EQ).
   econstructor. split. apply exec_straight_one. simpl; eauto. auto.
@@ -1032,6 +1092,12 @@ Proof.
   generalize (compare_ints_spec rs (Vint (Int.and i0 i)) Vzero m).
   intros [A B]. rewrite A. unfold Val.cmpu; simpl. destruct (Int.eq (Int.and i0 i) Int.zero); auto.
   intros. unfold compare_ints. Simplifs.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    trivial.
 Qed.
 
 Lemma transl_cond_correct_eff:
@@ -1054,6 +1120,12 @@ Proof.
   split. destruct (Val.cmp_bool c0 (rs x) (rs x0)) eqn:?; auto.
   eapply testcond_for_signed_comparison_correct; eauto. 
   intros. unfold compare_ints. Simplifs.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    trivial.
 (* compu *)
   simpl. rewrite (ireg_of_eq _ _ EQ). rewrite (ireg_of_eq _ _ EQ1).
   econstructor. split. apply eff_exec_straight_one. simpl. eauto. auto.
@@ -1061,6 +1133,12 @@ Proof.
   split. destruct (Val.cmpu_bool (Mem.valid_pointer m) c0 (rs x) (rs x0)) eqn:?; auto.
   eapply testcond_for_unsigned_comparison_correct; eauto. 
   intros. unfold compare_ints. Simplifs.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    trivial.
 (* compimm *)
   simpl. rewrite (ireg_of_eq _ _ EQ). destruct (Int.eq_dec i Int.zero).
   econstructor; split. apply eff_exec_straight_one. simpl; eauto. auto.
@@ -1068,11 +1146,23 @@ Proof.
   split. destruct (rs x); simpl; auto. subst. rewrite Int.and_idem.
   eapply testcond_for_signed_comparison_correct; eauto. 
   intros. unfold compare_ints. Simplifs.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    trivial.
   econstructor; split. apply eff_exec_straight_one. simpl; eauto. auto.
   simpl. reflexivity. 
   split. destruct (Val.cmp_bool c0 (rs x) (Vint i)) eqn:?; auto.
   eapply testcond_for_signed_comparison_correct; eauto. 
   intros. unfold compare_ints. Simplifs.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    trivial.
 (* compuimm *)
   simpl. rewrite (ireg_of_eq _ _ EQ).
   econstructor. split. apply eff_exec_straight_one. simpl. eauto. auto.
@@ -1080,26 +1170,32 @@ Proof.
   split. destruct (Val.cmpu_bool (Mem.valid_pointer m) c0 (rs x) (Vint i)) eqn:?; auto.
   eapply testcond_for_unsigned_comparison_correct; eauto. 
   intros. unfold compare_ints. Simplifs.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    trivial.
 (* compf *)
   simpl. rewrite (freg_of_eq _ _ EQ). rewrite (freg_of_eq _ _ EQ1).
   exists (nextinstr (compare_floats (swap_floats c0 (rs x) (rs x0)) (swap_floats c0 (rs x0) (rs x)) rs)).
   split. apply eff_exec_straight_one. 
   destruct c0; simpl; auto.
-  unfold nextinstr. rewrite Pregmap.gss. rewrite compare_floats_inv; auto with asmgen.
+  unfold nextinstr. rewrite Pregmap.gss. rewrite compare_floats_inv; try solve[intros N; subst; discriminate]. trivial. (*auto with asmgen.*)
   rewrite effect_instr_floatcomp; trivial.
   split. destruct (rs x); destruct (rs x0); simpl; auto.
   repeat rewrite swap_floats_commut. apply testcond_for_float_comparison_correct.
-  intros. Simplifs. apply compare_floats_inv; auto with asmgen. 
+  intros. Simplifs. apply compare_floats_inv; try solve [intros N; subst; discriminate]. (*auto with asmgen.*)
 (* notcompf *)
   simpl. rewrite (freg_of_eq _ _ EQ). rewrite (freg_of_eq _ _ EQ1).
   exists (nextinstr (compare_floats (swap_floats c0 (rs x) (rs x0)) (swap_floats c0 (rs x0) (rs x)) rs)).
   split. apply eff_exec_straight_one. 
   destruct c0; simpl; auto.
-  unfold nextinstr. rewrite Pregmap.gss. rewrite compare_floats_inv; auto with asmgen.
+  unfold nextinstr. rewrite Pregmap.gss. rewrite compare_floats_inv; try solve[intros N; subst; discriminate]. trivial. (*auto with asmgen.*)
   rewrite effect_instr_floatcomp; trivial.
   split. destruct (rs x); destruct (rs x0); simpl; auto.
   repeat rewrite swap_floats_commut. apply testcond_for_neg_float_comparison_correct.
-  intros. Simplifs. apply compare_floats_inv; auto with asmgen. 
+  intros. Simplifs. apply compare_floats_inv; try solve [intros N; subst; discriminate]. (*auto with asmgen. *)
 (* maskzero *)
   simpl. rewrite (ireg_of_eq _ _ EQ).
   econstructor. split. apply eff_exec_straight_one. simpl; eauto. auto.
@@ -1108,6 +1204,12 @@ Proof.
   generalize (compare_ints_spec rs (Vint (Int.and i0 i)) Vzero m).
   intros [A B]. rewrite A. unfold Val.cmpu; simpl. destruct (Int.eq (Int.and i0 i) Int.zero); auto.
   intros. unfold compare_ints. Simplifs.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    trivial.
 (* masknotzero *)
   simpl. rewrite (ireg_of_eq _ _ EQ).
   econstructor. split. apply eff_exec_straight_one. simpl; eauto. auto.
@@ -1116,6 +1218,12 @@ Proof.
   generalize (compare_ints_spec rs (Vint (Int.and i0 i)) Vzero m).
   intros [A B]. rewrite A. unfold Val.cmpu; simpl. destruct (Int.eq (Int.and i0 i) Int.zero); auto.
   intros. unfold compare_ints. Simplifs.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
+    trivial.
 Qed.
 
 Remark eval_testcond_nextinstr:

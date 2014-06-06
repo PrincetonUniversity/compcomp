@@ -4340,17 +4340,18 @@ destruct MTCH as [MC [INJ [RC [PG [GF [SMV WD]]]]]].
     destruct f; simpl in *; inv H0.
     monadInv TRANSL.
     split; trivial.
+  destruct (observableEF tf); inv H1.
 exploit transl_external_arguments_rec.
   eassumption. eassumption. eassumption. eapply incl_refl.
 intros [targs [Htargs AINJ]].
 exploit transl_external_arguments_fun.
    2:eapply GETARGS. 2:eapply Htargs. trivial.
 intros; subst.
-exists (decode_longs (sig_args (ef_sig tf)) targs).
+exists (decode_longs (sig_args (ef_sig e)) targs).
 assert (H: 
    val_list_inject (restrict (as_inj mu) (vis mu))
-     (decode_longs (sig_args (ef_sig tf)) ls ## (loc_arguments (ef_sig tf)))
-     (decode_longs (sig_args (ef_sig tf)) targs)).
+     (decode_longs (sig_args (ef_sig e)) ls ## (loc_arguments (ef_sig e)))
+     (decode_longs (sig_args (ef_sig e)) targs)).
 { apply decode_longs_inject; auto. }
 split.
 solve[apply val_list_inject_forall_inject; auto].
@@ -4477,11 +4478,12 @@ simpl.
  inv AtExtTgt.
  destruct f; inv H0. 
  inv AtExtTgt.
+ inv TRANSL.
+ destruct (observableEF tf); inv H0; inv H1.
  eexists. eexists.
     split. reflexivity.
     split. reflexivity.
  simpl in *.
- inv TRANSL.
  assert (INCvisNu': inject_incr
   (restrict (as_inj nu')
      (vis
@@ -4645,7 +4647,7 @@ assert (GFnu': forall b, isGlobalBlock (Genv.globalenv prog) b = true ->
           apply REACH_nil. unfold exportedSrc.
           rewrite (frgnSrc_shared _ WDnu' _ GFP). intuition.
 split.
-  econstructor. instantiate (1:=ef_sig e'). 
+  econstructor. instantiate (1:=ef_sig e). 
     { exploit match_stack_change_extcall. eapply FwdSrc. eapply FwdTgt. 
        eassumption. 
        eapply replace_locals_wd. assumption. 
@@ -5201,15 +5203,14 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
         eapply restrict_sm_preserves_globals; try eassumption.
           unfold vis. intuition.
   inv H. 
-  exploit (inlineable_extern_inject _ _ GDE_lemma).
-        eassumption. eassumption. eassumption. eassumption. eassumption. assumption.
+  exploit (inlineable_extern_inject _ _ GDE_lemma); try eassumption.
      eapply decode_longs_inject. eapply agree_reglist; eassumption.
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
   eexists; eexists. 
   split. eapply corestep_plus_one.
            econstructor. econstructor. eassumption.
-            reflexivity. reflexivity.
+            reflexivity. eassumption. reflexivity.
   exists mu'.
   intuition.
   split.
@@ -5233,32 +5234,33 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
                intros. eapply external_call_mem_forward; eassumption.
                intros. eapply Mem.load_unchanged_on; try eassumption.
                        red; intros.
-                       exploit agree_inj_unique. eapply  AGFRAME. apply H4. intros [SP DD]; subst.
+                       exploit agree_inj_unique. eapply  AGFRAME. apply H5. intros [SP DD]; subst.
                        intros N. exploit agree_bounds. eapply AGFRAME. eapply N. intros.
-                       clear - H1 H3 H5. destruct H1; omega.
+                       clear - H2 H4 H6. destruct H2; omega.
                intros. eapply OUTOFREACH; trivial.
                        red; intros.
-                         exploit agree_inj_unique. eapply  AGFRAME. apply H3. intros [SP DD]; subst.
+                         exploit agree_inj_unique. eapply  AGFRAME. apply H4. intros [SP DD]; subst.
                          intros N. exploit agree_bounds. eapply AGFRAME. eapply N. intros.
-                         clear - H1 H4. destruct H1; omega.
+                         clear - H2 H5. destruct H2; omega.
                        eapply Mem.perm_valid_block; eassumption.
                   eapply intern_incr_restrict; eassumption.
                   apply sm_inject_separated_mem in SEPARATED.
-                    red; intros. destruct (restrictD_Some _ _ _ _ _ H2); clear H2.
-                      destruct (restrictD_None' _ _ _ H1); clear H1.
+                    red; intros. destruct (restrictD_Some _ _ _ _ _ H3); clear H3.
+                      destruct (restrictD_None' _ _ _ H2); clear H2.
                         eapply SEPARATED; eassumption.
-                      destruct H2 as [bb2 [dd2 [AI1 Vis]]].
-                      rewrite (intern_incr_vis_inv _ _ WD WD' INCR _ _ _ AI1 H4) in Vis. discriminate.
+                      destruct H3 as [bb2 [dd2 [AI1 Vis]]].
+                      rewrite (intern_incr_vis_inv _ _ WD WD' INCR _ _ _ AI1 H5) in Vis. discriminate.
                     assumption.
               eapply AGFRAME.
-        rewrite list_Loc_type_mreg. eapply Val.has_subtype_list. eassumption. eapply external_call_well_typed'. econstructor. eapply H0. trivial.
+        rewrite list_Loc_type_mreg. eapply Val.has_subtype_list. eassumption. 
+           eapply external_call_well_typed'. econstructor. eapply H1. trivial.
     eapply INCR. assumption.
   intuition.
   eapply meminj_preserves_incr_sep. eapply PG. eassumption. 
              apply intern_incr_as_inj; trivial.
              apply sm_inject_separated_mem; eassumption.
   assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-          rewrite <- FRG. eapply (Glob _ H1).  
+          rewrite <- FRG. eapply (Glob _ H2).  
   (* Llabel *)
   eexists; eexists; split.
     apply corestep_plus_one; apply Mach_exec_Mlabel.
@@ -6007,7 +6009,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   eexists; eexists; eexists. 
   split. eapply effstep_plus_one.
            econstructor. econstructor. eassumption.
-            reflexivity. reflexivity.
+            reflexivity. assumption. reflexivity.
   exists mu'.
   split; trivial.
   split; trivial.
@@ -6034,32 +6036,33 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
                intros. eapply external_call_mem_forward; eassumption.
                intros. eapply Mem.load_unchanged_on; try eassumption.
                        red; intros.
-                       exploit agree_inj_unique. eapply  AGFRAME. apply H3. intros [SP DD]; subst.
+                       exploit agree_inj_unique. eapply  AGFRAME. apply H4. intros [SP DD]; subst.
                        intros N. exploit agree_bounds. eapply AGFRAME. eapply N. intros.
-                       clear - H H2 H4. destruct H; omega.
+                       clear - H H3 H5. destruct H; omega.
                intros. eapply OUTOFREACH; trivial.
                        red; intros.
-                         exploit agree_inj_unique. eapply  AGFRAME. apply H2. intros [SP DD]; subst.
+                         exploit agree_inj_unique. eapply  AGFRAME. apply H3. intros [SP DD]; subst.
                          intros N. exploit agree_bounds. eapply AGFRAME. eapply N. intros.
-                         clear - H H3. destruct H; omega.
+                         clear - H H4. destruct H; omega.
                        eapply Mem.perm_valid_block; eassumption.
                   eapply intern_incr_restrict; eassumption.
                   apply sm_inject_separated_mem in SEPARATED.
-                    red; intros. destruct (restrictD_Some _ _ _ _ _ H1); clear H1.
+                    red; intros. destruct (restrictD_Some _ _ _ _ _ H2); clear H2.
                       destruct (restrictD_None' _ _ _ H); clear H.
                         eapply SEPARATED; eassumption.
-                      destruct H1 as [bb2 [dd2 [AI1 Vis]]].
-                      rewrite (intern_incr_vis_inv _ _ WD WD' INCR _ _ _ AI1 H3) in Vis. discriminate.
+                      destruct H2 as [bb2 [dd2 [AI1 Vis]]].
+                      rewrite (intern_incr_vis_inv _ _ WD WD' INCR _ _ _ AI1 H4) in Vis. discriminate.
                     assumption.
               eapply AGFRAME.
-        rewrite list_Loc_type_mreg. eapply Val.has_subtype_list. eassumption. eapply external_call_well_typed'. econstructor. eapply H0. trivial.
+        rewrite list_Loc_type_mreg. eapply Val.has_subtype_list. eassumption. 
+           eapply external_call_well_typed'. econstructor. eapply H1. trivial.
       eapply INCR. assumption.
     intuition.
     eapply meminj_preserves_incr_sep. eapply PG. eassumption. 
              apply intern_incr_as_inj; trivial.
              apply sm_inject_separated_mem; eassumption.
     assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-          rewrite <- FRG. eapply (Glob _ H1).
+          rewrite <- FRG. eapply (Glob _ H2).
   eapply BuiltinEffect_Propagate; eassumption. 
   (* Llabel *)
   eexists; eexists; eexists; split.

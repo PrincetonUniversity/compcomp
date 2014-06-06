@@ -67,6 +67,7 @@ Inductive RTL_effstep (ge:genv):  (block -> Z -> bool) ->
       forall s f sp pc rs m ef args res pc' t v m',
       (fn_code f)!pc = Some(Ibuiltin ef args res pc') ->
       external_call ef ge rs##args m t v m' ->
+      observableEF ef = false -> 
       RTL_effstep ge (BuiltinEffect ge ef (rs##args) m)
          (RTL_State s f sp pc rs) m
          (RTL_State s f sp pc' (rs#res <- v)) m'
@@ -173,7 +174,7 @@ intros.
          eapply rtl_corestep_exec_Itailcall; eassumption. 
          eapply FreeEffect_free; eassumption. 
   split. unfold corestep, coopsem; simpl. econstructor; eassumption.
-         eapply BuiltinEffect_unchOn; eassumption.
+         eapply BuiltinEffect_unchOn; try eassumption.
 (*  split. unfold corestep, coopsem; simpl. 
          eapply rtl_corestep_exec_Ibuiltin; eassumption.
          eapply ec_builtinEffectPolymorphic; eassumption.*)

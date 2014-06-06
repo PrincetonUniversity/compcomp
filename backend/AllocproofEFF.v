@@ -2659,11 +2659,12 @@ simpl.
  simpl in *. inv MC; simpl in *. inv AtExtSrc. Focus 2. inv AtExtSrc.
  destruct f; inv AtExtSrc. 
  destruct tf; inv AtExtTgt.
+ inv FUN.
+ destruct (observableEF e1); inv H0; inv H1.
  eexists. eexists.
     split. reflexivity.
     split. reflexivity.
  simpl in *.
- inv FUN.
  assert (INCvisNu': inject_incr
   (restrict (as_inj nu')
      (vis
@@ -3723,7 +3724,7 @@ Proof. intros.
     eapply add_equations_args_inject; try eassumption.
       inv WTI. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto.     
   exploit (inlineable_extern_inject ge tge); try eapply PRE. eapply GDE_lemma. 
-         eassumption. eassumption.
+         eassumption. eassumption. eassumption.
   intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].
   assert (E: map ls1 (map R args') = reglist ls1 args').
   { unfold reglist. rewrite list_map_compose. auto. }
@@ -3746,6 +3747,7 @@ Proof. intros.
              econstructor. unfold reglist. eapply external_call_symbols_preserved; eauto. 
              (*exact symbols_preserved. exact varinfo_preserved.*)
               instantiate (1 := vl'); auto. 
+              assumption.
               instantiate (1 := ls2); auto. 
          eapply corestep_star_trans. eexact A3. clear A3.
          eapply corestep_star_one. 
@@ -3766,14 +3768,14 @@ Proof. intros.
       apply intern_incr_as_inj in INC; trivial.
         apply sm_inject_separated_mem in SEP; trivial.
         eapply meminj_preserves_incr_sep; eassumption. 
-    red; intros. destruct (H3 _ _ H12).
+    red; intros b fb Hb. destruct (H4 _ _ Hb).
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
     assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (H5 _ H12).
+          rewrite <- FRG. eapply (H6 _ H13).
   split; trivial. 
 (* annot *)
-- admit. (* annot is extenal call, like builtin?
+- admit. (* We don't treat annotations yet.
    exploit (exec_moves mv); eauto. intros [ls1 [A1 B1]]. 
    exploit external_call_mem_extends; eauto. eapply add_equations_args_lessdef; eauto.
   inv WTI. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto. 
@@ -5061,7 +5063,7 @@ induction CS;
     eapply add_equations_args_inject; try eassumption.
       inv WTI. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto.     
   exploit (inlineable_extern_inject ge tge); try eapply PRE. eapply GDE_lemma. 
-         eassumption. eassumption.
+         eassumption. eassumption. eassumption.
   intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].
   assert (E: map ls1 (map R args') = reglist ls1 args').
   { unfold reglist. rewrite list_map_compose. auto. }
@@ -5084,6 +5086,7 @@ induction CS;
              econstructor. unfold reglist. eapply external_call_symbols_preserved; eauto. 
              (*exact symbols_preserved. exact varinfo_preserved.*)
               instantiate (1 := vl'); auto. 
+              eassumption.
               instantiate (1 := ls2); auto. 
          eapply effstep_star_trans'. eexact A3. clear A3.
          eapply effstep_star_one. 
@@ -5110,20 +5113,20 @@ induction CS;
       apply intern_incr_as_inj in INC; trivial.
         apply sm_inject_separated_mem in SEP; trivial.
         eapply meminj_preserves_incr_sep; eassumption. 
-    red; intros. destruct (H3 _ _ H12).
+    red; intros b fb Hb. destruct (H4 _ _ Hb).
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
     assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (H5 _ H12).
+          rewrite <- FRG. eapply (H6 _ H13).
   split; trivial. 
   split; trivial. 
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
-  intros. rewrite andb_true_iff in H2.
-    rewrite andb_true_iff, orb_false_r in H2. 
-    destruct H2 as [[EFF VB] _].
+  intros. rewrite andb_true_iff in H3.
+    rewrite andb_true_iff, orb_false_r in H3. 
+    destruct H3 as [[EFF VB] _].
     eapply BuiltinEffect_Propagate; eassumption.
 (* annot *)
--  admit. (*TODO annot is external call, like builtin?
+-  admit. (*We don't treat ennotations yet
    exploit (Eff_exec_moves mv); eauto. intros [ls1 [A1 B1]]. 
    exploit external_call_mem_extends; eauto. eapply add_equations_args_lessdef; eauto.
   inv WTI. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto. 
@@ -5382,62 +5385,8 @@ induction CS;
            apply wt_regset_assign; auto. eapply Val.has_subtype; eauto.
          intuition.
   intuition.
-(*inductive case
-- (*The inv MSTATE; try UseShape at the beginning of this proof
-     has destructed MATCH, so we need to reestablish. It seems 
-     applying inv MSTATE; try UseShape to all subgoals is
-     a bit too aggressive...*)
-  destruct IHCS as [c2' [m2' [U2 [HH1 [mu' HH2]]]]].
-    intros. eapply EffSrc. apply H. assumption. eassumption. assumption.
-    constructor. econstructor; eauto.
-    assumption. 
-  exists c2', m2', U2. split; trivial.
-  destruct HH2 as [? [? [? [? [? [? ?]]]]]].
-  exists mu'. 
-  repeat (split; trivial). 
-    eapply (H6 _ _ H7).
-  intros. destruct (H6 _ _ H7).
-    destruct (H10 H8) as [b1 [delta [Frg [HE HP]]]]; clear H6.
-    exists b1, delta. split; trivial. split; trivial.
-    apply Mem.perm_valid_block in HP. 
-    apply H; assumption.
-- (*There's another inductive case. Again, I think applying 
-     inv MSTATE; try UseShape at the beginning of this proof is 
-     a bit too aggressive...*)
-   destruct IHCS as [c2' [m2' [U2 [HH1 [mu' HH2]]]]].
-    intros. eapply EffSrc. apply H. assumption. eassumption. assumption.
-    constructor. econstructor; eauto.
-    assumption. 
-  exists c2', m2', U2. split; trivial.
-  destruct HH2 as [? [? [? [? [? [? ?]]]]]].
-  exists mu'. 
-  repeat (split; trivial). 
-    eapply (H6 _ _ H7).
-  intros. destruct (H6 _ _ H7).
-    destruct (H10 H8) as [b1 [delta [Frg [HE HP]]]]; clear H6.
-    exists b1, delta. split; trivial. split; trivial.
-    apply Mem.perm_valid_block in HP. 
-    apply H; assumption.
-- (*There's another inductive case. Again, I think applying 
-     inv MSTATE; try UseShape at the beginning of this proof is 
-     a bit too aggressive...*)
-   destruct IHCS as [c2' [m2' [U2 [HH1 [mu' HH2]]]]].
-    intros. eapply EffSrc. apply H. assumption. eassumption. assumption.
-    constructor. econstructor; eauto.
-    assumption. 
-  exists c2', m2', U2. split; trivial.
-  destruct HH2 as [? [? [? [? [? [? ?]]]]]].
-  exists mu'. 
-  repeat (split; trivial). 
-    eapply (H6 _ _ H7).
-  intros. destruct (H6 _ _ H7).
-    destruct (H10 H8) as [b1 [delta [Frg [HE HP]]]]; clear H6.
-    exists b1, delta. split; trivial. split; trivial.
-    apply Mem.perm_valid_block in HP. 
-    apply H; assumption.*)
 Qed.
 
-(*program structure not yet updated to module*)
 Theorem transl_program_correct:
   forall (*(TRANSL: sel_program prog = OK tprog)*)
          (LNR: list_norepet (map fst (prog_defs prog)))
@@ -5550,7 +5499,9 @@ assert (GDE:= GDE_lemma).
     specialize (val_list_inject_forall_inject _ _ _ ARGS). intros ValsInj.
     specialize (forall_vals_inject_restrictD _ _ _ _ ValsInj); intros.
     exploit replace_locals_wd_AtExternal; try eassumption. 
-    intros H2. inv FUN. simpl. eexists; split; eauto. split; auto. simpl. intros. subst.
+    intros H2. inv FUN. simpl. 
+    destruct (observableEF e0); inv H0.
+    eexists; split; eauto. split; auto. simpl. intros. subst.
     (*MATCH*)
     split; auto. split; auto.
     rewrite replace_locals_as_inj, replace_locals_vis. 
@@ -5577,6 +5528,5 @@ assert (GDE:= GDE_lemma).
     repeat (split; try assumption).
     exists U2. split; try assumption. left; assumption. }
 Qed.
-
 
 End PRESERVATION.

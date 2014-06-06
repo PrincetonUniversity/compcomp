@@ -17,11 +17,12 @@ Require Import Op.
 Require Import CminorSel.
 Require Import SelectOp.
 Require Import SelectDiv.
-Require Import SelectLong.
-Require Import Selection.
+Require Import SelectLongNEW.
+Require Import SelectionNEW.
 Require Import SelectOpproof.
 Require Import SelectDivproof.
-Require Import SelectLongproof.
+Require Import BuiltinEffects.
+Require Import SelectLongproofEFF.
 
 Require Import mem_lemmas.
 Require Import core_semantics.
@@ -33,7 +34,6 @@ Require Import effect_simulations.
 Require Import effect_properties.
 Require Import effect_simulations_lemmas.
 
-Require Import BuiltinEffects.
 Require Import Cminor_coop.
 Require Import Cminor_eff.
 Require Import CminorSel_coop.
@@ -67,10 +67,10 @@ Section PRESERVATION.
 
 Variable prog: Cminor.program.
 Let ge := Genv.globalenv prog.
-Variable hf: helper_functions.
+(*Variable hf: helper_functions.*)
 Let tprog := transform_program (sel_fundef hf ge) prog.
 Let tge := Genv.globalenv tprog.
-Hypothesis HELPERS: i64_helpers_correct tge hf.
+Hypothesis HELPERS: i64_helpers_correct ge (*hf*).
 
 Lemma symbols_preserved:
   forall (s: ident), Genv.find_symbol tge s = Genv.find_symbol ge s.
@@ -193,11 +193,20 @@ Proof.
   eapply external_call_symbols_preserved; eauto. 
   exact symbols_preserved. exact varinfo_preserved.
 Qed.
-
+(*
 Lemma helpers_correct_preserved:
   forall h, i64_helpers_correct ge h -> i64_helpers_correct tge h.
 Proof.
   unfold i64_helpers_correct; intros.
+  repeat (match goal with [ H: _ /\ _ |- _ /\ _ ] => destruct H; split end);
+  intros; try (eapply helper_implements_preserved; eauto);
+  try (eapply builtin_implements_preserved; eauto).
+Qed.*)
+Lemma helpers_correct_preserved:
+  i64_helpers_correct tge.
+Proof.
+  unfold i64_helpers_correct; intros.
+  unfold i64_helpers_correct in HELPERS.
   repeat (match goal with [ H: _ /\ _ |- _ /\ _ ] => destruct H; split end);
   intros; try (eapply helper_implements_preserved; eauto);
   try (eapply builtin_implements_preserved; eauto).
@@ -292,8 +301,9 @@ Lemma eval_sel_unop:
   forall le op a1 v1 v,
   eval_expr tge sp e m le a1 v1 ->
   eval_unop op v1 = Some v ->
-  exists v', eval_expr tge sp e m le (sel_unop hf op a1) v' /\ Val.lessdef v v'.
+  exists v', eval_expr tge sp e m le (sel_unop (*hf*) op a1) v' /\ Val.lessdef v v'.
 Proof.
+  assert (THELPERS:= helpers_correct_preserved).
   destruct op; simpl; intros; FuncInv; try subst v.
   apply eval_cast8unsigned; auto.
   apply eval_cast8signed; auto.
@@ -326,8 +336,9 @@ Lemma eval_sel_binop:
   eval_expr tge sp e m le a1 v1 ->
   eval_expr tge sp e m le a2 v2 ->
   eval_binop op v1 v2 m = Some v ->
-  exists v', eval_expr tge sp e m le (sel_binop hf op a1 a2) v' /\ Val.lessdef v v'.
+  exists v', eval_expr tge sp e m le (sel_binop (*hf*) op a1 a2) v' /\ Val.lessdef v v'.
 Proof.
+  assert (THELPERS:= helpers_correct_preserved).
   destruct op; simpl; intros; FuncInv; try subst v.
   apply eval_add; auto.
   apply eval_sub; auto.
@@ -388,7 +399,7 @@ Lemma classify_call_correct:
   match classify_call ge a with
   | Call_default => True
   | Call_imm id => exists b, Genv.find_symbol ge id = Some b /\ v = Vptr b Int.zero
-  | Call_builtin ef => fd = External ef
+  | Call_builtin ef => fd = External ef /\ (*NEW*) observableEF ef = false
   end.
 Proof.
   unfold classify_call; intros. 
@@ -399,6 +410,10 @@ Proof.
   rewrite Genv.find_funct_find_funct_ptr in H0. 
   rewrite H0. 
   destruct fd. exists b; auto. 
+  remember (observableEF e0) as d. 
+  destruct d; simpl in *. 
+    rewrite andb_false_r. exists b; auto.
+  rewrite andb_true_r.
   destruct (ef_inline e0). auto. exists b; auto.
   simpl in H0. discriminate.
   auto.
@@ -697,7 +712,7 @@ Lemma sel_expr_inject:
      (GD: genvs_domain_eq ge tge)
      (NoRepet: list_norepet (map fst (prog_defs prog)))
      sp' (SP: sp_preserved j sp sp'),
-  exists v', CminorSel.eval_expr tge sp' e' m' le (sel_expr hf a) v' /\ 
+  exists v', CminorSel.eval_expr tge sp' e' m' le (sel_expr (*hf*) a) v' /\ 
              val_inject j v v'.
 Proof.
   induction 1; intros; simpl.
@@ -798,7 +813,7 @@ Lemma sel_exprlist_inject:
      (GD: genvs_domain_eq ge tge)
      (NoRepet: list_norepet (map fst (prog_defs prog)))
      sp' (SP: sp_preserved j sp sp'),
-  exists v', CminorSel.eval_exprlist tge sp' e' m' le (sel_exprlist hf a) v' /\ 
+  exists v', CminorSel.eval_exprlist tge sp' e' m' le (sel_exprlist (*hf*) a) v' /\ 
              val_list_inject j v v'.
 Proof.
   induction 1; intros; simpl. 
@@ -831,7 +846,7 @@ Inductive match_cont (*NEW:*)(j:meminj): Cminor.cont -> CminorSel.cont -> Prop :
       match_cont j Cminor.Kstop Kstop
   | match_cont_seq: forall s k k',
       match_cont j k k' ->
-      match_cont j (Cminor.Kseq s k) (Kseq (sel_stmt hf ge s) k')
+      match_cont j (Cminor.Kseq s k) (Kseq (sel_stmt (*hf*) ge s) k')
   | match_cont_block: forall k k',
       match_cont j k k' ->
       match_cont j (Cminor.Kblock k) (Kblock k')
@@ -845,7 +860,7 @@ Inductive match_cont (*NEW:*)(j:meminj): Cminor.cont -> CminorSel.cont -> Prop :
 
 Inductive match_states (j:meminj) : CMin_core -> mem -> CMinSel_core -> mem -> Prop :=
   | match_state: forall f s k s' k' sp e m sp' e' m',
-      s' = sel_stmt hf ge s ->
+      s' = sel_stmt (*hf*) ge s ->
       match_cont j k k' ->
       (*      env_lessdef e e' -> Mem.extends m m' ->*)
       env_inject j e e' -> Mem.inject j m m' -> sp_preserved j sp sp' ->
@@ -872,6 +887,7 @@ Inductive match_states (j:meminj) : CMin_core -> mem -> CMinSel_core -> mem -> P
       val_list_inject j args args' -> env_inject j e e' -> Mem.inject j m m' -> 
       sp_preserved j sp sp' ->
       CminorSel.eval_exprlist tge sp' e' m' nil al args' ->
+      (*NEW*) observableEF ef = false ->
       match_states j
         (CMin_Callstate (External ef) args (Cminor.Kcall optid f sp e k)) m
         (CMinSel_State (sel_function hf ge f) (Sbuiltin optid ef al) k' sp' e') m'
@@ -917,15 +933,15 @@ Qed.
 Remark find_label_commut:
   forall j lbl s k k',
   match_cont j k k' ->
-  match Cminor.find_label lbl s k, find_label lbl (sel_stmt hf ge s) k' with
+  match Cminor.find_label lbl s k, find_label lbl (sel_stmt (*hf*) ge s) k' with
   | None, None => True
-  | Some(s1, k1), Some(s1', k1') => s1' = sel_stmt hf ge s1 /\ match_cont j k1 k1'
+  | Some(s1, k1), Some(s1', k1') => s1' = sel_stmt (*hf*) ge s1 /\ match_cont j k1 k1'
   | _, _ => False
   end.
 Proof.
   induction s; intros; simpl; auto.
 (* store *)
-  unfold store. destruct (addressing m (sel_expr hf e)); simpl; auto.
+  unfold store. destruct (addressing m (sel_expr (*hf*) e)); simpl; auto.
 (* call *)
   destruct (classify_call ge e); simpl; auto.
 (* tailcall *)
@@ -933,12 +949,12 @@ Proof.
 (* seq *)
   exploit (IHs1 (Cminor.Kseq s2 k)). constructor; eauto. 
   destruct (Cminor.find_label lbl s1 (Cminor.Kseq s2 k)) as [[sx kx] | ];
-  destruct (find_label lbl (sel_stmt hf ge s1) (Kseq (sel_stmt hf ge s2) k')) as [[sy ky] | ];
+  destruct (find_label lbl (sel_stmt (*hf*) ge s1) (Kseq (sel_stmt (*hf*) ge s2) k')) as [[sy ky] | ];
   intuition. apply IHs2; auto.
 (* ifthenelse *)
   exploit (IHs1 k); eauto. 
   destruct (Cminor.find_label lbl s1 k) as [[sx kx] | ];
-  destruct (find_label lbl (sel_stmt hf ge s1) k') as [[sy ky] | ];
+  destruct (find_label lbl (sel_stmt (*hf*) ge s1) k') as [[sy ky] | ];
   intuition. apply IHs2; auto.
 (* loop *)
   apply IHs. constructor; auto.
@@ -1026,9 +1042,12 @@ Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
 Proof. intros.
   destruct MTCH as [MC [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
   destruct c1; inv AtExtSrc. destruct f; inv H0.
+  remember (observableEF e0) as obs.
+  destruct obs; inv H1.
   split; trivial. 
   inv MC; simpl.
   exists args'.
+    rewrite <- Heqobs.
     specialize (val_list_inject_forall_inject _ _ _ H6); intros.
     specialize (forall_vals_inject_restrictD _ _ _ _ H); intros.
     exploit replace_locals_wd_AtExternal; try eassumption.
@@ -1042,7 +1061,23 @@ Proof. intros.
         subst; trivial.
     eapply inject_shared_replace_locals; try eassumption.
       subst; trivial.
-admit. (*CompCert issue: external builtin is inlined *)
+  rewrite H11 in Heqobs. discriminate.
+(*  subst. exists args'.
+    specialize (val_list_inject_forall_inject _ _ _ H3); intros.
+    specialize (forall_vals_inject_restrictD _ _ _ _ H); intros. 
+  split; trivial. 
+  split; trivial. 
+  exploit replace_locals_wd_AtExternal; try eassumption.
+    intros WDnu.
+    intuition.   
+    assert (SMVnu: sm_valid nu m1 m2).
+      red. subst nu. rewrite replace_locals_DOM, replace_locals_RNG. apply SMV.
+    subst nu; split; repeat rewrite replace_locals_as_inj, replace_locals_vis. 
+        econstructor; eauto.
+        rewrite replace_locals_frgnBlocksSrc. intuition.
+        subst; trivial.
+    eapply inject_shared_replace_locals; try eassumption.
+      subst; trivial.*)
 Qed.
 
 (*FreshS/T: fresh blocks in src/tgt language*)
@@ -1344,16 +1379,17 @@ exists (st1' : CMin_core) (st2' : CMinSel_core),
   MATCH st1' mu' st1' m1' st2' m2'.
 Proof. intros.
  destruct MatchMu as [MC [RC [PG [GFP [Glob [VAL [WDmu INJ]]]]]]].
- inv MC; simpl in *; inv AtExtSrc.
- destruct f; inv H3.
-  remember (sel_fundef hf ge (External e)) as tfd.
-  destruct tfd; inv AtExtTgt. apply eq_sym in Heqtfd.
+ inv MC; simpl in *; try congruence.
+ simpl in *.
+ destruct f; inv AtExtSrc.
+ simpl in *.
+ remember (observableEF e0) as obs. destruct obs; inv H3.
+  apply eq_sym in AtExtTgt. inv AtExtTgt.
   exists (CMin_Returnstate ret1 k). eexists.
     split. reflexivity.
     split. reflexivity.
   simpl in *.
-  inv Heqtfd.
- assert (INCvisNu': inject_incr
+  assert (INCvisNu': inject_incr
   (restrict (as_inj nu')
      (vis
         (replace_externs nu'
@@ -1569,7 +1605,6 @@ intuition.
   red; intros. destruct (GFP _ _ H4). split; trivial.
   eapply extern_incr_as_inj; try eassumption.
   rewrite replace_locals_as_inj. assumption.
-admit. (*CompCert issue: external builtin is inlined *)
 Qed. 
 
 Lemma MATCH_diagram: forall (GDE : genvs_domain_eq ge tge)
@@ -1796,7 +1831,7 @@ Proof.
            exists spb, i, spb'. intuition.
          intuition. 
      (* turned into Sbuiltin *)
-       intros EQ. subst fd.  
+       intros [EQ OBS]. subst fd.  
        eexists; eexists. 
        split. right. split. omega.
            eapply corestep_star_zero. 
@@ -1876,13 +1911,13 @@ Proof.
           unfold vis. intuition.
       exploit sel_exprlist_inject; eauto. intros [vargs' [P Q]].
       exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply Q.
-        eassumption. eassumption. eassumption. eassumption. eassumption. assumption.
+        eassumption. eassumption. eassumption. eassumption. eassumption. eassumption. assumption.
       intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
       eexists; eexists. 
       split. left.
         apply corestep_plus_one. 
-          econstructor. eauto. eassumption.
+          econstructor. eauto. eassumption. assumption.
       exists mu'; intuition.
       split.
         econstructor. eauto. 
@@ -1894,18 +1929,18 @@ Proof.
             destruct optid; simpl; trivial.
               eapply set_var_inject; try eassumption.
           eapply inject_restrict; assumption.
-          destruct H13 as [bsp [i [bsp' [? [? Hsp]]]]]; subst.
+          destruct H14 as [bsp [i [bsp' [? [? Hsp]]]]]; subst.
             exists bsp, i, bsp'. split; trivial. split; trivial.
             eapply intern_incr_restrict; eassumption.
         intuition.
         eapply meminj_preserves_incr_sep. eapply PG. eassumption. 
              apply intern_incr_as_inj; trivial.
              apply sm_inject_separated_mem; eassumption.
-        red in GFP. red. intros. destruct (GFP _ _ H2).
+        red. intros b fbb Hb. destruct (GFP _ _ Hb).
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
         assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-          rewrite <- FRG. eapply (Glob _ H2). 
+          rewrite <- FRG. eapply (Glob _ H3). 
   (* Seq *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
@@ -1940,7 +1975,7 @@ Proof.
       assert (Val.bool_of_val v' b). 
         inv H0; inv B; econstructor.
       exists (CMinSel_State (sel_function hf ge f) 
-           (if b then sel_stmt hf ge s1 else sel_stmt hf ge s2) k' (Vptr spb' i) e').
+           (if b then sel_stmt (*hf*) ge s1 else sel_stmt (*hf*) ge s2) k' (Vptr spb' i) e').
       exists m2.
       split. left. 
         apply corestep_plus_one. 
@@ -2165,7 +2200,7 @@ Proof.
               (Cminor.fn_body f) (Cminor.call_cont k)).
         apply call_cont_commut; eauto.
       rewrite H. 
-      destruct (find_label lbl (sel_stmt hf ge (Cminor.fn_body f)) (call_cont k'0))
+      destruct (find_label lbl (sel_stmt (*hf*) ge (Cminor.fn_body f)) (call_cont k'0))
           as [[s'' k'']|] eqn:?; intros; try contradiction.
       destruct H. 
       eexists; eexists.
@@ -2514,7 +2549,7 @@ induction CS; simpl in *.
            exists spb, i, spb'. intuition.
          intuition. 
      (* turned into Sbuiltin *)
-       intros EQ. subst fd.  
+       intros [EQ OBS]. subst fd.  
        eexists; eexists; exists EmptyEffect. 
        split. right. split. omega.
            eapply effstep_star_zero. 
@@ -2561,8 +2596,9 @@ induction CS; simpl in *.
                destruct (GFPR _ _ H1).
                inv B. rewrite H9 in H5; inv H5. eauto.   
             apply sig_function_translated.
-        subst fd. econstructor; eauto.  
-           econstructor; auto. eassumption.
+        destruct H5 as [FD OBS]; subst fd. 
+          econstructor; eauto.  
+            econstructor; auto. eassumption.
             eapply functions_translated; eauto.
        exists mu. simpl.
        assert (SMV': sm_valid mu m' m2').
@@ -2596,13 +2632,13 @@ induction CS; simpl in *.
           unfold vis. intuition.
       exploit sel_exprlist_inject; eauto. intros [vargs' [P Q]].
       exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply Q.
-        eassumption. eassumption. eassumption. eassumption. eassumption. assumption.
+        eassumption. eassumption. eassumption. eassumption. eassumption. eassumption. assumption.
       intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
       eexists; eexists; eexists. 
       split. left.
         apply effstep_plus_one. 
-          econstructor. eauto. eassumption.
+          econstructor. eauto. eassumption. assumption.
       exists mu'. split; trivial. split; trivial. split; trivial.
       split.
         split. 
@@ -2615,18 +2651,18 @@ induction CS; simpl in *.
              destruct optid; simpl; trivial.
                eapply set_var_inject; try eassumption.
            eapply inject_restrict. assumption. intuition.
-           destruct H13 as [bsp [i [bsp' [? [? Hsp]]]]]; subst.
+           destruct H14 as [bsp [i [bsp' [? [? Hsp]]]]]; subst.
              exists bsp, i, bsp'. split; trivial. split; trivial.
              eapply intern_incr_restrict; eassumption.
          intuition.
          eapply meminj_preserves_incr_sep. eapply PG. eassumption. 
              apply intern_incr_as_inj; trivial.
              apply sm_inject_separated_mem; eassumption.
-         red in GFP. red. intros. destruct (GFP _ _ H2).
+         red; intros b fb Hb. destruct (GFP _ _ Hb).
            split; trivial.
            eapply intern_incr_as_inj; eassumption.
          assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-            rewrite <- FRG. eapply (Glob _ H2).
+            rewrite <- FRG. eapply (Glob _ H3).
        split; trivial. split; trivial.
        eapply BuiltinEffect_Propagate; eassumption. 
   (* Seq *)
@@ -2663,7 +2699,7 @@ induction CS; simpl in *.
       assert (Val.bool_of_val v' b). 
         inv H0; inv B; econstructor.
       exists (CMinSel_State (sel_function hf ge f) 
-           (if b then sel_stmt hf ge s1 else sel_stmt hf ge s2) k' (Vptr spb' i) e').
+           (if b then sel_stmt (*hf*) ge s1 else sel_stmt (*hf*) ge s2) k' (Vptr spb' i) e').
       exists m2. exists EmptyEffect.
       split. left. 
         apply effstep_plus_one. 
@@ -2897,7 +2933,7 @@ induction CS; simpl in *.
           lbl (Cminor.fn_body f) (Cminor.call_cont k)).
         apply call_cont_commut; eauto.
       rewrite H. 
-      destruct (find_label lbl (sel_stmt hf ge (Cminor.fn_body f)) (call_cont k'0))
+      destruct (find_label lbl (sel_stmt (*hf*) ge (Cminor.fn_body f)) (call_cont k'0))
           as [[s'' k'']|] eqn:?; intros; try contradiction.
       destruct H0. 
       eexists; eexists. eexists.
@@ -3115,15 +3151,7 @@ assert (GDE: genvs_domain_eq ge tge).
     split. assumption.
     simpl. inv H1. trivial. }
 (* at_external*)
-  { (* proof without the leak-out stuff :
-    intros. destruct H as [MC [RC [PG [GFP [Glob [VAL [WD INJ]]]]]]].
-    split. inv MC; trivial.
-    destruct c1; inv H0. destruct f; inv H1.
-    inv MC. simpl. exists args'; intuition. 
-      apply val_list_inject_forall_inject; eassumption.
-    simpl.
-    admit. CompCert issue: external builtin is inlined *) 
-    apply MATCH_atExternal. }
+  { apply MATCH_atExternal. }
 (* after_external*)
   { apply MATCH_AfterExternal. }
 (* core_diagram*)

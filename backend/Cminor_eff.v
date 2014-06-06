@@ -62,10 +62,10 @@ Inductive cmin_effstep (g: Cminor.genv):  (block -> Z -> bool) ->
       cmin_effstep g (FreeEffect m 0 (f.(fn_stackspace)) sp) (CMin_State f (Stailcall sig a bl) k (Vptr sp Int.zero) e) m
          (CMin_Callstate fd vargs (call_cont k)) m'
 
-(* WE DO NOT TREAT BUILTINS *)
 | cmin_effstep_builtin: forall f optid ef bl k sp e m vargs t vres m',
       eval_exprlist g sp e m bl vargs ->
       external_call ef g vargs m t vres m' ->
+      observableEF ef = false -> 
       cmin_effstep g (BuiltinEffect g ef vargs m)
           (*(BuiltinEffect g (ef_sig ef) vargs m) *)
           (CMin_State f (Sbuiltin optid ef bl) k sp e) m

@@ -692,6 +692,7 @@ Proof.
   apply alignof_blockcopy_1248.
   apply sizeof_pos. 
   eapply Zdivide_trans. apply alignof_blockcopy_divides. apply sizeof_alignof_compat.
+  simpl. reflexivity.
 Qed.
 
 Lemma make_memcpy_correct_BuiltinEffect:
@@ -715,7 +716,8 @@ Proof.
   econstructor; eauto. 
   apply alignof_blockcopy_1248.
   apply sizeof_pos. 
-  eapply Zdivide_trans. apply alignof_blockcopy_divides. apply sizeof_alignof_compat.  
+  eapply Zdivide_trans. apply alignof_blockcopy_divides. apply sizeof_alignof_compat.
+  simpl. reflexivity.
 Qed.
 (*
 Lemma make_memcpy_correct_BuiltinEffect:
@@ -2402,13 +2404,19 @@ Proof. intros.
 simpl.
  destruct MatchMu as [MC [RC [PG [GF [Glob [VAL [WDmu INJ]]]]]]].
  simpl in *. inv MC; simpl in *; inv AtExtSrc.
- destruct fd; inv H0. 
+ destruct fd; inv H0. simpl in TY. inv TY.
  destruct tfd; inv AtExtTgt.
+ remember (observableEF e0) as d.
+ destruct d; inv H1.
+ remember (observableEF e1) as d1.
+ destruct d1; inv H0.
+ simpl in *.
+ remember (list_typ_eq (sig_args (ef_sig e)) (typlist_of_typelist targs) &&
+           opt_typ_eq (sig_res (ef_sig e)) (opttyp_of_type tres)) as dd.
+ destruct dd; inv TR. clear Heqd1; apply eq_sym in Heqdd.
  eexists. eexists.
     split. reflexivity.
     split. reflexivity.
- simpl in *.
- inv TY.
  assert (INCvisNu': inject_incr
   (restrict (as_inj nu')
      (vis
@@ -2874,7 +2882,7 @@ Proof.
     exploit transl_arglist_correct; try eassumption.
     intros [tvargs [EVAL2 VINJ2]].
     exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply H0.
-        eassumption. eassumption. eassumption. eassumption. eassumption. eassumption.
+        eassumption. eassumption. eassumption. eassumption. eassumption. eassumption. eassumption.
     intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
     eexists; eexists; eexists mu'.
@@ -2893,11 +2901,11 @@ Proof.
          eapply meminj_preserves_incr_sep. eapply PG. eassumption. 
              apply intern_incr_as_inj; trivial.
              apply sm_inject_separated_mem; eassumption.
-         red. intros. destruct (GF _ _ H2).
+         red. intros b fbb Hb. destruct (GF _ _ Hb).
            split; trivial.
            eapply intern_incr_as_inj; eassumption.
          assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-           rewrite <- FRG. eapply (Glob _ H2).  
+           rewrite <- FRG. eapply (Glob _ H3).  
 (* seq *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *. 
@@ -3642,7 +3650,7 @@ Proof.
     exploit transl_arglist_correctMu; try eassumption.
     intros [tvargs [EVAL2 VINJ2]].
     exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply H0.
-        eassumption. eassumption. eassumption. eassumption. eassumption. eassumption.
+        eassumption. eassumption. eassumption. eassumption. eassumption. eassumption. eassumption.
     intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
     eexists; eexists; eexists mu'.
@@ -3663,11 +3671,11 @@ Proof.
          eapply meminj_preserves_incr_sep. eapply PG. eassumption. 
              apply intern_incr_as_inj; trivial.
              apply sm_inject_separated_mem; eassumption.
-         red. intros. destruct (GF _ _ H2).
+         red. intros b fbb Hb. destruct (GF _ _ Hb).
            split; trivial.
            eapply intern_incr_as_inj; eassumption.
          assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-           rewrite <- FRG. eapply (Glob _ H2). 
+           rewrite <- FRG. eapply (Glob _ H3). 
 (* seq *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *. 
@@ -4230,6 +4238,58 @@ Proof. intros.
   rewrite replace_locals_as_inj; trivial.
 Qed.
 
+Lemma MATCH_atExternal:
+forall (mu : SM_Injection) (c1 : CL_core) (m1 : mem) 
+     (c2 : CSharpMin_core) (m2 : mem) (e : external_function)
+     (vals1 : list val) (ef_sig : signature),
+   MATCH c1 mu c1 m1 c2 m2 ->
+   at_external CL_eff_sem2 c1 = Some (e, ef_sig, vals1) ->
+   Mem.inject (as_inj mu) m1 m2 /\
+   (exists vals2 : list val,
+      Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\
+      at_external csharpmin_eff_sem c2 = Some (e, ef_sig, vals2) /\
+      (forall pubSrc' pubTgt' : block -> bool,
+       pubSrc' =
+       (fun b : block =>
+        locBlocksSrc mu b && REACH m1 (exportedSrc mu vals1) b) ->
+       pubTgt' =
+       (fun b : block =>
+        locBlocksTgt mu b && REACH m2 (exportedTgt mu vals2) b) ->
+       forall nu : SM_Injection,
+       nu = replace_locals mu pubSrc' pubTgt' ->
+       MATCH c1 nu c1 m1 c2 m2 /\ Mem.inject (shared_of nu) m1 m2)).
+Proof. intros. destruct H as [MC [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
+    split; trivial.
+    destruct c1; inv H0. destruct fd; inv H1.
+    inv MC. simpl in TY. inv TY.     
+    specialize (val_list_inject_forall_inject _ _ _ ArgsInj). intros ValsInj.
+    specialize (forall_vals_inject_restrictD _ _ _ _ ValsInj); intros.
+    exploit replace_locals_wd_AtExternal; try eassumption. 
+    intros WDr.
+    remember (observableEF e0) as obs.
+    destruct obs; inv H0.
+    exists args2; intuition.
+      destruct tfd; simpl in *.
+        remember ( list_typ_eq (sig_args (ef_sig e)) (typlist_of_typelist targs) &&
+           opt_typ_eq (sig_res (ef_sig e)) (opttyp_of_type tres)) as q.
+        destruct q; inv TR.
+      remember ( list_typ_eq (sig_args (ef_sig e)) (typlist_of_typelist targs) &&
+           opt_typ_eq (sig_res (ef_sig e)) (opttyp_of_type tres)) as q.
+        destruct q; inv TR.
+        rewrite <- Heqobs. trivial.
+     (*MATCH*)
+       split; subst; rewrite replace_locals_as_inj, replace_locals_vis. 
+         econstructor; repeat rewrite restrict_sm_all, vis_restrict_sm, 
+            replace_locals_vis, replace_locals_as_inj in *; eauto.
+         simpl. reflexivity. 
+       rewrite replace_locals_frgnBlocksSrc. intuition.
+       (*sm_valid*)
+         red. rewrite replace_locals_DOM, replace_locals_RNG. apply SMV.
+    (*Shared*)
+      eapply inject_shared_replace_locals; try eassumption.
+      subst; trivial.
+Qed.
+
 (** The simulation proof *)
 Theorem transl_program_correct:
   forall (R: list_norepet (map fst (prog_defs prog)))
@@ -4324,28 +4384,7 @@ assert (GDE: genvs_domain_eq ge tge).
     split. eassumption.
     simpl. inv MK. trivial. }
 (* at_external*)
-  { intros. destruct H as [MC [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
-    split; trivial.
-    destruct c1; inv H0. destruct fd; inv H1.
-    inv MC. simpl.
-    specialize (val_list_inject_forall_inject _ _ _ ArgsInj). intros ValsInj.
-    specialize (forall_vals_inject_restrictD _ _ _ _ ValsInj); intros.
-    exploit replace_locals_wd_AtExternal; try eassumption. 
-    exists args2; intuition.
-      unfold transl_fundef in TR.
-        remember (list_typ_eq (sig_args (ef_sig e)) (typlist_of_typelist t) &&
-           opt_typ_eq (sig_res (ef_sig e)) (opttyp_of_type t0)).
-        destruct b; inv TR. trivial.
-     (*MATCH*)
-       split; subst; rewrite replace_locals_as_inj, replace_locals_vis. 
-         econstructor; repeat rewrite restrict_sm_all, vis_restrict_sm, 
-            replace_locals_vis, replace_locals_as_inj in *; eauto.
-       rewrite replace_locals_frgnBlocksSrc. intuition.
-       (*sm_valid*)
-         red. rewrite replace_locals_DOM, replace_locals_RNG. apply SMV.
-    (*Shared*)
-      eapply inject_shared_replace_locals; try eassumption.
-      subst; trivial. }
+  { apply MATCH_atExternal. }
 (* after_external*)
   { apply MATCH_afterExternal. assumption. }
 (* core_diagram*)

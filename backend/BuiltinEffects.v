@@ -150,19 +150,55 @@ Proof. intros.
                     eapply Mem.fresh_block_alloc; eassumption.
 Qed.
 
+Record helper_functions : Type := mk_helper_functions {
+  i64_dtos: ident;                      (**r float -> signed long *)
+  i64_dtou: ident;                      (**r float -> unsigned long *)
+  i64_stod: ident;                      (**r signed long -> float *)
+  i64_utod: ident;                      (**r unsigned long -> float *)
+  i64_stof: ident;                      (**r signed long -> float32 *)
+  i64_utof: ident;                      (**r unsigned long -> float32 *)
+  i64_neg: ident;                       (**r opposite *)
+  i64_add: ident;                       (**r addition *)
+  i64_sub: ident;                       (**r subtraction *)
+  i64_mul: ident;                       (**r multiplication 32x32->64 *)
+  i64_sdiv: ident;                      (**r signed division *)
+  i64_udiv: ident;                      (**r unsigned division *)
+  i64_smod: ident;                      (**r signed remainder *)
+  i64_umod: ident;                      (**r unsigned remainder *)
+  i64_shl: ident;                       (**r shift left *)
+  i64_shr: ident;                       (**r shift right unsigned *)
+  i64_sar: ident                        (**r shift right signed *)
+}.
+Variable hf: helper_functions.
+Definition hf_names := hf.(i64_dtos)::hf.(i64_dtou) :: 
+  hf.(i64_stod) ::  hf.(i64_utod) :: hf.(i64_stof) ::
+  hf.(i64_utof) :: hf.(i64_neg) :: hf.(i64_add) :: 
+  hf.(i64_sub) :: hf.(i64_mul) :: hf.(i64_sdiv) ::
+  hf.(i64_udiv) :: hf.(i64_smod) :: hf.(i64_umod) ::
+  hf.(i64_shl) :: hf.(i64_shr) :: hf.(i64_sar) :: nil.
+
+Definition observableEF (ef: external_function): bool :=
+  match ef with
+    EF_malloc => false (*somewhat arbitrary*)
+  | EF_free => false (*somewhat arbitrary*)
+  | EF_memcpy _ _ => false
+  | EF_builtin x _ => negb (existsb (ident_eq x) hf_names)  
+  | EF_external x _ => negb (existsb (ident_eq x) hf_names)
+  | _ => true
+  end.
+
 Lemma BuiltinEffect_unchOn:
-    forall {F V:Type} ef (g : Genv.t F V) vargs m t vres m',
+    forall {F V:Type} ef (g : Genv.t F V) vargs m t vres m'
+    (OBS: observableEF ef = false),
     external_call ef g vargs m t vres m' -> 
     Mem.unchanged_on
       (fun b z=> BuiltinEffect g ef vargs m b z = false) m m'.
 Proof. intros.
-  destruct ef.
-    admit. (*case EF_external*)
-    admit. (*case EF_builtin*)
-    admit. (*case EF_vload*)
-    admit. (*case EF_vstore*)
-    admit. (*case EF_vload_global*)
-    admit. (*case EF_vstore_global*)
+  destruct ef; try solve [inv OBS].
+    (*EF_external*)
+       admit.
+    (*EF_builtin*)
+       admit.
     (*case EF_malloc*)
        eapply  malloc_Effect_unchOn; eassumption.
     (*case EF_free*)
@@ -170,9 +206,6 @@ Proof. intros.
     (*case EE_memcpy*)
        inv H. clear - H1 H6 H7.
        eapply memcpy_Effect_unchOn; try eassumption. omega.
-    admit. (*case EF_annot1*)
-    admit. (*case EF_annot2*)
-    admit. (*case EF_inline_asm*)
 Qed.
 
 Lemma BuiltinEffect_valid_block:
@@ -183,6 +216,7 @@ Proof. intros. unfold BuiltinEffect in H.
     eapply freeEffect_valid_block; eassumption.
     eapply memcpy_Effect_validblock; eassumption.
 Qed.
+
 Lemma REACH_Store: forall m chunk b i v m'
      (ST: Mem.store chunk m b i v = Some m')
      Roots (VISb: Roots b = true)
@@ -309,7 +343,6 @@ induction M; simpl in *; intros.
           eexists. eapply reach_cons; try eassumption.
 Qed.
 
-
 (*takes the role of external_call_mem_inject for builtins etc.
   Since inlinables write at most to vis, we use the
   Mem-Unchanged_on condition loc_out_of_reach, rather than
@@ -317,7 +350,8 @@ Qed.
 Lemma inlineable_extern_inject: forall {F V TF TV:Type}
        (ge:Genv.t F V) (tge:Genv.t TF TV) (GDE: genvs_domain_eq ge tge) 
           ef vargs m t vres m1 mu tm vargs'
-       (WD: SM_wd mu) (SMV: sm_valid mu m tm) (RC: REACH_closed m (vis mu)),
+       (WD: SM_wd mu) (SMV: sm_valid mu m tm) (RC: REACH_closed m (vis mu))
+       (OBS: observableEF ef = false),
        meminj_preserves_globals ge (as_inj mu) ->
        external_call ef ge vargs m t vres m1 ->
        Mem.inject (as_inj mu) m tm ->
@@ -334,13 +368,9 @@ Lemma inlineable_extern_inject: forall {F V TF TV:Type}
          SM_wd mu' /\ sm_valid mu' m1 tm1 /\
          (REACH_closed m (vis mu) -> REACH_closed m1 (vis mu')).
 Proof. intros.
-destruct ef; simpl in H0.
-    admit. (*case EF_external*)
-    admit. (*case EF_builtin*)
-    admit. (*case EF_vload*)
-    admit. (*case EF_vstore*)
-    admit. (*case EF_vload_global*)
-    admit. (*case EF_vstore_global*)
+destruct ef; simpl in H0; try solve [inv OBS].
+    (*EFexternal*) admit.
+    (*EF_builtin*) admit.
     (*case EF_malloc*)
     inv H0. inv H2. inv H8. inv H6. 
     exploit alloc_parallel_intern; eauto. apply Zle_refl. apply Zle_refl. 
@@ -539,10 +569,6 @@ destruct ef; simpl in H0.
             Focus 2. apply eq_sym. eassumption. 
             eapply H15. clear - H5 H4. split. specialize (Zle_0_nat (length bts1)). intros. omega.
             apply inj_lt in H5. rewrite nat_of_Z_eq in H5; omega.
- 
-    admit. (*case EF_annot*)
-    admit. (*case EFannot_val*)
-    admit. (*case EF_inline*)
 Qed.
 
 Lemma BuiltinEffect_Propagate: forall {F V TF TV:Type}

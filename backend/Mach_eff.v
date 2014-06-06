@@ -134,6 +134,7 @@ Inductive mach_effstep: (block -> Z -> bool) ->
   | Mach_effexec_Mbuiltin:
       forall s f sp rs m ef args res b t vl rs' m',
       external_call' ef ge rs##args m t vl m' ->
+      observableEF ef = false ->
       rs' = set_regs res vl (undef_regs (destroyed_by_builtin ef) rs) ->
       mach_effstep 
          (BuiltinEffect ge ef (decode_longs (sig_args (ef_sig ef)) (rs##args)) m)
@@ -260,7 +261,7 @@ intros.
          eapply FreeEffect_free; eassumption.
   split. unfold corestep, coopsem; simpl. econstructor; eassumption.
          inv H.
-         eapply BuiltinEffect_unchOn. eassumption.
+         eapply BuiltinEffect_unchOn; eassumption.
   split. econstructor; eassumption.
          apply Mem.unchanged_on_refl.
   split. eapply Mach_exec_Mcond_true; eassumption.

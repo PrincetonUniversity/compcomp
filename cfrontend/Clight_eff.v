@@ -145,6 +145,7 @@ Inductive clight_effstep (ge:genv): (block -> Z -> bool) ->
   | clight_effstep_builtin:   forall f optid ef tyargs al k e le m vargs t vres m',
       eval_exprlist ge e le m al tyargs vargs ->
       external_call ef ge vargs m t vres m' ->
+      observableEF ef = false ->
       clight_effstep ge (BuiltinEffect ge ef vargs m)
          (CL_State f (Sbuiltin optid ef tyargs al) k e le) m
          (CL_State f Sskip k e (set_opttemp optid vres le)) m'

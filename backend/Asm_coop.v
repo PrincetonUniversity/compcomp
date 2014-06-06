@@ -12,11 +12,13 @@ Require Import Locations.
 Require Import Stacklayout.
 Require Import Conventions.
 
-Require Import Asm. 
+(*LENB: We don't import CompCert's original Asm.v, but the modified one*)
+Require Import AsmEFF. 
 
 Require Import mem_lemmas. (*for mem_forward*)
 Require Import core_semantics.
 Require Import val_casted.
+Require Import BuiltinEffects.
 
 Notation SP := ESP (only parsing).
 
@@ -27,27 +29,28 @@ Section RELSEM.
 Variable ge: genv.
 
 Inductive state: Type :=
-  | State: regset -> state
-  | ExtCallState: external_function -> list val -> regset -> state.
+  | State: signature -> regset -> state
+  | ExtCallState: signature -> external_function -> list val -> regset -> state.
 
 Inductive asm_step: state -> mem -> state -> mem -> Prop :=
   | asm_exec_step_internal:
-      forall b ofs c i rs m rs' m',
+      forall b ofs f i rs m rs' m' sg,
       rs PC = Vptr b ofs ->
-      Genv.find_funct_ptr ge b = Some (Internal c) ->
-      find_instr (Int.unsigned ofs) c = Some i ->
-      exec_instr ge c i rs m = Next rs' m' ->
-      asm_step (State rs) m (State rs') m'
+      Genv.find_funct_ptr ge b = Some (Internal f) ->
+      find_instr (Int.unsigned ofs) (fn_code f) = Some i ->
+      exec_instr ge (fn_code f) i rs m = Next rs' m' ->
+      asm_step (State sg rs) m (State sg rs') m'
   | asm_exec_step_builtin:
-      forall b ofs c ef args res rs m t vl rs' m',
+      forall b ofs f ef args res rs m t vl rs' m' sg,
       rs PC = Vptr b ofs ->
-      Genv.find_funct_ptr ge b = Some (Internal c) ->
-      find_instr (Int.unsigned ofs) c = Some (Pbuiltin ef args res) ->
+      Genv.find_funct_ptr ge b = Some (Internal f) ->
+      find_instr (Int.unsigned ofs) (fn_code f) = Some (Pbuiltin ef args res) ->
       external_call' ef ge (map rs args) m t vl m' ->
+      observableEF ef = false ->
       rs' = nextinstr_nf 
              (set_regs res vl
                (undef_regs (map preg_of (destroyed_by_builtin ef)) rs)) ->
-      asm_step (State rs) m (State rs') m'
+      asm_step (State sg rs) m (State sg rs') m'
 (*WE DON'T SUPPORT  ANNOTS YET
   | asm_exec_step_annot:
       forall b ofs c ef args rs m vargs t v m',
@@ -58,11 +61,11 @@ Inductive asm_step: state -> mem -> state -> mem -> Prop :=
       external_call' ef ge vargs m t v m' ->
       asm_step (State rs) m (State (nextinstr rs)) m'*)
   | asm_exec_step_external:
-      forall b ef args rs m,
+      forall b ef args rs m sg,
       rs PC = Vptr b Int.zero ->
       Genv.find_funct_ptr ge b = Some (External ef) ->
       extcall_arguments rs m (ef_sig ef) args ->
-      asm_step (State rs) m (ExtCallState ef args rs) m
+      asm_step (State sg rs) m (ExtCallState sg ef args rs) m
 (*NO REEAL EXTERNAL STEPS
   | asm_exec_step_external:
       forall b ef args res rs m t rs' m',
@@ -78,17 +81,20 @@ End RELSEM.
 Definition Asm_at_external (c: state):
           option (external_function * signature * list val) :=
   match c with
-    ExtCallState ef args rs => Some(ef, ef_sig ef, decode_longs (sig_args (ef_sig ef)) args)
+    ExtCallState _ ef args rs =>
+      if observableEF ef
+      then Some(ef, ef_sig ef, decode_longs (sig_args (ef_sig ef)) args)
+      else None
   | _ => None
   end.
 
 Definition Asm_after_external (vret: option val)(c: state) : option state :=
   match c with 
-    ExtCallState ef args rs => 
+    ExtCallState sg ef args rs => 
       match vret with
-         None => Some (State ((set_regs (loc_external_result (ef_sig ef)) 
+         None => Some (State sg ((set_regs (loc_external_result (ef_sig ef)) 
                                (encode_long (sig_res (ef_sig ef)) Vundef) rs) #PC <- (rs RA)))
-       | Some res => Some (State ((set_regs (loc_external_result (ef_sig ef)) 
+       | Some res => Some (State sg ((set_regs (loc_external_result (ef_sig ef)) 
                                (encode_long (sig_res (ef_sig ef)) res) rs) #PC <- (rs RA))) 
       end
   | _ => None
@@ -103,10 +109,10 @@ Definition Asm_initial_core (ge:genv) (v: val) (args:list val):
                  | None => None
                  | Some f => 
                     match f with Internal fi =>
-                     if (*Lenb: which signature should we take here?
-                          val_has_type_list_func args (sig_args fi))
-                        &&*)  vals_defined args
-                     then Some (State 
+                     let tyl := sig_args (funsig f) in
+                     if val_has_type_list_func args (sig_args (funsig f))
+                        && vals_defined args
+                     then Some (State (funsig f)
                                ((Pregmap.init Vundef)
                                     # PC <- (Vptr b Int.zero) (*lenb: is this use of f correct here?*)
                                     # RA <- Vzero
@@ -138,10 +144,19 @@ Inductive final_state: state -> int -> Prop :=
 *)
 
 Definition Asm_halted (q : state): option val :=
-    (*What fundef should we use here to check whether return type is long???*)
     match q with
-      State rs => if Val.cmp_bool Ceq (rs#PC) Vzero 
-                  then Some(rs#EAX) (*no check for integer return value*)
+      State sg rs => if Val.cmp_bool Ceq (rs#PC) Vzero 
+                  then match sig_res sg
+                       with Some Tlong =>
+                          match decode_longs (Tlong::nil) ((rs#EDX)::(rs#EAX)::nil) with
+                                | v :: nil => Some v
+                                | _ => None
+                          end
+                       | Some Tfloat => Some(rs#ST0)
+                       | Some Tsingle => Some(rs#ST0)
+                       | Some _ => Some(rs#EAX)
+                       | None => Some(rs#EAX)
+                       end 
                   else None
     | _ => None
     end.

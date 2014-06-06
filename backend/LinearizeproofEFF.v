@@ -1052,6 +1052,7 @@ destruct MTCH as [MC [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
 inv MC; simpl in AtExtSrc; inv AtExtSrc.
 destruct f; simpl in *; inv H2.
 split; trivial. monadInv H0.
+destruct (observableEF e0); inv H3.
 assert (ValsInj: Forall2 (val_inject (restrict (as_inj mu) (vis mu)))
   (decode_longs (sig_args (ef_sig e)) (ls1 ## (Conventions1.loc_arguments (ef_sig e))))
   (decode_longs (sig_args (ef_sig e)) (ls2 ## (Conventions1.loc_arguments (ef_sig e))))).
@@ -1262,11 +1263,12 @@ simpl.
  simpl in *. inv MC; simpl in *; inv AtExtSrc.
  destruct f; inv H2. 
  destruct tf; inv AtExtTgt.
+ inv H0.
+ destruct (observableEF e1); inv H2; inv H3.
  eexists. eexists.
     split. reflexivity.
     split. reflexivity.
  simpl in *.
- inv H0.
  assert (INCvisNu': inject_incr
   (restrict (as_inj nu')
      (vis
@@ -1971,11 +1973,11 @@ Proof. intros.
       apply intern_incr_as_inj in INC; trivial.
         apply sm_inject_separated_mem in SEP; trivial.
         eapply meminj_preserves_incr_sep; eassumption. 
-    red; intros. destruct (GFP _ _ H1).
+    red; intros. destruct (GFP _ _ H2).
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
     assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (Glob _ H1).
+          rewrite <- FRG. eapply (Glob _ H2).
 
   (* Lannot 
   eexists; eexists; split. 
@@ -2588,20 +2590,13 @@ Proof. intros.
       apply intern_incr_as_inj in INC; trivial.
         apply sm_inject_separated_mem in SEP; trivial.
         eapply meminj_preserves_incr_sep; eassumption. 
-      red; intros. destruct (GFP _ _ H1).
+      red; intros. destruct (GFP _ _ H2).
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
       assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (Glob _ H1).
+          rewrite <- FRG. eapply (Glob _ H2).
   intros.
     eapply BuiltinEffect_Propagate; try eassumption.
-  (* Lbuiltin 
-  eexists; eexists; split. 
-  left; econstructor; split. simpl.
-  apply plus_one. eapply exec_Lbuiltin; eauto.
-  eapply external_call_symbols_preserved'; eauto.
-  exact symbols_preserved. exact varinfo_preserved.
-  econstructor; eauto.*)
 
   (* Lannot 
   eexists; eexists; split. 

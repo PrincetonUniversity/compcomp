@@ -28,14 +28,14 @@ Require Import RTL.
 Require Import Conventions.
 Require Import Tailcall.
 
-Require Import sepcomp.mem_lemmas.
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.core_semantics_lemmas.
-Require Import sepcomp.effect_semantics.
+Require Import mem_lemmas.
+Require Import core_semantics.
+Require Import core_semantics_lemmas.
+Require Import effect_semantics.
 Require Import StructuredInjections.
 Require Import reach.
 Require Import effect_simulations.
-Require Import sepcomp.effect_properties.
+Require Import effect_properties.
 Require Import effect_simulations_lemmas.
 
 Require Import RTL_coop.
@@ -662,6 +662,8 @@ Proof. intros.
  destruct f; inv H4.
  rename args' into vals2. rename H2 into MINJ.
  split; trivial.
+ simpl.
+ destruct (observableEF e0); inv H3.
  eexists.
     split. eapply val_list_inject_forall_inject. eassumption.
     simpl. split. reflexivity.
@@ -832,6 +834,7 @@ Proof. intros. simpl.
  destruct MTCH as [MC [RC [PG [GFP [Glob [VAL WDmu]]]]]].
  simpl in *. inv MC; simpl in *; inv AtExtSrc.
  destruct f; inv H3. simpl in *. inv AtExtTgt.
+ destruct (observableEF e0); inv H3; inv H4.
  eexists. eexists.
     split. reflexivity.
     split. reflexivity.
@@ -1403,7 +1406,8 @@ Proof.
           unfold vis. intuition.
   assert (ArgsInj:= regset_get_list _ _ _ args RLD).
   exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply H0.
-        eassumption. eassumption. eassumption. eassumption. eassumption. eassumption.
+        eassumption. eassumption. eassumption. eassumption. 
+        eassumption. eassumption. eassumption.
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
   left. exists (RTL_State s' (transf_function f) (Vptr sp' Int.zero) pc' (rs'#res <- vres')), tm'; split.
@@ -1425,7 +1429,7 @@ Proof.
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
       assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-          rewrite <- FRG. eapply (Glob _ H2). 
+          rewrite <- FRG. eapply (Glob _ H3). 
 
 (* cond *)
   TransfInstr. 
@@ -1904,7 +1908,8 @@ Proof.
           unfold vis. intuition.
   assert (ArgsInj:= regset_get_list _ _ _ args RLD).
   exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply H0.
-        eassumption. eassumption. eassumption. eassumption. eassumption. eassumption.
+        eassumption. eassumption. eassumption. eassumption.
+        eassumption. eassumption. eassumption.
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
   left. exists (RTL_State s' (transf_function f) (Vptr sp' Int.zero) pc' (rs'#res <- vres')), tm'; eexists; split.
@@ -1929,7 +1934,7 @@ Proof.
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
       assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-          rewrite <- FRG. eapply (Glob _ H2). 
+          rewrite <- FRG. eapply (Glob _ H3). 
   eapply BuiltinEffect_Propagate; eassumption. 
 
 (* cond *)
@@ -2130,9 +2135,9 @@ SM_simulation.SM_simulation_inject rtl_eff_sem
 Proof.
 intros.
 assert (GDE:= GDE_lemma).
-apply sepcomp.effect_simulations_lemmas.inj_simulation_plus with
+apply effect_simulations_lemmas.inj_simulation_plus with
   (match_states:=MATCH)(measure :=measure).
-(*apply sepcomp.effect_simulations_lemmas.inj_simulation_star_wf with
+(*apply effect_simulations_lemmas.inj_simulation_star_wf with
   (match_states:=MATCH) (order :=measure).*)
 (*genvs_dom_eq*)
   assumption.

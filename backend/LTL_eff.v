@@ -18,9 +18,6 @@ Require Import LTL.
 Require Import LTL_coop.
 Require Import BuiltinEffects.
 
-(*We're using the BuiltEffect also for Lannot - 
-  maybe we should define a separate effect?*)
-
 Inductive ltl_effstep (g:genv):  (block -> Z -> bool) ->
             LTL_core -> mem -> LTL_core -> mem -> Prop :=
   | ltl_effstep_start_block: forall s f sp pc rs m bb,
@@ -68,6 +65,7 @@ Inductive ltl_effstep (g:genv):  (block -> Z -> bool) ->
         (LTL_Callstate s fd rs') m'
   | ltl_effstep_Lbuiltin: forall s f sp ef args res bb rs m t vl rs' m',
       external_call' ef g (reglist rs args) m t vl m' ->
+      observableEF ef =false ->
       rs' = Locmap.setlist (map R res) vl (undef_regs (destroyed_by_builtin ef) rs) ->
       ltl_effstep g (BuiltinEffect g ef (decode_longs (sig_args (ef_sig ef)) (reglist rs args)) m)
          (LTL_Block s f sp (Lbuiltin ef args res :: bb) rs) m
@@ -143,7 +141,7 @@ intros.
          eapply FreeEffect_free; eassumption.
   split. unfold corestep, coopsem; simpl. econstructor; eassumption.
          inv H.
-         eapply BuiltinEffect_unchOn. eassumption.
+         eapply BuiltinEffect_unchOn; eassumption.
 (*  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
          inv H. eapply ec_builtinEffectPolymorphic; eassumption.
   split. unfold corestep, coopsem; simpl. econstructor; eassumption.

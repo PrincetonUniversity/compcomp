@@ -11,6 +11,7 @@ Require Import Op.
 Require Import Registers.
 
 Require Import RTL.
+Require Import BuiltinEffects.
 
 Inductive RTL_core : Type :=
   | RTL_State:
@@ -93,6 +94,7 @@ Inductive RTL_corestep (ge:genv): RTL_core -> mem -> RTL_core -> mem -> Prop :=
       forall s f sp pc rs m ef args res pc' t v m',
       (fn_code f)!pc = Some(Ibuiltin ef args res pc') ->
       external_call ef ge rs##args m t v m' ->
+      observableEF ef = false ->      
       RTL_corestep ge (RTL_State s f sp pc rs) m
          (RTL_State s f sp pc' (rs#res <- v)) m'
 
@@ -178,10 +180,13 @@ Definition RTL_halted (c: RTL_core ): option val :=
 Definition RTL_at_external (c: RTL_core): option (external_function * signature * list val) :=
   match c with
     | RTL_State stack f sp pc rs => None
-    | RTL_Callstate stack f args =>  match f with
-                                        Internal _ => None
-                                      | External f' => Some( f', ef_sig f', args)
-                                    end
+    | RTL_Callstate stack f args => 
+        match f with
+          Internal _ => None
+        | External ef =>  if observableEF ef 
+                          then Some(ef, ef_sig ef, args)
+                          else None
+        end
     | RTL_Returnstate stack v => None
   end.
 

@@ -25,8 +25,8 @@ Require Import Events.
 Require Import Smallstep.
 Require Import Locations.
 Require Import Mach.
-Require Import Asm.
-Require Import Asmgen.
+Require Import AsmEFF.
+Require Import AsmgenEFF.
 Require Import Conventions.
 Require Import Axioms.
 
@@ -82,7 +82,7 @@ Lemma data_diff:
 Proof.
   congruence.
 Qed.
-Hint Resolve data_diff: asmgen.
+Hint Resolve data_diff: asmgenEFF.
 
 Lemma preg_of_not_SP:
   forall r, preg_of r <> SP.
@@ -202,41 +202,11 @@ destruct ZLOC as [Zero | [b [ofs [tb [SP LOC]]]]]; subst.
 Qed.
 
 (*Lenb: added parameter j:meminj and changed lessdef into val_inject*)
-(*Record agree mu (ms: Mach.regset) (sp: val) (rs: Asm.regset) : Prop := mkagree {
-  (*Modified*) agree_sp: val_inject (local_of mu) sp (rs#SP);
-  agree_sp_def: sp <> Vundef; 
-  (*New:*) agree_sp_ptr: forall b ofs, sp=Vptr b ofs -> 
-           exists tb, local_of mu b=Some(tb,0);
-  agree_mregs: forall r: mreg, val_inject (as_inj mu) (ms r) (rs#(preg_of r))
-}.*)
-
-Record agree mu (ms: Mach.regset) (sp: val) (rs: Asm.regset) : Prop := mkagree {
+Record agree mu (ms: Mach.regset) (sp: val) (rs: AsmEFF.regset) : Prop := mkagree {
   (*Modified*) agree_sp_local: val_inject (local_of mu) sp (rs#SP);
   (*New:*) agree_sp_spec: sp_spec mu sp;
   agree_mregs: forall r: mreg, val_inject (as_inj mu) (ms r) (rs#(preg_of r))
 }.
-
-(*Record agree (j:meminj) (ms: Mach.regset) (sp: val) (rs: Asm.regset) : Prop := mkagree {
-  agree_sp: rs#SP = sp;
-  agree_sp_def: sp <> Vundef;
-  agree_mregs: forall r: mreg, Val.lessdef (ms r) (rs#(preg_of r))
-}.*)
-(*
-Lemma agree_sp_local mu ms sp rs:
-      forall (A:agree mu ms sp rs),
-      val_inject (local_of mu) sp (rs#SP).
-Proof. intros. eapply A. Qed.
-*)
-(*NEW
-Lemma agree_sp_shape mu ms sp rs:
-      forall (A:agree mu ms sp rs),
-           exists b ofs, sp=Vptr b ofs /\ local_of mu b=Some(b,0) /\ 
-                     rs#SP = Vptr b ofs.
-Proof. intros.
-  inv A. destruct agree_sp_def0 as [b [z [X Y]]].
-  exists b, z. intuition.
-Qed.
-*)
 
 (*NEW*)
 Lemma agree_intern_incr ms sp rs: forall mu mu' (WD': SM_wd mu')
@@ -446,7 +416,7 @@ Lemma extcall_arg_match:
   agree mu ms sp rs ->
   Mem.inject (as_inj mu) m m' -> (*WAS: Mem.extends m m'*)
   Mach.extcall_arg ms m sp l v ->
-  exists v', Asm.extcall_arg rs m' l v' /\ 
+  exists v', AsmEFF.extcall_arg rs m' l v' /\ 
              val_inject (as_inj mu) v v' (*WAS: lessdef*).
 Proof.
   intros. inv H1.
@@ -482,7 +452,7 @@ Lemma extcall_args_match: forall mu ms sp rs m m' (WD: SM_wd mu),
      agree mu ms sp rs -> Mem.inject (as_inj mu) m m' ->
   forall ll vl,
   list_forall2 (Mach.extcall_arg ms m sp) ll vl ->
-  exists vl', list_forall2 (Asm.extcall_arg rs m') ll vl' /\ 
+  exists vl', list_forall2 (AsmEFF.extcall_arg rs m') ll vl' /\ 
               val_list_inject (as_inj mu) vl vl'.
 Proof.
   induction 4; intros. 
@@ -496,10 +466,10 @@ Lemma extcall_arguments_match:
   forall mu ms m m' sp rs sg args (WD: SM_wd mu),
   agree mu ms sp rs -> Mem.inject (as_inj mu) m m' ->
   Mach.extcall_arguments ms m sp sg args ->
-  exists args', Asm.extcall_arguments rs m' sg args' /\ 
+  exists args', AsmEFF.extcall_arguments rs m' sg args' /\ 
                 val_list_inject (as_inj mu) args args'.
 Proof.
-  unfold Mach.extcall_arguments, Asm.extcall_arguments; intros.
+  unfold Mach.extcall_arguments, AsmEFF.extcall_arguments; intros.
   eapply extcall_args_match; eauto.
 Qed.
 
@@ -510,7 +480,7 @@ Lemma annot_arg_match:
   agree mu ms sp rs ->
   Mem.inject (as_inj mu) m m' ->
   Mach.annot_arg ms m sp p v ->
-  exists v', Asm.annot_arg rs m' (transl_annot_param p) v' /\ 
+  exists v', AsmEFF.annot_arg rs m' (transl_annot_param p) v' /\ 
             val_inject (as_inj mu) v v'.
 Proof.
   intros. inv H1; simpl.
@@ -558,7 +528,7 @@ Lemma annot_arguments_match:
          Mem.inject (as_inj mu) m m' -> (*Mem.extends m m' ->*)
   forall pl vl,
   Mach.annot_arguments ms m sp pl vl ->
-  exists vl', Asm.annot_arguments rs m' (map transl_annot_param pl) vl'
+  exists vl', AsmEFF.annot_arguments rs m' (map transl_annot_param pl) vl'
            /\ val_list_inject (as_inj mu) vl vl'. (*Val.lessdef_list vl vl'.*)
 Proof.
   induction 4; intros. 
@@ -660,7 +630,7 @@ Qed.
   to the code pointer [pc]. *)
 
 Inductive transl_code_at_pc (ge: Mach.genv):
-    val -> block -> Mach.function -> Mach.code -> bool -> Asm.function -> Asm.code -> Prop :=
+    val -> block -> Mach.function -> Mach.code -> bool -> AsmEFF.function -> AsmEFF.code -> Prop :=
   transl_code_at_pc_intro:
     forall b ofs f c ep tf tc,
     Genv.find_funct_ptr ge b = Some(Internal f) ->
@@ -910,12 +880,12 @@ Inductive exec_straight: code -> regset -> mem ->
                          code -> regset -> mem -> Prop :=
   | exec_straight_one:
       forall i1 c rs1 m1 rs2 m2,
-      exec_instr ge fn i1 rs1 m1 = Next rs2 m2 ->
+      exec_instr ge (fn_code fn) i1 rs1 m1 = Next rs2 m2 ->
       rs2#PC = Val.add rs1#PC Vone ->
       exec_straight (i1 :: c) rs1 m1 c rs2 m2
   | exec_straight_step:
       forall i c rs1 m1 rs2 m2 c' rs3 m3,
-      exec_instr ge fn i rs1 m1 = Next rs2 m2 ->
+      exec_instr ge (fn_code fn) i rs1 m1 = Next rs2 m2 ->
       rs2#PC = Val.add rs1#PC Vone ->
       exec_straight c rs2 m2 c' rs3 m3 ->
       exec_straight (i :: c) rs1 m1 c' rs3 m3.
@@ -933,8 +903,8 @@ Qed.
 
 Lemma exec_straight_two:
   forall i1 i2 c rs1 m1 rs2 m2 rs3 m3,
-  exec_instr ge fn i1 rs1 m1 = Next rs2 m2 ->
-  exec_instr ge fn i2 rs2 m2 = Next rs3 m3 ->
+  exec_instr ge (fn_code fn) i1 rs1 m1 = Next rs2 m2 ->
+  exec_instr ge (fn_code fn) i2 rs2 m2 = Next rs3 m3 ->
   rs2#PC = Val.add rs1#PC Vone ->
   rs3#PC = Val.add rs2#PC Vone ->
   exec_straight (i1 :: i2 :: c) rs1 m1 c rs3 m3.
@@ -945,9 +915,9 @@ Qed.
 
 Lemma exec_straight_three:
   forall i1 i2 i3 c rs1 m1 rs2 m2 rs3 m3 rs4 m4,
-  exec_instr ge fn i1 rs1 m1 = Next rs2 m2 ->
-  exec_instr ge fn i2 rs2 m2 = Next rs3 m3 ->
-  exec_instr ge fn i3 rs3 m3 = Next rs4 m4 ->
+  exec_instr ge (fn_code fn) i1 rs1 m1 = Next rs2 m2 ->
+  exec_instr ge (fn_code fn) i2 rs2 m2 = Next rs3 m3 ->
+  exec_instr ge (fn_code fn) i3 rs3 m3 = Next rs4 m4 ->
   rs2#PC = Val.add rs1#PC Vone ->
   rs3#PC = Val.add rs2#PC Vone ->
   rs4#PC = Val.add rs3#PC Vone ->
@@ -961,14 +931,14 @@ Qed.
   (predicate [exec_straight]) correspond to correct Asm executions. *)
 
 Lemma exec_straight_steps_1:
-  forall c rs m c' rs' m',
+  forall c rs m c' rs' m' sg,
   exec_straight c rs m c' rs' m' ->
   list_length_z (fn_code fn) <= Int.max_unsigned ->
   forall b ofs,
   rs#PC = Vptr b ofs ->
   Genv.find_funct_ptr ge b = Some (Internal fn) ->
   code_tail (Int.unsigned ofs) (fn_code fn) c ->
-  corestep_plus Asm_eff_sem ge (State rs) m (State rs') m'.
+  corestep_plus Asm_eff_sem ge (State sg rs) m (State sg rs') m'.
 Proof.
   induction 1; intros.
   apply corestep_plus_one.
@@ -1035,16 +1005,16 @@ Inductive eff_exec_straight: (block -> Z -> bool) ->
                          code -> regset -> mem -> Prop :=
   | eff_exec_straight_one:
       forall i1 c rs1 m1 rs2 m2 U,
-      exec_instr ge fn i1 rs1 m1 = Next rs2 m2 ->
+      exec_instr ge (fn_code fn) i1 rs1 m1 = Next rs2 m2 ->
       rs2#PC = Val.add rs1#PC Vone ->
-      U = effect_instr ge fn i1 rs1 m1 ->
+      U = effect_instr ge (fn_code fn) i1 rs1 m1 ->
       eff_exec_straight U (i1 :: c) rs1 m1 c rs2 m2
   | eff_exec_straight_step:
       forall i c rs1 m1 rs2 m2 c' rs3 m3 U U2 ,
-      exec_instr ge fn i rs1 m1 = Next rs2 m2 ->
+      exec_instr ge (fn_code fn) i rs1 m1 = Next rs2 m2 ->
       rs2#PC = Val.add rs1#PC Vone ->
       eff_exec_straight U2 c rs2 m2 c' rs3 m3 ->
-      U = (fun b z => effect_instr ge fn i rs1 m1 b z || 
+      U = (fun b z => effect_instr ge (fn_code fn) i rs1 m1 b z || 
                        (U2 b z && valid_block_dec m1 b)) ->
       eff_exec_straight U (i :: c) rs1 m1 c' rs3 m3.
 
@@ -1133,7 +1103,7 @@ Proof. intros U1 c1 rs1 m1 c2 rs2 m2 EX1.
     eapply IHEX1. eassumption. reflexivity.
     subst. extensionality b; extensionality z. clear IHEX1.
     apply exec_instr_forward in H. 
-    remember (effect_instr ge fn i rs1 m1 b z) as d.
+    remember (effect_instr ge (fn_code fn) i rs1 m1 b z) as d.
     destruct d; simpl; trivial.
     remember (U2 b z && valid_block_dec m1 b) as q; apply eq_sym in Heqq.
     destruct q; simpl. rewrite andb_true_iff in Heqq. destruct Heqq.
@@ -1154,12 +1124,12 @@ Qed.
 
 Lemma eff_exec_straight_two:
   forall i1 i2 c rs1 m1 rs2 m2 rs3 m3 U,
-  exec_instr ge fn i1 rs1 m1 = Next rs2 m2 ->
-  exec_instr ge fn i2 rs2 m2 = Next rs3 m3 ->
+  exec_instr ge (fn_code fn) i1 rs1 m1 = Next rs2 m2 ->
+  exec_instr ge (fn_code fn) i2 rs2 m2 = Next rs3 m3 ->
   rs2#PC = Val.add rs1#PC Vone ->
   rs3#PC = Val.add rs2#PC Vone ->
-  U = (fun b z => effect_instr ge fn i1 rs1 m1 b z || 
-        (effect_instr ge fn i2 rs2 m2 b z && valid_block_dec m1 b)) ->  
+  U = (fun b z => effect_instr ge (fn_code fn) i1 rs1 m1 b z || 
+        (effect_instr ge (fn_code fn) i2 rs2 m2 b z && valid_block_dec m1 b)) ->  
   eff_exec_straight U (i1 :: i2 :: c) rs1 m1 c rs3 m3.
 Proof.
   intros. 
@@ -1169,26 +1139,26 @@ Qed.
 
 Lemma eff_exec_straight_three:
   forall i1 i2 i3 c rs1 m1 rs2 m2 rs3 m3 rs4 m4 U,
-  exec_instr ge fn i1 rs1 m1 = Next rs2 m2 ->
-  exec_instr ge fn i2 rs2 m2 = Next rs3 m3 ->
-  exec_instr ge fn i3 rs3 m3 = Next rs4 m4 ->
+  exec_instr ge (fn_code fn) i1 rs1 m1 = Next rs2 m2 ->
+  exec_instr ge (fn_code fn) i2 rs2 m2 = Next rs3 m3 ->
+  exec_instr ge (fn_code fn) i3 rs3 m3 = Next rs4 m4 ->
   rs2#PC = Val.add rs1#PC Vone ->
   rs3#PC = Val.add rs2#PC Vone ->
   rs4#PC = Val.add rs3#PC Vone ->
-  U = (fun b z => effect_instr ge fn i1 rs1 m1 b z || 
-        ((effect_instr ge fn i2 rs2 m2 b z ||
-          effect_instr ge fn i3 rs3 m3 b z) 
+  U = (fun b z => effect_instr ge (fn_code fn) i1 rs1 m1 b z || 
+        ((effect_instr ge (fn_code fn) i2 rs2 m2 b z ||
+          effect_instr ge (fn_code fn) i3 rs3 m3 b z) 
          && valid_block_dec m1 b)) -> 
   eff_exec_straight U (i1 :: i2 :: i3 :: c) rs1 m1 c rs4 m4.
 Proof.
   intros. eapply eff_exec_straight_step; try eassumption.
     eapply eff_exec_straight_two; eauto. reflexivity.
   subst. extensionality b; extensionality z.
-  destruct (effect_instr ge fn i1 rs1 m1 b z); simpl; trivial.
+  destruct (effect_instr ge (fn_code fn) i1 rs1 m1 b z); simpl; trivial.
   destruct (valid_block_dec m1 b); simpl.
   Focus 2. repeat rewrite andb_false_r. trivial.
   repeat rewrite andb_true_r.
-  destruct (effect_instr ge fn i2 rs2 m2 b z); simpl; trivial.
+  destruct (effect_instr ge (fn_code fn) i2 rs2 m2 b z); simpl; trivial.
   destruct (valid_block_dec m2 b). rewrite andb_true_r. trivial.
   elim n. eapply exec_instr_forward; eassumption.
 Qed.
@@ -1197,14 +1167,14 @@ Qed.
   (predicate [exec_straight]) correspond to correct Asm executions. *)
 
 Lemma eff_exec_straight_steps_1:
-  forall U c rs m c' rs' m',
+  forall U c rs m c' rs' m' sg,
   eff_exec_straight U c rs m c' rs' m' ->
   list_length_z (fn_code fn) <= Int.max_unsigned ->
   forall b ofs,
   rs#PC = Vptr b ofs ->
   Genv.find_funct_ptr ge b = Some (Internal fn) ->
   code_tail (Int.unsigned ofs) (fn_code fn) c ->
-  effstep_plus Asm_eff_sem ge U (State rs) m (State rs') m'.
+  effstep_plus Asm_eff_sem ge U (State sg rs) m (State sg rs') m'.
 Proof.
   induction 1; intros.
   apply effstep_plus_one.

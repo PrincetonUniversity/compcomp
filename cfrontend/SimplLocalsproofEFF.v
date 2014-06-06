@@ -3614,6 +3614,8 @@ destruct MTCH as [MC [RC [PG [Glob [SMV WD]]]]].
     inv MC; simpl in AtExtSrc; inv AtExtSrc.
     destruct fd; simpl in *; inv H0.
     split; trivial. monadInv TRFD.
+    remember (observableEF e0) as obs.
+    destruct obs; inv H1.
     exists tvargs; split; trivial. 
     eapply val_list_inject_forall_inject; try eassumption.
     split; trivial.
@@ -3694,11 +3696,16 @@ Proof. intros.
  inv MC; simpl in *; inv AtExtSrc.
   destruct fd; inv H0.
   destruct tfd; inv AtExtTgt.
-  eexists; eexists.
+    remember (observableEF e0) as obs.
+    destruct obs; inv H1. 
+    remember (observableEF e1) as obs'.
+    destruct obs'; inv H0. 
+    simpl in TRFD. inv TRFD. clear Heqobs'.
+    eexists; eexists.
     split. reflexivity.
     split. reflexivity.
   simpl in *.
-inv FUNTY. inv TRFD.
+inv FUNTY. 
 assert (INCvisNu': inject_incr
   (restrict (as_inj nu')
      (vis
@@ -4282,7 +4289,7 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
   rewrite restrict_sm_all in D.
   (*exploit external_call_mem_inject; eauto.*)
   exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply D.
-    eassumption. eassumption. eassumption. eassumption. eassumption. assumption.
+    eassumption. eassumption. eassumption. eassumption. eassumption. eassumption. assumption.
 (*  apply match_globalenvs_preserves_globals; eauto with compat.*)
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
@@ -4307,13 +4314,13 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       intros. eapply Mem.load_unchanged_on; try eassumption.
         intros. red. apply restrictI_None. left; trivial.
       intros. eapply intern_as_inj_preserved1; try eassumption. red; xomega.
-      intros. rewrite H2. apply eq_sym. 
+      intros. rewrite H3. apply eq_sym. 
               eapply intern_as_inj_preserved2; try eassumption. red; xomega.
       eapply match_cont_intern_invariant; try eassumption.
         intros. eapply Mem.load_unchanged_on; try eassumption.
                 intros. apply restrictI_None. left; trivial. 
         intros. eapply intern_as_inj_preserved1; try eassumption. red; xomega.
-        intros. rewrite H2. apply eq_sym. 
+        intros. rewrite H3. apply eq_sym. 
                 eapply intern_as_inj_preserved2; try eassumption. red; xomega.
 (*  inv MENV; xomega. inv MENV; xomega. *)
   eapply Ple_trans; eauto. eapply external_call_nextblock; eauto.
@@ -5114,7 +5121,7 @@ inv MS; simpl in *; try (monadInv TRS).
   rewrite restrict_sm_all in D.
   (*exploit external_call_mem_inject; eauto.*)
   exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply D.
-    eassumption. eassumption. eassumption. eassumption. eassumption. assumption.
+    eassumption. eassumption. eassumption. eassumption. eassumption. eassumption. assumption.
 (*  apply match_globalenvs_preserves_globals; eauto with compat.*)
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
@@ -5140,13 +5147,13 @@ inv MS; simpl in *; try (monadInv TRS).
         intros. eapply Mem.load_unchanged_on; try eassumption.
           intros. red. apply restrictI_None. left; trivial.
         intros. eapply intern_as_inj_preserved1; try eassumption. red; xomega.
-        intros. rewrite H1. apply eq_sym. 
+        intros. rewrite H2. apply eq_sym. 
                 eapply intern_as_inj_preserved2; try eassumption. red; xomega.
         eapply match_cont_intern_invariant; try eassumption.
         intros. eapply Mem.load_unchanged_on; try eassumption.
                 intros. apply restrictI_None. left; trivial. 
         intros. eapply intern_as_inj_preserved1; try eassumption. red; xomega.
-        intros. rewrite H1. apply eq_sym. 
+        intros. rewrite H2. apply eq_sym. 
                 eapply intern_as_inj_preserved2; try eassumption. red; xomega.
       (*  inv MENV; xomega. inv MENV; xomega. *)
       eapply Ple_trans; eauto. eapply external_call_nextblock; eauto.

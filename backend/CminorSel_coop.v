@@ -14,6 +14,7 @@ Require Import CminorSel.
 Require Import mem_lemmas. (*for mem_forward*)
 Require Import core_semantics.
 Require Import val_casted.
+Require Import BuiltinEffects.
 
 Inductive CMinSel_core: Type :=
   | CMinSel_State:                      (**r execution within a function *)
@@ -47,13 +48,89 @@ Definition FromState (c: CminorSel.state) : CMinSel_core * mem :=
    | Returnstate v k m => (CMinSel_Returnstate v k, m)
   end. 
 
+(*
+Section EVALEXPR_FUN.
+Variable ge: genv.
+Variable sp: val.
+Variable e: Cminor.env.
+Variable m: mem.
+
+Fixpoint  eval_exprlist_fun (le: letenv) (el: exprlist) : option(list val) :=
+  match el with
+   Enil => Some nil
+ | Econs a1 al => match eval_expr_fun le a1, eval_exprlist_fun le al
+                  with Some v1, Some vl => Some (v1 :: vl)
+                    | _, _ => None
+                  end
+  end
+with eval_expr_fun (le: letenv) (exp: expr): option val :=
+  match exp with
+  | Evar x => PTree.get x e
+  | Eop op al => match eval_exprlist_fun le al 
+                 with Some vl => eval_operation ge sp op vl m
+                    | None => None
+                 end
+  | Eload chunk addr al =>
+       match eval_exprlist_fun le al
+       with Some vl => 
+          match eval_addressing ge sp addr vl 
+           with Some vaddr => Mem.loadv chunk m vaddr
+              | None => None
+           end
+          | _ => None
+       end
+(*  | eval_Econdition: forall le a b c va v,
+      eval_condexpr le a va ->
+      eval_expr le (if va then b else c) v ->
+      eval_expr le (Econdition a b c) v*)
+  | Elet a b => match eval_expr_fun le a
+      with Some v1 => eval_expr_fun (v1 :: le) b
+         | None => None
+      end
+  | Eletvar n => nth_error le n
+(*  | Ebuiltin ef al => match eval_exprlist le al 
+      with Some vl =>
+      external_call ef ge vl m E0 v m -> ??externalcalls are not functional
+      eval_expr le (Ebuiltin ef al) v
+  | eval_Eexternal: forall le id sg al b ef vl v,
+      Genv.find_symbol ge id = Some b ->
+      Genv.find_funct_ptr ge b = Some (External ef) ->
+      ef_sig ef = sg ->
+      eval_exprlist le al vl ->
+      external_call ef ge vl m E0 v m ->
+      eval_expr le (Eexternal id sg al) v*)
+  | _ => None (*for now*)
+  end
+
+with eval_condexpr_fun (le: letenv) (ce: condexpr): option bool :=
+  match ce with
+   CEcond cond al => match eval_exprlist_fun le al
+      with Some vl => eval_condition cond vl m 
+         | None => None
+      end
+  | CEcondition a b c => match 
+      eval_condexpr_fun le a with
+        Some va => eval_condexpr_fun le (if va then b else c)
+      | None => None 
+      end
+  | CElet a b => match eval_expr_fun le a 
+      with Some v1 => eval_condexpr_fun (v1 :: le) b
+         | None => None
+      end
+  end.
+End EVALEXPR_FUN.
+*)
+
 Definition CMinSel_at_external (c: CMinSel_core) : option (external_function * signature * list val) :=
   match c with
   | CMinSel_State _ _ _ _ _ => None
-  | CMinSel_Callstate fd args k => match fd with
-                                  Internal f => None
-                                | External ef => Some (ef, ef_sig ef, args)
-                              end
+  | CMinSel_Callstate fd args k => 
+      match fd with
+        Internal f => None
+      | External ef => if observableEF ef 
+                       then Some (ef, ef_sig ef, args)
+                       else None
+      end
   | CMinSel_Returnstate v k => None
  end.
 
@@ -62,10 +139,12 @@ Definition CMinSel_after_external (vret: option val) (c: CMinSel_core) : option 
     CMinSel_Callstate fd args k => 
          match fd with
             Internal f => None
-          | External ef => match vret with
-                             None => Some (CMinSel_Returnstate Vundef k)
-                           | Some v => Some (CMinSel_Returnstate v k)
-                           end
+          | External ef => if observableEF ef 
+                           then match vret with
+                                None => Some (CMinSel_Returnstate Vundef k)
+                              | Some v => Some (CMinSel_Returnstate v k)
+                                end
+                           else None
          end
   | _ => None
   end.
@@ -115,10 +194,10 @@ Inductive CMinSel_corestep (ge : genv) : CMinSel_core -> mem ->
       CMinSel_corestep ge (CMinSel_State f (Stailcall sig a bl) k (Vptr sp Int.zero) e) m
         (CMinSel_Callstate fd vargs (call_cont k)) m'
 
-(* WE DO NOT TREAT BUILTINS *)
   | cminsel_corestep_builtin: forall f optid ef al k sp e m vl t v m',
       eval_exprlist ge sp e m nil al vl ->
       external_call ef ge vl m t v m' ->
+      observableEF ef = false ->
       CMinSel_corestep ge (CMinSel_State f (Sbuiltin optid ef al) k sp e) m
          (CMinSel_State f Sskip k sp (Cminor.set_optvar optid v e)) m'
 
@@ -190,7 +269,7 @@ Inductive CMinSel_corestep (ge : genv) : CMinSel_core -> mem ->
 
 Lemma CMinSel_corestep_not_at_external:
        forall ge m q m' q', CMinSel_corestep ge q m q' m' -> CMinSel_at_external q = None.
-  Proof. intros. inv H; reflexivity. Qed.
+  Proof. intros. inv H; try reflexivity. Qed.
 
 Definition CMinSel_halted (q : CMinSel_core): option val :=
     match q with 
@@ -211,7 +290,9 @@ Lemma CMinSel_after_at_external_excl : forall retv q q',
   Proof. intros.
        destruct q; simpl in *; try inv H.
        destruct f; try inv H1; simpl; trivial.
-         destruct retv; inv H0; simpl; trivial.
+       remember (observableEF e) as d. 
+       destruct d; try inv H0.
+       destruct retv; inv H1; simpl; trivial.
 Qed.
 
 Definition CMinSel_initial_core (ge:genv) (v: val) (args:list val): option CMinSel_core :=

@@ -16,6 +16,7 @@ Require Import LTL.
 Require Import mem_lemmas. (*for mem_forward*)
 Require Import core_semantics.
 Require Import val_casted.
+Require Import BuiltinEffects.
 
 Inductive LTL_core : Type :=
   | LTL_State:
@@ -51,8 +52,10 @@ Definition LTL_at_external (c: LTL_core) : option (external_function * signature
       match f with
         | Internal f => None
         | External ef => 
-          Some (ef, ef_sig ef, decode_longs (sig_args (ef_sig ef)) 
-                                 (map rs (loc_arguments (ef_sig ef))))
+           if observableEF ef 
+           then Some (ef, ef_sig ef, decode_longs (sig_args (ef_sig ef)) 
+                                     (map rs (loc_arguments (ef_sig ef))))
+           else None
       end
     | LTL_Returnstate _ _ _ => None
  end.
@@ -123,6 +126,7 @@ Inductive ltl_corestep: LTL_core -> mem -> LTL_core -> mem -> Prop :=
         (LTL_Callstate s fd rs') m'
   | ltl_exec_Lbuiltin: forall s f sp ef args res bb rs m t vl rs' m',
       external_call' ef ge (reglist rs args) m t vl m' ->
+      observableEF ef = false ->
       rs' = Locmap.setlist (map R res) vl (undef_regs (destroyed_by_builtin ef) rs) ->
       ltl_corestep (LTL_Block s f sp (Lbuiltin ef args res :: bb) rs) m
          (LTL_Block s f sp bb rs') m'
@@ -232,8 +236,6 @@ Definition check_signature (sig: signature): bool :=
    | _, _ => false
   end.
 
-(*LENB: we do not require argtype=nil and res_type =vint, and
-instead create an loc-list containing all agruments*) 
 Definition LTL_initial_core (ge:genv) (v: val) (args:list val): option LTL_core :=
    match v with
      | Vptr b i => 

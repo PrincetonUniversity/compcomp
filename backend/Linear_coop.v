@@ -16,6 +16,7 @@ Require Import Linear.
 Require Import mem_lemmas. (*for mem_forward*)
 Require Import core_semantics.
 Require Import val_casted.
+Require Import BuiltinEffects.
 
 (** Linear execution states. *)
 
@@ -94,6 +95,7 @@ Inductive Linear_step: Linear_core -> mem -> Linear_core -> mem -> Prop :=
   | lin_exec_Lbuiltin:
       forall s f sp rs m ef args res b t vl rs' m',
       external_call' ef ge (reglist rs args) m t vl m' ->
+      observableEF ef = false ->
       rs' = Locmap.setlist (map R res) vl (undef_regs (destroyed_by_builtin ef) rs) ->
       Linear_step (Linear_State s f sp (Lbuiltin ef args res :: b) rs) m
          (Linear_State s f sp b rs') m'
@@ -241,8 +243,10 @@ Definition Linear_at_external (c: Linear_core) : option (external_function * sig
       match f with
         | Internal f => None
         | External ef => 
-          Some (ef, ef_sig ef, decode_longs (sig_args (ef_sig ef)) 
-                                 (map rs (loc_arguments (ef_sig ef))))
+            if observableEF ef
+            then Some (ef, ef_sig ef, decode_longs (sig_args (ef_sig ef)) 
+                                   (map rs (loc_arguments (ef_sig ef))))
+            else None
       end
   | Linear_Returnstate _ _ _ => None
  end.

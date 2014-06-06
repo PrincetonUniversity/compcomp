@@ -13,6 +13,7 @@ Require Import Cminor.
 Require Import mem_lemmas. (*for mem_forward and wd_mem*)
 Require Import core_semantics.
 Require Import val_casted.
+Require Import BuiltinEffects.
 
 (*Obtained from Cminor.state by deleting the memory components.*)
 Inductive CMin_core: Type :=
@@ -101,7 +102,9 @@ Definition CMin_at_external (c: CMin_core) : option (external_function * signatu
   | CMin_State f s k sp e => None
   | CMin_Callstate fd args k => match fd with
                                   Internal f => None
-                                | External ef => Some (ef, ef_sig ef, args)
+                                | External ef => if observableEF ef 
+                                                 then Some (ef, ef_sig ef, args)
+                                                 else None
                               end
   | CMin_Returnstate v k => None
  end.
@@ -111,10 +114,12 @@ Definition CMin_after_external (vret: option val) (c: CMin_core) : option CMin_c
     CMin_Callstate fd args k => 
          match fd with
             Internal f => None
-          | External ef => match vret with
-                             None => Some (CMin_Returnstate Vundef k)
-                           | Some v => Some (CMin_Returnstate v k)
-                           end
+          | External ef =>  if observableEF ef 
+                            then match vret with
+                                None => Some (CMin_Returnstate Vundef k)
+                              | Some v => Some (CMin_Returnstate v k)
+                                 end
+                            else None
          end
   | _ => None
   end.
@@ -161,10 +166,10 @@ Inductive CMin_corestep (ge : genv) : CMin_core -> mem -> CMin_core -> mem -> Pr
       CMin_corestep ge (CMin_State f (Stailcall sig a bl) k (Vptr sp Int.zero) e) m
        (CMin_Callstate fd vargs (call_cont k)) m'
 
-(* WE DO NOT TREAT BUILTINS *)
   | cmin_corestep_builtin: forall f optid ef bl k sp e m vargs t vres m',
       eval_exprlist ge sp e m bl vargs ->
       external_call ef ge vargs m t vres m' ->
+      observableEF ef = false ->
       CMin_corestep ge (CMin_State f (Sbuiltin optid ef bl) k sp e) m
          (CMin_State f Sskip k sp (set_optvar optid vres e)) m'
 
@@ -259,7 +264,9 @@ Lemma CMin_after_at_external_excl : forall retv q q',
   Proof. intros.
        destruct q; simpl in *; try inv H.
        destruct f; try inv H1; simpl; trivial.
-         destruct retv; inv H0; simpl; trivial.
+       remember (observableEF e) as d.
+       destruct d; try inv H0.
+       destruct retv; inv H1; simpl; trivial.
 Qed.
 
 Definition CMin_core_sem : CoreSemantics genv CMin_core mem.

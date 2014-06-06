@@ -11,7 +11,8 @@ Require Import Locations.
 Require Import Stacklayout.
 Require Import Conventions.
 
-Require Import Asm. 
+(*LENB: again, we import the modified Asm*)
+Require Import AsmEFF. 
 Require Import Asm_coop. 
 
 Require Import mem_lemmas. (*for mem_forward*)
@@ -144,22 +145,23 @@ Variable ge: genv.
 Inductive asm_effstep: (block -> Z -> bool) -> 
                        state -> mem -> state -> mem -> Prop :=
   | asm_effexec_step_internal:
-      forall b ofs c i rs m rs' m',
+      forall b ofs f i rs m rs' m' sg,
       rs PC = Vptr b ofs ->
-      Genv.find_funct_ptr ge b = Some (Internal c) ->
-      find_instr (Int.unsigned ofs) c = Some i ->
-      exec_instr ge c i rs m = Next rs' m' ->
-      asm_effstep (effect_instr ge c i rs m) (State rs) m (State rs') m'
+      Genv.find_funct_ptr ge b = Some (Internal f) ->
+      find_instr (Int.unsigned ofs) (fn_code f) = Some i ->
+      exec_instr ge (fn_code f) i rs m = Next rs' m' ->
+      asm_effstep (effect_instr ge (fn_code f) i rs m) (State sg rs) m (State sg rs') m'
   | asm_effexec_step_builtin:
-      forall b ofs c ef args res rs m t vl rs' m',
+      forall b ofs f ef args res rs m t vl rs' m' sg,
       rs PC = Vptr b ofs ->
-      Genv.find_funct_ptr ge b = Some (Internal c) ->
-      find_instr (Int.unsigned ofs) c = Some (Pbuiltin ef args res) ->
+      Genv.find_funct_ptr ge b = Some (Internal f) ->
+      find_instr (Int.unsigned ofs) (fn_code f) = Some (Pbuiltin ef args res) ->
       external_call' ef ge (map rs args) m t vl m' ->
+      observableEF ef = false ->
       rs' = nextinstr_nf 
              (set_regs res vl
                (undef_regs (map preg_of (destroyed_by_builtin ef)) rs)) ->
-      asm_effstep (effect_instr ge c (Pbuiltin ef args res) rs m) (State rs) m (State rs') m'
+      asm_effstep (effect_instr ge (fn_code f) (Pbuiltin ef args res) rs m) (State sg rs) m (State sg rs') m'
 (*WE DON'T SUPPORT ANNOTS YET
   | asm_effexec_step_annot:
       forall b ofs c ef args rs m vargs t v m',
@@ -170,12 +172,12 @@ Inductive asm_effstep: (block -> Z -> bool) ->
       external_call' ef ge vargs m t v m' ->
       asm_effstep (State rs) m (State (nextinstr rs)) m'*)
   | asm_effexec_step_external:
-      forall b ef args rs m,
+      forall b ef args rs m sg,
       rs PC = Vptr b Int.zero ->
       Genv.find_funct_ptr ge b = Some (External ef) ->
       extcall_arguments rs m (ef_sig ef) args ->
-      asm_effstep EmptyEffect (State rs) m (ExtCallState ef args rs) m
-(*NO REEAL EXTERNAL STEPS
+      asm_effstep EmptyEffect (State sg rs) m (ExtCallState sg ef args rs) m
+(* EXTERNAL STEPS HALNDLE DBY CORESEMATICS INTERFACE
   | asm_effexec_step_external:
       forall b ef args res rs m t rs' m',
       rs PC = Vptr b Int.zero ->

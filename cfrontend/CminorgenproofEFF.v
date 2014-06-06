@@ -971,11 +971,13 @@ Proof. intros.
  inv MC; simpl in *; inv AtExtSrc.
   destruct fd; inv H0.
   destruct tfd; inv AtExtTgt.
+  inv TR.
+  remember (observableEF e1) as obs.
+  destruct obs; inv H0; inv H1.
   exists (CSharpMin_Returnstate ret1 k). eexists.
     split. reflexivity.
     split. reflexivity.
   simpl in *.
-inv TR.
 assert (INCvisNu': inject_incr
   (restrict (as_inj nu')
      (vis
@@ -1182,9 +1184,10 @@ Proof.
   intros. 
   inv MC; simpl in *; inv AtExt.
   destruct fd; inv H0.
+  inv TR.
+  destruct (observableEF e0); inv H1.
   exists targs.
-  split. apply val_list_inject_forall_inject; eassumption. 
-  inv TR. trivial.
+  split; trivial. apply val_list_inject_forall_inject; eassumption. 
 Qed.
 
 Lemma structured_match_callstack_replace_locals mu m1 m2 pubSrc' pubTgt': forall cs bound tbound
@@ -2381,7 +2384,8 @@ forall x t ef optid vres m' bl vargs
 (MCS : structured_match_callstack mu m tm (Frame cenv tfn e lenv te sp lo hi :: cs)
         (Mem.nextblock m) (Mem.nextblock tm))
 (EQ : transl_exprlist cenv bl = OK x)
-(MK : match_cont k tk cenv xenv cs),
+(MK : match_cont k tk cenv xenv cs)
+(OBS: observableEF ef = false),
 exists c2' : CMin_core,
   exists m2' mu', 
       corestep_plus CMin_core_sem tge
@@ -2401,7 +2405,7 @@ Proof. intros.
   exploit structured_match_callstack_match_globalenvs; try eassumption.
   intros [hi' [Hi1 [Hi2 MG]]].
   exploit (inlineable_extern_inject ge tge); try eapply PRE. eapply GDE_lemma. 
-         eassumption. eassumption. 
+         eassumption. eassumption. eassumption.
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
   eexists; eexists; exists mu'; split.
@@ -3981,10 +3985,11 @@ forall x t ef optid vres m' bl vargs tvargs
 (EQ : transl_exprlist cenv bl = OK x)
 (MK : match_cont k tk cenv xenv cs)
 (Vinj: val_list_inject (restrict (as_inj mu) (vis mu)) vargs tvargs)
-(EVAL2: eval_exprlist tge (Vptr sp Int.zero) te tm x tvargs),
+(EVAL2: eval_exprlist tge (Vptr sp Int.zero) te tm x tvargs)
+(OBS: observableEF ef = false),
 exists c2' : CMin_core,
   exists m2' mu', 
-      effstep_plus cmin_eff_sem tge (BuiltinEffects.BuiltinEffect tge ef tvargs tm)
+      effstep_plus cmin_eff_sem tge (BuiltinEffect tge ef tvargs tm)
            (CMin_State tfn (Sbuiltin optid ef x) tk (Vptr sp Int.zero) te) tm c2' m2' /\
   intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
@@ -4001,7 +4006,7 @@ Proof. intros. (*
   exploit structured_match_callstack_match_globalenvs; try eassumption.
   intros [hi' [Hi1 [Hi2 MG]]].
   exploit (inlineable_extern_inject ge tge); try eapply PRE.
-      apply GDE_lemma. eassumption. eassumption.
+      apply GDE_lemma. eassumption. eassumption. eassumption.
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
   eexists; eexists; eexists; split.
@@ -4222,14 +4227,14 @@ induction EFFSTEP; simpl in *.
           omega.
         elim n. trivial.  
    (*call*)
-      destruct MC as [SMC PRE].
+      { destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       monadInv TR.
       destruct (EFF_step_case_Call _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
        PRE TRF MCS _ _ _ _ _ _ optid vargs _ MK H H0 H1 EQ EQ1) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'. 
       intuition.
-      exists EmptyEffect. intuition. 
+      exists EmptyEffect. intuition. }
    (*builtin*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
@@ -4238,10 +4243,10 @@ induction EFFSTEP; simpl in *.
       exploit transl_exprlist_correct; try eassumption. eapply PRE. eapply PRE.
       intros [tvargs [EVAL2 VINJ2]].
       exploit MS_step_case_Builtin_eff; try eassumption.
-      intros [c2' [m2' [mu' [effstepPlus MS]]]]. 
+      intros [c2' [m2' [mu' [effstepPlus MS]]]]. assumption.
       instantiate (1:=optid) in effstepPlus.
       exists c2', m2', mu'. intuition. 
-      exists (BuiltinEffects.BuiltinEffect tge ef tvargs m2).
+      exists (BuiltinEffect tge ef tvargs m2).
       split. left. assumption. 
       eapply BuiltinEffect_Propagate; eassumption. 
   (* seq *)

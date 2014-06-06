@@ -15,8 +15,8 @@ Require Import Csharpminor.
 Require Import mem_lemmas. (*for mem_forward*)
 Require Import core_semantics.
 Require Import val_casted.
+Require Import BuiltinEffects.
 
-(*Obtained from Cminor.state by deleting the memory components.*)
 Inductive CSharpMin_core: Type :=
   | CSharpMin_State:                      (**r Execution within a function *)
       forall (f: function)              (**r currently executing function  *)
@@ -52,10 +52,13 @@ Definition FromState (c: Csharpminor.state) : CSharpMin_core * mem :=
 Definition CSharpMin_at_external (c: CSharpMin_core) : option (external_function * signature * list val) :=
   match c with
   | CSharpMin_State _ _ _ _ _ => None
-  | CSharpMin_Callstate fd args k => match fd with
-                                  Internal f => None
-                                | External ef => Some (ef, ef_sig ef, args)
-                              end
+  | CSharpMin_Callstate fd args k =>
+        match fd with
+          Internal f => None
+         | External ef => if observableEF ef 
+                          then Some (ef, ef_sig ef, args)
+                          else None
+        end
   | CSharpMin_Returnstate v k => None
  end.
 
@@ -106,10 +109,10 @@ Inductive CSharpMin_corestep (ge : genv) : CSharpMin_core -> mem -> CSharpMin_co
       CSharpMin_corestep ge (CSharpMin_State f (Scall optid sig a bl) k e le) m
         (CSharpMin_Callstate fd vargs (Kcall optid f e le k)) m
 
-(* WE DO NOT TREAT BUILTINS*)
   | csharpmin_corestep_builtin: forall f optid ef bl k e le m vargs t vres m',
       eval_exprlist ge e le m bl vargs ->
       external_call ef ge vargs m t vres m' ->
+      observableEF ef = false ->
       CSharpMin_corestep ge (CSharpMin_State f (Sbuiltin optid ef bl) k e le) m
          (CSharpMin_State f Sskip k e (Cminor.set_optvar optid vres le)) m'
 
