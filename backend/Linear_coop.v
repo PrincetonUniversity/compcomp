@@ -27,6 +27,12 @@ Inductive Linear_core: Type :=
              (c: Linear.code)                (**r current program point *)
              (rs: Linear.locset),            (**r location state *)
       Linear_core
+  (*A dummy corestate, to facilitate the stacking proof.*)
+  | Linear_CallstateIn:
+      forall (stack: list Linear.stackframe) (**r call stack *)
+             (f: Linear.fundef)              (**r function to call *)
+             (rs: Linear.locset),            (**r location state at point of call *)
+      Linear_core
   | Linear_Callstate:
       forall (stack: list Linear.stackframe) (**r call stack *)
              (f: Linear.fundef)              (**r function to call *)
@@ -138,6 +144,11 @@ Inductive Linear_step: Linear_core -> mem -> Linear_core -> mem -> Prop :=
       Mem.free m stk 0 f.(fn_stacksize) = Some m' ->
       Linear_step (Linear_State s f (Vptr stk Int.zero) (Lreturn :: b) rs) m
         (Linear_Returnstate s (sig_res (fn_sig f)) (return_regs (parent_locset s) rs)) m'
+  (*A dummy corestep, to facilitate the stacking proof.*)
+  | lin_exec_function_internal0:
+      forall s f rs m,
+      Linear_step (Linear_CallstateIn s (Internal f) rs) m
+                  (Linear_Callstate s (Internal f) rs) m
   | lin_exec_function_internal:
       forall s f rs m rs' m' stk,
       Mem.alloc m 0 f.(fn_stacksize) = (m', stk) ->
@@ -170,7 +181,7 @@ Definition Linear_initial_core (ge:genv) (v: val) (args:list val):
                      let tyl := sig_args (funsig f) in
                      if val_has_type_list_func args (sig_args (funsig f))
                         && vals_defined args
-                     then Some (Linear_Callstate
+                     then Some (Linear_CallstateIn
                                       nil
                                       f 
                                       (Locmap.setlist
@@ -244,6 +255,7 @@ Definition Linear_at_external (c: Linear_core) : option (external_function * sig
           Some (ef, ef_sig ef, decode_longs (sig_args (ef_sig ef)) 
                                  (map rs (loc_arguments (ef_sig ef))))
       end
+  | Linear_CallstateIn _ _ _ => None
   | Linear_Returnstate _ _ _ => None
  end.
 

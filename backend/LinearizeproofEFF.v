@@ -908,6 +908,14 @@ Inductive match_states mu: LTL_core -> mem -> Linear_core -> mem -> Prop :=
         (*NEW*) (SPLocal: sp_mapped mu sp1 sp2),
       match_states mu (LTL_Block s f sp1 bb ls1) m1
                       (Linear_State ts tf sp2 (linearize_block bb c) ls2) m2
+  | match_states_call0:
+      forall s (f:LTL.fundef) ls1 ls2 m1 m2 tf ts,
+      list_forall2 (match_stackframes mu) s ts ->
+      transf_fundef f = OK tf ->
+      match f with Internal _ => True | External _ => False end -> 
+      (*NEW*) forall (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls1 ls2),
+      match_states mu (LTL_Callstate s f ls1) m1
+                      (Linear_CallstateIn ts tf ls2) m2
   | match_states_call:
       forall s f ls1 ls2 m1 m2 tf ts,
       list_forall2 (match_stackframes mu) s ts ->
@@ -928,13 +936,7 @@ Definition measure (S: LTL_core) : nat :=
   | LTL_Block s f sp bb ls => 1%nat
   | _ => 0%nat
   end.
-(*
-Remark match_parent_locset:
-  forall mu s ts, list_forall2 (match_stackframes mu) s ts -> 
-         parent_locset ts = LTL.parent_locset s.
-Proof.
-  induction 1; simpl. auto. inv H; auto. 
-Qed.*)
+
 Remark match_parent_locset:
   forall mu s ts, list_forall2 (match_stackframes mu) s ts -> 
   agree_regs (restrict (as_inj mu) (vis mu)) (LTL.parent_locset s) (parent_locset ts).
@@ -1050,6 +1052,7 @@ Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
 Proof. intros. 
 destruct MTCH as [MC [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
 inv MC; simpl in AtExtSrc; inv AtExtSrc.
+destruct f; try inv H1. inv H3.
 destruct f; simpl in *; inv H2.
 split; trivial. monadInv H0.
 assert (ValsInj: Forall2 (val_inject (restrict (as_inj mu) (vis mu)))
@@ -1068,9 +1071,11 @@ exploit replace_locals_wd_AtExternal; try eassumption.
 intuition. 
 (*MATCH*)
     split; subst; rewrite replace_locals_vis. 
-      econstructor; repeat rewrite restrict_sm_all, vis_restrict_sm, replace_locals_vis, replace_locals_as_inj in *; eauto.
+      econstructor; repeat rewrite restrict_sm_all, vis_restrict_sm, 
+                                   replace_locals_vis, replace_locals_as_inj in *; eauto.
       eapply replace_locals_forall_stackframes; eassumption.
-    subst. rewrite restrict_sm_all, vis_restrict_sm, replace_locals_frgnBlocksSrc, replace_locals_as_inj in *.
+    subst. rewrite restrict_sm_all, vis_restrict_sm, replace_locals_frgnBlocksSrc, 
+                   replace_locals_as_inj in *.
            intuition.
            (*sm_valid*)
              red. rewrite replace_locals_DOM, replace_locals_RNG. apply SMV.
@@ -1260,6 +1265,7 @@ Proof. intros.
 simpl.
  destruct MatchMu as [MC [RC [PG [GFP [Glob [VAL [WDmu INJ]]]]]]].
  simpl in *. inv MC; simpl in *; inv AtExtSrc.
+ destruct f; try solve[inv H1]. inv H3.
  destruct f; inv H2. 
  destruct tf; inv AtExtTgt.
  eexists. eexists.
@@ -1400,14 +1406,6 @@ assert (RR1: REACH_closed m1'
            destruct (mappedD_true _ _ RC') as [[? ?] ?].
            eapply as_inj_DomRng; eassumption.
     eapply REACH_cons; try eassumption.
-(*assert (RRR: REACH_closed m1' (exportedSrc nu' (ret1 :: nil))).
-    intros b Hb. apply REACHAX in Hb.
-       destruct Hb as [L HL].
-       generalize dependent b.
-       induction L ; simpl; intros; inv HL; trivial.
-       specialize (IHL _ H1); clear H1.
-       unfold exportedSrc.
-       eapply REACH_cons; eassumption.*)
     
 assert (RRC: REACH_closed m1' (fun b : Values.block =>
                          mapped (as_inj nu') b &&
@@ -1418,7 +1416,8 @@ assert (RRC: REACH_closed m1' (fun b : Values.block =>
   eapply REACH_closed_intersection; eassumption.
 assert (GFnu': forall b, isGlobalBlock (Genv.globalenv prog) b = true ->
                DomSrc nu' b &&
-               (negb (locBlocksSrc nu' b) && REACH m1' (exportedSrc nu' (ret1 :: nil)) b) = true).
+               (negb (locBlocksSrc nu' b) && REACH m1' (exportedSrc nu' (ret1 :: nil)) b) 
+               = true).
      intros. specialize (Glob _ H0).
        assert (FSRC:= extern_incr_frgnBlocksSrc _ _ INC).
           rewrite replace_locals_frgnBlocksSrc in FSRC.
@@ -1553,7 +1552,7 @@ Proof. intros.
   2: solve[intros Heq; rewrite Heq in H1; inv H1].
   intros Heq; rewrite Heq in H1; inv H1.
   exploit function_ptr_translated; eauto. intros [tf [FP TF]].
-  exists (Linear_Callstate nil tf
+  exists (Linear_CallstateIn nil tf
             (Locmap.setlist (Conventions1.loc_arguments (funsig tf)) 
               (val_casted.encode_longs (sig_args (funsig tf)) vals2)
               (Locmap.init Vundef))).
@@ -1587,8 +1586,8 @@ Proof. intros.
      VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
     as [AA [BB [CC [DD [EE [FF GG]]]]]].
   split.
-    eapply match_states_call; try eassumption.
-      constructor.
+    eapply match_states_call0; try eassumption.
+      constructor. auto.
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest.
       rewrite (sig_preserved _ _ TF).
       eapply agree_regs_setlist.
@@ -1602,7 +1601,8 @@ Proof. intros.
         apply forall_inject_val_list_inject; auto.
           intros. apply REACH_nil. 
           rewrite orb_true_iff. right. 
-          apply (val_casted.getBlocks_encode_longs (sig_args (LTL.funsig (Internal f)))); auto.
+          apply (val_casted.getBlocks_encode_longs 
+                   (sig_args (LTL.funsig (Internal f)))); auto.
       red; intros. apply Conventions1.loc_arguments_rec_charact in H. 
            destruct l; try contradiction.
            destruct sl; try contradiction. trivial. 
@@ -1692,7 +1692,8 @@ Proof. intros.
   left. apply corestep_plus_one.
         eapply lin_exec_Ljumptable; eauto. 
          destruct AGREE as [AGREE_R _].
-         specialize (AGREE_R arg). rewrite vis_restrict_sm, restrict_sm_all, restrict_nest, ARG in AGREE_R.
+         specialize (AGREE_R arg). 
+         rewrite vis_restrict_sm, restrict_sm_all, restrict_nest, ARG in AGREE_R.
          inv AGREE_R. trivial. trivial.
   exists mu.
   split. apply intern_incr_refl. 
@@ -1748,7 +1749,8 @@ Proof. intros.
       eapply restrict_sm_preserves_globals; try eassumption.
       unfold vis; intuition.
   assert (SA: forall (id : ident) (ofs : int),
-      val_inject (as_inj (restrict_sm mu (vis mu))) (symbol_address ge id ofs) (symbol_address ge id ofs)).
+      val_inject (as_inj (restrict_sm mu (vis mu))) 
+                 (symbol_address ge id ofs) (symbol_address ge id ofs)).
     intros. eapply symbol_address_inject; try eapply PGR. 
   exploit (eval_addressing_inj ge SA); try eassumption.
      eapply val_inject_incr; try eapply SPLocal. 
@@ -1827,7 +1829,8 @@ Proof. intros.
       eapply restrict_sm_preserves_globals; try eassumption.
       unfold vis; intuition.
   assert (SA: forall (id : ident) (ofs : int),
-      val_inject (as_inj (restrict_sm mu (vis mu))) (symbol_address ge id ofs) (symbol_address ge id ofs)).
+      val_inject (as_inj (restrict_sm mu (vis mu))) 
+                 (symbol_address ge id ofs) (symbol_address ge id ofs)).
     intros. eapply symbol_address_inject; try eapply PGR. 
   exploit (eval_addressing_inj ge SA); try eassumption.
      eapply val_inject_incr; try eapply SPLocal. 
@@ -1901,7 +1904,9 @@ Proof. intros.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   specialize (match_parent_locset _ _ _ STACKS); intros parentsAGREE.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in parentsAGREE; trivial.
-  assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) (return_regs (LTL.parent_locset s) rs) (return_regs (parent_locset ts) ls2)).
+  assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) 
+                               (return_regs (LTL.parent_locset s) rs) 
+                               (return_regs (parent_locset ts) ls2)).
      eapply agree_regs_return; eassumption. 
   exploit agree_find_function_translated; try eassumption.
     eapply agree_regs_incr; try eapply AGREERET. apply restrict_incr.
@@ -1944,7 +1949,8 @@ Proof. intros.
     rewrite restrict_sm_all, vis_restrict_sm, restrict_nest in AGREE; trivial.
     eapply decode_longs_inject; eassumption.
   exploit (inlineable_extern_inject ge tge); try eassumption.
-  intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].  
+  intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED 
+         [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].  
   eexists; eexists; split.
   left. eapply corestep_plus_one. eapply lin_exec_Lbuiltin; eauto.
            econstructor. eassumption. reflexivity.
@@ -2131,11 +2137,71 @@ Proof. intros.
   intuition.
       eapply REACH_closed_free; try eassumption.
 
+  (* dummy step *)
+  assert (REACH: (reachable f)!!(LTL.fn_entrypoint f) = true).
+    apply reachable_entrypoint.
+  monadInv H8.
+  edestruct alloc_parallel_intern 
+    as [mu' [tm' [b' [Alloc' [MInj' [IntInc [mu'SP mu'MuR]]]]]]]; 
+      eauto; try apply Zle_refl.
+  eexists; eexists; split. 
+  left. eapply corestep_plus_two. 
+          eapply lin_exec_function_internal0; eauto.           
+          eapply lin_exec_function_internal; eauto. 
+          rewrite (stacksize_preserved _ _ EQ). eauto.
+  destruct mu'MuR as [A [B [C [D [E F]]]]].
+  exists mu'. 
+  split. assumption.
+  split. assumption.
+  split. assumption.
+  split.
+    generalize EQ; intro EQ'; monadInv EQ'. simpl. 
+    econstructor; eauto.
+      eapply list_match_stackframes_intern_incr; try eassumption.
+        eapply restrict_sm_intern_incr; eassumption.
+        apply restrict_sm_WD; try eassumption. trivial.
+      simpl. eapply is_tail_add_branch. constructor.      
+      rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
+        rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; trivial.
+        eapply agree_regs_undef.
+        eapply agree_regs_call_regs.
+        eapply agree_regs_incr. eassumption. apply intern_incr_restrict; eassumption.
+      destruct (joinD_Some _ _ _ _ _ mu'SP) as [EXT | [EXT LOC]]; clear mu'SP.
+        assert (extern_of mu = extern_of mu') by eapply IntInc.
+        rewrite <- H0 in EXT; clear H0.
+        elim (Mem.fresh_block_alloc _ _ _ _ _ H).
+        eapply SMV. 
+          eapply as_inj_DomRng; trivial.
+          apply extern_in_all; eassumption.
+      split. rewrite restrict_sm_local.
+        econstructor. apply restrictI_Some; try eassumption.
+          unfold vis. destruct (local_DomRng _ D _ _ _ LOC). rewrite H0; trivial.
+        rewrite Int.add_zero. trivial. 
+      intros. inv H0. rewrite restrict_sm_all.
+         eexists. apply restrictI_Some. apply local_in_all; eassumption.
+           unfold vis. destruct (local_DomRng _ D _ _ _ LOC). rewrite H0; trivial.
+  (*as in selectionproofEff*)
+    intuition.
+    apply meminj_preserves_incr_sep_vb with (j:=as_inj mu)(m0:=m)(tm:=m2); 
+        try eassumption. 
+      intros. apply as_inj_DomRng in H1.
+              split; eapply SMV; eapply H1.
+      assumption.
+      apply intern_incr_as_inj; eassumption.
+      apply sm_inject_separated_mem. assumption.
+      assumption.
+    red; intros. destruct (GFP _ _ H1). split; trivial.
+         eapply intern_incr_as_inj; eassumption.
+    assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply IntInc.
+      apply Glob in H1. rewrite <-FF; trivial.
+
   (* internal functions *)
   assert (REACH: (reachable f)!!(LTL.fn_entrypoint f) = true).
     apply reachable_entrypoint.
   monadInv H8.
-  edestruct alloc_parallel_intern as [mu' [tm' [b' [Alloc' [MInj' [IntInc [mu'SP mu'MuR]]]]]]]; eauto; try apply Zle_refl.
+  edestruct alloc_parallel_intern 
+    as [mu' [tm' [b' [Alloc' [MInj' [IntInc [mu'SP mu'MuR]]]]]]]; 
+      eauto; try apply Zle_refl.
   eexists; eexists; split. 
   left. apply corestep_plus_one. eapply lin_exec_function_internal; eauto. 
           rewrite (stacksize_preserved _ _ EQ). eauto.
@@ -2172,7 +2238,8 @@ Proof. intros.
            unfold vis. destruct (local_DomRng _ D _ _ _ LOC). rewrite H0; trivial.
   (*as in selectionproofEff*)
     intuition.
-    apply meminj_preserves_incr_sep_vb with (j:=as_inj mu)(m0:=m)(tm:=m2); try eassumption. 
+    apply meminj_preserves_incr_sep_vb with (j:=as_inj mu)(m0:=m)(tm:=m2); 
+        try eassumption. 
       intros. apply as_inj_DomRng in H1.
               split; eapply SMV; eapply H1.
       assumption.
@@ -2773,13 +2840,74 @@ Proof. intros.
     eapply FreeEffect_PropagateLeft; try eassumption.
     rewrite <- (stacksize_preserved _ _ TRF); eauto.  
 
+  (* dummy step *)
+  assert (REACH: (reachable f)!!(LTL.fn_entrypoint f) = true).
+    apply reachable_entrypoint.
+  monadInv H8.
+  edestruct alloc_parallel_intern 
+    as [mu' [tm' [b' [Alloc' [MInj' [IntInc [mu'SP mu'MuR]]]]]]]; eauto; 
+      try apply Zle_refl.
+  eexists; eexists; eexists; split. 
+  left. eapply effstep_plus_two. 
+          eapply lin_effexec_function_internal0; eauto. 
+          eapply lin_effexec_function_internal; eauto. 
+          rewrite (stacksize_preserved _ _ EQ). eauto.
+  destruct mu'MuR as [A [B [C [D [E F]]]]].
+  exists mu'. 
+  split. assumption.
+  split. assumption.
+  split. assumption.
+  split.
+   split. generalize EQ; intro EQ'; monadInv EQ'. simpl. 
+    econstructor; eauto.
+      eapply list_match_stackframes_intern_incr; try eassumption.
+        eapply restrict_sm_intern_incr; eassumption.
+        apply restrict_sm_WD; try eassumption. trivial.
+      simpl. eapply is_tail_add_branch. constructor.      
+      rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
+        rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; trivial.
+        eapply agree_regs_undef.
+        eapply agree_regs_call_regs.
+        eapply agree_regs_incr. eassumption. apply intern_incr_restrict; eassumption.
+      destruct (joinD_Some _ _ _ _ _ mu'SP) as [EXT | [EXT LOC]]; clear mu'SP.
+        assert (extern_of mu = extern_of mu') by eapply IntInc.
+        rewrite <- H0 in EXT; clear H0.
+        elim (Mem.fresh_block_alloc _ _ _ _ _ H).
+        eapply SMV. 
+          eapply as_inj_DomRng; trivial.
+          apply extern_in_all; eassumption.
+      split. rewrite restrict_sm_local.
+        econstructor. apply restrictI_Some; try eassumption.
+          unfold vis. destruct (local_DomRng _ D _ _ _ LOC). rewrite H0; trivial.
+        rewrite Int.add_zero. trivial. 
+      intros. inv H0. rewrite restrict_sm_all.
+         eexists. apply restrictI_Some. apply local_in_all; eassumption.
+           unfold vis. destruct (local_DomRng _ D _ _ _ LOC). rewrite H0; trivial.
+   (*as in selectionproofEff*)
+     intuition.
+     apply meminj_preserves_incr_sep_vb with (j:=as_inj mu)(m0:=m)(tm:=m2); try eassumption. 
+       intros. apply as_inj_DomRng in H1.
+               split; eapply SMV; eapply H1.
+       assumption.
+       apply intern_incr_as_inj; eassumption.
+       apply sm_inject_separated_mem. assumption.
+       assumption.
+     red; intros. destruct (GFP _ _ H1). split; trivial.
+          eapply intern_incr_as_inj; eassumption.
+     assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply IntInc.
+       apply Glob in H1. rewrite <-FF; trivial.
+  intuition.
+
   (* internal functions *)
   assert (REACH: (reachable f)!!(LTL.fn_entrypoint f) = true).
     apply reachable_entrypoint.
   monadInv H8.
-  edestruct alloc_parallel_intern as [mu' [tm' [b' [Alloc' [MInj' [IntInc [mu'SP mu'MuR]]]]]]]; eauto; try apply Zle_refl.
+  edestruct alloc_parallel_intern 
+    as [mu' [tm' [b' [Alloc' [MInj' [IntInc [mu'SP mu'MuR]]]]]]]; eauto; 
+      try apply Zle_refl.
   eexists; eexists; eexists; split. 
-  left. apply effstep_plus_one. eapply lin_effexec_function_internal; eauto. 
+  left. apply effstep_plus_one. 
+          eapply lin_effexec_function_internal; eauto. 
           rewrite (stacksize_preserved _ _ EQ). eauto.
   destruct mu'MuR as [A [B [C [D [E F]]]]].
   exists mu'. 

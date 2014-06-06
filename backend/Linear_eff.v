@@ -129,6 +129,11 @@ Inductive linear_effstep: (block -> Z -> bool) -> Linear_core -> mem -> Linear_c
       linear_effstep (FreeEffect m 0 (f.(fn_stacksize)) stk)
         (Linear_State s f (Vptr stk Int.zero) (Lreturn :: b) rs) m
         (Linear_Returnstate s (sig_res (fn_sig f)) (return_regs (parent_locset s) rs)) m'
+  | lin_effexec_function_internal0:
+      forall s f rs m,
+      linear_effstep EmptyEffect 
+                     (Linear_CallstateIn s (Internal f) rs) m
+                     (Linear_Callstate s (Internal f) rs) m
   | lin_effexec_function_internal:
       forall s f rs m rs' m' stk,
       Mem.alloc m 0 f.(fn_stacksize) = (m', stk) ->
@@ -195,6 +200,8 @@ intros.
   split. unfold corestep, coopsem; simpl. econstructor; eassumption.
          eapply FreeEffect_free; eassumption. 
   split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+         eapply Mem.unchanged_on_refl.
+  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
          eapply Mem.alloc_unchanged_on; eassumption. 
   (*no external call*) 
   split. unfold corestep, coopsem; simpl. econstructor; eassumption.
@@ -222,6 +229,7 @@ intros. unfold corestep, coopsem in H; simpl in H.
     eexists. eapply lin_effexec_Lcond_false; try eassumption; trivial.
     eexists. eapply lin_effexec_Ljumptable; try eassumption; trivial.
     eexists. eapply lin_effexec_Lreturn; eassumption.
+    eexists. eapply lin_effexec_function_internal0; eassumption.
     eexists. eapply lin_effexec_function_internal; try eassumption; trivial.
     eexists. eapply lin_effexec_return.
 Qed.
@@ -249,5 +257,4 @@ eapply Build_EffectSem with (sem := Linear_coop_sem)(effstep:=linear_effstep).
 apply linearstep_effax1.
 apply linearstep_effax2.
 apply linear_effstep_valid.
-(*intros. eapply linear_effstep_sub_val; eassumption.*)
 Defined.
