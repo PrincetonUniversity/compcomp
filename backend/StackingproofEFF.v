@@ -278,6 +278,12 @@ Record agree_args (mu: SM_Injection) (args: list val) (tys: list typ)
     agree_args_match: 
       stack=nil -> agree_args_match_aux (restrict (as_inj mu) (vis mu)) ls 0 args tys;
 
+    (** The singleton Linear stack restores the locset calculated
+        at program startup. *)
+    agree_args_match_singl:
+      forall f1 sp1 ls1 c1,
+      stack = Linear.Stackframe f1 sp1 ls1 c1 :: nil -> ls1 = ls;
+
     (** Unconditionally: 
         Values loaded from the Mach stack frame at pointer sp match 
         the initial arguments args. Arguments are pushed RTL, 
@@ -1215,7 +1221,9 @@ intros. inv H. constructor.
   generalize 0. revert tys. induction args. 
     solve[destruct tys; auto]. destruct tys; auto. }
 { revert agree_args_contains0. clear agree_args_match0.
-  generalize 0 as z. revert tys. induction args; auto.
+  generalize 0 as z. revert tys. induction args; auto. }
+{ revert agree_args_contains0. clear agree_args_match0.
+  generalize 0 as z. revert tys. induction args; auto. 
   destruct tys; auto. simpl. intros z. 
   generalize (match z with
      | 0 => 0
@@ -1280,6 +1288,12 @@ Lemma agree_args_setregs mu args tys stack ls m' sp' rtys rvals :
 Proof.
 inversion 1; subst. constructor; auto.
 intros. subst stack. apply agree_args_match_aux_setregs; auto.
+intros. subst stack. 
+  rewrite Locmap.gsetlisto; auto.
+  eapply agree_args_match_singl0; eauto.
+  rewrite Loc.notin_iff. intros l'. simpl. destruct l'; auto.
+  generalize (loc_result rtys). induction l. simpl; auto. simpl.
+  inversion 1. congruence. apply IHl; auto.
 Qed.
 
 Lemma agree_args_set_writable mu args tys stack ls m' sp' slt z ty v :
@@ -1289,6 +1303,12 @@ Lemma agree_args_set_writable mu args tys stack ls m' sp' slt z ty v :
 Proof.
 intros WR; inversion 1; subst. constructor; auto.
 intros. subst stack. apply agree_args_match_aux_set_writable; auto.
+intros. subst stack. 
+  rewrite Locmap.gso; auto. 
+  eapply agree_args_match_singl0; eauto.
+  revert WR; destruct slt; simpl; try solve[intros; congruence].
+  left; intros; congruence.  
+  left; intros; congruence.  
 Qed.
 
 Lemma agree_args_undef_regs mu args tys stack ls m' sp' regs :
@@ -1297,6 +1317,9 @@ Lemma agree_args_undef_regs mu args tys stack ls m' sp' regs :
 Proof.
 inversion 1; subst. constructor; auto.
 intros. subst stack. apply agree_args_match_aux_undef_regs; auto.
+intros. subst stack. 
+  induction regs; simpl; auto.
+  eapply agree_args_match_singl0; eauto.
 Qed.
 
 Lemma agree_args_extern_incr mu mu' args tys stack ls m1 m2 m2' sp' (WD' : SM_wd mu') :
@@ -1307,6 +1330,7 @@ Lemma agree_args_extern_incr mu mu' args tys stack ls m1 m2 m2' sp' (WD' : SM_wd
 Proof.
 inversion 1; subst. constructor; auto. intros. subst stack. 
 eapply agree_args_match_aux_extern_incr; eauto. solve[inv H3; auto].
+inv H3; auto. 
 inv H3; auto. 
 inv H3. intros ? ? X. inv H2. specialize (H3 b0 sp' z). revert H3.
 specialize (agree_sp_fresh0 b0 z). revert agree_sp_fresh0.
@@ -3136,7 +3160,7 @@ Inductive match_stacks mu (m m': mem) (sp0: block) :
   | match_stacks_empty: forall sg hi bound bound',
       Ple hi bound -> Ple hi bound' ->
       match_globalenvs (restrict (as_inj mu) (vis mu)) hi ->
-      tailcall_possible sg ->
+      (*tailcall_possible sg ->*)
       match_stacks mu m m' sp0 nil nil sg bound bound'
   | match_stacks_cons: forall f sp ls c cs fb sp' ra c' cs' sg bound bound' trf
         (TAIL: is_tail c (Linear.fn_code f))
@@ -3307,7 +3331,7 @@ Lemma match_stacks_change_meminj_intern:
 Proof.
   induction 3; intros.
   apply match_stacks_empty with hi; auto.
-  inv H3. constructor; eauto.
+(*  inv H3. constructor; eauto.
     intros. specialize (DOMAIN _ H3).
       eapply intern_incr_restrict; eassumption. 
   intros. red in H0.
@@ -3346,7 +3370,8 @@ Proof.
     red. eapply Plt_le_trans; eauto.  
     apply IHmatch_stacks; trivial. apply Ple_trans with bound'; auto. apply Plt_Ple; auto.
     eapply H. assumption.
-Qed.
+Qed.*)
+Admitted.
 
 Lemma match_stacks_change_meminj_extern:
   forall mu mu' m m' sp0 m1 m1',
@@ -3357,6 +3382,7 @@ Lemma match_stacks_change_meminj_extern:
   Ple bound' (Mem.nextblock m1') -> SM_wd mu -> SM_wd mu' ->
   match_stacks mu' m m' sp0 cs cs' sg bound bound'.
 Proof.
+(*
   induction 3; intros.
   apply match_stacks_empty with hi; auto.
   inv H3. constructor; eauto.
@@ -3401,7 +3427,8 @@ Proof.
     apply IHmatch_stacks; trivial. apply Ple_trans with bound'; auto. apply Plt_Ple; auto.
     assert (locBlocksTgt mu = locBlocksTgt mu') by eapply H.
     rewrite <- H5; assumption.
-Qed.
+Qed.*)
+Admitted.
 
 (** Preservation by parallel stores in Linear and Mach. *)
 
@@ -3872,7 +3899,9 @@ Hypothesis AGCS: agree_callee_save ls (parent_locset cs).
 Lemma transl_external_argument:
   forall l,
   In l (loc_arguments sg) ->
-  exists v, extcall_arg rs m' (parent_sp0 sp0 cs') l v /\ val_inject (restrict (as_inj mu) (vis mu)) (ls l) v.
+  exists v, 
+    extcall_arg rs m' (parent_sp0 sp0 cs') l v 
+    /\ val_inject (restrict (as_inj mu) (vis mu)) (ls l) v.
 Proof.
   intros.
   assert (loc_argument_acceptable l). apply loc_arguments_acceptable with sg; auto.
@@ -3880,8 +3909,10 @@ Proof.
   exists (rs r); split. constructor. auto. 
   destruct sl; try contradiction.
   inv MS.
-  elim (H4 _ H).
-  unfold parent_sp.
+  simpl parent_sp0. 
+  admit.
+  (*elim (H4 _ H).*)
+  unfold parent_sp0.
   assert (slot_valid f Outgoing pos ty = true).
     exploit loc_arguments_acceptable; eauto. intros [A B]. 
     unfold slot_valid. unfold proj_sumbool. rewrite zle_true. 
@@ -4005,6 +4036,7 @@ End ANNOT_ARGUMENTS.
 Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
   | match_states_intro:
       forall cs f sp c ls m cs' fb sp' rs m' tf args0 tys0 sp0
+        (STACKLEN: length cs > 0)
         (STACKS: match_stacks mu m m' sp0 cs cs' f.(Linear.fn_sig) sp sp')
         (TRANSL: transf_function f = OK tf)
         (FIND: Genv.find_funct_ptr tge fb = Some (Internal tf))
@@ -4030,7 +4062,7 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
         (WTLS: wt_locset ls)
         (AGARGS: agree_args_match_aux (restrict (as_inj mu) (vis mu)) 
                                       (call_regs ls) 0 args tys),
-      match_states mu (Linear_Callstate nil (Internal f) ls) m 
+      match_states mu (Linear_CallstateIn nil (Internal f) ls) m 
                       (Mach_CallstateIn fb args tys) m'
 
   | match_states_call_intern:
@@ -4058,21 +4090,19 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
         args (GETARGS: extcall_arguments rs m' (parent_sp0 sp0 cs') (ef_sig tf) args)
         (AGARGS: agree_args mu args0 tys0 cs ls m' sp0),
       match_states mu (Linear_Callstate cs f ls) m
-                     (Mach_CallstateOut cs' fb tf args rs 
-                       (mk_load_frame sp0 args0 tys0)) m'
+                      (Mach_CallstateOut cs' fb tf args rs 
+                        (mk_load_frame sp0 args0 tys0)) m'
 
   | match_states_return:
       forall cs ls m cs' retty rs m' sg args0 tys0 sp0
         (*(MINJ: Mem.inject j m m')*)
-        (STACKS: match_stacks mu m m' sp0 cs cs'
-                              sg (Mem.nextblock m) (Mem.nextblock m'))
+        (STACKS: match_stacks mu m m' sp0 cs cs' sg (Mem.nextblock m) (Mem.nextblock m'))
         (WTLS: wt_locset ls)
         (AGREGS: agree_regs (restrict (as_inj mu) (vis mu)) ls rs)
         (AGLOCS: agree_callee_save ls (parent_locset cs))
         (AGARGS: agree_args mu args0 tys0 cs ls m' sp0) (*NEW*), 
       match_states mu (Linear_Returnstate cs retty ls) m
-                     (Mach_Returnstate cs' retty rs 
-                       (mk_load_frame sp0 args0 tys0)) m'.
+                      (Mach_Returnstate cs' retty rs (mk_load_frame sp0 args0 tys0)) m'.
 
 Lemma match_states_restrict mu c1 m1 c2 m2 X: forall 
           (MS : match_states mu c1 m1 c2 m2)
@@ -4224,8 +4254,10 @@ destruct a; simpl.
   rewrite IHsgargs. rewrite Locmap.gso; trivial. constructor.
   destruct vals; try reflexivity.
   destruct v; try reflexivity.
-  rewrite IHsgargs. rewrite Locmap.gso. rewrite Locmap.gso; trivial. constructor. constructor.
-  rewrite IHsgargs. rewrite Locmap.gso. rewrite Locmap.gso; trivial. constructor. constructor.
+  rewrite IHsgargs. rewrite Locmap.gso. rewrite Locmap.gso; trivial. 
+    constructor. constructor.
+  rewrite IHsgargs. rewrite Locmap.gso. rewrite Locmap.gso; trivial. 
+    constructor. constructor.
   destruct vals; try reflexivity.
   rewrite IHsgargs. rewrite Locmap.gso; trivial. constructor.
   rewrite IHsgargs. rewrite Locmap.gso; trivial. constructor.  
@@ -5009,7 +5041,38 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   unfold slot_valid in H0. InvBooleans.
   exploit incoming_slot_in_parameters; eauto. intros IN_ARGS.
   inversion STACKS; clear STACKS.
-  elim (H7 _ IN_ARGS).
+  subst. 
+
+  (* read from dummy frame *)
+  eexists; eexists.
+  split. 
+  apply corestep_plus_one. econstructor; eauto.
+    rewrite (unfold_transf_function _ _ TRANSL). unfold fn_link_ofs. 
+    eapply index_contains_load_stack with (idx := FI_link). eapply TRANSL. 
+      solve[eapply agree_link; eauto].
+    simpl parent_sp0.
+    instantiate (1 := Vzero). admit. (*TODO*)
+  exists mu.
+  split. apply intern_incr_refl. 
+  split. apply sm_inject_separated_same_sminj.
+  split. apply sm_locally_allocatedChar.
+      intuition. 
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+  constructor.
+    econstructor; eauto with coqlib. econstructor; eauto.
+    apply agree_regs_set_reg. apply agree_regs_set_reg. auto. auto. admit.
+    eapply agree_frame_set_reg; eauto. eapply agree_frame_set_reg; eauto. 
+    apply caller_save_reg_within_bounds. 
+    apply temp_for_parent_frame_caller_save.
+    simpl. eapply Val.has_subtype; eauto. eapply agree_wt_ls; eauto.
+    (* agree_args *)
+    { apply agree_args_setreg; apply agree_args_undef_regs; auto. }
+  solve[intuition].
+
+  (* read from a real parent stack frame *)
   subst bound bound' s cs'.
   exploit agree_outgoing. eexact FRM. eapply ARGS; eauto.
   exploit loc_arguments_acceptable; eauto. intros [A B].
@@ -5108,7 +5171,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       exploit agree_bounds. eauto. apply Mem.perm_cur_max. eauto. 
       omega.*)
     apply match_stacks_change_mach_mem with m2; auto.
-    eauto with mem. eauto with mem. intros. rewrite <- H3; eapply Mem.load_store_other; eauto. 
+    eauto with mem. eauto with mem. intros. 
+      rewrite <- H3; eapply Mem.load_store_other; eauto. 
     eauto. eauto. auto. 
     apply agree_regs_set_slot. apply agree_regs_undef_regs; auto. 
     destruct sl.
@@ -5157,7 +5221,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     replace tres with (snd (type_of_operation op)).
     eapply type_of_operation_sound; eauto.
     red; intros. subst op. simpl in Heqo.
-    destruct args; simpl in H. discriminate. destruct args. discriminate. simpl in H. discriminate.
+    destruct args; simpl in H. discriminate. destruct args. discriminate. 
+      simpl in H. discriminate.
     rewrite TYOP; auto. 
   assert (exists v',
           eval_operation ge (Vptr sp' Int.zero) 
@@ -5207,7 +5272,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   intros [v' [C D]].
   eexists; eexists; split.   
     apply corestep_plus_one. econstructor.   
-    instantiate (1 := a'). rewrite <- A. apply eval_addressing_preserved. exact symbols_preserved.
+    instantiate (1 := a'). rewrite <- A. apply eval_addressing_preserved. 
+      exact symbols_preserved.
     eexact C. eauto.
   exists mu.
   split. apply intern_incr_refl. 
@@ -5340,6 +5406,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     econstructor; eauto.
       eapply agree_wt_ls; eauto.
       inv AGARGS. constructor; auto. inversion 1. 
+      intros until c1; inversion 1; subst. clear H0. solve[auto].
   solve[intuition].
 
   (*Lcall: case external function call. *)
@@ -5364,6 +5431,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     eapply match_states_call_extern; eauto.
       eapply agree_wt_ls; eauto.
       inv AGARGS. constructor; auto. inversion 1.       
+      intros until c1; inversion 1; subst. clear H0. solve[auto].
   solve[intuition].
 
   (* Ltailcall_internal *)
@@ -5503,12 +5571,14 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
                intros. eapply external_call_mem_forward; eassumption.
                intros. eapply Mem.load_unchanged_on; try eassumption.
                        red; intros.
-                       exploit agree_inj_unique. eapply  AGFRAME. apply H4. intros [SP DD]; subst.
+                       exploit agree_inj_unique. eapply  AGFRAME. apply H4. 
+                         intros [SP DD]; subst.
                        intros N. exploit agree_bounds. eapply AGFRAME. eapply N. intros.
                        clear - H1 H3 H5. destruct H1; omega.
                intros. eapply OUTOFREACH; trivial.
                        red; intros.
-                         exploit agree_inj_unique. eapply  AGFRAME. apply H3. intros [SP DD]; subst.
+                         exploit agree_inj_unique. eapply  AGFRAME. apply H3. 
+                           intros [SP DD]; subst.
                          intros N. exploit agree_bounds. eapply AGFRAME. eapply N. intros.
                          clear - H1 H4. destruct H1; omega.
                        eapply Mem.perm_valid_block; eassumption.
@@ -5518,7 +5588,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
                       destruct (restrictD_None' _ _ _ H1); clear H1.
                         eapply SEPARATED; eassumption.
                       destruct H2 as [bb2 [dd2 [AI1 Vis]]].
-                      rewrite (intern_incr_vis_inv _ _ WD WD' INCR _ _ _ AI1 H4) in Vis. discriminate.
+                      rewrite (intern_incr_vis_inv _ _ WD WD' INCR _ _ _ AI1 H4) in Vis. 
+                        discriminate.
                     assumption.
               eapply AGFRAME.
         rewrite list_Loc_type_mreg. eapply Val.has_subtype_list. eassumption. 
@@ -5695,72 +5766,30 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   assert (STORE: exists m4, store_args (Vptr sp0 Int.zero) 0 args tys m3 = Some m4).
   { admit. }
   destruct STORE as [m4 STORE].
-  case_eq (Mem.alloc m4 0 (fn_stacksize tfn)). intros m5 tstk.
-  assert (STORE5: exists m6, 
-            store_stack m5 (Vptr tstk Int.zero) 
-                        Tint (fn_link_ofs tfn) (parent_sp0 sp0 nil) 
-            = Some m6).
-    admit.
-  destruct STORE5 as [m6 STORE5].
-  assert (STORE6: exists m7, 
-            store_stack m6 (Vptr tstk Int.zero) 
-                        Tint (fn_retaddr_ofs tfn) (parent_ra nil) 
-            = Some m7).
-    admit.
-  destruct STORE6 as [m7 STORE6].
   eexists; eexists; split.
-    eapply corestep_plus_star_trans.
     eapply corestep_plus_one. simpl. econstructor; eauto.
-    eapply corestep_star_one. econstructor; eauto.
-    eexists.
-    split.
-    Focus 2.
-    split.
-    Focus 2.
-    split.
-    Focus 2.
-    split.
-    
-
-    exploit (function_prologue_correct 
-              f tfn TRANSL mu rs rs (call_regs rs) 
-              (Regmap.init Vundef) (Regmap.init Vundef) m m2 m' 
-              stk (Vptr sp0 Int.zero) Vzero nil fb nil (mk_load_frame sp0 args tys)); 
-      eauto.
-    admit.
-    admit.
-    admit.
-    admit.
-    solve[constructor].
-    solve[constructor].
-  intros [mu' [rs' [m2' [sp' [m3' [m4' [m5' [A [B [C [D [E [F [G 
-            [J [K [L [LOCALLOC' [WD' [SMV' [spLocalTgt' RC']]]]]]]]]]]]]]]]]]]]].
-  exists mu'.
-  intuition. 
-  split. 
-    econstructor; eauto. 
-      apply match_stacks_change_mach_mem with m2.
-      apply match_stacks_change_linear_mem with m.
-      rewrite SP_EQ; rewrite SP'_EQ.
-      eapply match_stacks_change_meminj_intern; eauto. apply Ple_refl. 
-      eauto with mem. intros. exploit Mem.perm_alloc_inv. eexact H. eauto. 
-      rewrite dec_eq_false; auto. 
-      intros. eapply stores_in_frame_valid; eauto with mem. 
-      intros. eapply stores_in_frame_perm; eauto with mem.
-      intros. rewrite <- H1. transitivity (Mem.load chunk m2' b ofs). 
-        eapply stores_in_frame_contents; eauto.
-      eapply Mem.load_alloc_unchanged; eauto. red. congruence.
-      eapply transf_function_well_typed; eauto.
-      auto with coqlib.
-      admit. (*TODO*)
-      admit. (*TODO*)
-    intuition.
-    eapply (intern_incr_meminj_preserves_globals_as_inj _ mu); trivial.
-      split; assumption.
-    eapply (intern_incr_meminj_preserves_globals_as_inj ge mu); trivial.
-      split; assumption.*)
-
-  admit. (*TODO*)
+  exists mu. (*NOT QUITE RIGHT*)
+  intuition.
+  apply intern_incr_refl.
+  apply sm_inject_separated_same_sminj.
+  admit. (*TODO -- mu above not right *)
+  split.
+  apply match_states_call_intern with (tf := tfn); auto.
+  apply match_stacks_empty with (hi := Mem.nextblock m); auto.
+  apply Ple_refl. 
+  admit.
+  admit.
+  simpl. unfold bind. solve[rewrite TRANSL; auto].
+  admit.
+  admit. 
+  constructor; auto.
+  admit.
+  admit.
+  admit.
+  admit.
+  intuition.
+  admit.
+  admit. }
 
 (* internal function *)
   destruct PRE as [RC [PG [Glob [SMV WD]]]]. 
