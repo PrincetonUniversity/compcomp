@@ -80,6 +80,7 @@ BACKEND=\
   Op.v OpEFF.v \
   CminorSel.v CminorSel_coop.v CminorSel_eff.v \
   SelectOp.v SelectDiv.v SelectLong.v Selection.v \
+  SelectionNEW.v SelectLongNEW.v \
   SelectOpproof.v SelectDivproof.v SelectLongproof.v \
   Selectionproof.v SelectionproofEFF.v \
   Registers.v RTL.v RTL_coop.v RTL_eff.v \
@@ -101,9 +102,8 @@ BACKEND=\
   CleanupLabels.v CleanupLabelsproof.v CleanupLabelsproofEFF.v \
   Mach.v Mach_coop.v Mach_eff.v \
   Bounds.v Stacklayout.v Stacking.v Stackingproof.v StackingproofEFF.v \
-  Asm.v Asm_coop.v Asm_eff.v \
-  Asmgen.v Asmgenproof0.v Asmgenproof1.v Asmgenproof.v \
-  Asmgenproof0EFF.v Asmgenproof1EFF.v AsmgenproofEFF.v
+  Asm.v Asmgen.v Asmgenproof0.v Asmgenproof1.v Asmgenproof.v \
+  AsmEFF.v AsmgenEFF.v Asmgenproof0EFF.v Asmgenproof1EFF.v AsmgenproofEFF.v
 
 # C front-end modules (in cfrontend/)
 
