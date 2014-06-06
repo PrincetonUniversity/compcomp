@@ -221,6 +221,22 @@ simpl. intros [a [H [H2 H3]]].
   exists a; split; auto. solve[rewrite undef_regs_get; auto].
 Qed.
 
+Lemma val_inject_intern_incr mu mu' v1 v2 (WD': SM_wd mu') :
+  intern_incr mu mu' -> 
+  val_inject (restrict (as_inj mu) (vis mu)) v1 v2 ->
+  val_inject (restrict (as_inj mu') (vis mu')) v1 v2.
+Proof.
+intros H H2. apply val_inject_incr 
+  with (f1 := (restrict (as_inj mu) (vis mu))); auto.
+generalize H as X; intro. inv H; auto. unfold inject_incr. 
+intros ? ? ? H. apply restrictD_Some in H. destruct H.
+unfold restrict. cut (vis mu' b=true). intros ->.
+assert (inject_incr (as_inj mu) (as_inj mu')).
+{ apply intern_incr_as_inj; auto. }
+solve[apply H4 in H; auto].
+eapply intern_incr_vis in X; eauto.
+Qed.
+
 Lemma val_inject_extern_incr mu mu' v1 v2 (WD': SM_wd mu') :
   extern_incr mu mu' -> 
   val_inject (restrict (as_inj mu) (vis mu)) v1 v2 ->
@@ -235,6 +251,24 @@ assert (inject_incr (as_inj mu) (as_inj mu')).
 { apply extern_incr_as_inj; auto. }
 solve[apply H4 in H; auto].
 erewrite extern_incr_vis in H3; eauto.
+Qed.
+
+Lemma agree_args_match_aux_intern_incr mu mu' ls ofs args tys (WD' : SM_wd mu') :
+  intern_incr mu mu' -> 
+  agree_args_match_aux (restrict (as_inj mu) (vis mu)) ls ofs args tys ->   
+  agree_args_match_aux (restrict (as_inj mu') (vis mu')) ls ofs args tys.
+Proof.
+intros X; revert ofs args ls; induction tys.
+destruct args; simpl; auto.
+destruct args; simpl; auto.
+intros ls. destruct a. 
+simpl. intros [a [H [H2 H3]]]. exists a; split; auto.
+  split; auto. revert H2. solve[apply val_inject_intern_incr; auto].
+simpl. intros [a [H [H2 H3]]]. exists a; split; auto.
+  split; auto. revert H2. solve[apply val_inject_intern_incr; auto].
+simpl. destruct v; auto. intros [H [H2 H3]]. solve[split; auto].
+simpl. intros [a [H [H2 H3]]]. exists a; split; auto.
+  split; auto. revert H2. solve[apply val_inject_intern_incr; auto].
 Qed.
 
 Lemma agree_args_match_aux_extern_incr mu mu' ls ofs args tys (WD' : SM_wd mu') :
@@ -1252,8 +1286,35 @@ intros b0 ofs Heq; subst b0. split; auto. solve[inv H; auto].
 intros b0 z lOf. inv H. apply local_in_all in lOf; auto. exfalso; eauto. 
 Qed.
 
+Lemma agree_args_alloc: 
+  forall mu args tys stack ls m sp' m' lo hi b (WD : SM_wd mu),
+  agree_args mu args tys stack ls m sp' -> 
+  Mem.alloc m lo hi = (m',b) -> 
+  agree_args mu args tys stack ls m' sp'.
+Proof.
+intros. apply agree_args_invariant with (m' := m); auto.
+apply Mem.alloc_unchanged_on with (P := fun b z => b=sp') in H0; auto.
+Qed.
+
+Lemma agree_args_free: 
+  forall mu args tys stack ls m sp' m' b lo hi (WD : SM_wd mu),
+  agree_args mu args tys stack ls m sp' -> 
+  b<>sp' -> 
+  Mem.free m b lo hi = Some m' -> 
+  agree_args mu args tys stack ls m' sp'.
+Proof.
+intros. apply agree_args_invariant with (m' := m); auto.
+eapply Mem.free_unchanged_on; eauto.
+Qed.
+
 Lemma Zlength_pos A : forall l : list A, Zlength l >= 0.
-Admitted.
+Proof.
+intros l.
+assert (forall z, z >= 0 -> Zlength_aux z A l >= 0).
+{ induction l. simpl. intros; omega. intros. 
+  simpl. eapply IHl. omega. }
+unfold Zlength. apply H. omega.
+Qed.
 
 Lemma Zlength_cons_pos A (a : A) l : Zlength (a::l) > 0.
 Proof.
@@ -1367,6 +1428,29 @@ Proof.
 inversion 1; subst. constructor; auto.
 intros. destruct (last_frame stack); auto. 
 apply agree_args_match_aux_undef_regs; auto.
+Qed.
+
+Lemma agree_args_intern_incr mu mu' args tys stack ls m1 m2 m2' sp' (WD' : SM_wd mu') :
+  intern_incr mu mu' ->
+  sm_inject_separated mu mu' m1 m2 ->
+  agree_args mu args tys stack ls m2' sp' ->
+  agree_args mu' args tys stack ls m2' sp'.
+Proof.
+inversion 1; subst. constructor; auto. intros. 
+  inv H3; destruct (last_frame stack); auto.
+  eapply agree_args_match_aux_intern_incr; eauto. 
+  destruct s; auto. destruct l; auto.
+  eapply agree_args_match_aux_intern_incr; eauto. solve[inv H3; auto].
+inv H3. intros ? ? X. inv H2. specialize (H3 b0 sp' z). revert H3.
+specialize (agree_sp_fresh0 b0 z). revert agree_sp_fresh0.
+case_eq (as_inj mu b0). intros [? ?] INJ.
+apply intern_incr_as_inj in H; auto. 
+apply H in INJ. rewrite INJ in X. inv X. 
+solve[intros Y _; apply Y; auto].
+intros NONE _ Y. destruct (Y (eq_refl _) X) as [Y1 Y2].
+unfold DomTgt in Y2. rewrite agree_sp_local0 in Y2. simpl in Y2; congruence.
+destruct H1 as [_ [_ [X [_ [_ _]]]]]. 
+apply X; inv H3; auto.
 Qed.
 
 Lemma agree_args_extern_incr mu mu' args tys stack ls m1 m2 m2' sp' (WD' : SM_wd mu') :
@@ -1713,6 +1797,18 @@ Remark stores_in_frame_trans:
   forall m3, stores_in_frame m2 m3 -> stores_in_frame m1 m3.
 Proof.
   induction 1; intros. auto. econstructor; eauto.
+Qed.
+
+Lemma agree_args_stores_in_frame mu args tys s m m' sp0 (WD : SM_wd mu) :
+  agree_args mu args tys s ls m sp0 -> 
+  sp<>sp0 -> 
+  stores_in_frame m m' -> 
+  agree_args mu args tys s ls m' sp0.
+Proof.
+intros H NEQ H2; induction H2; auto.
+apply IHstores_in_frame.
+eapply agree_args_invariant; eauto.
+eapply Mem.store_unchanged_on; eauto.
 Qed.
 
 Hypothesis number_inj: 
@@ -3206,10 +3302,10 @@ Inductive match_globalenvs (j: meminj) (bound: block) : Prop :=
 Inductive match_stacks mu (m m': mem) (sp0: block) : 
        list Linear.stackframe -> list stackframe -> signature -> block -> block -> Prop :=
   | match_stacks_empty: forall sg hi bound bound',
-      Ple hi bound -> Ple hi bound' ->
-      match_globalenvs (restrict (as_inj mu) (vis mu)) hi ->
-      (*tailcall_possible sg ->*)
-      match_stacks mu m m' sp0 nil nil sg bound bound'
+        Ple hi bound -> Ple hi bound' ->
+        match_globalenvs (restrict (as_inj mu) (vis mu)) hi ->
+        (*tailcall_possible sg ->*)
+        match_stacks mu m m' sp0 nil nil sg bound bound'
   | match_stacks_cons: forall f sp ls c cs fb sp' ra c' cs' sg bound bound' trf
         (TAIL: is_tail c (Linear.fn_code f))
         (WTF: wt_function f = true)
@@ -3379,7 +3475,7 @@ Lemma match_stacks_change_meminj_intern:
 Proof.
   induction 3; intros.
   apply match_stacks_empty with hi; auto.
-(*  inv H3. constructor; eauto.
+  inv H3. constructor; eauto.
     intros. specialize (DOMAIN _ H3).
       eapply intern_incr_restrict; eassumption. 
   intros. red in H0.
@@ -3387,20 +3483,20 @@ Proof.
     intros [b' delta'] EQ.
       apply intern_incr_restrict in H; trivial.
       rewrite (H _ _ _ EQ) in H3. inv H3. eauto.
-  intros EQ. specialize (DOMAIN _ H8).
+  intros EQ. specialize (DOMAIN _ H7).
              destruct (restrictD_Some _ _ _ _ _ H3); clear H3. 
              destruct (restrictD_Some _ _ _ _ _ DOMAIN); clear DOMAIN. 
              destruct (restrictD_None' _ _ _ EQ); clear EQ.
                destruct H0 as [AI [DD TT]].
-               destruct (AI _ _ _ H12 H9).
+               destruct (AI _ _ _ H11 H8).
                assert (DomTgt mu b2 = true).
                  eapply as_inj_DomRng; eassumption.
-               rewrite H14 in H13. discriminate. 
-             destruct H12 as [? [? [? ?]]].
+               rewrite H13 in H12. discriminate. 
+             destruct H11 as [? [? [? ?]]].
                assert (as_inj mu' b1 = Some (x, x0)).
                   eapply intern_incr_as_inj; eassumption.
-               rewrite H14 in H9; inv H9. 
-               rewrite (intern_incr_vis_inv _ _ H6 H7 H _ _ _ H12 H10) in H13.
+               rewrite H13 in H8; inv H8.
+               rewrite (intern_incr_vis_inv _ _ H5 H6 H _ _ _ H11 H9) in H12.
                discriminate.  
   econstructor; eauto. 
   eapply agree_frame_inject_incr; eauto.
@@ -3418,8 +3514,7 @@ Proof.
     red. eapply Plt_le_trans; eauto.  
     apply IHmatch_stacks; trivial. apply Ple_trans with bound'; auto. apply Plt_Ple; auto.
     eapply H. assumption.
-Qed.*)
-Admitted.
+Qed.
 
 Lemma match_stacks_change_meminj_extern:
   forall mu mu' m m' sp0 m1 m1',
@@ -3430,7 +3525,6 @@ Lemma match_stacks_change_meminj_extern:
   Ple bound' (Mem.nextblock m1') -> SM_wd mu -> SM_wd mu' ->
   match_stacks mu' m m' sp0 cs cs' sg bound bound'.
 Proof.
-(*
   induction 3; intros.
   apply match_stacks_empty with hi; auto.
   inv H3. constructor; eauto.
@@ -3441,21 +3535,21 @@ Proof.
     intros [b' delta'] EQ.
       apply extern_incr_restrict in H; trivial.
       rewrite (H _ _ _ EQ) in H3. inv H3. eauto.
-  intros EQ. specialize (DOMAIN _ H8).
+  intros EQ. specialize (DOMAIN _ H7).
              destruct (restrictD_Some _ _ _ _ _ H3); clear H3. 
              destruct (restrictD_Some _ _ _ _ _ DOMAIN); clear DOMAIN. 
              destruct (restrictD_None' _ _ _ EQ); clear EQ.
                destruct H0 as [AI [DD TT]].
-               destruct (AI _ _ _ H12 H9).
+               destruct (AI _ _ _ H11 H8).
                assert (DomTgt mu b2 = true).
                  eapply as_inj_DomRng; eassumption.
-               rewrite H14 in H13. discriminate. 
-             destruct H12 as [? [? [? ?]]].
+               rewrite H13 in H12. discriminate. 
+             destruct H11 as [? [? [? ?]]].
                assert (as_inj mu' b1 = Some (x, x0)).
                   eapply extern_incr_as_inj; eassumption.
-               rewrite H14 in H9; inv H9.
-               rewrite (extern_incr_vis _ _ H) in H13.
-               rewrite H13 in H10.
+               rewrite H13 in H8; inv H8.
+               rewrite (extern_incr_vis _ _ H) in H12.
+               rewrite H12 in H9.
                discriminate.  
   econstructor; eauto. 
   eapply agree_frame_inject_incr; eauto.
@@ -3475,8 +3569,7 @@ Proof.
     apply IHmatch_stacks; trivial. apply Ple_trans with bound'; auto. apply Plt_Ple; auto.
     assert (locBlocksTgt mu = locBlocksTgt mu') by eapply H.
     rewrite <- H5; assumption.
-Qed.*)
-Admitted.
+Qed.
 
 (** Preservation by parallel stores in Linear and Mach. *)
 
@@ -4074,12 +4167,12 @@ End ANNOT_ARGUMENTS.
 - Well-typedness of [f].
 *)
 
-(*Lenb: added parameter mu, and removed MINJ clauses (they're in MATCH now)
-  Adapted type from Linear.state -> Mach.state -> Prop to
-  Linear_core -> mem -> Mach_core -> mem -> Prop*)
+(* Lenb: added parameter mu, and removed MINJ clauses (they're in MATCH now)
+   Adapted type from Linear.state -> Mach.state -> Prop to
+   Linear_core -> mem -> Mach_core -> mem -> Prop *)
 
-(*We distinguish between internal and external calls (cf introduction of constructor 
-  Mach_CallstateOut)*)
+(* We distinguish between internal and external calls (cf. introduction
+   of constructor Mach_CallstateOut). *)
 
 Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
   | match_states_intro:
@@ -4107,6 +4200,7 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
         (TRANSL: transf_function f = OK tf)
         (FIND: Genv.find_funct_ptr tge fb = Some (Internal tf))
         (WTLS: wt_locset ls)
+        (NOREGS: forall r, ls (R r) = Vundef)
         (AGARGS: agree_args_match_aux (restrict (as_inj mu) (vis mu)) 
                                       (call_regs ls) 0 args tys),
       match_states mu (Linear_CallstateIn nil (Internal f) ls) m 
@@ -4121,7 +4215,10 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
         (WTLS: wt_locset ls)
         (AGREGS: agree_regs (restrict (as_inj mu) (vis mu)) ls rs)
         (AGLOCS: agree_callee_save ls (parent_locset cs))
-        (AGARGS: agree_args mu args0 tys0 cs ls m' sp0), 
+        (AGARGS: let ls' := match cs with 
+                              | nil => call_regs ls 
+                              | _ :: _ => ls 
+                            end in agree_args mu args0 tys0 cs ls' m' sp0), 
       match_states mu (Linear_Callstate cs f ls) m
                       (Mach_Callstate cs' fb rs (mk_load_frame sp0 args0 tys0)) m'
 
@@ -4367,6 +4464,17 @@ destruct sl; try solve[inv IN]. destruct IN as [H H0].
 right. omega.
 Qed.
 
+Lemma loc_arguments_gso_reg z vl tys r :
+  Locmap.setlist (loc_arguments_rec tys z) vl (Locmap.init Vundef) (R r) = Vundef.
+Proof.
+rewrite Locmap.gsetlisto. auto.
+rewrite Loc.notin_iff; intros l' IN.
+apply loc_arguments_rec_charact in IN.
+destruct l'; try solve[inv IN]. 
+destruct sl; try solve[inv IN]. destruct IN as [H H0].
+simpl; auto.
+Qed.
+
 Lemma wt_setlist_loc_arguments sig vals :
   wt_locset
     (Locmap.setlist (loc_arguments sig)
@@ -4599,6 +4707,8 @@ Proof. intros.
   eapply match_states_init; eauto. simpl.
 
   solve[apply wt_setlist_loc_arguments].
+
+  solve[intros r; apply loc_arguments_gso_reg].
 
   simpl. 
   assert (Linear.fn_sig f=fn_sig x) as ->.
@@ -5785,6 +5895,10 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       eapply Mem.valid_block_free_1; eauto. eapply agree_valid_mach; eauto. 
     apply wt_return_regs; auto. eapply match_stacks_wt_locset; eauto. 
       eapply agree_wt_ls; eauto.
+    { clear - AGARGS. 
+      destruct s. admit.
+      eapply agree_args_nonempty_locset; eauto.
+      
     admit. (*TODO*)
   intuition.
     eapply REACH_closed_free; try eassumption.
@@ -5818,11 +5932,10 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   admit.
   admit.
   simpl. unfold bind. solve[rewrite TRANSL; auto].
-  admit.
+  admit. 
   admit. 
   constructor; auto.
-  simpl. admit. (*call_regs vs. ...*)
-  admit.
+  admit. 
   admit.
   admit.
   intuition.
@@ -5863,7 +5976,10 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       eapply Mem.load_alloc_unchanged; eauto. red. congruence.
       eapply transf_function_well_typed; eauto.
       auto with coqlib.
-      admit. (*TODO*)
+      revert AGARGS. destruct s. admit. 
+      intros AGARGS. admit. (*TODO*)
+        (*eapply agree_args_nonempty_locset. 
+          apply Zlength_cons_pos.*)
       admit. (*TODO*)
     intuition.
     eapply (intern_incr_meminj_preserves_globals_as_inj _ mu); trivial.
