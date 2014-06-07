@@ -85,10 +85,8 @@ Fixpoint agree_args_match_aux j (ls: locset) ofs args tys : Prop :=
                 | _ => False
               end
             | _ =>  
-              exists a, 
-                ls (S Incoming ofs ty')=a 
-                /\ val_inject j a a' 
-                /\ agree_args_match_aux j ls (ofs+typesize ty') args' tys'
+              val_inject j (ls (S Incoming ofs ty')) a' 
+              /\ agree_args_match_aux j ls (ofs+typesize ty') args' tys'
           end
       end
   end.
@@ -112,11 +110,12 @@ Proof.
 revert args ofs ls. induction tys. destruct args; auto.
 intros ? ? ? sub. destruct args. auto. simpl.
 destruct a;
-try solve[intros [a0 [H2 [H H3]]]; exists a0; split; auto;
-          split; auto; eapply val_inject_restrict_sub; eauto]. 
+try solve[intros [H2 [H H3]]; split; auto;
+          split; auto; eapply val_inject_restrict_sub; eauto
+         |intros [H H3]; split; auto;
+          eapply val_inject_restrict_sub; eauto]. 
 destruct v; auto.
-intros [? [? ?]].
-split; auto.
+intros [? [? ?]]. split; auto. 
 Qed.
 
 Lemma loc_setregs_eq rtys rvals ls ofs ty :
@@ -140,10 +139,10 @@ revert ofs args ls; induction tys; simpl; auto.
 destruct args; simpl; auto.
 destruct args; simpl; auto.
 intros ls. destruct a. 
-simpl. intros [a [H [H2 H3]]]. solve[exists a; split; auto].
-simpl. intros [a [H [H2 H3]]]. solve[exists a; split; auto].
+simpl. intros [H2 H3]. solve[split; auto].
+simpl. intros [H2 H3]. solve[split; auto].
 simpl. destruct v0; auto. intros [H [H2 H3]]. solve[split; auto].
-simpl. intros [a [H [H2 H3]]]. solve[exists a; split; auto].
+simpl. intros [H2 H3]. solve[split; auto].
 Qed.
 
 Lemma agree_args_match_aux_setregs j ls ofs args tys rtys rvals :
@@ -154,15 +153,12 @@ revert ofs args ls; induction tys; simpl; auto.
 destruct args; simpl; auto.
 destruct args; simpl; auto.
 intros ls. destruct a. 
-simpl. intros [a [H [H2 H3]]]. exists a; split; auto.
-  solve[rewrite loc_setregs_eq; auto].
-simpl. intros [a [H [H2 H3]]]. exists a; split; auto.
-  solve[rewrite loc_setregs_eq; auto].
+simpl. intros [H2 H3]. split; auto. solve[rewrite loc_setregs_eq; auto].
+simpl. intros [H2 H3]. split; auto. solve[rewrite loc_setregs_eq; auto].
 simpl. destruct v; auto. intros [H [H2 H3]]. split; auto.
   solve[rewrite loc_setregs_eq; auto]. split; auto.
   solve[rewrite loc_setregs_eq; auto].
-simpl. intros [a [H [H2 H3]]]. exists a; split; auto.
-  solve[rewrite loc_setregs_eq; auto].
+simpl. intros [H2 H3]. split; auto. solve[rewrite loc_setregs_eq; auto].
 Qed.
 
 Lemma agree_args_match_aux_set_writable j ls ofs args tys slt z ty v :
@@ -174,12 +170,12 @@ revert ofs args ls; induction tys; simpl; auto.
 destruct args; simpl; auto.
 destruct args; simpl; auto.
 intros ls. destruct a. 
-simpl. intros WR [a [H [H2 H3]]]. 
-  exists a; split; auto. revert WR. destruct slt; try solve[inversion 1].
+simpl. intros WR [H2 H3]. 
+  split; auto. revert WR. destruct slt; try solve[inversion 1].
   rewrite Locmap.gso; auto. simpl. solve[left; intros C; congruence].
   rewrite Locmap.gso; auto. simpl. solve[left; intros C; congruence].
-simpl. intros WR [a [H [H2 H3]]]. 
-  exists a; split; auto. revert WR. destruct slt; try solve[inversion 1].
+simpl. intros WR [H2 H3]. 
+  split; auto. revert WR. destruct slt; try solve[inversion 1].
   rewrite Locmap.gso; auto. simpl. solve[left; intros C; congruence].
   rewrite Locmap.gso; auto. simpl. solve[left; intros C; congruence].
 simpl. destruct v0; auto. intros WR [H [H2 H3]]. 
@@ -190,8 +186,8 @@ simpl. destruct v0; auto. intros WR [H [H2 H3]].
   rewrite Locmap.gso; auto. simpl. solve[left; intros C; congruence].
   rewrite Locmap.gso; auto. simpl. solve[left; intros C; congruence].
   solve[auto].
-simpl. intros WR [a [H [H2 H3]]]. 
-  exists a; split; auto. revert WR. destruct slt; try solve[inversion 1].
+simpl. intros WR [H2 H3]. 
+  split; auto. revert WR. destruct slt; try solve[inversion 1].
   rewrite Locmap.gso; auto. simpl. solve[left; intros C; congruence].
   rewrite Locmap.gso; auto. simpl. solve[left; intros C; congruence].
 Qed.
@@ -210,15 +206,12 @@ revert ofs args ls; induction tys; simpl; auto.
 destruct args; simpl; auto.
 destruct args; simpl; auto.
 intros ls. destruct a. 
-simpl. intros [a [H [H2 H3]]]. 
-  exists a; split; auto. solve[rewrite undef_regs_get; auto].
-simpl. intros [a [H [H2 H3]]]. 
-  exists a; split; auto. solve[rewrite undef_regs_get; auto].
+simpl. intros [H2 H3]. split; auto. solve[rewrite undef_regs_get; auto].
+simpl. intros [H2 H3]. split; auto. solve[rewrite undef_regs_get; auto].
 simpl. destruct v; auto. intros [H [H2 H3]]. 
   split. rewrite undef_regs_get; auto. split; auto.
   solve[rewrite undef_regs_get; auto].
-simpl. intros [a [H [H2 H3]]]. 
-  exists a; split; auto. solve[rewrite undef_regs_get; auto].
+simpl. intros [H2 H3]. split; auto. solve[rewrite undef_regs_get; auto].
 Qed.
 
 Lemma val_inject_intern_incr mu mu' v1 v2 (WD': SM_wd mu') :
@@ -262,13 +255,13 @@ intros X; revert ofs args ls; induction tys.
 destruct args; simpl; auto.
 destruct args; simpl; auto.
 intros ls. destruct a. 
-simpl. intros [a [H [H2 H3]]]. exists a; split; auto.
-  split; auto. revert H2. solve[apply val_inject_intern_incr; auto].
-simpl. intros [a [H [H2 H3]]]. exists a; split; auto.
-  split; auto. revert H2. solve[apply val_inject_intern_incr; auto].
+simpl. intros [H2 H3]. split; auto.
+  revert H2. solve[apply val_inject_intern_incr; auto].
+simpl. intros [H2 H3]. split; auto.
+  revert H2. solve[apply val_inject_intern_incr; auto].
 simpl. destruct v; auto. intros [H [H2 H3]]. solve[split; auto].
-simpl. intros [a [H [H2 H3]]]. exists a; split; auto.
-  split; auto. revert H2. solve[apply val_inject_intern_incr; auto].
+simpl. intros [H2 H3]. split; auto.
+  revert H2. solve[apply val_inject_intern_incr; auto].
 Qed.
 
 Lemma agree_args_match_aux_extern_incr mu mu' ls ofs args tys (WD' : SM_wd mu') :
@@ -280,23 +273,121 @@ intros X; revert ofs args ls; induction tys.
 destruct args; simpl; auto.
 destruct args; simpl; auto.
 intros ls. destruct a. 
-simpl. intros [a [H [H2 H3]]]. exists a; split; auto.
-  split; auto. revert H2. solve[apply val_inject_extern_incr; auto].
-simpl. intros [a [H [H2 H3]]]. exists a; split; auto.
-  split; auto. revert H2. solve[apply val_inject_extern_incr; auto].
+simpl. intros [H2 H3]. split; auto.
+  revert H2. solve[apply val_inject_extern_incr; auto].
+simpl. intros [H2 H3]. split; auto.
+  revert H2. solve[apply val_inject_extern_incr; auto].
 simpl. destruct v; auto. intros [H [H2 H3]]. solve[split; auto].
-simpl. intros [a [H [H2 H3]]]. exists a; split; auto.
-  split; auto. revert H2. solve[apply val_inject_extern_incr; auto].
+simpl. intros [H2 H3]. split; auto.
+  revert H2. solve[apply val_inject_extern_incr; auto].
 Qed.
 
 Fixpoint agree_args_contains_aux m' sp' ofs args tys : Prop :=
+  let vsp := Vptr sp' Int.zero in
+  match tys with
+    | nil => args=nil
+    | ty'::tys' => 
+      match args with 
+        | nil => False
+        | a'::args' => 
+          match ty' with
+            | Tlong => 
+              match a' with
+                | Vlong n => 
+                  load_stack m' vsp Tint (Int.repr (fe_ofs_arg + 4*(ofs+1)))
+                  = Some (Vint (Int64.hiword n))
+                  /\ load_stack m' vsp Tint (Int.repr (fe_ofs_arg + 4*ofs))
+                     = Some (Vint (Int64.loword n))
+                  /\ agree_args_contains_aux m' sp' (ofs+2) args' tys'
+                | _ => False
+              end
+            | _ =>  
+              load_stack m' vsp ty' (Int.repr (fe_ofs_arg + 4*ofs)) = Some a' 
+              /\ agree_args_contains_aux m' sp' (ofs+typesize ty') args' tys'
+          end
+      end
+  end.
+
+Lemma agree_args_contains_aux_invariant:
+  forall tys m sp ofs args m',
+  agree_args_contains_aux m sp ofs args tys -> 
+  Mem.unchanged_on (fun b ofs => b=sp) m m' ->
+  agree_args_contains_aux m' sp ofs args tys.
+Proof.
+induction tys. destruct args; simpl; auto.
+intros m'; destruct args; simpl; auto. destruct a.
+generalize
+     (Int.repr
+        match ofs with
+        | 0 => 0
+        | Z.pos y' => Z.pos y'~0~0
+        | Z.neg y' => Z.neg y'~0~0
+        end) as z. 
+intros z [H H2] [H3 H4]. split; eauto. 
+unfold load_stack, Mem.loadv in H3|-*. 
+revert H3; case_eq (Val.add (Vptr sp Int.zero) (Vint z)); 
+  try solve[inversion 1].
+simpl; intros ? ?; inversion 1; subst.
+eapply Mem.load_unchanged_on. eapply H0. intros. solve[simpl; auto].
+generalize
+     (Int.repr
+        match ofs with
+        | 0 => 0
+        | Z.pos y' => Z.pos y'~0~0
+        | Z.neg y' => Z.neg y'~0~0
+        end) as z. 
+intros z [H H2] [H3 H4]. split; eauto. 
+unfold load_stack, Mem.loadv in H3|-*. 
+revert H3; case_eq (Val.add (Vptr sp Int.zero) (Vint z)); 
+  try solve[inversion 1].
+simpl; intros ? ?; inversion 1; subst.
+eapply Mem.load_unchanged_on. eapply H0. intros. solve[simpl; auto].
+generalize
+     (Int.repr
+        match ofs with
+        | 0 => 0
+        | Z.pos y' => Z.pos y'~0~0
+        | Z.neg y' => Z.neg y'~0~0
+        end) as z. 
+generalize
+     (Int.repr
+        match ofs + 1 with
+        | 0 => 0
+        | Z.pos y' => Z.pos y'~0~0
+        | Z.neg y' => Z.neg y'~0~0
+        end) as z1. 
+destruct v; try inversion 3.
+intros z1 z [H H2] [H3 [H4 H5]]. split; eauto. 
+unfold load_stack, Mem.loadv in H3|-*. 
+revert H3; case_eq (Val.add (Vptr sp Int.zero) (Vint z)); 
+  try solve[inversion 1].
+simpl; intros ? ?; inversion 1; subst.
+eapply Mem.load_unchanged_on. eapply H0. intros. solve[simpl; auto].
+split. eapply Mem.load_unchanged_on; eauto. intros. solve[simpl; auto].
+solve[eapply IHtys; eauto]. 
+generalize
+     (Int.repr
+        match ofs with
+        | 0 => 0
+        | Z.pos y' => Z.pos y'~0~0
+        | Z.neg y' => Z.neg y'~0~0
+        end) as z. 
+intros z [H H2] [H3 H4]. split; eauto. 
+unfold load_stack, Mem.loadv in H3|-*. 
+revert H3; case_eq (Val.add (Vptr sp Int.zero) (Vint z)); 
+  try solve[inversion 1].
+simpl; intros ? ?; inversion 1; subst.
+eapply Mem.load_unchanged_on. eapply H0. intros. solve[simpl; auto].
+Qed.
+
+(*Fixpoint agree_args_contains_aux m' sp' ofs args tys : Prop :=
   match args,tys with
     | nil,nil => True
     | a::args',ty::tys' => 
         Mem.load (chunk_of_type ty) m' sp' (fe_ofs_arg + 4*ofs) = Some a
         /\ agree_args_contains_aux m' sp' (ofs+1) args' tys'
     | _,_ => False
-  end.
+  end.*)
 
 Fixpoint last_frame (stack: list Linear.stackframe) :=
   match stack with
@@ -1248,6 +1339,38 @@ Proof.
   red; intros. apply H4; auto.
 Qed.
 
+Lemma agree_args_match_contain j ls z args0 args tys m' sp' ofs ty :
+  agree_args_match_aux j ls z args tys -> 
+  agree_args_contains_aux m' sp' z args tys -> 
+  In (S Outgoing ofs ty) (loc_arguments_rec tys z) -> 
+  Forall2 (val_inject j) args0 args -> 
+  exists v, 
+  load_stack m' (Vptr sp' Int.zero) ty (Int.repr (4*ofs)) = Some v
+  /\ val_inject j (ls (S Incoming ofs ty)) v.
+Proof.
+revert args0 args z. induction tys. 
+destruct args; simpl; try solve[intros; contradiction].
+destruct args. intros z H H2. simpl in H; contradiction.
+intros z H H2 IN VINJ. simpl in H, H2. destruct a.
+{ destruct H as [H3 H4]. destruct H2 as [H2 H5]. simpl in IN. destruct IN. 
+  - inversion H. subst ofs ty. exists v. split; auto.
+  - inv VINJ. eapply IHtys; eauto. }
+{ destruct H as [H3 H4]. destruct H2 as [H2 H5]. simpl in IN. destruct IN. 
+  - inversion H. subst ofs ty. exists v. split; auto.
+  - inv VINJ. eapply IHtys; eauto. }
+{ destruct v; try inversion H. destruct H2 as [H2 H5]. simpl in IN. destruct IN. 
+  - inversion H3. subst ofs ty. destruct H as [X [Y Z]].
+    exists (Vint (Int64.hiword i)); split; auto. rewrite H0. constructor. 
+  - destruct H3. inversion H3. subst ofs ty. destruct H as [X [Y Z]].
+    exists (Vint (Int64.loword i)); split; auto. destruct H5; auto.
+    destruct H1 as [H1 _]; rewrite H1; constructor.
+    destruct H2. destruct H5. destruct H as [? [? ?]]. destruct H1. inv VINJ.
+    eapply IHtys; eauto. }
+{ destruct H as [H3 H4]. destruct H2 as [H2 H5]. simpl in IN. destruct IN. 
+  - inversion H. subst ofs ty. exists v. split; auto.
+  - inv VINJ. eapply IHtys; eauto. }
+Qed.
+
 Lemma agree_args_invariant:
   forall mu args tys stack ls m' sp' m1' (WD : SM_wd mu),
   agree_args mu args tys stack ls m' sp' ->
@@ -1259,17 +1382,7 @@ intros. inv H. constructor.
   revert agree_args_match0. clear agree_args_contains0.
   generalize 0. revert tys. induction args. 
     solve[destruct tys; auto]. destruct tys; auto. }
-{ revert agree_args_contains0. clear agree_args_match0.
-  generalize 0 as z. revert tys. induction args; auto. 
-  destruct tys; auto. simpl. intros z. 
-  generalize (match z with
-     | 0 => 0
-     | Z.pos y' => Z.pos y'~0~0
-     | Z.neg y' => Z.neg y'~0~0
-     end) as ofs. intros ofs.
-  intros [L H]; split; auto.
-  eapply Mem.load_unchanged_on; eauto.
-  intros i _. unfold local_out_of_reach. split; auto. }
+{ eapply agree_args_contains_aux_invariant; eauto. }
 { auto. }
 { auto. }
 Qed.
@@ -5143,6 +5256,20 @@ destruct (eff_after_check2 _ _ _ _ _ MemInjNu' RValInjNu'
 unfold vis in *. solve[intuition].
 Qed.
 
+Lemma agree_args_load_stack f ofs ty mu args tys rs m sp sp' sp0 :
+  slot_within_bounds (function_bounds f) Incoming ofs ty -> 
+  In (S Outgoing ofs ty) (loc_arguments (Linear.fn_sig f)) -> 
+  agree_args mu args tys nil rs m sp0 -> 
+  agree_frame f (restrict (as_inj mu) (vis mu)) rs
+    (parent_locset nil) m sp m sp' (parent_sp0 sp0 nil) (parent_ra nil) -> 
+  exists v, 
+  load_stack m (Vptr sp0 Int.zero) ty
+     (Int.repr (offset_of_index (make_env (function_bounds f)) (FI_arg ofs ty)))
+     = Some v.
+Proof.
+simpl; intros H H2 H3 H4.
+Admitted.
+
 Lemma MATCH_diagram: forall st1 m1 st1' m1'
       (CS: corestep Linear_eff_sem ge st1 m1 st1' m1')
       st2 mu m2 (MTCH: MATCH st1 mu st1 m1 st2 m2),
@@ -5204,7 +5331,10 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     rewrite (unfold_transf_function _ _ TRANSL). unfold fn_link_ofs. 
     eapply index_contains_load_stack with (idx := FI_link). eapply TRANSL. 
       solve[eapply agree_link; eauto].
-    simpl parent_sp0.
+    simpl parent_sp0. unfold offset_of_index. 
+    inv AGARGS. simpl in *. 
+    unfold load_stack. 
+
     instantiate (1 := Vzero). admit. (*TODO*)
   exists mu.
   split. apply intern_incr_refl. 
