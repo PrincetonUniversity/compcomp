@@ -4036,6 +4036,7 @@ Variable ls: locset.
 Variable rs: regset.
 Hypothesis AGR: agree_regs (restrict (as_inj mu) (vis mu)) ls rs.
 Hypothesis AGCS: agree_callee_save ls (parent_locset cs).
+Hypothesis INCTX: (Zlength cs > 0 \/ tailcall_possible sg).
 
 Lemma transl_external_argument:
   forall l,
@@ -4051,8 +4052,8 @@ Proof.
   destruct sl; try contradiction.
   inv MS.
   simpl parent_sp0. 
-  admit.
-  (*elim (H4 _ H).*)
+  destruct INCTX as [H4|H4]. unfold Zlength in H4. simpl in H4. omega.
+  solve[elim (H4 _ H)].
   unfold parent_sp0.
   assert (slot_valid f Outgoing pos ty = true).
     exploit loc_arguments_acceptable; eauto. intros [A B]. 
@@ -4232,7 +4233,8 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
         (AGREGS: agree_regs (restrict (as_inj mu) (vis mu)) ls rs)
         (AGLOCS: agree_callee_save ls (parent_locset cs))
         args (GETARGS: extcall_arguments rs m' (parent_sp0 sp0 cs') (ef_sig tf) args)
-        (AGARGS: agree_args mu args0 tys0 cs ls m' sp0),
+        (AGARGS: agree_args mu args0 tys0 cs ls m' sp0)
+        (INCTX: Zlength cs > 0 \/ tailcall_possible (Linear.funsig f)),
       match_states mu (Linear_Callstate cs f ls) m
                       (Mach_CallstateOut cs' fb tf args rs 
                         (mk_load_frame sp0 args0 tys0)) m'
@@ -4737,42 +4739,34 @@ Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
        MATCH c1 nu c1 m1 c2 m2 /\ Mem.inject (shared_of nu) m1 m2).
 Proof. intros. 
 destruct MTCH as [MC [INJ [RC [PG [GF [SMV WD]]]]]].
-    inv MC; simpl in AtExtSrc; inv AtExtSrc.
-    destruct f; simpl in *; inv H0.
-    split; trivial. monadInv TRANSL.
-    destruct f; simpl in *; inv H0.
-    monadInv TRANSL.
-    split; trivial.
-exploit transl_external_arguments_rec.
-  eassumption. eassumption. eassumption. eapply incl_refl.
+  inv MC; simpl in AtExtSrc; inv AtExtSrc.
+  destruct f; simpl in *; inv H0.
+  split; trivial. monadInv TRANSL.
+  destruct f; simpl in *; inv H0.
+  monadInv TRANSL.
+  split; trivial. 
+exploit transl_external_arguments_rec; eauto. eapply incl_refl.
 intros [targs [Htargs AINJ]].
 exploit transl_external_arguments_fun.
-   2:eapply GETARGS. 2:eapply Htargs. trivial.
-intros; subst.
-exists (decode_longs (sig_args (ef_sig tf)) targs).
-assert (H: 
-   val_list_inject (restrict (as_inj mu) (vis mu))
-     (decode_longs (sig_args (ef_sig tf)) ls ## (loc_arguments (ef_sig tf)))
-     (decode_longs (sig_args (ef_sig tf)) targs)).
+2:eapply GETARGS. 2:eapply Htargs. trivial.
+intros; subst. exists (decode_longs (sig_args (ef_sig tf)) targs).
+assert 
+(H: val_list_inject (restrict (as_inj mu) (vis mu))
+    (decode_longs (sig_args (ef_sig tf)) ls ## (loc_arguments (ef_sig tf)))
+    (decode_longs (sig_args (ef_sig tf)) targs)).
 { apply decode_longs_inject; auto. }
-split.
-solve[apply val_list_inject_forall_inject; auto].
+split. solve[apply val_list_inject_forall_inject; auto].
 exploit replace_locals_wd_AtExternal; try eassumption.
-        apply val_list_inject_forall_inject in H.
-        apply forall_vals_inject_restrictD in H. eassumption.
-intros WDnu.
-intuition.
-  subst.
-  split. econstructor; try rewrite replace_locals_as_inj, replace_locals_vis; eauto. 
-         eapply match_stacks_replace_locals; eassumption.
-  solve[apply agree_args_replace_locals; auto]. 
-  rewrite replace_locals_as_inj, replace_locals_vis, replace_locals_frgnBlocksSrc.
-  intuition.
-  (*sm_valid*)
-    red. rewrite replace_locals_DOM, replace_locals_RNG. apply SMV.
-  (*inject_shared*)
-    eapply inject_shared_replace_locals; try eassumption.
-    subst; trivial.
+  apply val_list_inject_forall_inject in H.
+  apply forall_vals_inject_restrictD in H. eassumption.
+intros WDnu. split; auto. intros; subst. split. split; auto.
+econstructor; try rewrite replace_locals_as_inj, replace_locals_vis; eauto. 
+eapply match_stacks_replace_locals; eassumption.
+solve[apply agree_args_replace_locals; auto]. 
+rewrite replace_locals_as_inj, replace_locals_vis, replace_locals_frgnBlocksSrc.
+split; auto. split; auto. split; auto. split; auto. split; auto.
+(*sm_valid*) red. rewrite replace_locals_DOM, replace_locals_RNG. solve[apply SMV]. 
+(*inject_shared*) eapply inject_shared_replace_locals; eauto. eauto. solve[eauto].
 Qed.
 
 Lemma list_Loc_type_mreg r: Loc.type ## (R ## r) = mreg_type ## r.
@@ -4828,7 +4822,8 @@ Lemma MATCH_afterExternal: forall
       (MemInjMu : Mem.inject (as_inj mu) m1 m2)
       (MatchMu: MATCH st1 mu st1 m1 st2 m2)
       (AtExtSrc : at_external Linear_eff_sem st1 = Some (e, ef_sig, vals1))
-      (AtExtTgt : at_external (Mach_eff_sem return_address_offset) st2 = Some (e', ef_sig', vals2))
+      (AtExtTgt : at_external (Mach_eff_sem return_address_offset) st2 
+                  = Some (e', ef_sig', vals2))
       (ValInjMu : Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2)
       (pubSrc' : block -> bool)
       (pubSrcHyp : pubSrc' =
@@ -4924,7 +4919,8 @@ assert (PGnu': meminj_preserves_globals (Genv.globalenv prog) (as_inj nu')).
         rewrite replace_locals_as_inj in INC.
         rewrite (INC _ _ _ Heqd) in H0. trivial.
       destruct SEP as [SEPa _].
-        rewrite replace_locals_as_inj, replace_locals_DomSrc, replace_locals_DomTgt in SEPa. 
+        rewrite replace_locals_as_inj, replace_locals_DomSrc, replace_locals_DomTgt 
+          in SEPa. 
         destruct (SEPa _ _ _ Heqd H0).
         destruct (as_inj_DomRng _ _ _ _ PGb WDmu).
         congruence.
@@ -4970,9 +4966,9 @@ assert (RR1: REACH_closed m1'
         rewrite <- LCnu' in Heql. rewrite replace_locals_locBlocksSrc in *.
         rewrite <- PBnu' in Heqp. rewrite replace_locals_pubBlocksSrc in *.
         clear INCvisNu'. 
-        rewrite Heql in *. simpl in *. intuition.
+        rewrite Heql in *. simpl in *. clear INCTX. intuition.
         assert (VB: Mem.valid_block m1 b').
-          eapply VAL. unfold DOM, DomSrc. rewrite Heql. intuition.
+        { eapply VAL. unfold DOM, DomSrc. rewrite Heql; auto. }
         apply (H VB) in H2.
         rewrite (H0 H2) in H4. clear H H0.
         remember (locBlocksSrc mu b) as q.
@@ -4985,7 +4981,8 @@ assert (RR1: REACH_closed m1'
         rewrite replace_locals_frgnBlocksSrc in FRGnu'.
         rewrite FRGnu' in RC.
         apply andb_true_iff.  
-        split. unfold DomSrc. rewrite (frgnBlocksSrc_extBlocksSrc _ WDnu' _ RC). intuition.
+        split. unfold DomSrc. rewrite (frgnBlocksSrc_extBlocksSrc _ WDnu' _ RC). 
+          intuition.
         apply REACH_nil. unfold exportedSrc.
           rewrite (frgnSrc_shared _ WDnu' _ RC). intuition.
     destruct IHL. congruence.
@@ -5557,8 +5554,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       inv AGARGS. constructor; auto. simpl. destruct s; auto.
   solve[intuition].
 
-  (*Lcall: case external function call. *)
-  exploit transl_external_arguments; try eapply mtch_stack_intermediate; try eassumption.
+  (*Lcall: case external function call.*)
+  exploit transl_external_arguments; try eapply mtch_stack_intermediate; 
+    try eassumption. left; solve[apply Zlength_cons_pos].
   intros [args' [ExtArgs' ArgsInj]].
   assert (SG: ef_sig e = Linear.funsig f'). apply sig_preserved in C; apply C.
   rewrite <- SG in ExtArgs'.
@@ -5579,6 +5577,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     eapply match_states_call_extern; eauto.
       eapply agree_wt_ls; eauto.
       inv AGARGS. constructor; auto. simpl. destruct s; auto.
+  solve[left; apply Zlength_cons_pos].
   solve[intuition].
 
   (* Ltailcall_internal *)
@@ -5647,7 +5646,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
      (*previsously had eapply MSF' here.
        If MS remains the one that's used here we can probably
        elimnate MSF' here entirely)*) eapply MS.
-     eassumption. assumption.
+     eassumption. assumption. right. 
+     solve[apply zero_size_arguments_tailcall_possible; auto].
   intros [targs [ExtCallArgs ArgsInj]].
   clear MSF'.
   rewrite <- (sig_preserved _ _ C) in *; simpl in *.
@@ -5671,6 +5671,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     apply wt_return_regs; auto. eapply match_stacks_wt_locset; eauto.
      eapply agree_wt_ls; eauto.
      admit. (*TODO*)
+      right. solve[apply zero_size_arguments_tailcall_possible; auto].
   intuition.
     eapply REACH_closed_free; try eassumption.
     split; intros. 
@@ -5895,11 +5896,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       eapply Mem.valid_block_free_1; eauto. eapply agree_valid_mach; eauto. 
     apply wt_return_regs; auto. eapply match_stacks_wt_locset; eauto. 
       eapply agree_wt_ls; eauto.
-    { clear - AGARGS. 
-      destruct s. admit.
-      eapply agree_args_nonempty_locset; eauto.
-      
-    admit. (*TODO*)
+    { eapply agree_args_free; eauto.
+      destruct s. admit. (*TODO: fix parent_locset*)
+      eapply agree_args_nonempty_locset; eauto. solve[apply Zlength_cons_pos]. }
   intuition.
     eapply REACH_closed_free; try eassumption.
     split; intros. 
@@ -5962,6 +5961,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   exists mu'.
   intuition. 
   split. 
+    assert (SPNEQ: sp0 <> sp'). admit.
     econstructor; eauto. 
       apply match_stacks_change_mach_mem with m2.
       apply match_stacks_change_linear_mem with m.
@@ -5976,11 +5976,16 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       eapply Mem.load_alloc_unchanged; eauto. red. congruence.
       eapply transf_function_well_typed; eauto.
       auto with coqlib.
-      revert AGARGS. destruct s. admit. 
-      intros AGARGS. admit. (*TODO*)
-        (*eapply agree_args_nonempty_locset. 
-          apply Zlength_cons_pos.*)
-      admit. (*TODO*)
+      revert AGARGS. destruct s. intros ARGS.
+        eapply agree_args_stores_in_frame; eauto.
+        eapply agree_args_alloc; eauto.
+        eapply agree_args_intern_incr; eauto.
+        apply agree_args_undef_regs; auto.
+      intros AGARGS.
+        eapply agree_args_stores_in_frame; eauto.
+        eapply agree_args_alloc; eauto.
+        eapply agree_args_intern_incr; eauto.
+        eapply agree_args_nonempty_locset; eauto. apply Zlength_cons_pos.
     intuition.
     eapply (intern_incr_meminj_preserves_globals_as_inj _ mu); trivial.
       split; assumption.
