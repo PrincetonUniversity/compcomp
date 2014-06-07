@@ -66,9 +66,6 @@ Proof.
   destruct ty; reflexivity.
 Qed.
 
-Definition init_locset tys args :=
-  Locmap.setlist (loc_arguments_rec tys 0) (encode_longs tys args) (Locmap.init Vundef).
-
 (** Agreement over initial (Mach) args *)
 
 Fixpoint agree_args_match_aux j (ls: locset) ofs args tys : Prop :=
@@ -427,12 +424,13 @@ Record agree_args (f: Linear.fundef)
     (** Values in incoming stack slots (on the Linear side) match 
         the initial arguments args. *)
     agree_args_match: 
-      match last_frame stack with
-        | nil => agree_args_match_aux (restrict (as_inj mu) (vis mu)) ls 0 args tys
+      agree_args_match_aux (restrict (as_inj mu) (vis mu)) ls 0 args tys
+      (*match last_frame stack with
+        | nil => 
         | Linear.Stackframe f1 sp1 ls1 c1 :: nil => 
             agree_args_match_aux (restrict (as_inj mu) (vis mu)) ls1 0 args tys
         | _ :: _ => True
-      end;
+      end*);
 
     (** Values loaded from the Mach stack frame at pointer sp match 
         the initial arguments args. Arguments are pushed RTL, 
@@ -1449,7 +1447,7 @@ generalize (Zlength_pos _ l).
 omega.
 Qed. 
 
-Lemma agree_args_nonempty_locset f0 mu args tys s ls ls' m sp :
+(*Lemma agree_args_nonempty_locset f0 mu args tys s ls ls' m sp :
   Zlength s > 0 -> 
   agree_args f0 mu args tys s ls m sp -> 
   agree_args f0 mu args tys s ls' m sp.
@@ -1458,7 +1456,7 @@ intros H; inversion 1; subst; constructor; auto.
 induction s. revert H. unfold Zlength. simpl; intros; omega.
 simpl. destruct s. destruct a; auto. eapply IHs; auto.
 apply Zlength_cons_pos. constructor; auto. 
-Qed.
+Qed.*)
 
 Lemma agree_args_replace_locals f0 mu args tys stack ls m' sp' PS PT :
   agree_args f0 mu args tys stack ls m' sp' ->
@@ -1484,9 +1482,6 @@ destruct agree_args_inj0 as [x X]. exists x.
   rewrite replace_externs_vis, replace_externs_as_inj; auto.
   admit. (*TODO*)
 rewrite replace_externs_vis, replace_externs_as_inj. 
-  destruct (last_frame stack); auto.
-  solve[apply agree_args_match_aux_sub with (X := vis mu); auto].
-  destruct s. destruct l; auto.
   solve[apply agree_args_match_aux_sub with (X := vis mu); auto].
 solve[rewrite replace_externs_as_inj; intros ? ? INJ; eauto].
 solve[rewrite replace_externs_locBlocksTgt; auto].
@@ -3401,15 +3396,6 @@ Inductive match_globalenvs (j: meminj) (bound: block) : Prop :=
 
 (*Lenb: replaced (j:meminj) by mu, to enable the addition of (SPlocal:
   locBlocksTgt mu sp = true)*)
-
-(** TODO: Move to Linear_coop.v
-  [parent_locset0 ls0 cs] returns the mapping of values for locations
-  of the caller function, bottoming out with locset ls0. *)
-Definition parent_locset0 (ls0: locset) (stack: list Linear.stackframe) : locset :=
-  match stack with
-  | nil => ls0
-  | Linear.Stackframe f sp ls c :: stack' => ls
-  end.
 
 Inductive match_stacks mu (m m': mem) (sp0: block) : 
        list Linear.stackframe -> list stackframe -> signature -> block -> block -> Prop :=
