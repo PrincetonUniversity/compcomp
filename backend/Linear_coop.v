@@ -48,11 +48,23 @@ Inductive Linear_core: Type :=
              (rs0: Linear.locset),           (**r location state at program entry *)
       Linear_core.
 
+Definition call_regs' (callee : LTL.locset) (l : loc) :=
+  match l with
+    | R r => callee (R r)
+    | S Local _ _ => Vundef
+    | S Outgoing ofs ty => callee (S Incoming ofs ty)
+    | S Incoming _ _ => Vundef
+  end.
+
+Lemma call_regs_regs' callee ofs ty : 
+  call_regs' (call_regs callee) (S Outgoing ofs ty) = callee (S Outgoing ofs ty). 
+Proof. simpl; auto. Qed.
+
 (** [parent_locset0 ls0 cs] returns the mapping of values for locations
-  of the caller function, bottoming out with locset ls0. *)
+    of the caller function, bottoming out with locset ls0. *)
 Definition parent_locset0 (ls0: locset) (stack: list Linear.stackframe) : locset :=
   match stack with
-  | nil => ls0
+  | nil => call_regs' ls0
   | Linear.Stackframe f sp ls c :: stack' => ls
   end.
 
@@ -160,7 +172,7 @@ Inductive Linear_step: Linear_core -> mem -> Linear_core -> mem -> Prop :=
   | lin_exec_function_internal0:
       forall s f rs m rs0,
       Linear_step (Linear_CallstateIn s (Internal f) rs rs0) m
-                  (Linear_Callstate s (Internal f) rs rs0) m
+                  (Linear_Callstate s (Internal f) rs (call_regs rs0)) m
   | lin_exec_function_internal:
       forall s f rs m rs' m' stk rs0,
       Mem.alloc m 0 f.(fn_stacksize) = (m', stk) ->

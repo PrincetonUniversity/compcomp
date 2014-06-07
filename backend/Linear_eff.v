@@ -133,7 +133,7 @@ Inductive linear_effstep: (block -> Z -> bool) -> Linear_core -> mem -> Linear_c
       forall s f rs m rs0,
       linear_effstep EmptyEffect 
                      (Linear_CallstateIn s (Internal f) rs rs0) m
-                     (Linear_Callstate s (Internal f) rs rs0) m
+                     (Linear_Callstate s (Internal f) rs (call_regs rs0)) m
   | lin_effexec_function_internal:
       forall s f rs m rs' m' stk rs0,
       Mem.alloc m 0 f.(fn_stacksize) = (m', stk) ->
