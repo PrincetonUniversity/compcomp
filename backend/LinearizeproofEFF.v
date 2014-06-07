@@ -273,20 +273,20 @@ Qed.
 (** Correctness of the [starts_with] test. *)
 
 Lemma starts_with_correct:
-  forall lbl c1 c2 c3 s f sp ls m,
+  forall lbl c1 c2 c3 s f sp ls m ls0,
   is_tail c1 c2 ->
   unique_labels c2 ->
   starts_with lbl c1 = true ->
   find_label lbl c2 = Some c3 ->
   corestep_plus Linear_eff_sem tge
-              (Linear_State s f sp c1 ls) m
-              (Linear_State s f sp c3 ls) m.
+              (Linear_State s f sp c1 ls ls0) m
+              (Linear_State s f sp c3 ls ls0) m.
 Proof.
   induction c1.
   simpl; intros; discriminate.
   simpl starts_with. destruct a; try (intros; discriminate).
   intros. 
-  eapply corestep_plus_star_trans with  (Linear_State s f sp c1 ls) m.
+  eapply corestep_plus_star_trans with (Linear_State s f sp c1 ls ls0) m.
     apply corestep_plus_one. simpl. constructor. 
   destruct (peq lbl l).
     subst l. replace c3 with c1.
@@ -298,14 +298,14 @@ Proof.
 Qed.
 
 Lemma starts_with_correct_eff:
-  forall lbl c1 c2 c3 s f sp ls m,
+  forall lbl c1 c2 c3 s f sp ls m ls0,
   is_tail c1 c2 ->
   unique_labels c2 ->
   starts_with lbl c1 = true ->
   find_label lbl c2 = Some c3 ->
   effstep_plus Linear_eff_sem tge EmptyEffect
-              (Linear_State s f sp c1 ls) m
-              (Linear_State s f sp c3 ls) m.
+              (Linear_State s f sp c1 ls ls0) m
+              (Linear_State s f sp c3 ls ls0) m.
 Proof.
   induction c1.
   simpl; intros; discriminate.
@@ -507,13 +507,13 @@ Proof.
 Qed.
 
 Lemma add_branch_correct:
-  forall lbl c k s f tf sp ls m,
+  forall lbl c k s f tf sp ls m ls0,
   transf_function f = OK tf ->
   is_tail k tf.(fn_code) ->
   find_label lbl tf.(fn_code) = Some c ->
   corestep_plus Linear_eff_sem tge
-               (Linear_State s tf sp (add_branch lbl k) ls) m
-               (Linear_State s tf sp c ls) m.
+               (Linear_State s tf sp (add_branch lbl k) ls ls0) m
+               (Linear_State s tf sp c ls ls0) m.
 Proof.
   intros. unfold add_branch.
   caseEq (starts_with lbl k); intro SW.
@@ -523,13 +523,13 @@ Proof.
 Qed.
 
 Lemma add_branch_correct_eff:
-  forall lbl c k s f tf sp ls m,
+  forall lbl c k s f tf sp ls m ls0,
   transf_function f = OK tf ->
   is_tail k tf.(fn_code) ->
   find_label lbl tf.(fn_code) = Some c ->
   effstep_plus Linear_eff_sem tge EmptyEffect
-               (Linear_State s tf sp (add_branch lbl k) ls) m
-               (Linear_State s tf sp c ls) m.
+               (Linear_State s tf sp (add_branch lbl k) ls ls0) m
+               (Linear_State s tf sp c ls ls0) m.
 Proof.
   intros. unfold add_branch.
   caseEq (starts_with lbl k); intro SW.
@@ -537,7 +537,6 @@ Proof.
   eapply unique_labels_transf_function; eauto.
   apply effstep_plus_one. apply lin_effexec_Lgoto. auto.
 Qed.
-
 
 (*NEW, GFP as in selectionproofEFF*)
 Definition globalfunction_ptr_inject (j:meminj):=
@@ -647,7 +646,6 @@ Proof.
     subst.  
     repeat rewrite Locmap.gss; trivial.
   repeat rewrite Locmap.gso. auto. red. auto. red. auto.
-
   repeat rewrite Locmap.gso; auto. red. auto. red. auto.
 Qed.
 
@@ -868,7 +866,7 @@ Qed.
 
 Inductive match_states mu: LTL_core -> mem -> Linear_core -> mem -> Prop :=
   | match_states_add_branch:
-      forall s f sp1 sp2 pc ls1 ls2 m1 m2 tf ts c
+      forall s f sp1 sp2 pc ls1 ls2 m1 m2 tf ts c ls0
         (STACKS: list_forall2 (match_stackframes mu) s ts)
         (TRF: transf_function f = OK tf)
         (REACH: (reachable f)!!pc = true)
@@ -876,9 +874,9 @@ Inductive match_states mu: LTL_core -> mem -> Linear_core -> mem -> Prop :=
         (*NEW*) (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls1 ls2)
         (*NEW*) (SPLocal: sp_mapped mu sp1 sp2),
       match_states mu (LTL_State s f sp1 pc ls1) m1
-                     (Linear_State ts tf sp2 (add_branch pc c) ls2) m2
+                      (Linear_State ts tf sp2 (add_branch pc c) ls2 ls0) m2
   | match_states_cond_taken:
-      forall s f sp1 sp2 pc ls1 ls2 m1 m2 tf ts cond args c
+      forall s f sp1 sp2 pc ls1 ls2 m1 m2 tf ts cond args c ls0
         (STACKS: list_forall2 (match_stackframes mu) s ts)
         (TRF: transf_function f = OK tf)
         (REACH: (reachable f)!!pc = true)
@@ -886,9 +884,9 @@ Inductive match_states mu: LTL_core -> mem -> Linear_core -> mem -> Prop :=
         (*NEW*) (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls1 ls2)
         (*NEW*) (SPLocal: sp_mapped mu sp1 sp2),
       match_states mu (LTL_State s f sp1 pc (undef_regs (destroyed_by_cond cond) ls1)) m1
-                     (Linear_State ts tf sp2 (Lcond cond args pc :: c) ls2) m2
+                     (Linear_State ts tf sp2 (Lcond cond args pc :: c) ls2 ls0) m2
   | match_states_jumptable:
-      forall s f sp1 sp2 pc ls1 ls2 m1 m2 tf ts arg tbl c n
+      forall s f sp1 sp2 pc ls1 ls2 m1 m2 tf ts arg tbl c n ls0
         (STACKS: list_forall2 (match_stackframes mu) s ts)
         (TRF: transf_function f = OK tf)
         (REACH: (reachable f)!!pc = true)
@@ -897,9 +895,9 @@ Inductive match_states mu: LTL_core -> mem -> Linear_core -> mem -> Prop :=
         (*NEW*) (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls1 ls2)
         (*NEW*) (SPLocal: sp_mapped mu sp1 sp2),
       match_states mu (LTL_State s f sp1 pc (undef_regs destroyed_by_jumptable ls1)) m1
-                      (Linear_State ts tf sp2 (Ljumptable arg tbl :: c) ls2) m2
+                      (Linear_State ts tf sp2 (Ljumptable arg tbl :: c) ls2 ls0) m2
   | match_states_block:
-      forall s f sp1 sp2 bb ls1 ls2 m1 m2 tf ts c
+      forall s f sp1 sp2 bb ls1 ls2 m1 m2 tf ts c ls0
         (STACKS: list_forall2 (match_stackframes mu) s ts)
         (TRF: transf_function f = OK tf)
         (REACH: forall pc, In pc (successors_block bb) -> (reachable f)!!pc = true)
@@ -907,28 +905,28 @@ Inductive match_states mu: LTL_core -> mem -> Linear_core -> mem -> Prop :=
         (*NEW*) (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls1 ls2)
         (*NEW*) (SPLocal: sp_mapped mu sp1 sp2),
       match_states mu (LTL_Block s f sp1 bb ls1) m1
-                      (Linear_State ts tf sp2 (linearize_block bb c) ls2) m2
+                      (Linear_State ts tf sp2 (linearize_block bb c) ls2 ls0) m2
   | match_states_call0:
-      forall s (f:LTL.fundef) ls1 ls2 m1 m2 tf ts,
+      forall s (f:LTL.fundef) ls1 ls2 m1 m2 tf ts ls0,
       list_forall2 (match_stackframes mu) s ts ->
       transf_fundef f = OK tf ->
       match f with Internal _ => True | External _ => False end -> 
       (*NEW*) forall (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls1 ls2),
       match_states mu (LTL_Callstate s f ls1) m1
-                      (Linear_CallstateIn ts tf ls2) m2
+                      (Linear_CallstateIn ts tf ls2 ls0) m2
   | match_states_call:
-      forall s f ls1 ls2 m1 m2 tf ts,
+      forall s f ls1 ls2 m1 m2 tf ts ls0,
       list_forall2 (match_stackframes mu) s ts ->
       transf_fundef f = OK tf ->
       (*NEW*) forall (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls1 ls2),
       match_states mu (LTL_Callstate s f ls1) m1
-                      (Linear_Callstate ts tf ls2) m2
+                      (Linear_Callstate ts tf ls2 ls0) m2
   | match_states_return:
-      forall s ls1 ls2 m1 m2 ts retty,
+      forall s ls1 ls2 m1 m2 ts retty ls0,
       list_forall2 (match_stackframes mu) s ts ->
       (*NEW*) forall (AGREE:agree_regs (restrict (as_inj mu) (vis mu)) ls1 ls2),
       match_states mu (LTL_Returnstate s retty ls1) m1
-                      (Linear_Returnstate ts retty ls2) m2.
+                      (Linear_Returnstate ts retty ls2 ls0) m2.
 
 Definition measure (S: LTL_core) : nat :=
   match S with
@@ -937,9 +935,9 @@ Definition measure (S: LTL_core) : nat :=
   | _ => 0%nat
   end.
 
-Remark match_parent_locset:
-  forall mu s ts, list_forall2 (match_stackframes mu) s ts -> 
-  agree_regs (restrict (as_inj mu) (vis mu)) (LTL.parent_locset s) (parent_locset ts).
+Remark match_parent_locset0:
+  forall mu s ts0 ts, list_forall2 (match_stackframes mu) s ts -> 
+  agree_regs (restrict (as_inj mu) (vis mu)) (LTL.parent_locset s) (parent_locset0 ts0 ts).
 Proof. 
   induction 1; simpl. red; intros. auto. inv H; auto. 
 Qed.
@@ -1555,7 +1553,7 @@ Proof. intros.
   exists (Linear_CallstateIn nil tf
             (Locmap.setlist (Conventions1.loc_arguments (funsig tf)) 
               (val_casted.encode_longs (sig_args (funsig tf)) vals2)
-              (Locmap.init Vundef))).
+              (Locmap.init Vundef)) (init_locset (sig_args (funsig tf)) vals2)).
   split.
     destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
     subst. inv A. rewrite C in Heqzz. inv Heqzz.
@@ -1902,11 +1900,11 @@ Proof. intros.
 
   (* Ltailcall *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
-  specialize (match_parent_locset _ _ _ STACKS); intros parentsAGREE.
+  specialize (match_parent_locset0 _ _ ls0 _ STACKS); intros parentsAGREE.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in parentsAGREE; trivial.
   assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) 
                                (return_regs (LTL.parent_locset s) rs) 
-                               (return_regs (parent_locset ts) ls2)).
+                               (return_regs (parent_locset0 ls0 ts) ls2)).
      eapply agree_regs_return; eassumption. 
   exploit agree_find_function_translated; try eassumption.
     eapply agree_regs_incr; try eapply AGREERET. apply restrict_incr.
@@ -2133,7 +2131,7 @@ Proof. intros.
     rewrite FNSIG. econstructor; eauto.
            eapply agree_regs_return. 
              rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; trivial.
-             solve[apply (match_parent_locset _ _ _ STACKS)].
+             solve[apply (match_parent_locset0 _ _ _ _ STACKS)].
   intuition.
       eapply REACH_closed_free; try eassumption.
 
@@ -2572,9 +2570,9 @@ Proof. intros.
 
   (* Ltailcall *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
-  specialize (match_parent_locset _ _ _ STACKS); intros parentsAGREE.
+  specialize (match_parent_locset0 _ _ ls0 _ STACKS); intros parentsAGREE.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in parentsAGREE; trivial.
-  assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) (return_regs (LTL.parent_locset s) rs) (return_regs (parent_locset ts) ls2)).
+  assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) (return_regs (LTL.parent_locset s) rs) (return_regs (parent_locset0 ls0 ts) ls2)).
      eapply agree_regs_return; eassumption. 
   exploit agree_find_function_translated; try eassumption.
     eapply agree_regs_incr; try eapply AGREERET. apply restrict_incr.
@@ -2827,7 +2825,7 @@ Proof. intros.
     rewrite FNSIG; econstructor; eauto.
            eapply agree_regs_return. 
              rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; trivial.
-             solve[apply (match_parent_locset _ _ _ STACKS)].
+             solve[apply (match_parent_locset0 _ _ _ _ STACKS)].
     intuition.
       eapply REACH_closed_free; try eassumption.
   intros.
