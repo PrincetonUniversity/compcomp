@@ -1550,10 +1550,14 @@ Proof. intros.
   2: solve[intros Heq; rewrite Heq in H1; inv H1].
   intros Heq; rewrite Heq in H1; inv H1.
   exploit function_ptr_translated; eauto. intros [tf [FP TF]].
+  assert (exists fi, tf = Internal fi).
+  { monadInv TF. eauto. }
+  destruct H as [fi TFI].
   exists (Linear_CallstateIn nil tf
             (Locmap.setlist (Conventions1.loc_arguments (funsig tf)) 
               (val_casted.encode_longs (sig_args (funsig tf)) vals2)
-              (Locmap.init Vundef)) (init_locset (sig_args (funsig tf)) vals2)).
+              (Locmap.init Vundef)) 
+            (mk_load_frame (init_locset (sig_args (funsig tf)) vals2) fi)).
   split.
     destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
     subst. inv A. rewrite C in Heqzz. inv Heqzz.
@@ -1561,6 +1565,7 @@ Proof. intros.
     unfold Linear_eff_sem, Linear_coop_sem. simpl.
     case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
     rewrite D.
+    set (tf := Internal fi).
     assert (val_casted.val_has_type_list_func vals2 (sig_args (funsig tf))=true) as ->.
     { eapply val_casted.val_list_inject_hastype; eauto.
       eapply forall_inject_val_list_inject; eauto.
@@ -1576,7 +1581,6 @@ Proof. intros.
       eapply forall_inject_val_list_inject; eauto.
       destruct (val_casted.vals_defined vals1); auto.
       rewrite andb_comm in Heq; inv Heq. }
-    monadInv TF. rename x into tf.
     solve[auto].
 
     intros CONTRA. solve[elimtype False; auto].
@@ -1900,11 +1904,12 @@ Proof. intros.
 
   (* Ltailcall *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
-  specialize (match_parent_locset0 _ _ ls0 _ STACKS); intros parentsAGREE.
+  destruct ls0; simpl.
+  specialize (match_parent_locset0 _ _ rs0 _ STACKS); intros parentsAGREE.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in parentsAGREE; trivial.
   assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) 
                                (return_regs (LTL.parent_locset s) rs) 
-                               (return_regs (parent_locset0 ls0 ts) ls2)).
+                               (return_regs (parent_locset0 rs0 ts) ls2)).
      eapply agree_regs_return; eassumption. 
   exploit agree_find_function_translated; try eassumption.
     eapply agree_regs_incr; try eapply AGREERET. apply restrict_incr.
@@ -2099,6 +2104,7 @@ Proof. intros.
     split; intuition. econstructor; eauto.
 
   (* Lreturn *)
+  destruct ls0.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   assert (WDR: SM_wd (restrict_sm mu (vis mu))).
    apply restrict_sm_WD; try eassumption. trivial.
@@ -2108,8 +2114,11 @@ Proof. intros.
     eapply restrictD_Some. rewrite restrict_sm_all in SPB; eassumption.
   simpl in H0; rewrite Zplus_0_r in H0.
   rewrite (local_in_all _ WDR _ _ _ H2) in SPB; inv SPB.
-  eexists; eexists; split. 
-  left. apply corestep_plus_one. econstructor; eauto.
+  exists (Linear_Returnstate ts (sig_res (fn_sig tf)) 
+           (return_regs (parent_locset0 rs0 ts) ls2) (mk_load_frame rs0 f0)).
+  exists tm'; split.
+  left. apply corestep_plus_one. 
+    apply (lin_exec_Lreturn tge ts tf spb c ls2 m2 tm' rs0 f0); auto.
     rewrite (stacksize_preserved _ _ TRF). eauto.
   assert (SMV': sm_valid mu m' tm').
     split; intros;  
@@ -2136,6 +2145,7 @@ Proof. intros.
       eapply REACH_closed_free; try eassumption.
 
   (* dummy step *)
+  destruct ls0.
   assert (REACH: (reachable f)!!(LTL.fn_entrypoint f) = true).
     apply reachable_entrypoint.
   monadInv H8.
@@ -2569,10 +2579,11 @@ Proof. intros.
     rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; trivial.
 
   (* Ltailcall *)
+  destruct ls0.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
-  specialize (match_parent_locset0 _ _ ls0 _ STACKS); intros parentsAGREE.
+  specialize (match_parent_locset0 _ _ rs0 _ STACKS); intros parentsAGREE.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in parentsAGREE; trivial.
-  assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) (return_regs (LTL.parent_locset s) rs) (return_regs (parent_locset0 ls0 ts) ls2)).
+  assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) (return_regs (LTL.parent_locset s) rs) (return_regs (parent_locset0 rs0 ts) ls2)).
      eapply agree_regs_return; eassumption. 
   exploit agree_find_function_translated; try eassumption.
     eapply agree_regs_incr; try eapply AGREERET. apply restrict_incr.
@@ -2792,6 +2803,7 @@ Proof. intros.
     split; intuition. econstructor; eauto.
 
   (* Lreturn *)
+  destruct ls0.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   assert (WDR: SM_wd (restrict_sm mu (vis mu))).
    apply restrict_sm_WD; try eassumption. trivial.
@@ -2839,6 +2851,7 @@ Proof. intros.
     rewrite <- (stacksize_preserved _ _ TRF); eauto.  
 
   (* dummy step *)
+  destruct ls0.
   assert (REACH: (reachable f)!!(LTL.fn_entrypoint f) = true).
     apply reachable_entrypoint.
   monadInv H8.
