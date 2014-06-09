@@ -406,12 +406,19 @@ Record agree_args (f: Linear.fundef)
                   (stack: list Linear.stackframe)
                   (ls: locset) (m': mem) (sp': block) : Prop :=
   mk_agree_args {
+
+    (** [call_regs' ls] is well-typed. *)
+    agree_args_wt: wt_locset (call_regs' ls);
    
-    (** [tys] match the signature of the initial function. *)
-    agree_sig_match: 
+    (** [tys] match the signature of the initial Linear function. *)
+    agree_args_sig_match: sig_args (Linear.funsig f) = tys;
+
+    (** The last stack frame contains the initial function context. *)
+    agree_args_frame_match: 
       match last_frame stack with
-        | nil => sig_args (Linear.funsig f) = tys
-        | Linear.Stackframe f1 sp1 ls1 c1 :: nil => sig_args (Linear.fn_sig f1) = tys
+        | nil => True
+        | Linear.Stackframe f1 sp1 ls1 c1 :: nil => 
+            f = Internal f1 \/ tailcall_possible (Linear.fn_sig f1)              
         | _ :: _ => True
       end;
 
@@ -424,13 +431,7 @@ Record agree_args (f: Linear.fundef)
     (** Values in incoming stack slots (on the Linear side) match 
         the initial arguments args. *)
     agree_args_match: 
-      agree_args_match_aux (restrict (as_inj mu) (vis mu)) ls 0 args tys
-      (*match last_frame stack with
-        | nil => 
-        | Linear.Stackframe f1 sp1 ls1 c1 :: nil => 
-            agree_args_match_aux (restrict (as_inj mu) (vis mu)) ls1 0 args tys
-        | _ :: _ => True
-      end*);
+      agree_args_match_aux (restrict (as_inj mu) (vis mu)) ls 0 args tys;
 
     (** Values loaded from the Mach stack frame at pointer sp match 
         the initial arguments args. Arguments are pushed RTL, 
@@ -1487,39 +1488,6 @@ solve[rewrite replace_externs_as_inj; intros ? ? INJ; eauto].
 solve[rewrite replace_externs_locBlocksTgt; auto].
 Qed.
 
-Lemma agree_args_setreg f0 mu args tys stack ls m' sp' reg v :
-  agree_args f0 mu args tys stack ls m' sp' ->
-  agree_args f0 mu args tys stack (Locmap.set (R reg) v ls) m' sp'.
-Proof.
-inversion 1; subst. constructor; auto.
-intros. apply agree_args_match_aux_setreg; auto.
-Qed.
-
-Lemma agree_args_setregs f0 mu args tys stack ls m' sp' regs rvals :
-  agree_args f0 mu args tys stack ls m' sp' ->
-  agree_args f0 mu args tys stack (Locmap.setlist R ## regs rvals ls) m' sp'.
-Proof.
-inversion 1; subst. constructor; auto.
-intros. apply agree_args_match_aux_setregs; auto.
-Qed.
-
-Lemma agree_args_set_writable f0 mu args tys stack ls m' sp' slt z ty v :
-  slot_writable slt=true ->
-  agree_args f0 mu args tys stack ls m' sp' ->
-  agree_args f0 mu args tys stack (Locmap.set (S slt z ty) v ls) m' sp'.
-Proof.
-intros WR; inversion 1; subst. constructor; auto.
-intros. apply agree_args_match_aux_set_writable; auto.
-Qed.
-
-Lemma agree_args_undef_regs f0 mu args tys stack ls m' sp' regs :
-  agree_args f0 mu args tys stack ls m' sp' ->
-  agree_args f0 mu args tys stack (LTL.undef_regs regs ls) m' sp'.
-Proof.
-inversion 1; subst. constructor; auto.
-intros. apply agree_args_match_aux_undef_regs; auto.
-Qed.
-
 Lemma agree_args_intern_incr f0 mu mu' args tys stack ls m1 m2 m2' sp' (WD' : SM_wd mu') :
   intern_incr mu mu' ->
   sm_inject_separated mu mu' m1 m2 ->
@@ -1527,7 +1495,9 @@ Lemma agree_args_intern_incr f0 mu mu' args tys stack ls m1 m2 m2' sp' (WD' : SM
   agree_args f0 mu' args tys stack ls m2' sp'.
 Proof.
 inversion 1; subst. constructor; auto. intros. 
-  inv H3; auto. 
+  inv H3; auto.
+  inv H3; auto.
+  inv H3; auto.
   inv H3. destruct agree_args_inj0 as [args0 INJ]. admit. (*TODO*)
   inv H3. eapply agree_args_match_aux_intern_incr; eauto. 
   inv H3; auto.
@@ -1550,6 +1520,8 @@ Lemma agree_args_extern_incr f0 mu mu' args tys stack ls m1 m2 m2' sp' (WD' : SM
   agree_args f0 mu' args tys stack ls m2' sp'.
 Proof.
 inversion 1; subst. constructor; auto. intros. 
+  inv H3; auto. 
+  inv H3; auto. 
   inv H3; auto. 
   inv H3. destruct agree_args_inj0 as [args0 INJ]. admit. (*TODO*)
   inv H3. eapply agree_args_match_aux_extern_incr; eauto. 
@@ -4269,7 +4241,7 @@ End ANNOT_ARGUMENTS.
 
 Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
   | match_states_intro:
-      forall cs f sp c ls ls0 m cs' fb sp' rs m' tf args0 tys0 sp0
+      forall cs f sp c ls ls0 f0 m cs' fb sp' rs m' tf args0 tys0 sp0
         (STACKS: match_stacks mu m m' sp0 ls0 cs cs' f.(Linear.fn_sig) sp sp')
         (TRANSL: transf_function f = OK tf)
         (FIND: Genv.find_funct_ptr tge fb = Some (Internal tf))
@@ -4280,10 +4252,13 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
                     (parent_sp0 sp0 cs') (parent_ra cs'))
         (TAIL: is_tail c (Linear.fn_code f))
         (SPLOCT: locBlocksTgt mu sp' = true) 
-        (AGARGS: agree_args (Internal f) mu args0 tys0 cs ls0 m' sp0)
-        (SPNEQ: sp0<>sp'),
+        (AGARGS: agree_args (Internal f0) mu args0 tys0 cs ls0 m' sp0)
+        (SPNEQ: sp0<>sp')
+        (AGINITF: match cs with nil => f=f0 
+                                    \/ tailcall_possible (Linear.fn_sig f)
+                              | _::_ => True end),
       match_states mu
-        (Linear_State cs f (Vptr sp Int.zero) c ls ls0) m
+        (Linear_State cs f (Vptr sp Int.zero) c ls (Linear_coop.mk_load_frame ls0 f0)) m
         (Mach_State cs' fb (Vptr sp' Int.zero) 
                     (transl_code (make_env (function_bounds f)) c) rs 
                     (mk_load_frame sp0 args0 tys0)) m'
@@ -4296,11 +4271,12 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
         (NOREGS: forall r, ls (R r) = Vundef)
         (AGARGS: agree_args_match_aux (restrict (as_inj mu) (vis mu)) 
                                       (call_regs ls) 0 args tys),
-      match_states mu (Linear_CallstateIn nil (Internal f) ls ls) m 
+      match_states mu (Linear_CallstateIn nil (Internal f) ls 
+                        (Linear_coop.mk_load_frame ls f)) m 
                       (Mach_CallstateIn fb args tys) m'
 
   | match_states_call_intern:
-      forall cs f ls ls0 m cs' fb rs m' tf args0 tys0 sp0
+      forall cs f ls ls0 f0 m cs' fb rs m' tf args0 tys0 sp0
         (STACKS: match_stacks mu m m' sp0 ls0 cs cs' 
                    (Linear.funsig f) (Mem.nextblock m) (Mem.nextblock m'))
         (TRANSL: transf_fundef f = OK (Internal tf))
@@ -4308,12 +4284,15 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
         (WTLS: wt_locset ls)
         (AGREGS: agree_regs (restrict (as_inj mu) (vis mu)) ls rs)
         (AGLOCS: agree_callee_save ls (parent_locset0 ls0 cs))
-        (AGARGS: agree_args f mu args0 tys0 cs ls0 m' sp0), 
-      match_states mu (Linear_Callstate cs f ls ls0) m
+        (AGARGS: agree_args (Internal f0) mu args0 tys0 cs ls0 m' sp0)
+        (AGINITF: match cs with nil => f=Internal f0 
+                                    \/ tailcall_possible (Linear.funsig f) 
+                              | _::_ => True end), 
+      match_states mu (Linear_Callstate cs f ls (Linear_coop.mk_load_frame ls0 f0)) m
                       (Mach_Callstate cs' fb rs (mk_load_frame sp0 args0 tys0)) m'
 
   | match_states_call_extern:
-      forall cs f ls ls0 m cs' fb rs m' tf args0 tys0 sp0
+      forall cs f ls ls0 f0 m cs' fb rs m' tf args0 tys0 sp0
         (STACKS: match_stacks mu m m' sp0 ls0 cs cs' 
                    (Linear.funsig f) (Mem.nextblock m) (Mem.nextblock m'))
         (TRANSL: transf_fundef f = OK (External tf))
@@ -4322,19 +4301,19 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
         (AGREGS: agree_regs (restrict (as_inj mu) (vis mu)) ls rs)
         (AGLOCS: agree_callee_save ls (parent_locset0 ls0 cs))
         args (GETARGS: extcall_arguments rs m' (parent_sp0 sp0 cs') (ef_sig tf) args)
-        (AGARGS: agree_args f mu args0 tys0 cs ls0 m' sp0)
+        (AGARGS: agree_args (Internal f0) mu args0 tys0 cs ls0 m' sp0)
         (INCTX: Zlength cs > 0 \/ tailcall_possible (Linear.funsig f)),
-      match_states mu (Linear_Callstate cs f ls ls0) m
+      match_states mu (Linear_Callstate cs f ls (Linear_coop.mk_load_frame ls0 f0)) m
                       (Mach_CallstateOut cs' fb tf args rs (mk_load_frame sp0 args0 tys0)) m'
 
   | match_states_return:
-      forall f cs ls ls0 m cs' retty rs m' sg args0 tys0 sp0
+      forall cs ls ls0 f0 m cs' retty rs m' sg args0 tys0 sp0
         (STACKS: match_stacks mu m m' sp0 ls0 cs cs' sg (Mem.nextblock m) (Mem.nextblock m'))
         (WTLS: wt_locset ls)
         (AGREGS: agree_regs (restrict (as_inj mu) (vis mu)) ls rs)
         (AGLOCS: agree_callee_save ls (parent_locset0 ls0 cs))
-        (AGARGS: agree_args f mu args0 tys0 cs ls0 m' sp0),
-      match_states mu (Linear_Returnstate cs retty ls ls0) m
+        (AGARGS: agree_args (Internal f0) mu args0 tys0 cs ls0 m' sp0),
+      match_states mu (Linear_Returnstate cs retty ls (Linear_coop.mk_load_frame ls0 f0)) m
                       (Mach_Returnstate cs' retty rs (mk_load_frame sp0 args0 tys0)) m'.
 
 Lemma match_states_restrict mu c1 m1 c2 m2 X: forall 
@@ -5188,18 +5167,6 @@ split.
 
  (*agree_callee_save*)
     { apply agree_callee_save_set_result; auto. }
-(*
-(*TODO: Move*)
-Lemma agree_callee_save_comm ls1 ls2 : 
-  agree_callee_save ls1 ls2 -> 
-  agree_callee_save ls2 ls1.
-Proof.
-intros H l. specialize (H l). destruct l; auto. 
-intros; rewrite H; auto. rewrite H; auto.
-Qed.
-
-      apply agree_callee_save_comm.
-      solve[apply agree_callee_save_set_result; auto]. }*)
 
  (*agree_args*)
     apply agree_args_replace_externs; auto.
@@ -5304,8 +5271,10 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
 
   (* read from dummy frame *)
   generalize AGARGS as AGARGS'; intro.
-  inv AGARGS. simpl in *. subst tys0. destruct agree_args_inj0 as [args1 X].
-  exploit agree_args_match_contain; eauto. intros [v [LD VINJ]]. 
+  inv AGARGS. simpl in *. destruct agree_args_inj0 as [args1 X].
+  exploit agree_args_match_contain; eauto. 
+  destruct AGINITF as [Y|Y]. subst. solve[eauto]. solve[elim (Y _ IN_ARGS)].
+  intros [v [LD VINJ]]. 
   eexists; eexists. split. 
   apply corestep_plus_one. econstructor; eauto.
     rewrite (unfold_transf_function _ _ TRANSL). unfold fn_link_ofs. 
@@ -5315,7 +5284,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   split. apply intern_incr_refl. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
-      intuition. 
+      clear AGINITF. intuition. 
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -5323,7 +5292,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   constructor.
     econstructor; eauto with coqlib. econstructor; eauto.
     apply agree_regs_set_reg. apply agree_regs_set_reg. auto. auto. 
-    cut (rs (S Incoming ofs ty) = rs0 (S Incoming ofs ty)). solve[intros ->; auto].
+    cut (rs (S Incoming ofs ty) = ls0 (S Incoming ofs ty)). solve[intros ->; auto].
     inv AGFRAME. solve[rewrite agree_incoming0; auto].
     eapply agree_frame_set_reg; eauto. eapply agree_frame_set_reg; eauto. 
     apply caller_save_reg_within_bounds. 
@@ -5437,6 +5406,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       solve[destruct PRE as [? [? [? [? ?]]]]; auto].
       eapply Mem.store_unchanged_on; eauto. }
     solve[auto].
+    solve[auto].
 
   intuition.
   eapply Mem.store_outside_inject; eauto. 
@@ -5471,7 +5441,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     rewrite TYOP; auto. 
   assert (exists v',
           eval_operation ge (Vptr sp' Int.zero) 
-                         (transl_op (make_env (function_bounds f)) op) rs1##args m2 
+                         (transl_op (make_env (function_bounds f)) op) rs0##args m2 
           = Some v'
        /\ val_inject (restrict (as_inj mu) (vis mu)) v v').
   eapply eval_operation_inject; eauto.
@@ -5503,7 +5473,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   (* Lload *)
   assert (exists a',
           eval_addressing ge (Vptr sp' Int.zero) 
-                          (transl_addr (make_env (function_bounds f)) addr) rs1##args 
+                          (transl_addr (make_env (function_bounds f)) addr) rs0##args 
           = Some a'
        /\ val_inject (restrict (as_inj mu) (vis mu)) a a').
   eapply eval_addressing_inject; eauto. 
@@ -5541,7 +5511,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   (* Lstore *)
   assert (exists a',
           eval_addressing ge (Vptr sp' Int.zero) 
-                          (transl_addr (make_env (function_bounds f)) addr) rs1##args 
+                          (transl_addr (make_env (function_bounds f)) addr) rs0##args 
           = Some a'
        /\ val_inject (restrict (as_inj mu) (vis mu)) a a').
   eapply eval_addressing_inject; eauto. 
@@ -5550,7 +5520,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   destruct H1 as [a' [A B]].
   assert (INJR: Mem.inject (restrict (as_inj mu) (vis mu)) m m2).
     eapply inject_restrict; try eassumption. eapply PRE.
-  assert (VINJR: val_inject (restrict (as_inj mu) (vis mu)) (rs (R src)) (rs1 src)).
+  assert (VINJR: val_inject (restrict (as_inj mu) (vis mu)) (rs (R src)) (rs0 src)).
      eauto.
   exploit (Mem.storev_mapped_inject (as_inj mu)); eauto.
      eapply val_inject_incr; try eassumption.
@@ -5612,7 +5582,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   exploit return_address_offset_exists. eexact IST.
   intros [ra D].
   assert (mtch_stack_intermediate: 
-    match_stacks mu m m2 sp1 rs0
+    match_stacks mu m m2 sp1 ls0
                          (Linear.Stackframe f (Vptr sp0 Int.zero) rs b :: s)
                          (Stackframe fb (Vptr sp' Int.zero) (Vptr fb ra)
                            (transl_code (make_env (function_bounds f)) b) :: cs')
@@ -5632,6 +5602,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   (*New: distinguish whether invoked function is internal or external - 
     in the latter case, we now perform an additional step*)
   destruct tf'.
+
   (*Lcall: case internal function call*)
   eexists; eexists; split.
     apply corestep_plus_one. 
@@ -5648,8 +5619,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   constructor.
     econstructor; eauto.
       eapply agree_wt_ls; eauto.
-      inv AGARGS. constructor; auto. clear - agree_sig_match0.
-      induction s; auto. destruct s; simpl; auto. solve[eapply IHs; eauto].
+      inv AGARGS. constructor; auto. clear - agree_args_frame_match0 AGINITF.
+      induction s; auto. simpl. destruct AGINITF. 
+        left; subst; auto. solve[right; auto].
   solve[intuition].
 
   (*Lcall: case external function call.*)
@@ -5674,8 +5646,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   split.
     eapply match_states_call_extern; eauto.
       eapply agree_wt_ls; eauto.
-      inv AGARGS. constructor; auto. clear - agree_sig_match0.
-      induction s; auto. destruct s; simpl; auto. solve[eapply IHs; eauto].
+      inv AGARGS. constructor; auto. clear - agree_args_frame_match0 AGINITF.
+      induction s; auto. subst. simpl. destruct AGINITF.
+        subst; left; auto. solve[right; auto].
   solve[left; apply Zlength_cons_pos].
   solve[intuition].
 
@@ -5729,10 +5702,11 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     simpl. unfold bind. rewrite EQ. reflexivity.
     apply wt_return_regs; auto. 
     eapply match_stacks_wt_locset; eauto.
-    admit. (*TODO: wt_locset rs0*)
+    inv AGARGS; auto. 
     eapply agree_wt_ls; eauto.
     eapply agree_args_free; eauto. 
-    admit. (*TOOD: fix agree_args, function signature matching clause*)
+    destruct s; auto. right. 
+    solve[apply zero_size_arguments_tailcall_possible; auto].
   intuition.
     eapply REACH_closed_free; try eassumption.
     split; intros. 
@@ -5770,10 +5744,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     eapply match_states_call_extern; eauto. 
     apply wt_return_regs; auto. 
       eapply match_stacks_wt_locset; eauto.
-      admit. (*TODO: wt_locset (call_regs' rs0)*)
+      inv AGARGS; auto.
       eapply agree_wt_ls; eauto.
       eapply agree_args_free; eauto. 
-      admit. (*TOOD: fix Internal vs. External issue*)
       right. solve[apply zero_size_arguments_tailcall_possible; auto].
   intuition.
     eapply REACH_closed_free; try eassumption.
@@ -5803,7 +5776,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   intuition.
   split.
     econstructor; eauto with coqlib. 
-    eapply (match_stack_change_extcall_intern m m' m2 tm' sp1 rs0 mu); try assumption.
+    eapply (match_stack_change_extcall_intern m m' m2 tm' sp1 ls0 mu); try assumption.
         eapply external_call_mem_forward; eassumption.
         eapply external_call_mem_forward; eassumption.
       apply Plt_Ple. change (Mem.valid_block m sp0). eapply agree_valid_linear; eauto.
@@ -5916,7 +5889,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     econstructor. eauto. eauto. eauto. eauto. eauto.
     apply agree_frame_undef_locs; auto. 
     apply destroyed_by_cond_caller_save; auto.
-    eapply find_label_tail; eauto. auto. auto. auto.
+    eapply find_label_tail; eauto. auto. auto. auto. auto.
   solve[intuition].
 
   (* Lcond, false *)
@@ -5938,11 +5911,11 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   split.
     econstructor. eauto. eauto. eauto. eauto. eauto. 
     apply agree_frame_undef_locs; auto. apply destroyed_by_cond_caller_save. 
-    eauto with coqlib. auto. auto. auto.
+    eauto with coqlib. auto. auto. auto. auto.
   solve[intuition].
 
   (* Ljumptable *)
-  assert (rs1 arg = Vint n).
+  assert (rs0 arg = Vint n).
   { generalize (AGREGS arg). rewrite H. intro IJ; inv IJ; auto. }
   eexists; eexists; split.
     apply corestep_plus_one; eapply Mach_exec_Mjumptable; eauto. 
@@ -5959,7 +5932,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   split.  
     econstructor. eauto. eauto. eauto. eauto. eauto. 
     apply agree_frame_undef_locs; auto. apply destroyed_by_jumptable_caller_save.
-    eapply find_label_tail; eauto. auto. auto. auto.
+    eapply find_label_tail; eauto. auto. auto. auto. auto.
   solve[intuition].
 
   (* Lreturn *)
@@ -5983,12 +5956,10 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   split.  
     assert (FNSIG: Linear.fn_sig f=fn_sig tf).
     { rewrite (unfold_transf_function _ _ TRANSL); trivial. }
-    rewrite FNSIG. apply match_states_return 
-      with (f:=Internal f)(sg:=Linear.fn_sig f); auto.
+    rewrite FNSIG. eapply match_states_return; eauto.
     apply match_stacks_change_bounds with stk sp'.
     apply match_stacks_change_linear_mem with m.  
-    apply match_stacks_change_mach_mem with m2.
-    eauto. 
+    apply match_stacks_change_mach_mem with m2. eauto. 
     eauto with mem. intros. eapply Mem.perm_free_1; eauto. 
     intros. rewrite <- H1. eapply Mem.load_free; eauto. 
     eauto with mem. intros. eapply Mem.perm_free_3; eauto. 
@@ -5997,8 +5968,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     apply Plt_Ple. change (Mem.valid_block m1' sp'). 
       eapply Mem.valid_block_free_1; eauto. eapply agree_valid_mach; eauto. 
     apply wt_return_regs; auto. eapply match_stacks_wt_locset; eauto. 
-      admit. (*TODO: wt_locset rs0 issue*)
-      eapply agree_wt_ls; eauto.
+    solve[inv AGARGS; auto].
+    eapply agree_wt_ls; eauto.
     solve[eapply agree_args_free; eauto]. 
   intuition.
     eapply REACH_closed_free; try eassumption.
@@ -6011,7 +5982,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
 (* initial function *)
 { destruct PRE as [RC [PG [Glob [SMV WD]]]]. 
   revert TRANSL. unfold transf_fundef, transf_partial_fundef.
-  caseEq (transf_function f); simpl; try congruence.
+  caseEq (transf_function f0); simpl; try congruence.
   intros tfn TRANSL EQ. inversion EQ; clear EQ; subst tf.
   case_eq (Mem.alloc m2 0 (4*Zlength args)). 
   intros m3 sp0 ALLOC.
@@ -6036,6 +6007,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   admit. 
   constructor; auto.
   admit. 
+  admit.
+  admit.
   admit.
   admit.
   admit.
@@ -6093,6 +6066,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
         eapply agree_args_stores_in_frame; eauto.
         eapply agree_args_alloc; eauto.
         solve[eapply agree_args_intern_incr; eauto].
+        revert AGINITF. destruct s; auto. intros [Y|Y].
+        solve[inv Y; auto]. solve[auto].
     intuition.
     eapply (intern_incr_meminj_preserves_globals_as_inj _ mu); trivial.
       split; assumption.
@@ -6116,16 +6091,14 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       apply extensionality; intros; rewrite freshloc_irrefl. intuition.
       apply extensionality; intros; rewrite freshloc_irrefl. intuition.
   split.  
-    econstructor; eauto.
-    apply agree_frame_return with rs0; auto.
-    inv AGARGS. constructor; auto. simpl in *. destruct s; auto.
-    revert agree_sig_match0.
-    case_eq (last_frame (s::s0)). intros H. 
-    apply last_frame_cons_nonnil in H; contradiction.
-    solve[destruct s1; auto].
+    econstructor; eauto. 
+    eapply agree_frame_return; eauto.
+    inv AGARGS. constructor; auto. simpl in *. destruct s; auto. simpl; auto.
     intros C. subst sp'. inv AGARGS. eapply agree_sp_fresh0.
     inv FRM. apply restrictD_Some in agree_inj0. 
     destruct agree_inj0 as [X Y]. solve[apply X].
+    inv AGARGS. revert agree_args_frame_match0. simpl. destruct s; auto.
+    intros [Y|Y]. left; inv Y; auto. right; auto.
   solve[intuition]. 
 Qed.
 
