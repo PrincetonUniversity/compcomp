@@ -85,10 +85,10 @@ Inductive mach_effstep: (block -> Z -> bool) ->
         (Mach_State s f sp c rs' lf) m'
   (*NOTE [loader]*)
   | Mach_effexec_Minitialize_call: 
-      forall m args tys m1 stk m2 fb,
-      Mem.alloc m 0 (4*Zlength args) = (m1, stk) ->
-      let sp := Vptr stk Int.zero in
-      store_args sp 0 args tys m1 = Some m2 -> 
+      forall m args tys m1 stk m2 fb z,
+      args_len_rec args tys = Some z -> 
+      Mem.alloc m 0 (4*z) = (m1, stk) ->
+      store_args m1 stk args tys = Some m2 -> 
       mach_effstep EmptyEffect 
         (Mach_CallstateIn fb args tys) m
         (Mach_Callstate nil fb (Regmap.init Vundef) (mk_load_frame stk args tys)) m2
@@ -246,7 +246,7 @@ intros.
       eapply unchanged_on_trans with (m2 := m1).
       solve[eapply Mem.alloc_unchanged_on; eauto].
       solve[eapply store_args_unch_on; eauto].
-      solve[apply alloc_forward in H; auto].
+      solve[apply alloc_forward in H0; auto].
       simpl. intros b ofs H2 _ H3. subst. 
       solve[apply sp_fresh; auto]. } 
   split. eapply Mach_exec_Mcall_internal; eassumption.

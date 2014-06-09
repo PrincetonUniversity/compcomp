@@ -4269,10 +4269,14 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
         (FIND: Genv.find_funct_ptr tge fb = Some (Internal tf))
         (WTLS: wt_locset ls)
         (NOREGS: forall r, ls (R r) = Vundef)
-        (AGARGS: agree_args_match_aux (restrict (as_inj mu) (vis mu)) 
-                                      (call_regs ls) 0 args tys),
-      match_states mu (Linear_CallstateIn nil (Internal f) ls 
-                        (Linear_coop.mk_load_frame ls f)) m 
+        (NOLOCSIN: forall slt ofs ty, 
+                   slt = Local \/ slt = Incoming -> ls (S slt ofs ty) = Vundef)
+        (AGARGS: agree_args_match_aux (restrict (as_inj mu) (vis mu)) (call_regs ls) 0 args tys)
+        (TYSEQ: sig_args (Linear.fn_sig f) = tys)
+        (ARGS0: exists args0, val_list_inject (restrict (as_inj mu) (vis mu)) args0 args)
+        (VALSDEF: vals_defined args=true)
+        (HASTY: Val.has_type_list args tys),
+      match_states mu (Linear_CallstateIn nil (Internal f) ls (Linear_coop.mk_load_frame ls f)) m 
                       (Mach_CallstateIn fb args tys) m'
 
   | match_states_call_intern:
@@ -4339,6 +4343,9 @@ econstructor; try eassumption.
     rewrite restrict_sm_all. intros. 
     apply restrictD_Some in H. destruct H. solve[eapply agree_sp_fresh0; eauto].
     solve[rewrite restrict_sm_locBlocksTgt; auto].
+econstructor; try eassumption.
+  rewrite vis_restrict_sm. rewrite restrict_sm_all.
+    rewrite restrict_nest; assumption.
 econstructor; try eassumption.
   rewrite vis_restrict_sm. rewrite restrict_sm_all.
     rewrite restrict_nest; assumption.
@@ -4735,19 +4742,11 @@ Proof. intros.
            && val_casted.vals_defined vals1).
   2: solve[intros H2; rewrite H2 in H1; inv H1].
   intros H2; rewrite H2 in H1. inv H1. 
+
   exploit function_ptr_translated; eauto. intros [tf [FP TF]].
   clear Ini.
-  destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
-  subst. apply eq_sym in A. inv A. rewrite C in Heqzz. inv Heqzz.
-  unfold tge in FP. rewrite D in FP. inv FP.
-  case_eq (Int.eq_dec Int.zero Int.zero).
-  2: solve[intros CONTRA; elimtype False; auto].
-  intros ? e.
-  exists (Mach_CallstateIn b vals2 (sig_args (funsig tf))).
-  split. simpl. rewrite e, D. 
 
-  assert (val_casted.val_has_type_list_func vals2 (sig_args (funsig tf))=true) 
-    as ->.
+  assert (VALS2: val_casted.val_has_type_list_func vals2 (sig_args (funsig tf))=true).
   { eapply val_casted.val_list_inject_hastype; eauto.
     eapply forall_inject_val_list_inject; eauto.
     destruct (val_casted.vals_defined vals1); auto.
@@ -4758,13 +4757,22 @@ Proof. intros.
     destruct (val_casted.val_has_type_list_func vals1
       (sig_args (Linear.funsig (Internal f)))); auto. }
 
-  assert (val_casted.vals_defined vals2=true) as ->.
+  assert (DEF2: val_casted.vals_defined vals2=true).
   { eapply val_casted.val_list_inject_defined.
     eapply forall_inject_val_list_inject; eauto.
     destruct (val_casted.vals_defined vals1); auto.
     rewrite andb_comm in H2; inv H2. }
 
-  monadInv TF. rename x into tf. simpl. 
+  destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
+  subst. apply eq_sym in A. inv A. rewrite C in Heqzz. inv Heqzz.
+  unfold tge in FP. rewrite D in FP. inv FP.
+  case_eq (Int.eq_dec Int.zero Int.zero).
+  2: solve[intros CONTRA; elimtype False; auto].
+  intros ? e.
+  exists (Mach_CallstateIn b vals2 (sig_args (funsig tf))).
+  split. simpl. rewrite e, D. 
+
+  rewrite VALS2, DEF2. monadInv TF. rename x into tf. simpl. 
   solve[simpl; auto].
 
   destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
@@ -4780,23 +4788,32 @@ Proof. intros.
 
   split. 2: rewrite initial_SM_as_inj; intuition.
   apply bind_inversion in TF. destruct TF as [x [TF X]]. inv X.
-  eapply match_states_init; eauto. simpl.
 
-  solve[apply wt_setlist_loc_arguments].
-
-  solve[intros r; apply loc_arguments_gso_reg].
-
-  simpl. 
   assert (Linear.fn_sig f=fn_sig x) as ->.
   { apply unfold_transf_function in TF; rewrite TF; auto. }
 
-  unfold loc_arguments.
-  rewrite initial_SM_as_inj.
+  eapply match_states_init; eauto. simpl.
+
+  solve[apply wt_setlist_loc_arguments].
+  solve[intros r; apply loc_arguments_gso_reg].
+
+  intros ? ? ? [X|X]. subst. unfold init_locset. admit. admit.
+
+  simpl. unfold loc_arguments. rewrite initial_SM_as_inj.
   rewrite andb_true_iff in H2. destruct H2 as [H2 H3]. revert H2.
   generalize (sig_args (fn_sig x)) as tys.
   apply forall_inject_val_list_inject in VInj. intros tys.
   generalize (encode_longs_inject _ tys vals1 vals2 VInj).
   solve[intros H2 H4; apply agree_args_match_init; auto].
+
+  solve[rewrite H1; auto].
+  exists vals1. rewrite initial_SM_as_inj. 
+    unfold initial_SM, vis. simpl. 
+    apply forall_inject_val_list_inject.
+    apply restrict_forall_vals_inject; auto.
+    intros b0 GET. apply REACH_nil. 
+    solve[rewrite orb_true_iff; right; auto].
+  solve[rewrite val_has_type_list_func_charact; auto].
 Qed.
 
 Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
@@ -5984,38 +6001,45 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   revert TRANSL. unfold transf_fundef, transf_partial_fundef.
   caseEq (transf_function f0); simpl; try congruence.
   intros tfn TRANSL EQ. inversion EQ; clear EQ; subst tf.
-  case_eq (Mem.alloc m2 0 (4*Zlength args)). 
-  intros m3 sp0 ALLOC.
-  assert (STORE: exists m4, store_args (Vptr sp0 Int.zero) 0 args tys m3 = Some m4).
-  { admit. }
+  set (tys := sig_args (Linear.fn_sig f0)).
+  assert (exists z, args_len_rec args tys = Some z).
+  { eapply args_len_rec_succeeds; eauto. }
+  destruct H as [z ARGSLEN]. 
+  case_eq (Mem.alloc m2 0 (4*z)). intros m3 sp0 ALLOC.
+  assert (STORE: exists m4, store_args m3 sp0 args tys = Some m4).
+  { unfold store_args; eapply store_args_rec_succeeds; eauto.
+    admit. (*TODO: initial_core should fail if arguments don't fit in address space*) }
   destruct STORE as [m4 STORE].
   eexists; eexists; split.
     eapply corestep_plus_one. simpl. econstructor; eauto.
-  exists mu. (*NOT QUITE RIGHT*)
+  exists mu. (*NOT RIGHT*)
   intuition.
   apply intern_incr_refl.
   apply sm_inject_separated_same_sminj.
   admit. (*TODO -- mu above not right *)
   split.
   apply match_states_call_intern with (tf := tfn); auto.
-  apply match_stacks_empty with (hi := Mem.nextblock m); auto.
+  apply match_stacks_empty with (hi := Mem.nextblock m).
   apply Ple_refl. 
   admit.
   admit.
   simpl. unfold bind. solve[rewrite TRANSL; auto].
-  admit. 
-  admit. 
-  constructor; auto.
-  admit. 
-  admit.
-  admit.
-  admit.
-  admit.
-  admit.
-  admit.
+  intros r. simpl. solve[rewrite Regmap.gi, NOREGS; auto].
+  simpl. unfold agree_callee_save. 
+    destruct l. intros _. simpl. rewrite NOREGS; auto.
+    intros _. simpl. destruct sl; auto. 
+  constructor; auto. admit. (*TOOD: agree_args_match_wt*)
+  simpl; auto. destruct ARGS0 as [args0 ARGS0].
+  solve[eexists; eapply val_list_inject_forall_inject; eauto].
+  admit. (*TODO: store_args_agree_args_contains*)  
+  intros b0 z0 ASINJ. destruct SMV as [H H0]. 
+    specialize (H0 sp0). exploit H0. unfold RNG.
+    apply as_inj_DomRng in ASINJ. destruct ASINJ; auto. auto. 
+    intros VAL. apply Mem.fresh_block_alloc in ALLOC. solve[apply ALLOC; auto].
+  admit. (*TODO: choose right mu' above*)
   intuition.
-  admit.
-  admit. }
+  admit. (*TODO: choose right mu' above*)
+  admit. (*TODO: choose right mu' above*) }
 
 (* internal function *)
   destruct PRE as [RC [PG [Glob [SMV WD]]]]. 
