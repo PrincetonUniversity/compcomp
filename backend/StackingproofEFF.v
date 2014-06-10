@@ -6230,9 +6230,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   split.
   apply match_states_call_intern with (tf := tfn); auto.
   apply match_stacks_empty with (hi := Pmin (Mem.nextblock m) (Mem.nextblock m4)).
-  admit. (*TODO*)
-  admit. (*TODO*)
-  admit. (*TODO*)
+  admit. (*TODO: match_globalenvs*)
+  admit. (*TODO: match_globalenvs*)
+  admit. (*TODO: match_globalenvs*)
   simpl. unfold bind. solve[rewrite TRANSL; auto].
   intros r. simpl. solve[rewrite Regmap.gi, NOREGS; auto].
   simpl. unfold agree_callee_save. 

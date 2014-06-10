@@ -282,44 +282,6 @@ Lemma store_args_rec_succeeds_aux sz m sp args tys z
   Mem.range_perm m sp (4*z) (4*z + 4*sz) Cur Writable -> 
   exists m', store_args_rec m sp z args tys = Some m'.
 Proof.
-(*rewrite val_casted.val_has_type_list_func_charact in HASTY. intros ARGLEN RNG.
-revert args z sz m VALSDEF HASTY ARGLEN RNG POS REP; induction tys. 
-destruct args; auto. simpl. intros. 
-solve[eauto]. intros H H2. simpl; congruence.
-destruct args. simpl; congruence. intros z sz m VALSDEF; destruct a.
-- case_eq (args_len_rec args tys); try solve[inversion 1]. intros z0 EQ.
-inversion 1; subst. unfold store_stack, Mem.storev. intros H3. simpl. 
-unfold store_stack, Mem.storev; simpl.
-case_eq (Mem.store Mint32 m sp
-  (Int.unsigned (Int.add Int.zero (Int.repr
-    match z with | 0 => 0 | Z.pos y' => Z.pos y'~0~0 
-                 | Z.neg y' => Z.neg y'~0~0 end))) v).
-intros m0 STORE ALLOC POS REP. eapply IHtys.
-solve[destruct v; auto; inv VALSDEF].
-simpl in HASTY. rewrite andb_true_iff in HASTY. solve[destruct HASTY; auto].
-revert H3. simpl. destruct (args_len_rec args tys). eauto. solve[inversion 1].
-simpl in H3. rewrite EQ in H3. inv H3. 
-assert (Mem.range_perm m sp (4*z) (4*z + 4*(z0+1)) Cur Writable).
-{ admit. }
-clear ALLOC.
-assert (Zeq: 4*(z+1) = 4*z + 4) by omega. rewrite Zeq.
-assert (4*z + 4 + 4*z0 = 4*z + 4*z0 + 4) as -> by omega.
-assert (z0_pos: 0 <= z0) by admit. 
-eapply range_perm_shift; try omega. 
-assert (4*z + 4*z0 + 4 = 4*z + 4*(z0+1)) as -> by omega.
-admit. (*by STORE and H*)
-omega. 
-assert (z0+1 < sz). admit. 
-omega.
-intros STORE RNG Zpos. 
-assert (VAL: Mem.valid_access m Mint32 sp (4*z) Writable).
-{ admit. }
-apply Mem.valid_access_store with (v := v) in VAL. 
-destruct VAL as [m2 STORE']. intros MOD.
-assert (Int.unsigned (Int.add Int.zero (Int.repr (4*z))) = 4*z).
-{ rewrite Int.add_zero_l, Int.unsigned_repr; auto.
-  assert (0 <= sz). admit.
-  split. omega. *)
 Admitted. (*TODO*)
 
 Lemma store_args_rec_succeeds sz m sp args tys 
