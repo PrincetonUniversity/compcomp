@@ -80,20 +80,20 @@ Inductive Mach_core: Type :=
              (loader: load_frame),     (**r program loader frame *)
       Mach_core.
 
-(*NOTE [store_args] store_args is used to model program loading of
+(*NOTE [store_args_simple] is used to model program loading of
   initial arguments.  Cf. NOTE [loader] below. *)
 
-(*Fixpoint store_args (sp: val) (ofs: Z) (args: list val) (tys: list typ) (m: mem) 
+Fixpoint store_args0 (m: mem) (sp: val) (ofs: Z) (args: list val) (tys: list typ) 
          : option mem :=
   match args,tys with
     | nil,nil => Some m
     | a::args',ty::tys' => 
       match store_stack m sp ty (Int.repr (Stacklayout.fe_ofs_arg + 4*ofs)) a with
         | None => None
-        | Some m' => store_args sp (ofs+typesize ty) args' tys' m'
+        | Some m' => store_args0 m' sp (ofs+typesize ty) args' tys'
       end
     | _,_ => None
-  end.*)
+  end.
 
 (* [store_args_rec] is more complicated, but more precise than, 
    [store_args (encode_longs args) (encode_typs tys)]. Still, it's not totally
@@ -125,6 +125,78 @@ Fixpoint store_args_rec m sp ofs args tys : option mem :=
       end
     | _, _ => None
   end.
+
+(*Fixpoint encode_longs' (tyl : list typ) (vl : list val) {struct tyl} : list val :=
+  match tyl with
+  | nil => nil
+  | Tint :: tyl' =>
+      match vl with
+      | nil => nil
+      | v :: vl' => v :: encode_longs' tyl' vl'
+      end
+  | Tfloat :: tyl' =>
+      match vl with
+      | nil => nil
+      | v :: vl' => v :: encode_longs' tyl' vl'
+      end
+  | Tlong :: tyl' =>
+      match vl with
+      | nil => nil
+      | Vundef :: vl' => Vundef :: Vundef :: encode_longs' tyl' vl'
+      | Vint _ :: vl' => Vundef :: Vundef :: encode_longs' tyl' vl'
+      | Vlong n :: vl' =>
+          Vint (Int64.loword n)
+          :: Vint (Int64.hiword n) :: encode_longs' tyl' vl'
+      | Vfloat _ :: vl' => Vundef :: Vundef :: encode_longs' tyl' vl'
+      | Vptr _ _ :: vl' => Vundef :: Vundef :: encode_longs' tyl' vl'
+      end
+  | Tsingle :: tyl' =>
+      match vl with
+      | nil => nil
+      | v :: vl' => v :: encode_longs' tyl' vl'
+      end
+  end.
+*)
+
+(*Lemma store_args_store_args_rec m stk ofs args tys m' : 
+  vals_defined args=true ->
+  val_has_type_list_func args tys=true -> 
+  store_args0 m (Vptr stk Int.zero) ofs 
+                (encode_longs tys args) (encode_typs tys) = Some m' ->
+  exists m'', store_args_rec m stk ofs args tys = Some m''.
+Proof.
+revert args ofs m. induction tys. destruct args; simpl; auto. intros; congruence. 
+destruct args. simpl; intros; congruence. 
+simpl. intros ofs m. rewrite andb_true_iff. intros DEF [A B]. destruct a.
+- simpl. generalize (Int.repr match ofs with | 0 => 0 | Z.pos y' => Z.pos y'~0~0
+                                             | Z.neg y' => Z.neg y'~0~0 end) as z.
+intros z. case_eq (store_stack m (Vptr stk Int.zero) Tint z v).
+2: intros; congruence.
+intros m0 STORE. intros. apply IHtys; auto. destruct v; auto. congruence.
+- simpl. generalize (Int.repr match ofs with | 0 => 0 | Z.pos y' => Z.pos y'~0~0
+                                             | Z.neg y' => Z.neg y'~0~0 end) as z.
+intros z. case_eq (store_stack m (Vptr stk Int.zero) Tfloat z v).
+2: intros; congruence.
+intros m0 STORE. intros. apply IHtys; auto. destruct v; auto. congruence.
+- simpl. rewrite <-val_has_type_funcP in A. 
+destruct v; try solve[congruence|inv A]. simpl.
+generalize (Int.repr match ofs with | 0 => 0 | Z.pos y' => Z.pos y'~0~0
+                                             | Z.neg y' => Z.neg y'~0~0 end) as z.
+generalize (Int.repr match ofs+1 with | 0 => 0 | Z.pos y' => Z.pos y'~0~0
+                                             | Z.neg y' => Z.neg y'~0~0 end) as z'.
+intros z' z. 
+case_eq (store_stack m (Vptr stk Int.zero) Tint z' (Vint (Int64.hiword i))).
+intros m0 STORE.
+case_eq (store_stack m0 (Vptr stk Int.zero) Tint z (Vint (Int64.loword i))).
+intros m1 STORE'.
+
+case_eq (store_stack m (Vptr stk Int.zero) Tint z (Vint (Int64.loword i))).
+intros m0' STORE''. 
+case_eq (store_stack m0' (Vptr stk Int.zero) Tint z' (Vint (Int64.hiword i))).
+intros m1' STORE'''.
+assert (m1' = m1) as ->. 
+assert (ofs+1+1 = ofs+2) as -> by omega. 
+rewrite IHtys; auto. split; auto. *)
 
 Lemma store_stack_fwd m sp t i a m' :
   store_stack m sp t i a = Some m' -> 
@@ -273,6 +345,61 @@ Lemma range_perm_shift m b lo sz n k p :
   Mem.range_perm m b lo (lo+sz+n) k p -> 
   Mem.range_perm m b (lo+n) (lo+sz+n) k p.
 Proof. intros A B C RNG ofs [H H2]; apply RNG; omega. Qed.
+
+Inductive only_stores (sp: block) : mem -> mem -> Type :=
+| only_stores_nil m : only_stores sp m m
+| only_stores_cons m ch ofs v m'' m' : 
+    Mem.store ch m sp ofs v = Some m'' -> 
+    only_stores sp m'' m' -> 
+    only_stores sp m m'.
+
+Lemma only_stores_fwd sp m m' : 
+  only_stores sp m m' -> mem_forward m m'.
+Proof.
+induction 1. apply mem_forward_refl. 
+eapply mem_forward_trans. eapply store_forward; eauto. apply IHX.
+Qed.
+
+Lemma store_args_rec_only_stores m sp args tys z m' :
+  store_args_rec m sp z args tys = Some m' -> 
+  only_stores sp m m'.
+Proof.
+revert args z m. induction tys. destruct args; simpl.
+intros ? ?; inversion 1. constructor.
+intros ? ? ?; congruence.
+destruct args; simpl. intros; congruence. intros z m. 
+generalize
+ (Int.repr match z with
+             | 0 => 0 | Z.pos y' => Z.pos y'~0~0
+             | Z.neg y' => Z.neg y'~0~0 end) as z'.
+generalize
+ (Int.repr match z+1 with
+             | 0 => 0 | Z.pos y' => Z.pos y'~0~0
+             | Z.neg y' => Z.neg y'~0~0 end) as z''.
+intros z'' z'. destruct a.
+- case_eq (store_stack m (Vptr sp Int.zero) Tint z' v); 
+  try solve[intros; congruence].
+unfold store_stack, Mem.storev. simpl. intros m0 STORE H. 
+solve[eapply only_stores_cons; eauto].
+- case_eq (store_stack m (Vptr sp Int.zero) Tfloat z' v); 
+  try solve[intros; congruence].
+unfold store_stack, Mem.storev. simpl. intros m0 STORE H. 
+solve[eapply only_stores_cons; eauto].
+- destruct v; try solve[intros; congruence].
+case_eq (store_stack m (Vptr sp Int.zero) Tint z'' (Vint (Int64.hiword i))); 
+  try solve[intros; congruence].
+unfold store_stack, Mem.storev. simpl. intros m0 STORE.
+case_eq (Mem.store Mint32 m0 sp (Int.unsigned (Int.add Int.zero z'))
+                   (Vint (Int64.loword i)));
+  try solve[intros; congruence].
+intros m1 STORE' H.
+eapply only_stores_cons; eauto.
+eapply only_stores_cons; eauto.
+- case_eq (store_stack m (Vptr sp Int.zero) Tsingle z' v); 
+  try solve[intros; congruence].
+unfold store_stack, Mem.storev. simpl. intros m0 STORE H. 
+solve[eapply only_stores_cons; eauto].
+Qed.
 
 Lemma store_args_rec_succeeds_aux sz m sp args tys z 
       (VALSDEF: val_casted.vals_defined args=true)
