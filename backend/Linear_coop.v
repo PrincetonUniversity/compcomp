@@ -18,26 +18,62 @@ Require Import core_semantics.
 Require Import val_casted.
 Require Import BuiltinEffects.
 
+Inductive load_frame: Type :=
+| mk_load_frame:
+    forall (rs0: Linear.locset)  (**r location state at program entry *)
+           (f: Linear.function), (**r initial function *)
+    load_frame.
+
 (** Linear execution states. *)
 
 Inductive Linear_core: Type :=
   | Linear_State:
       forall (stack: list Linear.stackframe) (**r call stack *)
              (f: Linear.function)            (**r function currently executing *)
-             (sp: val)                (**r stack pointer *)
+             (sp: val)                       (**r stack pointer *)
              (c: Linear.code)                (**r current program point *)
-             (rs: Linear.locset),             (**r location state *)
+             (rs: Linear.locset)             (**r location state *)
+             (lf: load_frame),           (**r location state at program entry *)
+      Linear_core
+  (*A dummy corestate, to facilitate the stacking proof.*)
+  | Linear_CallstateIn:
+      forall (stack: list Linear.stackframe) (**r call stack *)
+             (f: Linear.fundef)              (**r function to call *)
+             (rs: Linear.locset)             (**r location state at point of call *)
+             (lf: load_frame),           (**r location state at program entry *)
       Linear_core
   | Linear_Callstate:
       forall (stack: list Linear.stackframe) (**r call stack *)
              (f: Linear.fundef)              (**r function to call *)
-             (rs: Linear.locset),             (**r location state at point of call *)
+             (rs: Linear.locset)             (**r location state at point of call *)
+             (lf: load_frame),           (**r location state at program entry *)
       Linear_core
   | Linear_Returnstate:
       forall (stack: list Linear.stackframe) (**r call stack *)
              (retty: option typ)      (**r optional return register int-floatness *)
-             (rs: Linear.locset),             (**r location state at point of return *)
+             (rs: Linear.locset)             (**r location state at point of return *)
+             (lf: load_frame),           (**r location state at program entry *)
       Linear_core.
+
+Definition call_regs' (callee : LTL.locset) (l : loc) :=
+  match l with
+    | R r => callee (R r)
+    | S Local _ _ => Vundef
+    | S Outgoing ofs ty => callee (S Incoming ofs ty)
+    | S Incoming _ _ => Vundef
+  end.
+
+Lemma call_regs_regs' callee ofs ty : 
+  call_regs' (call_regs callee) (S Outgoing ofs ty) = callee (S Outgoing ofs ty). 
+Proof. simpl; auto. Qed.
+
+(** [parent_locset0 ls0 cs] returns the mapping of values for locations
+    of the caller function, bottoming out with locset ls0. *)
+Definition parent_locset0 (ls0: locset) (stack: list Linear.stackframe) : locset :=
+  match stack with
+  | nil => call_regs' ls0
+  | Linear.Stackframe f sp ls c :: stack' => ls
+  end.
 
 Section RELSEM.
 
@@ -45,44 +81,44 @@ Variable ge: genv.
 
 Inductive Linear_step: Linear_core -> mem -> Linear_core -> mem -> Prop :=
   | lin_exec_Lgetstack:
-      forall s f sp sl ofs ty dst b rs m rs',
+      forall s f sp sl ofs ty dst b rs m rs' lf,
       rs' = Locmap.set (R dst) (rs (S sl ofs ty)) (undef_regs (destroyed_by_getstack sl) rs) ->
-      Linear_step (Linear_State s f sp (Lgetstack sl ofs ty dst :: b) rs) m
-        (Linear_State s f sp b rs') m
+      Linear_step (Linear_State s f sp (Lgetstack sl ofs ty dst :: b) rs lf) m
+        (Linear_State s f sp b rs' lf) m
   | lin_exec_Lsetstack:
-      forall s f sp src sl ofs ty b rs m rs',
+      forall s f sp src sl ofs ty b rs m rs' lf,
       rs' = Locmap.set (S sl ofs ty) (rs (R src)) (undef_regs (destroyed_by_setstack ty) rs) ->
-      Linear_step (Linear_State s f sp (Lsetstack src sl ofs ty :: b) rs) m
-        (Linear_State s f sp b rs') m
+      Linear_step (Linear_State s f sp (Lsetstack src sl ofs ty :: b) rs lf) m
+        (Linear_State s f sp b rs' lf) m
   | lin_exec_Lop:
-      forall s f sp op args res b rs m v rs',
+      forall s f sp op args res b rs m v rs' lf,
       eval_operation ge sp op (reglist rs args) m = Some v ->
       rs' = Locmap.set (R res) v (undef_regs (destroyed_by_op op) rs) ->
-      Linear_step (Linear_State s f sp (Lop op args res :: b) rs) m
-        (Linear_State s f sp b rs') m
+      Linear_step (Linear_State s f sp (Lop op args res :: b) rs lf) m
+        (Linear_State s f sp b rs' lf) m
   | lin_exec_Lload:
-      forall s f sp chunk addr args dst b rs m a v rs',
+      forall s f sp chunk addr args dst b rs m a v rs' lf,
       eval_addressing ge sp addr (reglist rs args) = Some a ->
       Mem.loadv chunk m a = Some v ->
       rs' = Locmap.set (R dst) v (undef_regs (destroyed_by_load chunk addr) rs) ->
-      Linear_step (Linear_State s f sp (Lload chunk addr args dst :: b) rs) m
-        (Linear_State s f sp b rs') m
+      Linear_step (Linear_State s f sp (Lload chunk addr args dst :: b) rs lf) m
+        (Linear_State s f sp b rs' lf) m
   | lin_exec_Lstore:
-      forall s f sp chunk addr args src b rs m m' a rs',
+      forall s f sp chunk addr args src b rs m m' a rs' lf,
       eval_addressing ge sp addr (reglist rs args) = Some a ->
       Mem.storev chunk m a (rs (R src)) = Some m' ->
       rs' = undef_regs (destroyed_by_store chunk addr) rs ->
-      Linear_step (Linear_State s f sp (Lstore chunk addr args src :: b) rs) m
-        (Linear_State s f sp b rs') m'
+      Linear_step (Linear_State s f sp (Lstore chunk addr args src :: b) rs lf) m
+        (Linear_State s f sp b rs' lf) m'
   | lin_exec_Lcall:
-      forall s f sp sig ros b rs m f',
+      forall s f sp sig ros b rs m f' lf,
       find_function ge ros rs = Some f' ->
       sig = funsig f' ->
-      Linear_step (Linear_State s f sp (Lcall sig ros :: b) rs) m
-        (Linear_Callstate (Stackframe f sp rs b:: s) f' rs) m
+      Linear_step (Linear_State s f sp (Lcall sig ros :: b) rs lf) m
+        (Linear_Callstate (Stackframe f sp rs b:: s) f' rs lf) m
   | lin_exec_Ltailcall:
-      forall s f stk sig ros b rs m rs' f' m',
-      rs' = return_regs (parent_locset s) rs ->
+      forall s f stk sig ros b rs m rs' f' m' rs0 f0,
+      rs' = return_regs (parent_locset0 rs0 s) rs ->
       find_function ge ros rs' = Some f' ->
       (*Lenb: Mach's at/after external treatment, and absence of m and ge in atExternal
            may need this:
@@ -90,15 +126,15 @@ Inductive Linear_step: Linear_core -> mem -> Linear_core -> mem -> Prop :=
             (exists f'', f' = Internal f'') ->*)
       sig = funsig f' ->
       Mem.free m stk 0 f.(fn_stacksize) = Some m' ->
-      Linear_step (Linear_State s f (Vptr stk Int.zero) (Ltailcall sig ros :: b) rs) m
-        (Linear_Callstate s f' rs') m'
+      Linear_step (Linear_State s f (Vptr stk Int.zero) (Ltailcall sig ros :: b) rs (mk_load_frame rs0 f0)) m
+        (Linear_Callstate s f' rs' (mk_load_frame rs0 f0)) m'
   | lin_exec_Lbuiltin:
-      forall s f sp rs m ef args res b t vl rs' m',
+      forall s f sp rs m ef args res b t vl rs' m' lf,
       external_call' ef ge (reglist rs args) m t vl m' ->
       observableEF ef = false ->
       rs' = Locmap.setlist (map R res) vl (undef_regs (destroyed_by_builtin ef) rs) ->
-      Linear_step (Linear_State s f sp (Lbuiltin ef args res :: b) rs) m
-         (Linear_State s f sp b rs') m'
+      Linear_step (Linear_State s f sp (Lbuiltin ef args res :: b) rs lf) m
+         (Linear_State s f sp b rs' lf) m'
 (*NO ANNOTS YET
   | lin_exec_Lannot:
       forall s f sp rs m ef args b t v m',
@@ -106,46 +142,52 @@ Inductive Linear_step: Linear_core -> mem -> Linear_core -> mem -> Prop :=
       Linear_step (Linear_State s f sp (Lannot ef args :: b) rs) m
          (Linear_State s f sp b rs) m'*)
   | lin_exec_Llabel:
-      forall s f sp lbl b rs m,
-      Linear_step (Linear_State s f sp (Llabel lbl :: b) rs) m
-        (Linear_State s f sp b rs) m
+      forall s f sp lbl b rs m lf,
+      Linear_step (Linear_State s f sp (Llabel lbl :: b) rs lf) m
+        (Linear_State s f sp b rs lf) m
   | lin_exec_Lgoto:
-      forall s f sp lbl b rs m b',
+      forall s f sp lbl b rs m b' lf,
       find_label lbl f.(fn_code) = Some b' ->
-      Linear_step (Linear_State s f sp (Lgoto lbl :: b) rs) m
-        (Linear_State s f sp b' rs) m
+      Linear_step (Linear_State s f sp (Lgoto lbl :: b) rs lf) m
+        (Linear_State s f sp b' rs lf) m
   | lin_exec_Lcond_true:
-      forall s f sp cond args lbl b rs m rs' b',
+      forall s f sp cond args lbl b rs m rs' b' lf,
       eval_condition cond (reglist rs args) m = Some true ->
       rs' = undef_regs (destroyed_by_cond cond) rs ->
       find_label lbl f.(fn_code) = Some b' ->
-      Linear_step (Linear_State s f sp (Lcond cond args lbl :: b) rs) m
-        (Linear_State s f sp b' rs') m
+      Linear_step (Linear_State s f sp (Lcond cond args lbl :: b) rs lf) m
+        (Linear_State s f sp b' rs' lf) m
   | lin_exec_Lcond_false:
-      forall s f sp cond args lbl b rs m rs',
+      forall s f sp cond args lbl b rs m rs' lf,
       eval_condition cond (reglist rs args) m = Some false ->
       rs' = undef_regs (destroyed_by_cond cond) rs ->
-      Linear_step (Linear_State s f sp (Lcond cond args lbl :: b) rs) m
-        (Linear_State s f sp b rs') m
+      Linear_step (Linear_State s f sp (Lcond cond args lbl :: b) rs lf) m
+        (Linear_State s f sp b rs' lf) m
   | lin_exec_Ljumptable:
-      forall s f sp arg tbl b rs m n lbl b' rs',
+      forall s f sp arg tbl b rs m n lbl b' rs' lf,
       rs (R arg) = Vint n ->
       list_nth_z tbl (Int.unsigned n) = Some lbl ->
       find_label lbl f.(fn_code) = Some b' ->
       rs' = undef_regs (destroyed_by_jumptable) rs ->
-      Linear_step (Linear_State s f sp (Ljumptable arg tbl :: b) rs) m
-        (Linear_State s f sp b' rs') m
+      Linear_step (Linear_State s f sp (Ljumptable arg tbl :: b) rs lf) m
+        (Linear_State s f sp b' rs' lf) m
   | lin_exec_Lreturn:
-      forall s f stk b rs m m',
+      forall s f stk b rs m m' rs0 f0,
+      let lf := mk_load_frame rs0 f0 in 
       Mem.free m stk 0 f.(fn_stacksize) = Some m' ->
-      Linear_step (Linear_State s f (Vptr stk Int.zero) (Lreturn :: b) rs) m
-        (Linear_Returnstate s (sig_res (fn_sig f)) (return_regs (parent_locset s) rs)) m'
+      Linear_step (Linear_State s f (Vptr stk Int.zero) (Lreturn :: b) rs lf) m
+        (Linear_Returnstate s (sig_res (fn_sig f)) (return_regs (parent_locset0 rs0 s) rs) lf) m'
+  (*A dummy corestep, to facilitate the stacking proof.*)
+  | lin_exec_function_internal0:
+      forall s f rs m rs0 f0,
+      Linear_step (Linear_CallstateIn s (Internal f) rs (mk_load_frame rs0 f0)) m
+                  (Linear_Callstate s (Internal f) rs (mk_load_frame (call_regs rs0) f0)) m
   | lin_exec_function_internal:
-      forall s f rs m rs' m' stk,
+      forall s f rs m rs' m' stk lf,
       Mem.alloc m 0 f.(fn_stacksize) = (m', stk) ->
       rs' = undef_regs destroyed_at_function_entry (call_regs rs) ->
-      Linear_step (Linear_Callstate s (Internal f) rs) m
-        (Linear_State s f (Vptr stk Int.zero) f.(fn_code) rs') m'
+      Linear_step (Linear_Callstate s (Internal f) rs lf) m
+        (Linear_State s f (Vptr stk Int.zero) f.(fn_code) rs' lf) m'
 (*NO RULE FOR EXTERNAL CALLS
   | lin_exec_function_external:
       forall s ef args res rs1 rs2 m t m',
@@ -155,11 +197,14 @@ Inductive Linear_step: Linear_core -> mem -> Linear_core -> mem -> Prop :=
       Linear_step (Linear_Callstate s (External ef) rs1) m
           (Linear_Returnstate s rs2) m'*)
   | lin_exec_return:
-      forall s f sp rs0 c rs retty m,
-      Linear_step (Linear_Returnstate (Stackframe f sp rs0 c :: s) retty rs) m
-         (Linear_State s f sp c rs) m.
+      forall s f sp lf c rs retty m rs_init,
+      Linear_step (Linear_Returnstate (Stackframe f sp lf c :: s) retty rs rs_init) m
+         (Linear_State s f sp c rs rs_init) m.
 
 End RELSEM.
+
+Definition init_locset tys args :=
+  Locmap.setlist (loc_arguments_rec tys 0) (encode_longs tys args) (Locmap.init Vundef).
 
 Definition Linear_initial_core (ge:genv) (v: val) (args:list val): 
            option Linear_core :=match v with
@@ -172,13 +217,8 @@ Definition Linear_initial_core (ge:genv) (v: val) (args:list val):
                      let tyl := sig_args (funsig f) in
                      if val_has_type_list_func args (sig_args (funsig f))
                         && vals_defined args
-                     then Some (Linear_Callstate
-                                      nil
-                                      f 
-                                      (Locmap.setlist
-                                          (loc_arguments (funsig f)) 
-                                          (encode_longs tyl args)
-                                          (Locmap.init Vundef)))
+                     then let ls0 := init_locset (sig_args (funsig f)) args 
+                          in Some (Linear_CallstateIn nil f ls0 (mk_load_frame ls0 fi))
                      else None
                     | External _ => None
                      end
@@ -201,7 +241,7 @@ Inductive initial_state (p: program): state -> Prop :=
 Definition Linear_halted (q : Linear_core): option val :=
     match q with 
       (*Return Tlong, which must be decoded*)
-      | Linear_Returnstate nil (Some Tlong) rs => 
+      | Linear_Returnstate nil (Some Tlong) rs _ => 
            match loc_result (mksignature nil (Some Tlong)) with
              | nil => None
              | r1 :: r2 :: nil => 
@@ -213,7 +253,7 @@ Definition Linear_halted (q : Linear_core): option val :=
            end
 
       (*Return a value of any other typ*)
-      | Linear_Returnstate nil (Some retty) rs => 
+      | Linear_Returnstate nil (Some retty) rs _ => 
            match loc_result (mksignature nil (Some retty)) with
             | nil => None
             | r :: TL => match TL with 
@@ -223,7 +263,7 @@ Definition Linear_halted (q : Linear_core): option val :=
            end
 
       (*Return Tvoid - modeled as integer return*)
-      | Linear_Returnstate nil None rs => Some (rs (R AX))
+      | Linear_Returnstate nil None rs _ => Some (rs (R AX))
 
       | _ => None
     end.
@@ -238,8 +278,8 @@ Inductive final_state: state -> int -> Prop :=
 
 Definition Linear_at_external (c: Linear_core) : option (external_function * signature * list val) :=
   match c with
-  | Linear_State _ _ _ _ _ => None
-  | Linear_Callstate s f rs => 
+  | Linear_State _ _ _ _ _ _ => None
+  | Linear_Callstate s f rs _ => 
       match f with
         | Internal f => None
         | External ef => 
@@ -248,22 +288,23 @@ Definition Linear_at_external (c: Linear_core) : option (external_function * sig
                                    (map rs (loc_arguments (ef_sig ef))))
             else None
       end
-  | Linear_Returnstate _ _ _ => None
+  | Linear_CallstateIn _ _ _ _ => None
+  | Linear_Returnstate _ _ _ _ => None
  end.
 
 Definition Linear_after_external (vret: option val) (c: Linear_core) : option Linear_core :=
   match c with 
-    | Linear_Callstate s f rs => 
+    | Linear_Callstate s f rs lf => 
       match f with
         | Internal f => None
         | External ef => 
           match vret with
             | None => Some (Linear_Returnstate s (sig_res (ef_sig ef))
                              (Locmap.setlist (map R (loc_result (ef_sig ef))) 
-                               (encode_long (sig_res (ef_sig ef)) Vundef) rs))
+                               (encode_long (sig_res (ef_sig ef)) Vundef) rs) lf)
             | Some v => Some (Linear_Returnstate s (sig_res (ef_sig ef))
                                (Locmap.setlist (map R (loc_result (ef_sig ef))) 
-                                 (encode_long (sig_res (ef_sig ef)) v) rs))
+                                 (encode_long (sig_res (ef_sig ef)) v) rs) lf)
           end
       end
     | _ => None
