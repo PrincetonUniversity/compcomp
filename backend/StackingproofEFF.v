@@ -6121,11 +6121,38 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   destruct STORE as [m4 STORE].
   eexists; eexists; split.
     eapply corestep_plus_one. simpl. econstructor; eauto.
-  exists mu. (*NOT RIGHT*)
-  intuition.
-  apply intern_incr_refl.
-  apply sm_inject_separated_same_sminj.
-  admit. (*TODO -- mu above not right *)
+  exists (alloc_right_sm mu sp0); intuition.
+  apply alloc_right_sm_intern_incr.
+  split. rewrite alloc_right_sm_as_inj; intros ? ? ? -> ?; congruence.
+  split. rewrite alloc_right_sm_DomSrc; intros ? -> ?; congruence.
+  intros ? H. rewrite alloc_right_sm_DomTgt. rewrite H, orb_true_iff.
+  intros [Y|Y]; try solve[intros; congruence]. 
+  unfold eq_block in Y. cut (b2 = sp0). intros. subst b2. clear Y.
+  eapply Mem.fresh_block_alloc; eauto.
+  solve[destruct (peq b2 sp0); try simpl in Y; congruence].
+  (*TODO: sm_locally_allocated_alloc_right_sm*)
+  { rewrite sm_locally_allocatedChar.
+  assert (locBlocksSrc (alloc_right_sm mu sp0) = locBlocksSrc mu) as -> by auto.
+  assert (locBlocksTgt (alloc_right_sm mu sp0) 
+        = (fun b => eq_block b sp0 || locBlocksTgt mu b)) as -> by auto.
+  assert (extBlocksSrc (alloc_right_sm mu sp0) = extBlocksSrc mu) as -> by auto.
+  assert (extBlocksTgt (alloc_right_sm mu sp0) = extBlocksTgt mu) as -> by auto.
+  assert (DomSrc (alloc_right_sm mu sp0) = DomSrc mu) as -> by auto.
+  cut (freshloc m2 m4 = fun b => eq_block b sp0). intros ->.
+  split; auto. extensionality b. 
+    solve[rewrite freshloc_irrefl, orb_comm; simpl; auto].
+  split; auto. extensionality b. simpl. unfold DomTgt. destruct mu; simpl.
+    solve[rewrite <-orb_assoc, orb_comm; auto].
+  split; auto. extensionality b. 
+    solve[rewrite freshloc_irrefl, orb_comm; simpl; auto].
+  split; auto. extensionality b. solve[rewrite orb_comm; auto].
+  assert (F: freshloc m3 m4 = fun b => false).
+    admit. (*TODO*)
+  assert (freshloc m2 m4 = freshloc m2 m3) as ->.
+  { extensionality b; rewrite <-freshloc_trans with (m'' := m3), F, orb_comm; auto.
+    apply alloc_forward in ALLOC; auto.    
+    apply store_args_fwd in STORE; auto. }
+  apply freshloc_alloc in ALLOC; rewrite ALLOC; auto. }
   split.
   apply match_states_call_intern with (tf := tfn); auto.
   apply match_stacks_empty with (hi := Mem.nextblock m).
@@ -6144,14 +6171,19 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   solve[eexists; eapply val_list_inject_forall_inject; eauto].
   eapply store_args_contains; eauto. omega.
   solve[apply val_has_type_list_func_charact; apply HASTY].
-  intros b0 z0 ASINJ. destruct SMV as [H H0]. 
+  rewrite alloc_right_sm_as_inj. intros b0 z0 ASINJ. destruct SMV as [H H0]. 
     specialize (H0 sp0). exploit H0. unfold RNG.
     apply as_inj_DomRng in ASINJ. destruct ASINJ; auto. auto. 
     intros VAL. apply Mem.fresh_block_alloc in ALLOC. solve[apply ALLOC; auto].
-  admit. (*TODO: choose right mu' above*)
+  rewrite alloc_right_sm_locBlocksTgt, orb_true_iff; left.
+  solve[destruct (eq_block sp0 sp0); auto].
   intuition.
-  admit. (*TODO: choose right mu' above*)
-  admit. (*TODO: choose right mu' above*) }
+  admit. (*TODO: reestablish injection*)
+  admit. (*TODO: sm_valid_alloc_right_sm*) 
+  apply alloc_right_sm_wd; auto.
+  destruct SMV. case_eq (DomTgt mu sp0); auto. intros Q.
+  unfold RNG in H0. specialize (H0 _ Q). 
+  apply Mem.fresh_block_alloc in ALLOC. exfalso. solve[apply ALLOC; auto]. }
 
 (* internal function *)
   destruct PRE as [RC [PG [Glob [SMV WD]]]]. 
