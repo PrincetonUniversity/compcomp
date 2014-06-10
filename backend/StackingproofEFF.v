@@ -1448,17 +1448,6 @@ generalize (Zlength_pos _ l).
 omega.
 Qed. 
 
-(*Lemma agree_args_nonempty_locset f0 mu args tys s ls ls' m sp :
-  Zlength s > 0 -> 
-  agree_args f0 mu args tys s ls m sp -> 
-  agree_args f0 mu args tys s ls' m sp.
-Proof.
-intros H; inversion 1; subst; constructor; auto.
-induction s. revert H. unfold Zlength. simpl; intros; omega.
-simpl. destruct s. destruct a; auto. eapply IHs; auto.
-apply Zlength_cons_pos. constructor; auto. 
-Qed.*)
-
 Lemma agree_args_replace_locals f0 mu args tys stack ls m' sp' PS PT :
   agree_args f0 mu args tys stack ls m' sp' ->
   agree_args f0 (replace_locals mu PS PT) args tys stack ls m' sp'.
@@ -1472,6 +1461,50 @@ solve[rewrite replace_locals_as_inj; auto].
 solve[rewrite replace_locals_locBlocksTgt; auto].
 Qed.
 
+(*TODO: put in core/StructuredInjections or somewhere similar*)
+Lemma forall_vals_inject_restrictD' j vals1 vals2 X 
+      (Inj : Forall2 (val_inject (restrict j X)) vals1 vals2) :
+  Forall2 (val_inject j) vals1 vals2 
+  /\ (forall b : block, getBlocks vals1 b = true -> X b = true).
+Proof. 
+intros. induction Inj. constructor.
+constructor; trivial. unfold getBlocks. simpl. intros; congruence.
+destruct IHInj as [H0 H1]. split. constructor; auto.
+  eapply val_inject_restrictD in H. eassumption.
+intros b0 GET. rewrite getBlocksD in GET. 
+assert (H2: (exists ofs, x=Vptr b0 ofs) \/ getBlocks l b0=true).
+{ revert GET; case_eq x; auto. intros b1 i ? H2; subst x. 
+  rewrite orb_true_iff in H2. destruct H2; auto. 
+  destruct (eq_block b1 b0); try (simpl in H2; congruence). subst.
+  left. exists i. auto. }
+destruct H2 as [[ofs H2]|H2]. subst x. 
+inv H. apply restrictD_Some in H4. destruct H4; auto.
+apply H1; auto.
+Qed.
+
+Lemma forall_vals_inject_intern_incr mu mu' vals1 vals2 
+      (Inj : Forall2 (val_inject (as_inj mu)) vals1 vals2) 
+      (Incr : intern_incr mu mu') 
+      (WD : SM_wd mu') : 
+  Forall2 (val_inject (as_inj mu')) vals1 vals2. 
+Proof. 
+intros. induction Inj. constructor.
+constructor; trivial. apply val_inject_incr with (f1 := as_inj mu); auto.
+apply intern_incr_as_inj; auto.
+Qed.
+
+Lemma forall_vals_inject_extern_incr mu mu' vals1 vals2 
+      (Inj : Forall2 (val_inject (as_inj mu)) vals1 vals2) 
+      (Incr : extern_incr mu mu') 
+      (WD : SM_wd mu') : 
+  Forall2 (val_inject (as_inj mu')) vals1 vals2. 
+Proof. 
+intros. induction Inj. constructor.
+constructor; trivial. apply val_inject_incr with (f1 := as_inj mu); auto.
+apply extern_incr_as_inj; auto.
+Qed.
+(*END TODO*)
+
 Lemma agree_args_replace_externs f0 mu args tys stack ls m' sp' FS FT 
     (HFS: forall b, vis mu b = true -> locBlocksSrc mu b || FS b = true) :
   agree_args f0 mu args tys stack ls m' sp' ->
@@ -1481,7 +1514,10 @@ inversion 1; subst.
 constructor; auto.
 destruct agree_args_inj0 as [x X]. exists x. 
   rewrite replace_externs_vis, replace_externs_as_inj; auto.
-  admit. (*TODO*)
+  apply restrict_forall_vals_inject.
+  apply forall_vals_inject_restrictD in X; auto. 
+  apply forall_vals_inject_restrictD' in X; auto. destruct X as [_ X].
+  intros b0 GET. apply HFS. apply X; auto.
 rewrite replace_externs_vis, replace_externs_as_inj. 
   solve[apply agree_args_match_aux_sub with (X := vis mu); auto].
 solve[rewrite replace_externs_as_inj; intros ? ? INJ; eauto].
@@ -1498,7 +1534,13 @@ inversion 1; subst. constructor; auto. intros.
   inv H3; auto.
   inv H3; auto.
   inv H3; auto.
-  inv H3. destruct agree_args_inj0 as [args0 INJ]. admit. (*TODO*)
+  inv H3. destruct agree_args_inj0 as [args0 INJ]. exists args0. 
+    apply restrict_forall_vals_inject.
+    apply forall_vals_inject_restrictD in INJ; auto. 
+    apply forall_vals_inject_intern_incr with (mu := mu); auto.
+    apply forall_vals_inject_restrictD' in INJ; auto. destruct INJ as [_ X].
+    intros b0 GET. cut (vis mu b0=true). apply intern_incr_vis; auto.
+    solve[apply X; auto].
   inv H3. eapply agree_args_match_aux_intern_incr; eauto. 
   inv H3; auto.
 inv H3. intros ? ? X. inv H2. specialize (H3 b0 sp' z). revert H3.
@@ -1523,7 +1565,13 @@ inversion 1; subst. constructor; auto. intros.
   inv H3; auto. 
   inv H3; auto. 
   inv H3; auto. 
-  inv H3. destruct agree_args_inj0 as [args0 INJ]. admit. (*TODO*)
+  inv H3. destruct agree_args_inj0 as [args0 INJ]. exists args0.
+    apply restrict_forall_vals_inject.
+    apply forall_vals_inject_restrictD in INJ; auto. 
+    apply forall_vals_inject_extern_incr with (mu := mu); auto.
+    apply forall_vals_inject_restrictD' in INJ; auto. destruct INJ as [_ X].
+    intros b0 GET. cut (vis mu b0=true). intros. erewrite <-extern_incr_vis; eauto.
+    solve[apply X; auto].
   inv H3. eapply agree_args_match_aux_extern_incr; eauto. 
   inv H3; auto.
 inv H3. intros ? ? X. inv H2. specialize (H3 b0 sp' z). revert H3.
@@ -5255,38 +5303,44 @@ Qed.
 
 Lemma store_args_rec_outside m sp z args tys m' v ch sz : 
   sz >= 0 -> z >= 0 -> 4*sz >= size_chunk ch -> 
+  4*(z+sz+2*(Zlength args)) <= Int.max_unsigned -> 
   store_args_rec m sp (z + sz) args tys = Some m' -> 
   Mem.load ch m sp (Int.unsigned (Int.add Int.zero (Int.repr (4*z)))) = Some v -> 
   Mem.load ch m' sp (Int.unsigned (Int.add Int.zero (Int.repr (4*z)))) = Some v.
 Proof.
-  revert m args z sz. induction tys. destruct args. intros ? ? POS POS2 H H2 H3.
-  simpl in H2. inv H2; auto. intros ? ? POS POS2 H H2 H3. simpl in H2. inv H2.
-  intros ? ? ? ? POS POS2 H H2 H3. destruct args. inv H2. destruct a. 
+  revert m args z sz. induction tys. destruct args. intros ? ? POS POS2 OVER H H2 H3.
+  simpl in H2. inv H2; auto. intros ? ? POS POS2 OVER H H2 H3. simpl in H2. inv H2.
+  intros ? ? ? ? POS POS2 OVER H H2 H3. destruct args. inv H2. destruct a. 
   - revert H2. unfold store_args_rec. 
   case_eq (store_stack m (Vptr sp Int.zero) Tint
             (Int.repr (fe_ofs_arg + 4 * (z + sz))) v0); try solve[inversion 2].
   fold store_args_rec. intros m0 STORE REST. 
-  eapply IHtys with (m := m0) (sz := sz + typesize Tint); eauto. 
+  apply IHtys with (m := m0) (sz := sz + typesize Tint) (args := args); eauto. 
   simpl; omega. simpl typesize. omega. 
+  simpl typesize. revert H. rewrite Zlength_cons. unfold Z.succ. intros; omega.
   assert (z+(sz+typesize Tint) = z+sz+typesize Tint) as -> by omega; eauto.
-  unfold store_stack, Mem.storev in STORE; simpl in STORE.
+  unfold store_stack, Mem.storev in STORE; simpl in STORE. 
   erewrite Mem.load_store_other; eauto.  
   right. left. simpl. rewrite !Int.add_zero_l. rewrite !Int.unsigned_repr. 
   assert (A: 4*z+size_chunk ch <= 4*(z+sz)) by omega. solve[apply A].
-  admit. (*TODO: no overflow*)
-  admit. (*TODO: no overflow*)
-Admitted.
+  revert H. generalize (Zlength_cons_pos _ v0 args). generalize (Zlength (v0::args)). intros.
+  assert (A: 0 <= 4*(z+sz) <= Int.max_unsigned) by omega. solve[apply A].
+  revert H. generalize (Zlength_cons_pos _ v0 args). generalize (Zlength (v0::args)). intros.
+  assert (A: 0 <= 4*z <= Int.max_unsigned) by omega. solve[apply A].
+Admitted. (*other cases are similar*)
 
-Lemma store_args_contains m sp args tys m' z (POS: z >= 0) :
+Lemma store_args_contains m sp args tys m' z 
+      (POS: z >= 0) 
+      (OVER: 4*(z+2*(Zlength args)) <= Int.max_unsigned) : 
   val_has_type_list_func args tys=true -> 
   store_args_rec m sp z args tys = Some m' -> 
   agree_args_contains_aux m' sp z args tys.
 Proof.
-  revert m args z POS. induction tys.
-  destruct args; auto. simpl; auto. simpl. inversion 2.
-  destruct args; auto. simpl. inversion 2.
+  revert m args z POS OVER. induction tys.
+  destruct args; auto. simpl; auto. simpl. inversion 3.
+  destruct args; auto. simpl. inversion 3.
   unfold store_args. unfold store_args_rec, agree_args_contains_aux. 
-  intros z POS HASTY. simpl in HASTY. 
+  intros z POS OVER HASTY. simpl in HASTY. 
   rewrite andb_true_iff in HASTY. destruct HASTY as [H HASTY].
   destruct a.
   - case_eq (store_stack m (Vptr sp Int.zero) Tint (Int.repr (fe_ofs_arg + 4*z)) v);
@@ -5294,19 +5348,25 @@ Proof.
   intros m0 STORE REST. unfold store_stack, Mem.storev in STORE; simpl in STORE.
   unfold load_stack, Mem.loadv; simpl. split. fold store_args_rec in REST.  
   eapply store_args_rec_outside with (sz := typesize Tint); eauto. 
-  simpl; omega. simpl; omega. erewrite Mem.load_store_same; eauto.
+  simpl; omega. simpl; omega. 
+  rewrite Zlength_cons in OVER. unfold Z.succ in OVER. simpl typesize. omega.
+  erewrite Mem.load_store_same; eauto.
   f_equal. change Mint32 with (chunk_of_type Tint).
   rewrite Val.load_result_same; eauto. solve[apply val_has_type_funcP; auto].
-  solve[eapply IHtys; eauto; omega].
+  eapply IHtys; eauto. omega. 
+  clear - OVER. rewrite Zlength_cons in OVER. unfold Z.succ in OVER. omega.
   - case_eq (store_stack m (Vptr sp Int.zero) Tfloat (Int.repr (fe_ofs_arg + 4*z)) v);
     try solve[inversion 2].
   intros m0 STORE REST. unfold store_stack, Mem.storev in STORE; simpl in STORE.
   unfold load_stack, Mem.loadv; simpl. split. fold store_args_rec in REST.  
   eapply store_args_rec_outside with (sz := typesize Tfloat); eauto. 
-  simpl; omega. simpl; omega. erewrite Mem.load_store_same; eauto.
+  simpl; omega. simpl; omega. 
+  rewrite Zlength_cons in OVER. unfold Z.succ in OVER. simpl typesize. omega.
+  erewrite Mem.load_store_same; eauto.
   f_equal. change Mfloat64al32 with (chunk_of_type Tfloat).
   rewrite Val.load_result_same; eauto. solve[apply val_has_type_funcP; auto].
-  solve[eapply IHtys; eauto; omega].
+  eapply IHtys; eauto. omega. 
+  clear - OVER. rewrite Zlength_cons in OVER. unfold Z.succ in OVER. omega.
   - destruct v; try solve[inversion 1].
   case_eq (store_stack m (Vptr sp Int.zero) Tint (Int.repr (fe_ofs_arg + 4*(z+1))) 
                        (Vint (Int64.hiword i)));
@@ -5317,29 +5377,44 @@ Proof.
     try solve[inversion 2].
   intros m1 STORE' REST. unfold store_stack, Mem.storev in STORE'; simpl in STORE'.
   unfold load_stack, Mem.loadv; simpl. split. fold store_args_rec in REST.  
-  eapply store_args_rec_outside with (sz := 1); eauto. omega. simpl; omega. simpl; omega.
+  eapply store_args_rec_outside with (sz := 1) (args := args); eauto. 
+  omega. simpl; omega. simpl; omega.
+  rewrite Zlength_cons in OVER. unfold Z.succ in OVER. simpl typesize. omega.
   assert (z+1+1 = z+2) as -> by omega; eauto. 
   erewrite Mem.load_store_other; eauto.
   erewrite Mem.load_store_same with (m1 := m); eauto. f_equal. 
   right. simpl. right. rewrite !Int.add_zero_l, !Int.unsigned_repr. 
   assert (A: 4*z + 4 <= 4*(z+1)) by omega. solve[apply A].
-  admit. (*TODO: no overflow*)
-  admit. (*TODO: no overflow*)
+  assert (A: 0 <= 4*(z+1) <= Int.max_unsigned). 
+  { clear - OVER POS. revert OVER. 
+    generalize (Zlength_cons_pos _ (Vlong i) args).
+    generalize (Zlength (Vlong i::args)). intros. omega. }
+  solve[apply A].
+  assert (A: 0 <= 4*z <= Int.max_unsigned). 
+  { clear - OVER POS. revert OVER. 
+    generalize (Zlength_cons_pos _ (Vlong i) args).
+    generalize (Zlength (Vlong i::args)). intros. omega. }
+  solve[apply A].
   fold store_args_rec in REST. split. 
   eapply store_args_rec_outside with (sz := 2); eauto. simpl; omega. simpl; omega.
+  rewrite Zlength_cons in OVER. unfold Z.succ in OVER. simpl typesize. omega.
   erewrite Mem.load_store_same; eauto.
   change Mint32 with (chunk_of_type Tint).
   rewrite Val.load_result_same; eauto. solve[apply val_has_type_funcP; auto].
-  solve[eapply IHtys; eauto; omega].
+  eapply IHtys; eauto. omega. 
+  clear - OVER. rewrite Zlength_cons in OVER. unfold Z.succ in OVER. omega.
   - case_eq (store_stack m (Vptr sp Int.zero) Tsingle (Int.repr (fe_ofs_arg + 4*z)) v);
     try solve[inversion 2].
   intros m0 STORE REST. unfold store_stack, Mem.storev in STORE; simpl in STORE.
   unfold load_stack, Mem.loadv; simpl. split. fold store_args_rec in REST.  
   eapply store_args_rec_outside with (sz := typesize Tsingle); eauto. 
-  simpl; omega. simpl; omega. erewrite Mem.load_store_same; eauto.
+  simpl; omega. simpl; omega. 
+  rewrite Zlength_cons in OVER. unfold Z.succ in OVER. simpl typesize. omega.
+  erewrite Mem.load_store_same; eauto.
   f_equal. change Mfloat32 with (chunk_of_type Tsingle).
   rewrite Val.load_result_same; eauto. solve[apply val_has_type_funcP; auto].
-  solve[eapply IHtys; eauto; omega].
+  eapply IHtys; eauto. omega. 
+  clear - OVER. rewrite Zlength_cons in OVER. unfold Z.succ in OVER. omega.
 Qed.
 
 Lemma MATCH_diagram: forall st1 m1 st1' m1'
@@ -6146,8 +6221,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   split; auto. extensionality b. 
     solve[rewrite freshloc_irrefl, orb_comm; simpl; auto].
   split; auto. extensionality b. solve[rewrite orb_comm; auto].
-  assert (F: freshloc m3 m4 = fun b => false).
-    admit. (*TODO*)
+  assert (F: freshloc m3 m4 = fun b => false). {  admit. (*TODO*) }
   assert (freshloc m2 m4 = freshloc m2 m3) as ->.
   { extensionality b; rewrite <-freshloc_trans with (m'' := m3), F, orb_comm; auto.
     apply alloc_forward in ALLOC; auto.    
@@ -6155,8 +6229,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   apply freshloc_alloc in ALLOC; rewrite ALLOC; auto. }
   split.
   apply match_states_call_intern with (tf := tfn); auto.
-  apply match_stacks_empty with (hi := Mem.nextblock m).
-  apply Ple_refl. 
+  apply match_stacks_empty with (hi := Pmin (Mem.nextblock m) (Mem.nextblock m4)).
+  admit. (*TODO*)
   admit. (*TODO*)
   admit. (*TODO*)
   simpl. unfold bind. solve[rewrite TRANSL; auto].
@@ -6169,7 +6243,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   solve[apply wt_init_locset].
   simpl; auto. destruct ARGS0 as [args0 [ARGS0 _]].
   solve[eexists; eapply val_list_inject_forall_inject; eauto].
-  eapply store_args_contains; eauto. omega.
+  eapply store_args_contains; eauto. omega. 
+  assert (OVER: 4*(2*Zlength args) <= Int.max_unsigned). admit. (*TODO: no overflow check*)
+  solve[apply OVER].
   solve[apply val_has_type_list_func_charact; apply HASTY].
   rewrite alloc_right_sm_as_inj. intros b0 z0 ASINJ. destruct SMV as [H H0]. 
     specialize (H0 sp0). exploit H0. unfold RNG.
@@ -6178,7 +6254,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   rewrite alloc_right_sm_locBlocksTgt, orb_true_iff; left.
   solve[destruct (eq_block sp0 sp0); auto].
   intuition.
-  admit. (*TODO: reestablish injection*)
+  rewrite alloc_right_sm_as_inj.
+  eapply Mem.alloc_right_inject in ALLOC; eauto.
+  admit. (*TODO: store_args reestablish injection*)
   admit. (*TODO: sm_valid_alloc_right_sm*) 
   apply alloc_right_sm_wd; auto.
   destruct SMV. case_eq (DomTgt mu sp0); auto. intros Q.
