@@ -14,7 +14,53 @@ Require Import CminorSel.
 Require Import mem_lemmas. (*for mem_forward*)
 Require Import core_semantics.
 Require Import val_casted.
+Require Import effect_semantics. (*for EmptyEffect*)
 Require Import BuiltinEffects.
+
+Fixpoint silent (ge:genv) (a:expr) := 
+  match a with 
+    Eop _ al => silentExprList ge al
+  | Eload _ _ al => silentExprList ge al
+  | Econdition con a1 a2 => silentCondExpr ge con 
+       /\ silent ge a1 /\ silent ge a2
+  | Elet a1 a2 => silent ge a1 /\ silent ge a2
+  | Ebuiltin ef al => observableEF ef = false 
+       /\ silentExprList ge al
+       /\ (forall args m, BuiltinEffect ge ef args m = EmptyEffect)
+  | Eexternal x sg al => silentExprList ge al /\
+      match Genv.find_symbol ge x with
+          None => True
+        | Some b =>
+            match Genv.find_funct_ptr ge b with
+              Some (External ef) => observableEF ef = false
+                /\ (forall args m, BuiltinEffect ge ef args m = EmptyEffect)
+            | _ => True
+            end
+      end
+  | _ => True
+  end
+with silentExprList ge (al:exprlist) := 
+          match al with 
+             Econs a el => silent ge a /\ silentExprList ge el
+           | _ => True
+          end
+with silentCondExpr ge (condex: condexpr):=
+  match condex with
+    CEcond co al => silentExprList ge al
+  | CEcondition con1 con2 con3 =>
+     silentCondExpr ge con1 /\
+     silentCondExpr ge con2 /\
+     silentCondExpr ge con3
+  | CElet a con => 
+     silent ge a /\
+     silentCondExpr ge con
+  end.
+
+Definition silentEOS ge (a: expr + ident) : Prop :=
+  match a with 
+    inl e => silent ge e
+  | inr x => True 
+  end.
 
 Inductive CMinSel_core: Type :=
   | CMinSel_State:                      (**r execution within a function *)
@@ -47,79 +93,6 @@ Definition FromState (c: CminorSel.state) : CMinSel_core * mem :=
    | Callstate f args k m => (CMinSel_Callstate f args k, m)
    | Returnstate v k m => (CMinSel_Returnstate v k, m)
   end. 
-
-(*
-Section EVALEXPR_FUN.
-Variable ge: genv.
-Variable sp: val.
-Variable e: Cminor.env.
-Variable m: mem.
-
-Fixpoint  eval_exprlist_fun (le: letenv) (el: exprlist) : option(list val) :=
-  match el with
-   Enil => Some nil
- | Econs a1 al => match eval_expr_fun le a1, eval_exprlist_fun le al
-                  with Some v1, Some vl => Some (v1 :: vl)
-                    | _, _ => None
-                  end
-  end
-with eval_expr_fun (le: letenv) (exp: expr): option val :=
-  match exp with
-  | Evar x => PTree.get x e
-  | Eop op al => match eval_exprlist_fun le al 
-                 with Some vl => eval_operation ge sp op vl m
-                    | None => None
-                 end
-  | Eload chunk addr al =>
-       match eval_exprlist_fun le al
-       with Some vl => 
-          match eval_addressing ge sp addr vl 
-           with Some vaddr => Mem.loadv chunk m vaddr
-              | None => None
-           end
-          | _ => None
-       end
-(*  | eval_Econdition: forall le a b c va v,
-      eval_condexpr le a va ->
-      eval_expr le (if va then b else c) v ->
-      eval_expr le (Econdition a b c) v*)
-  | Elet a b => match eval_expr_fun le a
-      with Some v1 => eval_expr_fun (v1 :: le) b
-         | None => None
-      end
-  | Eletvar n => nth_error le n
-(*  | Ebuiltin ef al => match eval_exprlist le al 
-      with Some vl =>
-      external_call ef ge vl m E0 v m -> ??externalcalls are not functional
-      eval_expr le (Ebuiltin ef al) v
-  | eval_Eexternal: forall le id sg al b ef vl v,
-      Genv.find_symbol ge id = Some b ->
-      Genv.find_funct_ptr ge b = Some (External ef) ->
-      ef_sig ef = sg ->
-      eval_exprlist le al vl ->
-      external_call ef ge vl m E0 v m ->
-      eval_expr le (Eexternal id sg al) v*)
-  | _ => None (*for now*)
-  end
-
-with eval_condexpr_fun (le: letenv) (ce: condexpr): option bool :=
-  match ce with
-   CEcond cond al => match eval_exprlist_fun le al
-      with Some vl => eval_condition cond vl m 
-         | None => None
-      end
-  | CEcondition a b c => match 
-      eval_condexpr_fun le a with
-        Some va => eval_condexpr_fun le (if va then b else c)
-      | None => None 
-      end
-  | CElet a b => match eval_expr_fun le a 
-      with Some v1 => eval_condexpr_fun (v1 :: le) b
-         | None => None
-      end
-  end.
-End EVALEXPR_FUN.
-*)
 
 Definition CMinSel_at_external (c: CMinSel_core) : option (external_function * signature * list val) :=
   match c with
@@ -164,12 +137,14 @@ Inductive CMinSel_corestep (ge : genv) : CMinSel_core -> mem ->
       CMinSel_corestep ge (CMinSel_State f Sskip k (Vptr sp Int.zero) e) m
         (CMinSel_Returnstate Vundef k) m'
 
-  | cminsel_corestep_assign: forall f id a k sp e m v,
+  | cminsel_corestep_assign: forall f id a k sp e m v
+      (SIL: silent ge a),
       eval_expr ge sp e m nil a v ->
       CMinSel_corestep ge (CMinSel_State f (Sassign id a) k sp e) m
         (CMinSel_State f Sskip k sp (PTree.set id v e)) m
 
-  | cminsel_corestep_store: forall f chunk addr al b k sp e m vl v vaddr m',
+  | cminsel_corestep_store: forall f chunk addr al b k sp e m vl v vaddr m'
+      (SIL: silent ge b) (SILS: silentExprList ge al),
       eval_exprlist ge sp e m nil al vl ->
       eval_expr ge sp e m nil b v ->
       eval_addressing ge sp addr vl = Some vaddr ->
@@ -177,7 +152,8 @@ Inductive CMinSel_corestep (ge : genv) : CMinSel_core -> mem ->
       CMinSel_corestep ge (CMinSel_State f (Sstore chunk addr al b) k sp e) m
         (CMinSel_State f Sskip k sp e) m'
 
-  | cminsel_corestep_call: forall f optid sig a bl k sp e m vf vargs fd,
+  | cminsel_corestep_call: forall f optid sig a bl k sp e m vf vargs fd
+      (SIL: silentEOS ge a) (SILS: silentExprList ge bl),
       eval_expr_or_symbol ge sp e m nil a vf ->
       eval_exprlist ge sp e m nil bl vargs ->
       Genv.find_funct ge vf = Some fd ->
@@ -185,7 +161,8 @@ Inductive CMinSel_corestep (ge : genv) : CMinSel_core -> mem ->
       CMinSel_corestep ge (CMinSel_State f (Scall optid sig a bl) k sp e) m
         (CMinSel_Callstate fd vargs (Kcall optid f sp e k)) m
 
-  | cminsel_corestep_tailcall: forall f sig a bl k sp e m vf vargs fd m',
+  | cminsel_corestep_tailcall: forall f sig a bl k sp e m vf vargs fd m'
+      (SIL: silentEOS ge a) (SILS: silentExprList ge bl),
       eval_expr_or_symbol ge (Vptr sp Int.zero) e m nil a vf ->
       eval_exprlist ge (Vptr sp Int.zero) e m nil bl vargs ->
       Genv.find_funct ge vf = Some fd ->
@@ -194,7 +171,8 @@ Inductive CMinSel_corestep (ge : genv) : CMinSel_core -> mem ->
       CMinSel_corestep ge (CMinSel_State f (Stailcall sig a bl) k (Vptr sp Int.zero) e) m
         (CMinSel_Callstate fd vargs (call_cont k)) m'
 
-  | cminsel_corestep_builtin: forall f optid ef al k sp e m vl t v m',
+  | cminsel_corestep_builtin: forall f optid ef al k sp e m vl t v m'
+      (SILS: silentExprList ge al),
       eval_exprlist ge sp e m nil al vl ->
       external_call ef ge vl m t v m' ->
       observableEF ef = false ->
@@ -205,7 +183,8 @@ Inductive CMinSel_corestep (ge : genv) : CMinSel_core -> mem ->
       CMinSel_corestep ge (CMinSel_State f (Sseq s1 s2) k sp e) m
         (CMinSel_State f s1 (Kseq s2 k) sp e) m
 
-  | cminsel_corestep_ifthenelse: forall f c s1 s2 k sp e m b,
+  | cminsel_corestep_ifthenelse: forall f c s1 s2 k sp e m b
+      (SIL: silentCondExpr ge c),
       eval_condexpr ge sp e m nil c b ->
       CMinSel_corestep ge (CMinSel_State f (Sifthenelse c s1 s2) k sp e) m
         (CMinSel_State f (if b then s1 else s2) k sp e) m
@@ -228,7 +207,8 @@ Inductive CMinSel_corestep (ge : genv) : CMinSel_core -> mem ->
       CMinSel_corestep ge (CMinSel_State f (Sexit (S n)) (Kblock k) sp e) m
         (CMinSel_State f (Sexit n) k sp e) m
 
-  | cminsel_corestep_switch: forall f a cases default k sp e m n,
+  | cminsel_corestep_switch: forall f a cases default k sp e m n
+      (SIL: silent ge a),
       eval_expr ge sp e m nil a (Vint n) ->
       CMinSel_corestep ge (CMinSel_State f (Sswitch a cases default) k sp e) m
         (CMinSel_State f (Sexit (switch_target n default cases)) k sp e) m
@@ -237,7 +217,9 @@ Inductive CMinSel_corestep (ge : genv) : CMinSel_core -> mem ->
       Mem.free m sp 0 f.(fn_stackspace) = Some m' ->
       CMinSel_corestep ge (CMinSel_State f (Sreturn None) k (Vptr sp Int.zero) e) m
         (CMinSel_Returnstate Vundef (call_cont k)) m'
-  | cminsel_corestep_return_1: forall f a k sp e m v m',
+
+  | cminsel_corestep_return_1: forall f a k sp e m v m'
+      (SIL: silent ge a),
       eval_expr ge (Vptr sp Int.zero) e m nil a v ->
       Mem.free m sp 0 f.(fn_stackspace) = Some m' ->
       CMinSel_corestep ge (CMinSel_State f (Sreturn (Some a)) k (Vptr sp Int.zero) e) m
@@ -257,7 +239,8 @@ Inductive CMinSel_corestep (ge : genv) : CMinSel_core -> mem ->
       Cminor.set_locals f.(fn_vars) (Cminor.set_params vargs f.(fn_params)) = e ->
       CMinSel_corestep ge (CMinSel_Callstate (Internal f) vargs k) m
         (CMinSel_State f f.(fn_body) k (Vptr sp Int.zero) e) m'
-(*no external call
+
+(*All external calls in this language at handled by atExternal
   | cminsel_corestep_external_function: forall ef vargs k m t vres m',
       external_call ef ge vargs m t vres m' ->
       step (Callstate (External ef) vargs k) m

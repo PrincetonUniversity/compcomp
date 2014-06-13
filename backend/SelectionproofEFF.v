@@ -63,6 +63,1207 @@ Proof.
 Qed.
 *)
 
+Lemma silent_addimm (ge: Genv.t fundef unit) n: 
+       forall e, silent ge e -> silent ge (addimm n e). 
+Proof. intros e.
+  unfold addimm. intros. 
+  destruct (Int.eq n Int.zero); simpl; auto. 
+  destruct (addimm_match e); simpl; auto. 
+Qed. 
+
+Lemma silent_add ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
+       silent ge (add e1 e2). 
+Proof. intros.
+  unfold add. 
+  destruct (add_match e1 e2); simpl in *;
+    try eapply silent_addimm; eauto; intuition.
+Qed.  
+
+Lemma silent_shlimm ge i: forall e, silent ge e ->
+   silent ge (shlimm e i).
+Proof. intros. unfold shlimm.
+    destruct (Int.eq i Int.zero); simpl; eauto. 
+    destruct (shlimm_match e); simpl; auto. 
+      destruct (Int.ltu (Int.add i n1) Int.iwordsize); simpl; auto.      destruct (shift_is_scale i); simpl; auto.
+      destruct (shift_is_scale i); simpl; auto.  
+Qed.
+
+Lemma silent_splitlong ge f: forall e, silent ge e ->
+    (forall h l, silent ge h -> silent ge l -> silent ge (f h l)) -> 
+   silent ge (splitlong e f).
+Proof. intros. unfold splitlong.
+    destruct (splitlong_match e); simpl in *; eauto. 
+    destruct H as [? [? _]]. apply H0; trivial.
+    split; trivial.
+    apply H0; simpl; split; auto.
+Qed.
+
+Lemma silent_shrimm ge i: forall e, silent ge e ->
+   silent ge (shrimm e i).
+Proof. intros. unfold shrimm.
+    destruct (Int.eq i Int.zero); simpl; eauto. 
+    destruct (shrimm_match e); simpl; auto. 
+      destruct (Int.ltu (Int.add i n1) Int.iwordsize); simpl; auto.
+Qed.
+
+Lemma silent_shruimm ge i: forall e, silent ge e ->
+   silent ge (shruimm e i).
+Proof. intros. unfold shruimm.
+    destruct (Int.eq i Int.zero); simpl; eauto. 
+    destruct (shruimm_match e); simpl; auto. 
+      destruct (Int.ltu (Int.add i n1) Int.iwordsize); simpl; auto.
+Qed.
+
+Lemma silent_shrximm ge i: forall e, silent ge e ->
+   silent ge (shrximm e i).
+Proof. intros. unfold shrximm.
+    destruct (Int.eq i Int.zero); simpl; eauto. 
+Qed.
+
+Lemma silent_mulimm_base ge n: forall e, silent ge e ->
+      silent ge (mulimm_base n e).
+Proof. intros.
+    unfold mulimm_base. destruct (Int.one_bits n); simpl; auto.
+    destruct l; simpl; auto.
+      eapply silent_shlimm; eauto. 
+    destruct l; simpl; auto. split; trivial.
+     eapply silent_add.
+      eapply silent_shlimm; simpl; eauto.
+      eapply silent_shlimm; simpl; eauto.
+Qed.  
+
+Lemma silent_mulimm ge n: forall e, silent ge e ->
+       silent ge (mulimm n e). 
+Proof. intros e.
+  unfold mulimm. intros. 
+  destruct (Int.eq n Int.zero); simpl; auto. 
+  destruct (Int.eq n Int.one); simpl; auto. 
+  destruct (mulimm_match e); simpl; auto.
+  simpl in *. destruct H as [H _]. 
+    eapply silent_addimm.
+    eapply silent_mulimm_base; eauto.
+    eapply silent_mulimm_base; eauto.  
+Qed. 
+
+Lemma silent_mul ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
+       silent ge (mul e1 e2). 
+Proof. intros; unfold mul. 
+  destruct (mul_match e1 e2); simpl in *;
+    try solve [apply silent_mulimm; eauto]. 
+   intuition.
+Qed.  
+
+Lemma silent_sub ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
+       silent ge (sub e1 e2). 
+Proof. intros; unfold sub. 
+  destruct (sub_match e1 e2); simpl in *;
+   try solve [apply silent_addimm; simpl in *; intuition].
+   auto. 
+Qed.  
+
+Lemma silent_lift_expr ge: forall e p, silent ge e ->
+       silent ge (lift_expr p e)
+with silent_lift_exprlist ge: forall al p, silentExprList ge al ->
+   silentExprList ge (lift_exprlist p al)
+with silent_lift_condexpr ge: forall con p, silentCondExpr ge con ->
+   silentCondExpr ge (lift_condexpr p con).
+Proof.
+  induction e; intros; simpl in *; auto.
+    destruct H as [HC [HE1 HE2]]. 
+    split; eauto. 
+  
+    destruct H. split; eauto. 
+  
+    destruct (le_gt_dec p n); simpl; trivial. 
+
+    destruct H as [? [? ?]]. 
+    repeat split; auto. 
+
+    destruct H. split. auto.
+    destruct (Genv.find_symbol ge i); simpl in *; trivial.
+
+  induction al; intros; simpl in *; auto.
+    destruct H.  split; eauto.
+
+  induction con; intros; simpl in *; auto. 
+    destruct H as [Hcon [HC1 HC2]].
+    split. auto. split; auto.
+
+    destruct H. split; auto.
+Qed. 
+
+Lemma silent_lift ge: forall e, silent ge e ->
+       silent ge (lift e). 
+Proof. intros; unfold lift.  
+  apply silent_lift_expr; trivial. 
+Qed.  
+
+Lemma silent_mull_base ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
+      silent ge (mull_base e1 e2).
+Proof. intros. unfold mull_base.
+  unfold splitlong2; simpl. 
+  remember (splitlong2_match e1 e2) as s.
+  destruct s; simpl. simpl in *. 
+  clear Heqs. 
+    destruct H as [? [? _]]. destruct H0 as [? [? _]].
+    destruct (ident_eq (i64_mul hf) (i64_mul hf)); simpl. 
+      repeat rewrite orb_true_r. simpl.
+      split. repeat split; auto. 
+      split. apply silent_add; simpl. 
+                apply silent_add; simpl; auto.
+                apply silent_mul; simpl; auto. 
+                apply silent_lift; trivial. 
+                apply silent_lift; trivial. 
+                apply silent_mul; simpl; auto. 
+                apply silent_lift; trivial. 
+                apply silent_lift; trivial. 
+      repeat split; trivial. 
+    elim n; trivial. 
+  split; trivial. 
+    destruct (ident_eq (i64_mul hf)  (i64_mul hf)); simpl. 
+      repeat rewrite orb_true_r. simpl.
+      simpl in H. destruct H as [HH1 [HL1 _]].
+      split. repeat split; trivial.
+        apply silent_lift; trivial. 
+      split. apply silent_add; simpl. 
+                apply silent_add; simpl; auto.
+                apply silent_mul; simpl; auto. 
+                apply silent_lift; trivial. 
+                apply silent_lift; trivial. 
+                apply silent_mul; simpl; auto. 
+                apply silent_lift; trivial. 
+                apply silent_lift; trivial. 
+      repeat split; trivial. 
+    elim n; trivial. 
+  split; trivial. 
+    destruct (ident_eq (i64_mul hf)  (i64_mul hf)); simpl. 
+      repeat rewrite orb_true_r. simpl.
+      simpl in H0. destruct H0 as [HH2 [HL2 _]].
+      split. repeat split; trivial.
+        apply silent_lift; trivial. 
+      split. apply silent_add; simpl. 
+                apply silent_add; simpl; auto.
+                apply silent_mul; simpl; auto. 
+                apply silent_lift; trivial. 
+                apply silent_lift; trivial. 
+                apply silent_mul; simpl; auto. 
+                apply silent_lift; trivial. 
+                apply silent_lift; trivial. 
+      repeat split; trivial. 
+    elim n; trivial.
+  split; trivial. 
+    split. apply silent_lift; trivial.
+    destruct (ident_eq (i64_mul hf)  (i64_mul hf)); simpl. 
+      repeat rewrite orb_true_r. simpl.
+      repeat split; trivial.
+    elim n; trivial.  
+Qed. 
+
+Lemma silent_divsmul ge z1 z2: silent ge (divs_mul z1 z2).
+Proof.
+     unfold divs_mul. apply silent_add.
+     apply silent_shrimm.
+     destruct (zlt z2 Int.half_modulus); simpl. auto. auto.
+     apply silent_shruimm; simpl; eauto.
+Qed.
+
+Lemma silent_divumul ge z1 z2: silent ge (divu_mul z1 z2).
+Proof.
+     unfold divu_mul. apply silent_shruimm. simpl. auto.
+Qed.
+
+Lemma silent_divsimm ge n: forall e, silent ge e ->
+      silent ge (divsimm e n).
+Proof. intros. unfold divsimm.
+  destruct (Int.is_power2 n); simpl.
+    destruct (Int.ltu i (Int.repr 31)); simpl. 
+     eapply silent_shrximm; eauto.
+     repeat split; auto.      
+   destruct (divs_mul_params (Int.signed n)); simpl.
+     destruct p; simpl. split; trivial.
+     apply silent_divsmul; auto.
+   repeat split; auto.  
+Qed.
+
+Lemma silent_modsimm ge n: forall e, silent ge e ->
+      silent ge (modsimm e n).
+Proof. intros. unfold modsimm.
+  destruct (Int.is_power2 n); simpl.
+    destruct (Int.ltu i (Int.repr 31)); simpl. 
+     repeat split; auto.      
+     apply silent_mulimm. apply silent_shrximm; simpl. auto.
+   repeat split; auto.  
+   destruct (divs_mul_params (Int.signed n)); simpl.
+     destruct p; simpl. repeat split; auto. 
+     apply silent_mulimm.
+     apply silent_divsmul. 
+   repeat split; auto.  
+Qed.
+
+Lemma silent_andimm ge n: forall e, silent ge e ->
+      silent ge (andimm n e).
+Proof. intros. unfold andimm.
+  destruct (Int.eq n Int.zero); simpl. trivial. 
+  destruct (Int.eq n Int.mone); simpl; trivial. 
+  destruct (andimm_match e); simpl; trivial. 
+  split; trivial. 
+Qed.
+
+Lemma silent_orimm ge n: forall e, silent ge e ->
+      silent ge (orimm n e).
+Proof. intros. unfold orimm.
+  destruct (Int.eq n Int.zero); simpl. trivial. 
+  destruct (Int.eq n Int.mone); simpl; trivial. 
+  destruct (orimm_match e); simpl; trivial. 
+  split; trivial. 
+Qed.
+
+Lemma silent_xorimm ge n: forall e, silent ge e ->
+      silent ge (xorimm n e).
+Proof. intros. unfold xorimm.
+  destruct (Int.eq n Int.zero); simpl. trivial. 
+  destruct (xorimm_match e); simpl; trivial. 
+  split; trivial. 
+Qed.
+
+Lemma silent_moduimm ge n: forall e, silent ge e ->
+      silent ge (moduimm e n).
+Proof. intros. unfold moduimm.
+  destruct (Int.is_power2 n); simpl.      
+    apply silent_andimm; auto.
+   destruct (divu_mul_params (Int.unsigned n)); simpl.
+     destruct p; simpl. repeat split; auto. 
+     apply silent_mulimm.
+     apply silent_divumul. 
+   repeat split; auto.  
+Qed.
+
+Lemma silent_divuimm ge n: forall e, silent ge e ->
+      silent ge (divuimm e n).
+Proof. intros. unfold divuimm.
+  destruct (Int.is_power2 n); simpl.
+    apply silent_shruimm; auto.
+   destruct (divu_mul_params (Int.unsigned n)); simpl.
+     destruct p; simpl. split; trivial.
+     unfold divu_mul. apply silent_shruimm. simpl. auto.
+   repeat split; auto.  
+Qed.
+
+Lemma silent_divfimm ge n: forall e, silent ge e ->
+      silent ge (divfimm e n).
+Proof. intros. unfold divfimm.
+  destruct (Float.exact_inverse n); simpl.
+   repeat split; auto.  
+   repeat split; auto.  
+Qed.
+
+Lemma silent_divu ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
+      silent ge (divu e1 e2).
+Proof. intros. unfold divu.
+  destruct (divu_match e2); simpl in *. 
+  apply silent_divuimm; auto. 
+  repeat split; auto.
+Qed.
+
+Lemma silent_divs ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
+      silent ge (divs e1 e2).
+Proof. intros. unfold divs.
+  destruct (divs_match e2); simpl in *. 
+  apply silent_divsimm; auto. 
+  repeat split; auto.
+Qed.
+
+Lemma silent_modu ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
+      silent ge (modu e1 e2).
+Proof. intros. unfold modu.
+  destruct (modu_match e2); simpl in *. 
+  apply silent_moduimm; auto. 
+  repeat split; auto.
+Qed.
+
+Lemma silent_mods ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
+      silent ge (mods e1 e2).
+Proof. intros. unfold mods.
+  destruct (mods_match e2); simpl in *. 
+  apply silent_modsimm; auto. 
+  repeat split; auto.
+Qed.
+
+Lemma silent_and ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
+      silent ge (and e1 e2).
+Proof. intros. unfold and.
+  destruct (and_match e1 e2); simpl in *. 
+  apply silent_andimm; auto. 
+  apply silent_andimm; auto. 
+  repeat split; auto.
+Qed.
+
+Lemma silent_or ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
+      silent ge (or e1 e2).
+Proof. intros. unfold or.
+  destruct (or_match e1 e2); simpl in *. 
+  apply silent_orimm; auto. 
+  apply silent_orimm; auto. 
+  destruct (Int.eq (Int.add n1 n2) Int.iwordsize); simpl.
+    destruct (same_expr_pure t1 t2); simpl; auto.
+    destruct H; destruct H0; repeat split; eauto.
+    destruct H; destruct H0; repeat split; eauto.
+  destruct (Int.eq (Int.add n1 n2) Int.iwordsize); simpl.
+    destruct (same_expr_pure t1 t2); simpl; auto.
+    destruct H; destruct H0; repeat split; eauto.
+    destruct H; destruct H0; repeat split; eauto.
+  repeat split; auto.
+Qed.
+
+Lemma silent_xor ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
+      silent ge (xor e1 e2).
+Proof. intros. unfold xor.
+  destruct (xor_match e1 e2); simpl in *. 
+  apply silent_xorimm; auto. 
+  apply silent_xorimm; auto. 
+  repeat split; auto.
+Qed.
+
+Lemma silent_shl ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
+      silent ge (shl e1 e2).
+Proof. intros. unfold shl.
+  destruct (shl_match e2); simpl in *. 
+  apply silent_shlimm; auto. 
+  repeat split; auto.
+Qed.
+
+Lemma silent_shr ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
+      silent ge (shr e1 e2).
+Proof. intros. unfold shr.
+  destruct (shr_match e2); simpl in *. 
+  apply silent_shrimm; auto. 
+  repeat split; auto.
+Qed.
+
+Lemma silent_shru ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
+      silent ge (shru e1 e2).
+Proof. intros. unfold shru.
+  destruct (shru_match e2); simpl in *. 
+  apply silent_shruimm; auto. 
+  repeat split; auto.
+Qed.
+
+Lemma silent_divf ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
+      silent ge (divf e1 e2).
+Proof. intros. unfold divf.
+  destruct (divf_match e2); simpl in *. 
+  apply silent_divfimm; auto. 
+  repeat split; auto.
+Qed.
+
+Lemma silent_addl ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
+      silent ge (addl e1 e2).
+Proof. intros. unfold addl.
+  destruct (is_longconst e1); simpl in *. 
+    destruct (is_longconst e2); simpl in *. repeat split; trivial.
+    destruct (Int64.eq i Int64.zero); simpl; trivial.
+    destruct (ident_eq (i64_add hf)(i64_add hf)); simpl. 
+      repeat rewrite orb_true_r. simpl. repeat split; trivial.
+    elim n; trivial.
+  destruct (is_longconst e2); simpl in *. 
+    destruct (Int64.eq i Int64.zero); simpl; trivial.
+    destruct (ident_eq (i64_add hf)(i64_add hf)); simpl. 
+      repeat rewrite orb_true_r. simpl. repeat split; trivial.
+    elim n; trivial.
+    destruct (ident_eq (i64_add hf)(i64_add hf)); simpl. 
+      repeat rewrite orb_true_r. simpl. repeat split; trivial.
+    elim n; trivial.
+Qed.
+
+Lemma silent_negl ge: forall e, silent ge e ->
+      silent ge (negl e).
+Proof. intros. unfold negl.
+  destruct (is_longconst e); simpl in *. repeat split; trivial.
+    destruct (ident_eq (i64_neg hf) (i64_neg hf)); simpl. 
+      repeat rewrite orb_true_r. simpl. repeat split; trivial.
+    elim n; trivial. 
+Qed.
+
+Lemma silent_subl ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
+      silent ge (subl e1 e2).
+Proof. intros. unfold subl.
+  destruct (is_longconst e1); simpl in *. 
+    destruct (is_longconst e2); simpl in *. repeat split; trivial.
+    destruct (Int64.eq i Int64.zero); simpl; trivial.
+    apply silent_negl; auto.
+    destruct (ident_eq (i64_sub hf)(i64_sub hf)); simpl. 
+      repeat rewrite orb_true_r. simpl. repeat split; trivial.
+    elim n; trivial.
+  destruct (is_longconst e2); simpl in *. 
+    destruct (Int64.eq i Int64.zero); simpl; trivial.
+    destruct (ident_eq (i64_sub hf)(i64_sub hf)); simpl. 
+      repeat rewrite orb_true_r. simpl. repeat split; trivial.
+    elim n; trivial.
+    destruct (ident_eq (i64_sub hf)(i64_sub hf)); simpl. 
+      repeat rewrite orb_true_r. simpl. repeat split; trivial.
+    elim n; trivial.
+Qed.
+
+Lemma divsdummy: Val.divls (Vlong Int64.one) (Vlong Int64.one) 
+        = Some (Vlong (Int64.divs Int64.one Int64.one)). 
+Proof. 
+ assert (Int64.eq Int64.one Int64.zero = false). 
+   apply Int64.eq_false. discriminate. 
+ simpl. rewrite H; simpl. 
+ assert (Int64.eq Int64.one (Int64.repr Int64.min_signed) = false). 
+   apply Int64.eq_false. discriminate. 
+ rewrite H0; simpl. trivial.
+Qed. 
+
+Lemma silent_divl (ge: Genv.t fundef unit) 
+                  (HC: i64_helpers_correct ge) e1 e2:
+      silent ge e1 -> silent ge e2 -> silent ge (divl e1 e2).
+Proof. intros. unfold divl, binop_long.
+  assert (IMPL: forall x y z : val,
+        Val.divls x y = Some z ->
+        helper_implements ge (i64_sdiv hf) sig_ll_l (x :: y :: nil) z) 
+      by eapply HC. 
+  destruct (IMPL _ _ _ divsdummy) 
+     as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
+  destruct (is_longconst e1); simpl in *.
+    destruct (is_longconst e2); simpl in *. repeat split; trivial.
+    split. repeat split; trivial. 
+    unfold fundef. rewrite FOUND, PTR. split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE.
+      intros. specialize (EXE m). inv EXE.
+    split. repeat split; trivial.
+    unfold fundef. rewrite FOUND, PTR. split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE.
+      intros. specialize (EXE m). inv EXE.
+Qed.
+
+Lemma silent_lowlong ge: forall e, silent ge e ->
+   silent ge (lowlong e).
+Proof. intros. unfold lowlong.
+    destruct (lowlong_match e); simpl in *; eauto. eapply H.
+Qed.
+        
+Lemma silent_shllimm ge (HC:i64_helpers_correct ge) i e:
+      silent ge e -> silent ge (shllimm e i).
+Proof. intros. unfold shllimm.
+    destruct (Int.eq i Int.zero); simpl; eauto. 
+    destruct (Int.ltu i Int.iwordsize); simpl; auto. 
+      apply silent_splitlong. trivial. 
+        intros; simpl.  
+          split. apply silent_or. apply silent_shlimm; trivial.
+          apply silent_shruimm; trivial.
+          split; trivial. apply silent_shlimm; trivial.
+    destruct (Int.ltu i Int64.iwordsize'); simpl.
+       split. apply silent_shlimm. apply silent_lowlong; trivial.
+       split; trivial.
+    split. repeat split; trivial.
+    assert (IMPL: forall x y : val,
+        helper_implements ge (i64_shl hf) sig_li_l 
+          (x :: y :: nil) (Val.shll x y)) by eapply HC.
+   destruct (IMPL Vundef Vundef)
+     as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
+   unfold fundef; rewrite FOUND, PTR. split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE.
+      intros. specialize (EXE m). inv EXE.
+Qed.
+
+Lemma silent_mullimm ge (HC: i64_helpers_correct ge) n e:
+      silent ge e -> silent ge (mullimm e n). 
+Proof. intros. unfold mullimm. 
+  destruct (Int64.eq n Int64.zero); simpl; auto. 
+  destruct (Int64.eq n Int64.one); simpl; auto. 
+  destruct (Int64.is_power2 n); simpl; auto.
+    eapply silent_shllimm; trivial. 
+    apply silent_mull_base; simpl; trivial. auto. 
+Qed. 
+
+Lemma silent_mull ge (HC: i64_helpers_correct ge) e1 e2: 
+      silent ge e1 -> silent ge e2 -> silent ge (mull e1 e2).
+Proof. intros. unfold mull.
+  destruct (is_longconst e1); simpl in *. 
+    destruct (is_longconst e2); simpl in *. repeat split; trivial.
+    apply silent_mullimm; auto. 
+  destruct (is_longconst e2); simpl in *. 
+    apply silent_mullimm; auto. 
+    apply silent_mull_base; trivial. 
+Qed.
+
+Lemma silent_highlong ge e: 
+      silent ge e -> silent ge (highlong e).
+Proof. intros; unfold highlong.
+  destruct (highlong_match e); simpl in *. 
+    eapply H. 
+    split; trivial. 
+Qed. 
+
+Lemma silent_shrlimm ge (HC:i64_helpers_correct ge) i e:
+      silent ge e -> silent ge (shrlimm e i).
+Proof. intros. unfold shrlimm.
+    destruct (Int.eq i Int.zero); simpl; eauto. 
+    destruct (Int.ltu i Int.iwordsize); simpl; auto. 
+      apply silent_splitlong. trivial. 
+        intros; simpl.  
+          split. apply silent_shrimm; trivial. 
+          split; trivial. 
+          apply silent_or. apply silent_shruimm; trivial.
+          apply silent_shlimm; trivial.
+    destruct (Int.ltu i Int64.iwordsize'); simpl; auto.
+       split. apply silent_highlong; trivial.
+       split. apply silent_shrimm; simpl; auto.
+       split; trivial. apply silent_shrimm; simpl; auto. 
+    split. repeat split; trivial.
+    assert (IMPL: forall x y : val,
+        helper_implements ge (i64_sar hf) sig_li_l 
+          (x :: y :: nil) (Val.shrl x y)) by eapply HC.
+    destruct (IMPL Vundef Vundef)
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
+    unfold fundef; rewrite FOUND, PTR.  split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE.
+      intros. specialize (EXE m). inv EXE.
+Qed.
+
+Lemma silent_shrluimm ge (HC: i64_helpers_correct ge) n e:
+       silent ge e -> silent ge (shrluimm e n).
+Proof. intros; unfold shrluimm.
+  destruct (Int.eq n Int.zero); simpl; trivial.
+  destruct (Int.ltu n Int.iwordsize); simpl.
+    apply silent_splitlong; trivial.
+    intros. unfold makelong. simpl. 
+       split. apply silent_shruimm; trivial.
+       split; trivial. 
+       apply silent_or. apply silent_shruimm; trivial.
+       apply silent_shlimm; trivial.
+  destruct (Int.ltu n Int64.iwordsize'); simpl.
+    repeat split; trivial.
+    apply silent_shruimm; trivial.
+    apply silent_highlong; trivial.
+  split. repeat split; trivial.
+    assert (IMPL: forall x y : val,
+        helper_implements ge (i64_shr hf) sig_li_l 
+          (x :: y :: nil) (Val.shrlu x y)) by eapply HC.
+    destruct (IMPL Vundef Vundef)
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
+    unfold fundef; rewrite FOUND, PTR.  split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE.
+      intros. specialize (EXE m). inv EXE.
+Qed.
+
+Lemma divlu_dummy:
+      Val.divlu (Vlong Int64.one) (Vlong Int64.one) = 
+      Some (Vlong (Int64.divu Int64.one Int64.one)).
+Proof.
+assert (Int64.eq Int64.one Int64.zero = false). 
+  apply Int64.eq_false. discriminate. 
+simpl; rewrite H. trivial. 
+Qed.
+
+Lemma silent_divlu ge (HC:i64_helpers_correct ge) e1 e2:
+      silent ge e1 -> silent ge e2 -> silent ge (divlu e1 e2).
+Proof. intros. unfold divlu.
+    assert (IMPL: forall x y z : val,
+        Val.divlu x y = Some z ->
+        helper_implements ge (i64_udiv hf) sig_ll_l (x :: y :: nil) z) by eapply HC.
+    destruct (IMPL _ _ _ divlu_dummy)
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
+  destruct (is_longconst e1); simpl in *. 
+    destruct (is_longconst e2); simpl in *.
+    repeat split; trivial.
+    split. repeat split; trivial.
+    unfold fundef; rewrite FOUND, PTR.  split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE.
+      intros. specialize (EXE m). inv EXE.
+  destruct (is_longconst e2); simpl in *. 
+    destruct (Int64.is_power2 i); simpl. 
+      apply silent_shrluimm; trivial.
+    split. repeat split; trivial.
+    unfold fundef; rewrite FOUND, PTR.  split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE.
+      intros. specialize (EXE m). inv EXE.
+  split. repeat split; trivial.
+    unfold fundef; rewrite FOUND, PTR.  split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE.
+      intros. specialize (EXE m). inv EXE.
+Qed.
+
+Lemma modls_dummy:
+      Val.modls (Vlong Int64.one) (Vlong Int64.one) = 
+      Some (Vlong (Int64.mods Int64.one Int64.one)).
+Proof.
+unfold Val.modls. 
+assert (Int64.eq Int64.one Int64.zero = false). 
+  apply Int64.eq_false. discriminate. 
+simpl; rewrite H. simpl. trivial. 
+Qed.
+
+Lemma silent_modl ge (HC:i64_helpers_correct ge) e1 e2:
+       silent ge e1 -> silent ge e2 -> silent ge (modl e1 e2).
+Proof. intros. unfold modl.
+  unfold binop_long.
+  assert (IMPL: forall x y z : val,
+        Val.modls x y = Some z ->
+        helper_implements ge (i64_smod hf) sig_ll_l (x :: y :: nil) z)
+        by eapply HC.
+  destruct (IMPL _ _ _ modls_dummy)
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
+  destruct (is_longconst e1); simpl in *; auto. 
+    destruct (is_longconst e2); simpl in *; auto.
+    split. repeat split; trivial.
+    unfold fundef. rewrite FOUND, PTR. split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE.
+      intros. specialize (EXE m). inv EXE.
+  split. repeat split; trivial.
+    unfold fundef. rewrite FOUND, PTR. split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE.
+      intros. specialize (EXE m). inv EXE.
+Qed.
+
+Lemma silent_andl ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
+      silent ge (andl e1 e2).
+Proof. intros. unfold andl. unfold splitlong2.
+  remember (splitlong2_match e1 e2) as s. 
+  destruct s; simpl in *.
+    destruct H as [H1 [L1 _]].
+    destruct H0 as [H2 [L2 _]].
+    repeat split; trivial.
+    apply silent_and; trivial.
+    apply silent_and; trivial.
+  clear Heqs. destruct H as [H1 [L1 _]].
+    repeat split; trivial.
+    apply silent_and; simpl; auto. apply silent_lift; trivial.
+    apply silent_and; simpl; auto. apply silent_lift; trivial.
+  clear Heqs. destruct H0 as [H2 [L2 _]].
+    repeat split; trivial.
+    apply silent_and; simpl; auto. apply silent_lift; trivial.
+    apply silent_and; simpl; auto. apply silent_lift; trivial.
+  repeat split; trivial. apply silent_lift; trivial.
+Qed. 
+
+Lemma modlu_dummy:
+      Val.modlu (Vlong Int64.one) (Vlong Int64.one) = 
+      Some (Vlong (Int64.mods Int64.one Int64.one)).
+Proof.
+unfold Val.modlu. 
+assert (Int64.eq Int64.one Int64.zero = false). 
+  apply Int64.eq_false. discriminate. 
+simpl; rewrite H. simpl. trivial. 
+Qed.
+
+Lemma silent_modlu ge (HC: i64_helpers_correct ge) e1 e2:
+      silent ge e1 -> silent ge e2 -> silent ge (modlu e1 e2).
+Proof. intros. unfold modlu.
+  assert (IMPL: forall x y z : val,
+        Val.modlu x y = Some z ->
+        helper_implements ge (i64_umod hf) sig_ll_l (x :: y :: nil) z)
+    by eapply HC.
+  destruct (IMPL _ _ _ modlu_dummy)
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
+  destruct (is_longconst e1); simpl in *; auto. 
+    destruct (is_longconst e2); simpl in *; auto. 
+      split. repeat split; trivial.
+      unfold fundef. rewrite FOUND, PTR. split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE.
+      intros. specialize (EXE m). inv EXE.
+    destruct (is_longconst e2); simpl in *; auto.   
+      destruct (Int64.is_power2 i); simpl in *; auto.
+        apply silent_andl; simpl; auto.
+        split. repeat split; trivial.
+      unfold fundef. rewrite FOUND, PTR. split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE.
+      intros. specialize (EXE m). inv EXE.
+  split. repeat split; trivial.
+    unfold fundef. rewrite FOUND, PTR. split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE.
+      intros. specialize (EXE m). inv EXE.
+Qed.
+
+Lemma silent_orl ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
+      silent ge (orl e1 e2).
+Proof. intros. unfold orl. unfold splitlong2.
+  remember (splitlong2_match e1 e2) as s. 
+  destruct s; simpl in *; clear Heqs.
+    destruct H as [H1 [L1 _]].
+    destruct H0 as [H2 [L2 _]].
+    repeat split; trivial.
+    apply silent_or; trivial.
+    apply silent_or; trivial.
+  destruct H as [H1 [L1 _]].
+    repeat split; trivial.
+    apply silent_or; simpl; auto. apply silent_lift; trivial.
+    apply silent_or; simpl; auto. apply silent_lift; trivial.
+  destruct H0 as [H2 [L2 _]].
+    repeat split; trivial.
+    apply silent_or; simpl; auto. apply silent_lift; trivial.
+    apply silent_or; simpl; auto. apply silent_lift; trivial.
+  repeat split; trivial. apply silent_lift; trivial.
+Qed. 
+
+Lemma silent_xorl ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
+      silent ge (xorl e1 e2).
+Proof. intros. unfold xorl. unfold splitlong2.
+  remember (splitlong2_match e1 e2) as s. 
+  destruct s; simpl in *; clear Heqs.
+    destruct H as [H1 [L1 _]].
+    destruct H0 as [H2 [L2 _]].
+    repeat split; trivial.
+    apply silent_xor; trivial.
+    apply silent_xor; trivial.
+  destruct H as [H1 [L1 _]].
+    repeat split; trivial.
+    apply silent_xor; simpl; auto. apply silent_lift; trivial.
+    apply silent_xor; simpl; auto. apply silent_lift; trivial.
+  destruct H0 as [H2 [L2 _]].
+    repeat split; trivial.
+    apply silent_xor; simpl; auto. apply silent_lift; trivial.
+    apply silent_xor; simpl; auto. apply silent_lift; trivial.
+  repeat split; trivial. apply silent_lift; trivial.
+Qed. 
+
+Lemma silent_shll ge (HC:i64_helpers_correct ge) e1 e2:
+       silent ge e1 -> silent ge e2 -> silent ge (shll e1 e2).
+Proof. intros. unfold shll. 
+  destruct (is_intconst e2); simpl in *; auto. 
+    apply silent_shllimm; trivial. 
+  split. repeat split; trivial.
+    assert (IMPL: forall x y : val,
+        helper_implements ge (i64_shl hf) sig_li_l 
+          (x :: y :: nil) (Val.shll x y)) by eapply HC.
+    destruct (IMPL Vundef Vundef)
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
+    unfold fundef; rewrite FOUND, PTR. split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE.
+      intros. specialize (EXE m). inv EXE.
+Qed. 
+
+Lemma silent_shrl ge (HC:i64_helpers_correct ge) e1 e2:
+      silent ge e1 -> silent ge e2 -> silent ge (shrl e1 e2).
+Proof. intros. unfold shrl. 
+  destruct (is_intconst e2); simpl in *; auto. 
+    apply silent_shrlimm; trivial. 
+  split. repeat split; trivial.
+  assert (IMPL: forall x y : val,
+        helper_implements ge (i64_sar hf) sig_li_l 
+          (x :: y :: nil) (Val.shrl x y)) by eapply HC.
+  destruct (IMPL Vundef Vundef)
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
+  unfold fundef; rewrite FOUND, PTR.  split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE.
+      intros. specialize (EXE m). inv EXE.
+Qed. 
+
+Lemma silent_shrlu ge (HC:i64_helpers_correct ge) e1 e2:
+      silent ge e1 -> silent ge e2 -> silent ge (shrlu e1 e2).
+Proof. intros. unfold shrlu. 
+  destruct (is_intconst e2); simpl in *; auto.   
+    apply silent_shrluimm; trivial. 
+  split. repeat split; trivial.
+  assert (IMPL: forall x y : val,
+        helper_implements ge (i64_shr hf) sig_li_l 
+          (x :: y :: nil) (Val.shrlu x y)) by eapply HC.
+  destruct (IMPL Vundef Vundef)
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
+  unfold fundef; rewrite FOUND, PTR.  split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE.
+      intros. specialize (EXE m). inv EXE.
+Qed.
+
+Lemma silent_compXimm  ge C cc c n e: silent ge e ->
+   silent ge (compimm C cc c e n).
+Proof. intros. unfold compimm.
+  destruct (compimm_match c e); simpl in *; auto.
+    destruct (Int.eq_dec n Int.zero); simpl in *; auto.
+      destruct (Int.eq_dec n Int.one); simpl in *; auto.
+    destruct (Int.eq_dec n Int.zero); simpl in *; auto.
+      destruct (Int.eq_dec n Int.one); simpl in *; auto.
+    destruct (Int.eq_dec n Int.zero); simpl in *; auto.
+    destruct H.  
+      destruct (Int.eq_dec n Int.zero); simpl in *; auto.
+Qed.      
+
+Lemma silent_comp ge c e1 e2: silent ge e1 -> silent ge e2 ->
+      silent ge (comp c e1 e2).
+Proof. intros. unfold comp. 
+  destruct (comp_match e1 e2); simpl in *; auto. 
+    apply silent_compXimm; auto.
+    apply silent_compXimm; auto.
+Qed.   
+
+Lemma silent_compu ge c e1 e2: silent ge e1 -> silent ge e2 ->
+      silent ge (compu c e1 e2).
+Proof. intros. unfold compu. 
+  destruct (compu_match e1 e2); simpl in *; auto. 
+    apply silent_compXimm; auto.
+    apply silent_compXimm; auto.
+Qed.   
+
+Lemma silent_cmpl_eq_zero ge e: silent ge e ->
+      silent ge (cmpl_eq_zero e).
+Proof. intros. unfold cmpl_eq_zero.
+  apply silent_splitlong; trivial.
+  intros; simpl. apply silent_comp; simpl; auto. 
+  apply silent_or; trivial.
+Qed.  
+
+Lemma silent_cmpl_ne_zero ge e: silent ge e ->
+      silent ge (cmpl_ne_zero e).
+Proof. intros. unfold cmpl_ne_zero.
+  apply silent_splitlong; trivial.
+  intros; simpl. apply silent_comp; simpl; auto. 
+  apply silent_or; trivial.
+Qed.  
+
+Lemma silent_cmpl_gen ge C D e1 e2: silent ge e1 -> silent ge e2 ->
+      silent ge (cmpl_gen C D e1 e2).
+Proof. intros. unfold cmpl_gen.
+  unfold splitlong2. 
+  destruct (splitlong2_match e1 e2); simpl in *; auto. 
+  destruct H as [HH1 [HL1 _]]. destruct H0 as [HH2 [HL2 _]]. 
+    repeat split; auto. 
+  destruct H as [HH1 [HL1 _]]. repeat split; auto. 
+    apply silent_lift; trivial.
+    apply silent_lift; trivial.
+    apply silent_lift; trivial.
+  destruct H0 as [HH2 [HL2 _]]. repeat split; auto. 
+    apply silent_lift; trivial.
+    apply silent_lift; trivial.
+    apply silent_lift; trivial. 
+  repeat split; auto. 
+    apply silent_lift; trivial.
+Qed.  
+
+Lemma silent_cmplu_gen ge C D e1 e2: silent ge e1 -> 
+      silent ge e2 -> silent ge (cmplu_gen C D e1 e2).
+Proof. intros. unfold cmplu_gen.
+  unfold splitlong2. 
+  destruct (splitlong2_match e1 e2); simpl in *; auto. 
+  destruct H as [HH1 [HL1 _]]. destruct H0 as [HH2 [HL2 _]]. 
+    repeat split; auto. 
+  destruct H as [HH1 [HL1 _]]. repeat split; auto. 
+    apply silent_lift; trivial.
+    apply silent_lift; trivial.
+    apply silent_lift; trivial.
+  destruct H0 as [HH2 [HL2 _]]. repeat split; auto. 
+    apply silent_lift; trivial.
+    apply silent_lift; trivial.
+    apply silent_lift; trivial. 
+  repeat split; auto. 
+    apply silent_lift; trivial.
+Qed.  
+
+Lemma silent_cmpl ge c e1 e2: silent ge e1 -> silent ge e2 ->
+      silent ge (cmpl c e1 e2).
+Proof. intros. unfold cmpl. 
+  destruct c; simpl; auto.
+    destruct (is_longconst_zero e2); simpl in *; auto. 
+      apply silent_cmpl_eq_zero; auto. 
+      apply silent_cmpl_eq_zero; auto. 
+        apply silent_xorl; trivial.
+    destruct (is_longconst_zero e2); simpl in *; auto. 
+      apply silent_cmpl_ne_zero; auto. 
+      apply silent_cmpl_ne_zero; auto. 
+        apply silent_xorl; trivial.
+    destruct (is_longconst_zero e2); simpl in *; auto. 
+      apply silent_comp; simpl; auto. apply silent_highlong; trivial. 
+      apply silent_cmpl_gen; auto. 
+      apply silent_cmpl_gen; auto. 
+      apply silent_cmpl_gen; auto. 
+    destruct (is_longconst_zero e2); simpl in *; auto. 
+      apply silent_comp; simpl; auto. apply silent_highlong; trivial. 
+      apply silent_cmpl_gen; auto. 
+Qed.   
+
+Lemma silent_cmplu ge c e1 e2: silent ge e1 -> silent ge e2 ->
+      silent ge (cmplu c e1 e2).
+Proof. intros. unfold cmplu. 
+  destruct c; simpl; auto.
+    destruct (is_longconst_zero e2); simpl in *; auto. 
+      apply silent_cmpl_eq_zero; auto. 
+      apply silent_cmpl_eq_zero; auto. 
+        apply silent_xorl; trivial.
+    destruct (is_longconst_zero e2); simpl in *; auto. 
+      apply silent_cmpl_ne_zero; auto. 
+      apply silent_cmpl_ne_zero; auto. 
+        apply silent_xorl; trivial.
+    apply silent_cmplu_gen; auto. 
+    apply silent_cmplu_gen; auto. 
+    apply silent_cmplu_gen; auto. 
+    apply silent_cmplu_gen; auto. 
+Qed.   
+
+Lemma silent_binop ge (HC:i64_helpers_correct ge) e1 e2 b
+   (Silent1: silent ge e1) (Silent2: silent ge e2):
+   silent ge (sel_binop b e1 e2).
+Proof. intros.
+destruct b; simpl; try solve [repeat split; auto].
+apply silent_add; trivial.
+apply silent_sub; trivial.
+apply silent_mul; trivial.
+apply silent_divs; trivial.
+apply silent_divu; trivial.
+apply silent_mods; trivial.
+apply silent_modu; auto.
+apply silent_and; auto.
+apply silent_or; auto.
+apply silent_xor; auto.
+apply silent_shl; auto.
+apply silent_shr; auto.
+apply silent_shru; auto.
+apply silent_divf; auto.
+apply silent_addl; auto.
+apply silent_subl; auto.
+apply silent_mull; auto.
+apply silent_divl; auto.
+apply silent_divlu; auto.
+apply silent_modl; auto.
+apply silent_modlu; auto.
+apply silent_andl; auto.
+apply silent_orl; auto.
+apply silent_xorl; auto.
+apply silent_shll; auto.
+apply silent_shrl; auto.
+apply silent_shrlu; auto.
+apply silent_comp; auto.
+apply silent_compu; auto.
+apply silent_cmpl; auto.
+apply silent_cmplu; auto.
+Qed.
+
+Lemma silent_cast8unsigned ge e: silent ge e ->
+   silent ge (cast8unsigned e).
+Proof. intros. unfold cast8unsigned.
+  destruct (cast8unsigned_match e); simpl; auto. 
+Qed.
+
+Lemma silent_cast16unsigned ge e: silent ge e ->
+   silent ge (cast16unsigned e).
+Proof. intros. unfold cast16unsigned.
+  destruct (cast16unsigned_match e); simpl; auto. 
+Qed.
+
+Lemma silent_notl ge e: silent ge e ->
+   silent ge (notl e).
+Proof. intros. unfold notl.
+  apply silent_splitlong; trivial.
+  intros; simpl; auto.  
+Qed.
+
+Lemma silent_intoflong ge e: silent ge e ->
+   silent ge (intoflong e).
+Proof. intros. unfold intoflong.
+  apply silent_lowlong; trivial.
+Qed.
+
+Lemma longoffloat_dummy: exists x z, 
+  Val.longoffloat x = Some z.
+Proof.
+unfold Val.longoffloat, Float.longoffloat, Float.Zoffloat.
+exists (Vfloat Float.zero). simpl.
+assert (Float.zero = Fappli_IEEE.B754_zero 53 1024 false).
+  reflexivity.
+rewrite H. 
+eexists; reflexivity. 
+Qed. 
+
+Lemma longuoffloat_dummy: exists x z, 
+  Val.longuoffloat x = Some z.
+Proof.
+unfold Val.longuoffloat, Float.longuoffloat, Float.Zoffloat.
+exists (Vfloat Float.zero). simpl.
+assert (Float.zero = Fappli_IEEE.B754_zero 53 1024 false).
+  reflexivity.
+rewrite H. 
+eexists; reflexivity. 
+Qed. 
+
+Lemma floatoflong_dummy: exists x z, 
+  Val.floatoflong x = Some z.
+Proof.
+unfold Val.floatoflong, Float.floatoflong.
+exists (Vlong Int64.zero).
+eexists; reflexivity. 
+Qed. 
+
+Lemma floatoflongu_dummy: exists x z, 
+  Val.floatoflongu x = Some z.
+Proof.
+unfold Val.floatoflongu, Float.floatoflongu. 
+exists (Vlong Int64.zero). 
+eexists; reflexivity. 
+Qed. 
+
+Lemma singleoflong_dummy: exists x z, 
+  Val.singleoflong x = Some z.
+Proof.
+unfold Val.singleoflong, Float.singleoflong.
+exists (Vlong Int64.zero). 
+eexists; reflexivity. 
+Qed. 
+
+Lemma singleoflongu_dummy: exists x z, 
+  Val.singleoflongu x = Some z.
+Proof.
+unfold Val.singleoflongu, Float.singleoflongu.
+exists (Vlong Int64.zero). 
+eexists; reflexivity. 
+Qed. 
+
+Lemma free_has_effect m b lo sz: 
+      ~ Mem.free m b (Int.unsigned lo - 4)
+         (Int.unsigned lo + Int.unsigned sz) = Some m.
+Proof. intros N.
+  specialize (Int.unsigned_range sz). intros.
+  apply (Mem.perm_free_2 _ _ _ _ _ N (Int.unsigned lo - 4) Cur Freeable). omega.
+  eapply (Mem.free_range_perm _ _ _ _ _ N). omega. 
+Qed.
+
+Lemma silent_unop ge (HC:i64_helpers_correct ge) u e: 
+      silent ge e -> silent ge (sel_unop u e).
+Proof. intros.
+destruct u; simpl; try solve [repeat split; auto].
+apply silent_cast8unsigned; trivial. 
+apply silent_cast16unsigned; trivial. 
+apply silent_negl; trivial. 
+apply silent_notl; trivial.
+apply silent_intoflong; trivial.
+split. repeat split; trivial.
+assert (IMPL:forall x z : val,
+        Val.longoffloat x = Some z ->
+        helper_implements ge (i64_dtos hf) sig_f_l (x :: nil) z)
+     by eapply HC.
+destruct longoffloat_dummy as [x [z XZ]].
+destruct (IMPL _ _ XZ)
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
+unfold fundef. rewrite FOUND, PTR. split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE. 
+        apply free_has_effect in H3. contradiction. 
+      intros. specialize (EXE m). inv EXE. 
+
+split. split; trivial.
+assert (IMPL:forall x z : val,
+        Val.longuoffloat x = Some z ->
+        helper_implements ge (i64_dtou hf) sig_f_l (x :: nil) z)
+     by eapply HC.
+destruct longuoffloat_dummy as [x [z XZ]].
+destruct (IMPL _ _ XZ)
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
+unfold fundef. rewrite FOUND, PTR. split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE. 
+        apply free_has_effect in H3. contradiction. 
+      intros. specialize (EXE m). inv EXE. 
+
+split. split; trivial.
+assert (IMPL:forall x z : val,
+        Val.floatoflong x = Some z ->
+        helper_implements ge (i64_stod hf) sig_l_f (x :: nil) z)
+     by eapply HC.
+destruct floatoflong_dummy as [x [z XZ]].
+destruct (IMPL _ _ XZ)
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
+unfold fundef. rewrite FOUND, PTR.  split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE. 
+        apply free_has_effect in H3. contradiction. 
+      intros. specialize (EXE m). inv EXE. 
+
+split. split; trivial.
+assert (IMPL:forall x z : val,
+        Val.floatoflongu x = Some z ->
+        helper_implements ge (i64_utod hf) sig_l_f (x :: nil) z)
+     by eapply HC.
+destruct floatoflongu_dummy as [x [z XZ]].
+destruct (IMPL _ _ XZ)
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
+unfold fundef. rewrite FOUND, PTR. split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE. 
+        apply free_has_effect in H3. contradiction. 
+      intros. specialize (EXE m). inv EXE. 
+
+split. split; trivial.
+assert (IMPL:forall x z : val,
+        Val.singleoflong x = Some z ->
+        helper_implements ge (i64_stof hf) sig_l_s (x :: nil) z)
+     by eapply HC.
+destruct singleoflong_dummy as [x [z XZ]].
+destruct (IMPL _ _ XZ)
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
+unfold fundef. rewrite FOUND, PTR. split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE. 
+        apply free_has_effect in H3. contradiction. 
+      intros. specialize (EXE m). inv EXE.  
+
+split. split; trivial.
+assert (IMPL:forall x z : val,
+        Val.singleoflongu x = Some z ->
+        helper_implements ge (i64_utof hf) sig_l_s (x :: nil) z)
+     by eapply HC.
+destruct singleoflongu_dummy as [x [z XZ]].
+destruct (IMPL _ _ XZ)
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
+unfold fundef. rewrite FOUND, PTR. split. trivial.
+      destruct ef; simpl; try reflexivity.
+      intros. specialize (EXE m). inv EXE. 
+        apply free_has_effect in H3. contradiction. 
+      intros. specialize (EXE m). inv EXE.  
+Qed.
+
+Lemma silent_addressing ge ch e a el: silent ge e ->
+      (a, el) = addressing ch e -> silentExprList ge el.
+Proof. intros. unfold addressing in H0.
+  destruct (addressing_match e); inv H0; simpl in *; auto. 
+Qed.    
+
+Lemma sel_expr_silent ge (HC:i64_helpers_correct ge) e:
+      silent ge (sel_expr e).
+Proof. intros.
+  induction e; simpl; trivial.
+  destruct c; simpl; auto.
+  unfold addrsymbol. remember (symbol_is_external i) as ext.
+    destruct ext; simpl; trivial.
+    destruct (Int.eq i0 Int.zero); simpl; eauto.
+  apply silent_unop; trivial. 
+  apply silent_binop; trivial. 
+  unfold load. remember (addressing m (sel_expr e)) as a. 
+    destruct a; simpl.
+    eapply silent_addressing; eauto.
+Qed. 
+
+Lemma sel_exprlist_silent ge (HC:i64_helpers_correct ge) al:
+      silentExprList ge (sel_exprlist al).
+Proof. induction al; simpl; trivial.
+  split; auto.
+  apply sel_expr_silent; trivial.
+Qed.
+
+Lemma sel_condexpr_silent ge (HC:i64_helpers_correct ge) a: 
+      silentCondExpr ge (condexpr_of_expr (sel_expr a)).
+Proof. intros.
+  specialize (sel_expr_silent ge HC a). intros.
+  remember (sel_expr a) as e. clear Heqe.
+  induction e; simpl in *; auto.
+  destruct o; simpl; auto. 
+  destruct H as [HH1 [HH2 HH3]]; auto.
+  destruct H as [HH1 HH3]; auto. 
+Qed.
+
 Section PRESERVATION.
 
 Variable prog: Cminor.program.
@@ -174,14 +1375,15 @@ Lemma helper_implements_preserved:
   helper_implements ge id sg vargs vres ->
   helper_implements tge id sg vargs vres.
 Proof.
-  intros. destruct H as (b & ef & A & B & C & D).
+  intros. destruct H as (b & ef & A & B & C & D & E).
   exploit function_ptr_translated; eauto. simpl. intros. 
   exists b; exists ef. 
   split. rewrite symbols_preserved. auto.
   split. auto.
   split. auto.
-  intros. eapply external_call_symbols_preserved; eauto. 
-  exact symbols_preserved. exact varinfo_preserved.
+  split. intros. eapply external_call_symbols_preserved; eauto. 
+         exact symbols_preserved. exact varinfo_preserved.
+  trivial.
 Qed.
 
 Lemma builtin_implements_preserved:
@@ -262,18 +1464,37 @@ Proof.
   eapply eval_Eload; eauto. 
 Qed.
 
+Lemma eval_addressing': forall (ge : genv) (sp : val) (e : env) 
+         (m : mem) 
+         (le : letenv) (chunk : memory_chunk) (a : expr) 
+         (v : val) (b : block) (ofs : int),
+       eval_expr ge sp e m le a v ->
+       v = Vptr b ofs -> silent ge a ->
+       let (mode, args) := addressing chunk a in
+       exists vl : list val,
+         eval_exprlist ge sp e m le args vl /\
+         Op.eval_addressing ge sp mode vl = Some v /\
+         silentExprList ge args.
+Proof.
+  intros until v. unfold addressing; case (addressing_match a); intros; InvEval.
+  inv H. exists vl; auto.
+  exists (v :: nil); split. constructor; auto. constructor. 
+  subst; simpl. rewrite Int.add_zero; auto. 
+Qed. 
+
 Lemma eval_coopstore:
   forall chunk a1 a2 v1 v2 f k m',
   eval_expr tge sp e m nil a1 v1 ->
   eval_expr tge sp e m nil a2 v2 ->
   Mem.storev chunk m v1 v2 = Some m' ->
+  forall (SIL1: silent tge a1) (SIL2: silent tge a2),
   CMinSel_corestep tge (CMinSel_State f (store chunk a1 a2) k sp e) m
         (CMinSel_State f Sskip k sp e) m'.
 Proof.
   intros. generalize H1; destruct v1; simpl; intro; try discriminate.
   unfold store.
-  generalize (eval_addressing _ _ _ _ _ chunk _ _ _ _ H (refl_equal _)).
-  destruct (addressing chunk a1). intros [vl [EV EQ]]. 
+  generalize (eval_addressing' _ _ _ _ _ chunk _ _ _ _ H (refl_equal _) SIL1).
+  destruct (addressing chunk a1). intros [vl [EV [EQ SILArgs]]]. 
   eapply cminsel_corestep_store; eauto. 
 Qed.
 
@@ -282,6 +1503,7 @@ Lemma eval_effstore:
   eval_expr tge sp e m nil a1 v1 ->
   eval_expr tge sp e m nil a2 v2 ->
   Mem.storev chunk m v1 v2 = Some m' ->
+  forall (SIL1: silent tge a1) (SIL2: silent tge a2),
   cminsel_effstep tge (StoreEffect v1 (encode_val chunk v2))
         (CMinSel_State f (store chunk a1 a2) k sp e) m
         (CMinSel_State f Sskip k sp e) m'.
@@ -291,8 +1513,8 @@ effsstep tge (State f (store chunk a1 a2) k sp e m)
 Proof.
   intros. generalize H1; destruct v1; simpl; intro; try discriminate.
   unfold store.
-  generalize (eval_addressing _ _ _ _ _ chunk _ _ _ _ H (refl_equal _)).
-  destruct (addressing chunk a1). intros [vl [EV EQ]]. 
+  generalize (eval_addressing' _ _ _ _ _ chunk _ _ _ _ H (refl_equal _) SIL1).
+  destruct (addressing chunk a1). intros [vl [EV [EQ SILArgs]]]. 
   eapply cminsel_effstep_store; eauto. 
 Qed.
 (** Correctness of instruction selection for operators *)
@@ -438,8 +1660,9 @@ Proof.
 Qed.*)
 
 (** Lenb: replace eval_unop_lessdef with eval_unop from
-    Cminorgenproof; this requires the additio of Require Import Float above
-  Compatibility of [eval_unop] with respect to [val_inject]. *)
+    Cminorgenproof; this requires the addition of 
+    Require Import Float above*)
+(* Compatibility of [eval_unop] with respect to [val_inject]. *)
 
 Lemma eval_unop_compat:
   forall f op v1 tv1 v,
@@ -823,21 +2046,6 @@ Proof.
   exploit IHeval_exprlist; eauto. intros [vl' [C D]].
   exists (v1' :: vl'); split; eauto. constructor; eauto.
 Qed.
-(*
-Lemma sel_exprlist_correct:
-  forall sp e m a v,
-  Cminor.eval_exprlist ge sp e m a v ->
-  forall e' le m',
-  env_lessdef e e' -> Mem.extends m m' ->
-  exists v', eval_exprlist tge sp e' m' le (sel_exprlist hf a) v' /\ Val.lessdef_list v v'.
-Proof.
-  induction 1; intros; simpl. 
-  exists (@nil val); split; auto. constructor.
-  exploit sel_expr_correct; eauto. intros [v1' [A B]].
-  exploit IHeval_exprlist; eauto. intros [vl' [C D]].
-  exists (v1' :: vl'); split; auto. constructor; eauto.
-Qed.
-*)
 
 (** Semantic preservation for functions and statements. *)
 
@@ -856,7 +2064,6 @@ Inductive match_cont (*NEW:*)(j:meminj): Cminor.cont -> CminorSel.cont -> Prop :
       (*env_lessdef e e' ->*)
       env_inject j e e' -> sp_preserved j sp sp' ->
       match_cont j (Cminor.Kcall id f sp e k) (Kcall id (sel_function hf ge f) sp' e' k').
-
 
 Inductive match_states (j:meminj) : CMin_core -> mem -> CMinSel_core -> mem -> Prop :=
   | match_state: forall f s k s' k' sp e m sp' e' m',
@@ -1623,7 +2830,8 @@ Lemma MATCH_diagram: forall (GDE : genvs_domain_eq ge tge)
      SM_wd mu' /\
      sm_valid mu' m1' m2'.
 Proof.
-  intros. 
+  intros.
+  assert (THELPERS:= helpers_correct_preserved); clear HELPERS.
    inv CS; simpl in *.
   (*skip seq*)
       destruct MC as [SMC PRE].
@@ -1712,6 +2920,7 @@ Proof.
       split. left.
          apply corestep_plus_one. 
            econstructor; eauto. 
+           apply sel_expr_silent; trivial.
       simpl. exists mu. intuition.
       apply intern_incr_refl. 
       apply sm_inject_separated_same_sminj.
@@ -1745,6 +2954,8 @@ Proof.
       split. left.
          apply corestep_plus_one. 
             eapply eval_coopstore; eauto. 
+            apply sel_expr_silent; trivial.
+            apply sel_expr_silent; trivial.
       simpl. exists mu.
       assert (SMV': sm_valid mu m1' m2').
         split; intros; 
@@ -1793,7 +3004,10 @@ Proof.
        eexists; eexists. 
        split. left. 
          apply corestep_plus_one.  
-            econstructor. econstructor; eauto. apply C. 
+            econstructor. 
+               simpl. apply sel_expr_silent; trivial.
+               apply sel_exprlist_silent; trivial.
+            econstructor; eauto. apply C. 
             eapply functions_translated; eauto.
             eapply restrict_GFP_vis; eassumption.
              apply sig_function_translated.
@@ -1816,7 +3030,10 @@ Proof.
        eexists; eexists. 
        split. left. rewrite <- symbols_preserved in U. 
          apply corestep_plus_one. 
-            econstructor. econstructor; eauto. apply C. 
+            econstructor. 
+              simpl. trivial.
+              apply sel_exprlist_silent; trivial.
+            econstructor; eauto. apply C. 
             eapply functions_translated; eauto.
             eapply restrict_GFP_vis; eassumption.
             apply sig_function_translated. 
@@ -1866,19 +3083,28 @@ Proof.
         apply corestep_plus_one. 
         exploit classify_call_correct; eauto.    
         destruct (classify_call ge a) as [ | id | ef]; intros.
-            econstructor. econstructor; eauto. apply C. 
+            econstructor. 
+              simpl. apply sel_expr_silent; trivial.
+              apply sel_exprlist_silent; trivial.
+            econstructor; eauto. apply C. 
             eapply functions_translated; eauto. 
             apply sig_function_translated.
             eassumption.
         destruct H5 as [b [U V]].  
-            econstructor; eauto. econstructor; eauto.
+            econstructor; eauto. 
+              simpl; trivial.
+              apply sel_exprlist_silent; trivial.
+            econstructor; eauto.
             rewrite symbols_preserved; eauto.
             eapply functions_translated; eauto. subst vf; auto.
             rewrite Genv.find_funct_find_funct_ptr in H1.
                destruct (GFPR _ _ H1).
                inv B. rewrite H9 in H5; inv H5. eauto.
             apply sig_function_translated.
-        simpl. econstructor; auto. econstructor; auto. 
+        simpl. econstructor; auto.
+                 simpl. apply sel_expr_silent; trivial.
+                 apply sel_exprlist_silent; trivial.
+                 econstructor; auto. 
            eassumption. 
             eapply functions_translated; eauto.
             apply sig_function_translated.
@@ -1917,7 +3143,9 @@ Proof.
       eexists; eexists. 
       split. left.
         apply corestep_plus_one. 
-          econstructor. eauto. eassumption. assumption.
+          econstructor.
+              apply sel_exprlist_silent; trivial. 
+              eauto. eassumption. assumption.
       exists mu'; intuition.
       split.
         econstructor. eauto. 
@@ -1979,7 +3207,9 @@ Proof.
       exists m2.
       split. left. 
         apply corestep_plus_one. 
-            econstructor; eauto. eapply eval_condexpr_of_expr; eauto.
+            econstructor; eauto. 
+              apply sel_condexpr_silent; trivial.
+            eapply eval_condexpr_of_expr; eauto.
       exists mu; simpl; intuition. 
        apply intern_incr_refl. 
        apply sm_inject_separated_same_sminj.
@@ -2083,6 +3313,7 @@ Proof.
       split. left. 
         apply corestep_plus_one. 
             econstructor; eauto.
+            apply sel_expr_silent; trivial.
       exists mu; simpl; intuition. 
        apply intern_incr_refl. 
        apply sm_inject_separated_same_sminj.
@@ -2147,6 +3378,7 @@ Proof.
       split. left. 
         apply corestep_plus_one. 
             econstructor; eauto.
+            apply sel_expr_silent; trivial.
       exists mu; simpl.
       assert (SMV': sm_valid mu m1' m2').
         split; intros;
@@ -2337,6 +3569,7 @@ Lemma MATCH_effcore_diagram:
          Mem.perm m1 b1 (ofs - delta1) Max Nonempty)).
 Proof.
   intros. 
+  assert (THELPERS:= helpers_correct_preserved); clear HELPERS.
 induction CS; simpl in *.
   (*skip seq*)
       destruct MC as [SMC PRE].
@@ -2426,7 +3659,8 @@ induction CS; simpl in *.
       eexists; eexists. eexists.
       split. left.
          apply effstep_plus_one. 
-           econstructor; eauto. 
+           econstructor; eauto.
+           apply sel_expr_silent; trivial.
       simpl. exists mu. intuition.
       apply intern_incr_refl. 
       apply sm_inject_separated_same_sminj.
@@ -2460,6 +3694,8 @@ induction CS; simpl in *.
       split. left.
          apply effstep_plus_one.
           eapply eval_effstore; eauto.
+          apply sel_expr_silent; trivial.
+          apply sel_expr_silent; trivial.
       simpl. exists mu.
       assert (SMV': sm_valid mu m' m2').
         split; intros; 
@@ -2511,7 +3747,10 @@ induction CS; simpl in *.
        eexists; eexists. eexists.
        split. left. 
          apply effstep_plus_one. 
-            econstructor. econstructor; eauto. apply C. 
+            econstructor. 
+              simpl. apply sel_expr_silent; trivial.
+              apply sel_exprlist_silent; trivial.
+            econstructor; eauto. apply C. 
             eapply functions_translated; eauto.
             eapply restrict_GFP_vis; eassumption. 
              apply sig_function_translated. 
@@ -2534,7 +3773,10 @@ induction CS; simpl in *.
        eexists; eexists. eexists.
        split. left. rewrite <- symbols_preserved in U. 
          apply effstep_plus_one.
-            econstructor. econstructor; eauto. apply C. 
+            econstructor. 
+            simpl. trivial.
+            apply sel_exprlist_silent; trivial.
+            econstructor; eauto. apply C. 
             eapply functions_translated; eauto.
             eapply restrict_GFP_vis; eassumption.
             apply sig_function_translated.
@@ -2584,12 +3826,18 @@ induction CS; simpl in *.
         apply effstep_plus_one. 
         exploit classify_call_correct; eauto.    
         destruct (classify_call ge a) as [ | id | ef]; intros.
-            econstructor. econstructor; eauto. apply C. 
+            econstructor.
+            simpl. apply sel_expr_silent; trivial.
+            apply sel_exprlist_silent; trivial.
+            econstructor; eauto. apply C. 
             eapply functions_translated; eauto. 
             apply sig_function_translated.
             eassumption.
         destruct H5 as [b [U V]].  
-            econstructor; eauto. econstructor; eauto.
+            econstructor; eauto.
+              simpl. trivial.
+              apply sel_exprlist_silent; trivial.
+             econstructor; eauto.
             rewrite symbols_preserved; eauto.
             eapply functions_translated; eauto. subst vf; auto.
             rewrite Genv.find_funct_find_funct_ptr in H1.
@@ -2597,9 +3845,11 @@ induction CS; simpl in *.
                inv B. rewrite H9 in H5; inv H5. eauto.   
             apply sig_function_translated.
         destruct H5 as [FD OBS]; subst fd. 
-          econstructor; eauto.  
-            econstructor; auto. eassumption.
-            eapply functions_translated; eauto.
+          econstructor; eauto.
+           simpl. apply sel_expr_silent; trivial.
+           apply sel_exprlist_silent; trivial.  
+           econstructor; auto. eassumption.
+           eapply functions_translated; eauto.
        exists mu. simpl.
        assert (SMV': sm_valid mu m' m2').
          split; intros;
@@ -2638,7 +3888,9 @@ induction CS; simpl in *.
       eexists; eexists; eexists. 
       split. left.
         apply effstep_plus_one. 
-          econstructor. eauto. eassumption. assumption.
+          econstructor.
+            apply sel_exprlist_silent; trivial. 
+          eauto. eassumption. assumption.
       exists mu'. split; trivial. split; trivial. split; trivial.
       split.
         split. 
@@ -2704,6 +3956,7 @@ induction CS; simpl in *.
       split. left. 
         apply effstep_plus_one. 
             econstructor; eauto.
+            apply sel_condexpr_silent; trivial.
             eapply eval_condexpr_of_expr; eauto.
       exists mu; simpl; intuition. 
        apply intern_incr_refl. 
@@ -2808,6 +4061,7 @@ induction CS; simpl in *.
       split. left. 
         apply effstep_plus_one. 
             econstructor; eauto.
+            apply sel_expr_silent; trivial.
       exists mu; simpl; intuition. 
        apply intern_incr_refl. 
        apply sm_inject_separated_same_sminj.
@@ -2876,6 +4130,7 @@ induction CS; simpl in *.
       split. left. 
         apply effstep_plus_one. 
             econstructor; eauto.
+            apply sel_expr_silent; trivial.
       exists mu; simpl.
       assert (SMV': sm_valid mu m' m2').
         split; intros;
@@ -3039,22 +4294,7 @@ induction CS; simpl in *.
            eapply set_var_inject; auto.
          assumption.
        intuition.
-(*inductive case
-  destruct IHCS as [c2' [m2' [U2 [HH1 [mu'  HH2]]]]].
-    intros. eapply EffSrc. apply H. assumption. eassumption.
-    assumption. assumption.
-  exists c2', m2', U2. split; trivial.
-  destruct HH2 as [? [? [? [? [? [? ?]]]]]].
-  exists mu'. 
-  repeat (split; trivial). 
-    eapply (H6 _ _ H7).
-  intros. destruct (H6 _ _ H7).
-    destruct (H10 H8) as [b1 [delta [Frg [HE HP]]]]; clear H6.
-    exists b1, delta. split; trivial. split; trivial.
-    apply Mem.perm_valid_block in HP. 
-    apply H; assumption. *)
 Qed. 
-
 
 (*program structure not yet updated to module*)
 Theorem transl_program_correct:
@@ -3166,205 +4406,4 @@ assert (GDE: genvs_domain_eq ge tge).
     exists U2. split; assumption. }
 Qed.
 
-
 End PRESERVATION.
-
-(*
-Lemma sel_step_correct:
-  forall S1 m1 S2 m2, cmin_effstep ge S1 m1 S2 m2 ->
-  forall T1, match_states S1 T1 ->
-  (exists T2, cminsel_effstep tge T1 m1 T2 m2 /\ match_states S2 T2)
-  \/ (measure S2 < measure S1 /\ match_states S2 T1)%nat.
-Proof.
-  induction 1; intros T1 ME; inv ME; simpl.
-  (* skip seq *)
-  inv H7. left; econstructor; split. econstructor. constructor; auto.
-
-
-Lemma sel_step_correct:
-  forall S1 t S2, Cminor.step ge S1 t S2 ->
-  forall T1, match_states S1 T1 ->
-  (exists T2, step tge T1 t T2 /\ match_states S2 T2)
-  \/ (measure S2 < measure S1 /\ t = E0 /\ match_states S2 T1)%nat.
-Proof.
-  induction 1; intros T1 ME; inv ME; simpl.
-  (* skip seq *)
-  inv H7. left; econstructor; split. econstructor. constructor; auto.
-  (* skip block *)
-  inv H7. left; econstructor; split. econstructor. constructor; auto.
-  (* skip call *)
-  exploit Mem.free_parallel_extends; eauto. intros [m2' [A B]].
-  left; econstructor; split. 
-  econstructor. inv H9; simpl in H; simpl; auto. 
-  eauto. 
-  constructor; auto.
-  (* assign *)
-  exploit sel_expr_correct; eauto. intros [v' [A B]].
-  left; econstructor; split.
-  econstructor; eauto.
-  constructor; auto. apply set_var_lessdef; auto.
-  (* store *)
-  exploit sel_expr_correct. eexact H. eauto. eauto. intros [vaddr' [A B]].
-  exploit sel_expr_correct. eexact H0. eauto. eauto. intros [v' [C D]].
-  exploit Mem.storev_extends; eauto. intros [m2' [P Q]].
-  left; econstructor; split.
-  eapply eval_store; eauto.
-  constructor; auto.
-  (* Scall *)
-  exploit sel_exprlist_correct; eauto. intros [vargs' [C D]].
-  exploit classify_call_correct; eauto. 
-  destruct (classify_call ge a) as [ | id | ef].
-  (* indirect *)
-  exploit sel_expr_correct; eauto. intros [vf' [A B]].
-  left; econstructor; split.
-  econstructor; eauto. econstructor; eauto. 
-  eapply functions_translated; eauto. 
-  apply sig_function_translated.
-  constructor; auto. constructor; auto.
-  (* direct *)
-  intros [b [U V]]. 
-  left; econstructor; split.
-  econstructor; eauto. econstructor; eauto. rewrite symbols_preserved; eauto.
-  eapply functions_translated; eauto. subst vf; auto. 
-  apply sig_function_translated.
-  constructor; auto. constructor; auto.
-  (* turned into Sbuiltin *)
-  intros EQ. subst fd. 
-  right; split. omega. split. auto. 
-  econstructor; eauto.
-  (* Stailcall *)
-  exploit Mem.free_parallel_extends; eauto. intros [m2' [P Q]].
-  exploit sel_expr_correct; eauto. intros [vf' [A B]].
-  exploit sel_exprlist_correct; eauto. intros [vargs' [C D]].
-  left; econstructor; split.
-  exploit classify_call_correct; eauto. 
-  destruct (classify_call ge a) as [ | id | ef]; intros. 
-  econstructor; eauto. econstructor; eauto. eapply functions_translated; eauto. apply sig_function_translated.
-  destruct H2 as [b [U V]].
-  econstructor; eauto. econstructor; eauto. rewrite symbols_preserved; eauto. eapply functions_translated; eauto. subst vf; auto. apply sig_function_translated.
-  econstructor; eauto. econstructor; eauto. eapply functions_translated; eauto. apply sig_function_translated.
-  constructor; auto. apply call_cont_commut; auto.
-  (* Sbuiltin *)
-  exploit sel_exprlist_correct; eauto. intros [vargs' [P Q]].
-  exploit external_call_mem_extends; eauto. 
-  intros [vres' [m2 [A [B [C D]]]]].
-  left; econstructor; split.
-  econstructor. eauto. eapply external_call_symbols_preserved; eauto.
-  exact symbols_preserved. exact varinfo_preserved.
-  constructor; auto.
-  destruct optid; simpl; auto. apply set_var_lessdef; auto.
-  (* Seq *)
-  left; econstructor; split. constructor. constructor; auto. constructor; auto.
-  (* Sifthenelse *)
-  exploit sel_expr_correct; eauto. intros [v' [A B]].
-  assert (Val.bool_of_val v' b). inv B. auto. inv H0.
-  left; exists (State (sel_function hf ge f) (if b then sel_stmt hf ge s1 else sel_stmt hf ge s2) k' sp e' m'); split.
-  econstructor; eauto. eapply eval_condexpr_of_expr; eauto. 
-  constructor; auto. destruct b; auto.
-  (* Sloop *)
-  left; econstructor; split. constructor. constructor; auto. constructor; auto.
-  (* Sblock *)
-  left; econstructor; split. constructor. constructor; auto. constructor; auto.
-  (* Sexit seq *)
-  inv H7. left; econstructor; split. constructor. constructor; auto.
-  (* Sexit0 block *)
-  inv H7. left; econstructor; split. constructor. constructor; auto.
-  (* SexitS block *)
-  inv H7. left; econstructor; split. constructor. constructor; auto.
-  (* Sswitch *)
-  exploit sel_expr_correct; eauto. intros [v' [A B]]. inv B.
-  left; econstructor; split. econstructor; eauto. constructor; auto.
-  (* Sreturn None *)
-  exploit Mem.free_parallel_extends; eauto. intros [m2' [P Q]].
-  left; econstructor; split. 
-  econstructor. simpl; eauto. 
-  constructor; auto. apply call_cont_commut; auto.
-  (* Sreturn Some *)
-  exploit Mem.free_parallel_extends; eauto. intros [m2' [P Q]].
-  exploit sel_expr_correct; eauto. intros [v' [A B]].
-  left; econstructor; split. 
-  econstructor; eauto.
-  constructor; auto. apply call_cont_commut; auto.
-  (* Slabel *)
-  left; econstructor; split. constructor. constructor; auto.
-  (* Sgoto *)
-  exploit (find_label_commut lbl (Cminor.fn_body f) (Cminor.call_cont k)).
-    apply call_cont_commut; eauto.
-  rewrite H. 
-  destruct (find_label lbl (sel_stmt hf ge (Cminor.fn_body f)) (call_cont k'0))
-  as [[s'' k'']|] eqn:?; intros; try contradiction.
-  destruct H0. 
-  left; econstructor; split.
-  econstructor; eauto. 
-  constructor; auto.
-  (* internal function *)
-  exploit Mem.alloc_extends. eauto. eauto. apply Zle_refl. apply Zle_refl. 
-  intros [m2' [A B]].
-  left; econstructor; split.
-  econstructor; eauto.
-  constructor; auto. apply set_locals_lessdef. apply set_params_lessdef; auto.
-  (* external call *)
-  exploit external_call_mem_extends; eauto. 
-  intros [vres' [m2 [A [B [C D]]]]].
-  left; econstructor; split.
-  econstructor. eapply external_call_symbols_preserved; eauto.
-  exact symbols_preserved. exact varinfo_preserved.
-  constructor; auto.
-  (* external call turned into a Sbuiltin *)
-  exploit external_call_mem_extends; eauto. 
-  intros [vres' [m2 [A [B [C D]]]]].
-  left; econstructor; split.
-  econstructor. eauto. eapply external_call_symbols_preserved; eauto.
-  exact symbols_preserved. exact varinfo_preserved.
-  constructor; auto.
-  (* return *)
-  inv H2. 
-  left; econstructor; split. 
-  econstructor. 
-  constructor; auto. destruct optid; simpl; auto. apply set_var_lessdef; auto.
-  (* return of an external call turned into a Sbuiltin *)
-  right; split. omega. split. auto. constructor; auto. 
-  destruct optid; simpl; auto. apply set_var_lessdef; auto.
-Qed.
-
-Lemma sel_initial_states:
-  forall S, Cminor.initial_state prog S ->
-  exists R, initial_state tprog R /\ match_states S R.
-Proof.
-  induction 1.
-  econstructor; split.
-  econstructor.
-  apply Genv.init_mem_transf; eauto.
-  simpl. fold tge. rewrite symbols_preserved. eexact H0.
-  apply function_ptr_translated. eauto. 
-  rewrite <- H2. apply sig_function_translated; auto.
-  constructor; auto. constructor. apply Mem.extends_refl.
-Qed.
-
-Lemma sel_final_states:
-  forall S R r,
-  match_states S R -> Cminor.final_state S r -> final_state R r.
-Proof.
-  intros. inv H0. inv H. inv H3. inv H5. constructor.
-Qed.
-
-End PRESERVATION.
-
-Axiom get_helpers_correct:
-  forall ge hf, get_helpers ge = OK hf -> i64_helpers_correct ge hf.
-
-Theorem transf_program_correct:
-  forall prog tprog,
-  sel_program prog = OK tprog ->
-  forward_simulation (Cminor.semantics prog) (CminorSel.semantics tprog).
-Proof.
-  intros. unfold sel_program in H. 
-  destruct (get_helpers (Genv.globalenv prog)) as [hf|] eqn:E; simpl in H; try discriminate.
-  inv H.
-  eapply forward_simulation_opt.
-  apply symbols_preserved.
-  apply sel_initial_states.
-  apply sel_final_states.
-  apply sel_step_correct. apply helpers_correct_preserved. apply get_helpers_correct. auto.
-Qed.
-*)

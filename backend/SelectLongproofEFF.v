@@ -27,6 +27,9 @@ Require Import CminorSel.
 Require Import SelectOp.
 Require Import SelectOpproof.
 Require Import BuiltinEffects.
+(*Require Import mem_lemmas.
+Require Import StructuredInjections.
+Require Import reach.*)
 Require Import SelectLongNEW.
 
 Open Local Scope cminorsel_scope.
@@ -36,13 +39,36 @@ Open Local Scope cminorsel_scope.
 Section HELPERS.
 
 Context {F V: Type} (ge: Genv.t (AST.fundef F) V).
-
+(*
+Definition helper_injects ef vargs vres : Prop :=
+  forall {TF TV:Type} (tge:Genv.t TF TV) (GDE: genvs_domain_eq ge tge) 
+       (SymbPres: forall s, Genv.find_symbol tge s = Genv.find_symbol ge s)
+        m t m1 mu tm vargs'
+       (WD: SM_wd mu) (SMV: sm_valid mu m tm) (RC: REACH_closed m (vis mu)),
+       meminj_preserves_globals ge (as_inj mu) ->
+       external_call ef ge vargs m t vres m1 ->
+       Mem.inject (as_inj mu) m tm ->
+       val_list_inject (restrict (as_inj mu) (vis mu)) vargs vargs' ->
+       exists mu' vres' tm1,
+         external_call ef tge vargs' tm t vres' tm1 /\
+         val_inject (restrict (as_inj mu') (vis mu')) vres vres' /\
+         Mem.inject (as_inj mu') m1 tm1 /\
+         Mem.unchanged_on (loc_unmapped (restrict (as_inj mu) (vis mu))) m m1 /\
+         Mem.unchanged_on (loc_out_of_reach (restrict (as_inj mu) (vis mu)) m) tm tm1 /\
+         intern_incr mu mu' /\
+         sm_inject_separated mu mu' m tm /\
+         sm_locally_allocated mu mu' m tm m1 tm1 /\
+         SM_wd mu' /\ sm_valid mu' m1 tm1 /\
+         (REACH_closed m (vis mu) -> REACH_closed m1 (vis mu')).
+*)
 Definition helper_implements (id: ident) (sg: signature) (vargs: list val) (vres: val) : Prop :=
   exists b, exists ef,
      Genv.find_symbol ge id = Some b
   /\ Genv.find_funct_ptr ge b = Some (External ef)
   /\ ef_sig ef = sg
-  /\ forall m, external_call ef ge vargs m E0 vres m.
+  /\ (forall m, external_call ef ge vargs m E0 vres m)
+  (*NEW*) /\ observableEF ef = false
+  (*NEW /\ helper_injects ef vargs vres*).
 
 Definition builtin_implements (id: ident) (sg: signature) (vargs: list val) (vres: val) : Prop :=
   forall m, external_call (EF_builtin id sg) ge vargs m E0 vres m.
@@ -72,7 +98,7 @@ End HELPERS.
 
 Section CMCONSTR.
 
-(*Variable hf: helper_functions.*)
+(*Now in builtineffects Variable hf: helper_functions.*)
 Variable ge: genv.
 Hypothesis HELPERS: i64_helpers_correct ge (*hf*).
 Variable sp: val.
@@ -89,7 +115,7 @@ Lemma eval_helper:
   helper_implements ge id sg vargs vres ->
   eval_expr ge sp e m le (Eexternal id sg args) vres.
 Proof.
-  intros. destruct H0 as (b & ef & A & B & C & D). econstructor; eauto.
+  intros. destruct H0 as (b & ef & A & B & C & D & E). econstructor; eauto.
 Qed.
 
 Corollary eval_helper_1:

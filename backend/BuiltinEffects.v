@@ -196,9 +196,83 @@ Lemma BuiltinEffect_unchOn:
 Proof. intros.
   destruct ef; try solve [inv OBS].
     (*EF_external*)
-       admit.
-    (*EF_builtin*)
-       admit.
+       inv H. apply Mem.unchanged_on_refl.
+(*       simpl in *. rewrite negb_false_iff, orb_false_r in *.
+       unfold ident_eq in OBS.
+       destruct (peq name (i64_dtos hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_dtou hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_stod hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_utod hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_stof hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_utof hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_neg hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_add hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_sub hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_mul hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_sdiv hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_udiv hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_smod hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_umod hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_shl hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_shr hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_sar hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       discriminate.*)
+    (*EF_builtin - same proof as previous case*)
+       inv H. apply Mem.unchanged_on_refl.
+(*       simpl in *. rewrite negb_false_iff, orb_false_r in *.
+       unfold ident_eq in OBS.
+       destruct (peq name (i64_dtos hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_dtou hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_stod hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_utod hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_stof hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_utof hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_neg hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_add hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_sub hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_mul hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_sdiv hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_udiv hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_smod hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_umod hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_shl hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_shr hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       destruct (peq name (i64_sar hf)); simpl in *. 
+        subst name. inv H. apply Mem.unchanged_on_refl.
+       discriminate.*)
     (*case EF_malloc*)
        eapply  malloc_Effect_unchOn; eassumption.
     (*case EF_free*)

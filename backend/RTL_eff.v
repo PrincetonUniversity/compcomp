@@ -106,23 +106,18 @@ Inductive RTL_effstep (ge:genv):  (block -> Z -> bool) ->
                   f.(fn_entrypoint)
                   (init_regs args f.(fn_params)))
         m'
-(*no external calls
   | rtl_effstep_exec_function_external:
-      forall s ef args res t m m',
+      forall s ef args res t m m'
+      (OBS: observableEF ef = false),
       external_call ef ge args m t res m' ->
-      RTL_effstep ge (Callstate s (External ef) args) m
-         t (Returnstate s res m')*)
+      RTL_effstep ge (BuiltinEffect ge ef args m)
+          (RTL_Callstate s (External ef) args) m
+          (RTL_Returnstate s res) m'
   | rtl_effstep_exec_return:
       forall res f sp pc rs s vres m,
       RTL_effstep ge EmptyEffect
         (RTL_Returnstate (Stackframe res f sp pc rs :: s) vres) m
         (RTL_State s f sp pc (rs#res <- vres)) m.
-(*
-  | rtl_effstep_sub_val: forall E EE c m c' m',
-      (forall b ofs, Mem.valid_block m b ->
-                     E b ofs = true -> EE b ofs = true) ->
-      RTL_effstep ge E c m c' m' ->
-      RTL_effstep ge EE c m c' m'.*)
 
 Lemma rtl_eff_exec_Iload':
   forall ge s f sp pc rs m chunk addr args dst pc' rs' a v,
@@ -189,7 +184,10 @@ intros.
          eapply FreeEffect_free; eassumption. 
   split. unfold corestep, coopsem; simpl. 
          eapply rtl_corestep_exec_function_internal; eassumption.
-         eapply Mem.alloc_unchanged_on; eassumption.
+         eapply Mem.alloc_unchanged_on; eassumption. 
+  split. unfold corestep, coopsem; simpl. 
+         eapply rtl_corestep_exec_function_external; eassumption.
+         eapply BuiltinEffect_unchOn; try eassumption.
   split. unfold corestep, coopsem; simpl.
          eapply rtl_corestep_exec_return; eassumption.
          apply Mem.unchanged_on_refl.
@@ -211,15 +209,10 @@ intros. inv H.
     eexists. eapply rtl_effstep_exec_Ijumptable; eassumption.
     eexists. eapply rtl_effstep_exec_Ireturn; eassumption.
     eexists. eapply rtl_effstep_exec_function_internal; eassumption.
+    eexists. eapply rtl_effstep_exec_function_external; eassumption.
     eexists. eapply rtl_effstep_exec_return.
 Qed.
 
-(*
-Lemma RTL_effstep_sub: forall g U V c m c' m'
-         (UV: forall b ofs, U b ofs = true -> V b ofs = true),
-         (RTL_effstep g U c m c' m' -> RTL_effstep g V c m c' m').
-Qed.
-*)
 (*
 Definition cmin_effstep ge (E:block -> Z -> bool) 
    (c : RTL_core) m (c' : RTL_core) m': Prop :=
@@ -241,6 +234,7 @@ intros.
   eapply FreeEffect_validblock; eassumption.
   eapply BuiltinEffect_valid_block; eassumption.
   eapply FreeEffect_validblock; eassumption.
+  eapply BuiltinEffect_valid_block; eassumption.
 Qed.
 
 Program Definition rtl_eff_sem : 
@@ -249,6 +243,5 @@ eapply Build_EffectSem with (sem := rtl_coop_sem)(effstep:=RTL_effstep).
 apply rtl_effax1.
 apply rtl_effax2.
 apply rtl_effstep_valid.
-(*intros. eapply rtl_effstep_sub_val; eassumption.*)
 Defined.
 

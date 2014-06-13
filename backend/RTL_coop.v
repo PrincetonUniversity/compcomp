@@ -128,12 +128,12 @@ Inductive RTL_corestep (ge:genv): RTL_core -> mem -> RTL_core -> mem -> Prop :=
                   f.(fn_entrypoint)
                   (init_regs args f.(fn_params)))
         m'
-(*no external calls
   | rtl_corestep_exec_function_external:
-      forall s ef args res t m m',
+      forall s ef args res t m m'
+      (OBS: observableEF ef = false),
       external_call ef ge args m t res m' ->
-      RTL_corestep ge (Callstate s (External ef) args) m
-         t (Returnstate s res m')*)
+      RTL_corestep ge (RTL_Callstate s (External ef) args) m
+          (RTL_Returnstate s res) m'
   | rtl_corestep_exec_return:
       forall res f sp pc rs s vres m,
       RTL_corestep ge (RTL_Returnstate (Stackframe res f sp pc rs :: s) vres) m
@@ -206,7 +206,8 @@ Definition RTL_after_external (vret: option val)(c: RTL_core): option RTL_core :
 
 Lemma corestep_not_external: forall (ge : genv) (m : mem) (q : RTL_core) (m' : mem) (q' : RTL_core),
                                RTL_corestep ge q m q' m' -> RTL_at_external q = None.
-  intros. inv H; reflexivity. 
+  intros. inv H; try reflexivity. 
+  simpl. rewrite OBS. trivial.
 Qed.
 
 Lemma corestep_not_halted: forall (ge : genv) (m : mem) (q : RTL_core) (m' : mem) (q' : RTL_core),
@@ -250,6 +251,7 @@ Proof. intros.
          eapply external_call_mem_forward; eassumption.
          eapply free_forward; eassumption.
          eapply alloc_forward; eassumption.
+         eapply external_call_mem_forward; eassumption.
 Qed.
 
 Program Definition rtl_coop_sem : 
