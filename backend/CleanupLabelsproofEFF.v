@@ -440,6 +440,7 @@ Proof.
    red; intros. eapply H1. right; trivial.
 Qed.
 
+
 (***********************************************************************)
 
 (*NEW, as in Linearize*) 
@@ -526,31 +527,48 @@ Qed.
 
 Inductive match_states mu: Linear_core -> mem -> Linear_core -> mem -> Prop :=
   | match_states_intro:
-      forall s f sp c ls m ts (*NEW*) tsp tls tm
+      forall s f sp c ls m ts (*NEW*) tsp tls tm ls0 tls0 f0
         (STACKS: list_forall2 (match_stackframes mu) s ts)
         (INCL: incl c f.(fn_code))
         (*NEW*) (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls tls)
+        (*NEW*) (AGREE0: forall l, val_inject (restrict (as_inj mu) (vis mu)) (ls0 l) (tls0 l))
         (*NEW*) (SPlocal: sp_mapped mu sp tsp),
-      match_states mu (Linear_State s f sp c ls) m
+      match_states mu (Linear_State s f sp c ls (mk_load_frame ls0 f0)) m
                       (Linear_State ts (transf_function f) tsp 
-                        (remove_unused_labels (labels_branched_to f.(fn_code)) c) tls) tm
+                        (remove_unused_labels (labels_branched_to f.(fn_code)) c) tls 
+                        (mk_load_frame tls0 (transf_function f0))) tm
+
+  | match_states_initial:
+      forall s f ls m ts (*NEW*) tls tm ls0 tls0 f0
+      (*NEW*) (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls tls)
+      (*NEW*) (AGREE0: forall l, val_inject (restrict (as_inj mu) (vis mu)) (ls0 l) (tls0 l)),
+      list_forall2 (match_stackframes mu) s ts ->
+      match_states mu (Linear_CallstateIn s f ls (mk_load_frame ls0 f0)) m
+                      (Linear_CallstateIn ts (transf_fundef f) tls 
+                        (mk_load_frame tls0 (transf_function f0))) tm
+
   | match_states_call:
-      forall s f ls m ts (*NEW*) tls tm
-      (*NEW*) (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls tls),
+      forall s f ls m ts (*NEW*) tls tm ls0 tls0 f0
+      (*NEW*) (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls tls)
+      (*NEW*) (AGREE0: forall l, val_inject (restrict (as_inj mu) (vis mu)) (ls0 l) (tls0 l)),
       list_forall2 (match_stackframes mu) s ts ->
-      match_states mu (Linear_Callstate s f ls) m
-                      (Linear_Callstate ts (transf_fundef f) tls) tm
+      match_states mu (Linear_Callstate s f ls (mk_load_frame ls0 f0)) m
+                      (Linear_Callstate ts (transf_fundef f) tls 
+                        (mk_load_frame tls0 (transf_function f0))) tm
+
   | match_states_return:
-      forall s ls m ts (*NEW*) tpopt tls tm
-     (*NEW*) (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls tls),
+      forall s ls m ts (*NEW*) tpopt tls tm ls0 tls0 f0
+      (*NEW*) (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls tls)
+      (*NEW*) (AGREE0: forall l, val_inject (restrict (as_inj mu) (vis mu)) (ls0 l) (tls0 l)),
       list_forall2 (match_stackframes mu) s ts ->
-      match_states mu (Linear_Returnstate s tpopt ls) m
-                      (Linear_Returnstate ts tpopt tls) tm.
+      match_states mu (Linear_Returnstate s tpopt ls (mk_load_frame ls0 f0)) m
+                      (Linear_Returnstate ts tpopt tls 
+                        (mk_load_frame tls0 (transf_function f0))) tm.
 
 (*Lenb: converted to Linear_core*)
 Definition measure (st: Linear_core) : nat :=
   match st with
-  | Linear_State s f sp c ls => List.length c
+  | Linear_State s f sp c ls lf => List.length c
   | _ => O
   end.
 
@@ -675,15 +693,16 @@ Proof.
 Qed.
 *)
 
-Lemma match_parent_locset mu:
-  forall s ts,
+Lemma match_parent_locset mu :
+  forall s ts ls0 tls0,
+  (forall l:loc, val_inject (restrict (as_inj mu) (vis mu)) (ls0 l) (tls0 l)) -> 
   list_forall2 (match_stackframes mu) s ts ->
   agree_regs (restrict (as_inj mu) (vis mu))
-             (parent_locset s) (parent_locset ts).
+             (parent_locset0 ls0 s) (parent_locset0 tls0 ts).
 Proof.
-  induction 1; simpl.
-    red; intros. split; intros. econstructor.  econstructor.
-    inv H; trivial.
+  induction 2; simpl.
+    red; intros. split; intros. apply H. simpl. destruct sl; try constructor. apply H.
+    inv H0; trivial.
 Qed.
 
 Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
@@ -1120,6 +1139,27 @@ split.
             apply orb_true_iff; left.
             solve[rewrite getBlocks_char; eexists; left; reflexivity].
       apply map_R_outgoing. }  
+  { (*agree*)
+    rewrite restrict_sm_all, vis_restrict_sm, replace_externs_as_inj, replace_externs_vis.
+    rewrite restrict_nest; auto. intros l. 
+    apply val_inject_incr with (f1 := (restrict (as_inj (restrict_sm mu (vis mu)))
+                (vis (restrict_sm mu (vis mu))))); auto.
+    rewrite restrict_sm_all, vis_restrict_sm.
+    rewrite restrict_nest; trivial. 
+    red; intros. 
+    destruct (restrictD_Some _ _ _ _ _ H0).
+    apply restrictI_Some. 
+    apply extern_incr_as_inj in INC; trivial.
+    rewrite replace_locals_as_inj in INC.
+    apply INC. trivial.
+    apply extern_incr_vis in INC.
+    rewrite replace_locals_vis in INC. rewrite INC in H2.
+    unfold vis in H2. remember (locBlocksSrc nu' b) as q.    
+    destruct q; simpl in *; trivial.
+    apply andb_true_iff; split.
+    unfold DomSrc. rewrite (frgnBlocksSrc_extBlocksSrc _ WDnu' _ H2). intuition. 
+    apply REACH_nil. unfold exportedSrc. rewrite sharedSrc_iff_frgnpub, H2; trivial. 
+    intuition. }
   { (*list_match_stackgrames*)
     eapply match_stackframes_forall_restrict_sm_incr. 
       eassumption.
@@ -1157,6 +1197,106 @@ intuition.
   eapply extern_incr_as_inj; try eassumption.
   rewrite replace_locals_as_inj. assumption.
 Qed. 
+
+(*TODO: Move elsewhere*)
+Lemma init_locset_val_inject_aux tys vals1 vals2 j ls1 ls2 z : 
+  (forall l, val_inject j (ls1 l) (ls2 l)) -> 
+  Forall2 (val_inject j) vals1 vals2 -> 
+  forall l, val_inject j 
+    ((Locmap.setlist (Conventions1.loc_arguments_rec tys z)
+       (val_casted.encode_longs tys vals1) ls1) l)
+    ((Locmap.setlist (Conventions1.loc_arguments_rec tys z)
+       (val_casted.encode_longs tys vals2) ls2) l).
+Proof.
+revert vals1 vals2 z ls1 ls2.
+induction tys. simpl. intros vals1 vals2 l0 ls1 ls2 H H2 l; auto.
+intros vals1 vals2 l0 ls1 ls2 H H2 l. inv H2. simpl.
+destruct a; simpl; auto.
+destruct a; simpl. 
+- eapply IHtys; auto. 
+unfold Locmap.set. intros l2. case_eq (Loc.eq (S Outgoing l0 Tint) l2).
+intros e _; subst l2. apply val_load_result_inject; auto.
+intros neq _. destruct (Loc.diff_dec (S Outgoing l0 Tint) l2); auto.
+- eapply IHtys; auto. 
+unfold Locmap.set. intros l2. case_eq (Loc.eq (S Outgoing l0 Tfloat) l2).
+intros e _; subst l2. apply val_load_result_inject; auto.
+intros neq _. destruct (Loc.diff_dec (S Outgoing l0 Tfloat) l2); auto.
+- inv H0. eapply IHtys; eauto.
+unfold Locmap.set. intros l2. case_eq (Loc.eq (S Outgoing l0 Tint) l2).
+intros e _; subst l2. apply val_load_result_inject; auto.
+intros neq _. destruct (Loc.diff_dec (S Outgoing l0 Tint) l2); auto.
+case_eq (Loc.eq (S Outgoing (l0+1) Tint) l2).
+intros e _; subst l2. apply val_load_result_inject; auto.
+intros neq' _. destruct (Loc.diff_dec (S Outgoing (l0+1) Tint) l2); auto.
+apply IHtys; auto.
+unfold Locmap.set. intros l2. case_eq (Loc.eq (S Outgoing l0 Tint) l2).
+intros e _; subst l2. apply val_load_result_inject; auto.
+intros neq _. destruct (Loc.diff_dec (S Outgoing l0 Tint) l2); auto.
+case_eq (Loc.eq (S Outgoing (l0+1) Tint) l2).
+intros e _; subst l2. apply val_load_result_inject; auto.
+intros neq' _. destruct (Loc.diff_dec (S Outgoing (l0+1) Tint) l2); auto.
+apply IHtys; auto.
+unfold Locmap.set. intros l2. case_eq (Loc.eq (S Outgoing l0 Tint) l2).
+intros e _; subst l2. apply val_load_result_inject; auto.
+intros neq _. destruct (Loc.diff_dec (S Outgoing l0 Tint) l2); auto.
+case_eq (Loc.eq (S Outgoing (l0+1) Tint) l2).
+intros e _; subst l2. apply val_load_result_inject; auto.
+intros neq' _. destruct (Loc.diff_dec (S Outgoing (l0+1) Tint) l2); auto.
+apply IHtys; auto.
+unfold Locmap.set. intros l2. case_eq (Loc.eq (S Outgoing l0 Tint) l2).
+intros e _; subst l2. apply val_load_result_inject; auto.
+intros neq _. destruct (Loc.diff_dec (S Outgoing l0 Tint) l2); auto.
+case_eq (Loc.eq (S Outgoing (l0+1) Tint) l2).
+intros e _; subst l2. apply val_load_result_inject; auto.
+intros neq' _. destruct (Loc.diff_dec (S Outgoing (l0+1) Tint) l2); auto.
+destruct y.
+apply IHtys; auto.
+unfold Locmap.set. intros l2. case_eq (Loc.eq (S Outgoing l0 Tint) l2).
+intros e _; subst l2. apply val_load_result_inject; auto.
+intros neq _. destruct (Loc.diff_dec (S Outgoing l0 Tint) l2); auto.
+case_eq (Loc.eq (S Outgoing (l0+1) Tint) l2).
+intros e _; subst l2. apply val_load_result_inject; auto.
+intros neq' _. destruct (Loc.diff_dec (S Outgoing (l0+1) Tint) l2); auto.
+apply IHtys; auto.
+unfold Locmap.set. intros l2. case_eq (Loc.eq (S Outgoing l0 Tint) l2).
+intros e _; subst l2. apply val_load_result_inject; auto.
+intros neq _. destruct (Loc.diff_dec (S Outgoing l0 Tint) l2); auto.
+case_eq (Loc.eq (S Outgoing (l0+1) Tint) l2).
+intros e _; subst l2. apply val_load_result_inject; auto.
+intros neq' _. destruct (Loc.diff_dec (S Outgoing (l0+1) Tint) l2); auto.
+apply IHtys; auto.
+unfold Locmap.set. intros l2. case_eq (Loc.eq (S Outgoing l0 Tint) l2).
+intros e _; subst l2. apply val_load_result_inject; auto.
+intros neq _. destruct (Loc.diff_dec (S Outgoing l0 Tint) l2); auto.
+case_eq (Loc.eq (S Outgoing (l0+1) Tint) l2).
+intros e _; subst l2. apply val_load_result_inject; auto.
+intros neq' _. destruct (Loc.diff_dec (S Outgoing (l0+1) Tint) l2); auto.
+apply IHtys; auto.
+unfold Locmap.set. intros l2. case_eq (Loc.eq (S Outgoing l0 Tint) l2).
+intros e _; subst l2. apply val_load_result_inject; auto.
+intros neq _. destruct (Loc.diff_dec (S Outgoing l0 Tint) l2); auto.
+case_eq (Loc.eq (S Outgoing (l0+1) Tint) l2).
+intros e _; subst l2. apply val_load_result_inject; auto.
+intros neq' _. destruct (Loc.diff_dec (S Outgoing (l0+1) Tint) l2); auto.
+apply IHtys; auto.
+unfold Locmap.set. intros l2. case_eq (Loc.eq (S Outgoing l0 Tint) l2).
+intros e _; subst l2. apply val_load_result_inject; auto.
+intros neq _. destruct (Loc.diff_dec (S Outgoing l0 Tint) l2); auto.
+case_eq (Loc.eq (S Outgoing (l0+1) Tint) l2).
+intros e _; subst l2. apply val_load_result_inject; auto.
+intros neq' _. destruct (Loc.diff_dec (S Outgoing (l0+1) Tint) l2); auto.
+- eapply IHtys; auto. 
+unfold Locmap.set. intros l2. case_eq (Loc.eq (S Outgoing l0 Tsingle) l2).
+intros e _; subst l2. apply val_load_result_inject; auto.
+intros neq _. destruct (Loc.diff_dec (S Outgoing l0 Tsingle) l2); auto.
+Qed.
+
+Lemma init_locset_val_inject tys vals1 vals2 j : 
+  Forall2 (val_inject j) vals1 vals2 -> 
+  forall l, val_inject j (init_locset tys vals1 l) (init_locset tys vals2 l).
+Proof.
+intros. apply init_locset_val_inject_aux; auto. 
+Qed.
 
 Lemma MATCH_initial: forall (v1 v2 : val) (sig : signature) entrypoints
   (EP: In (v1, v2, sig) entrypoints)
@@ -1208,10 +1348,10 @@ Proof. intros.
   2: solve[intros Heq; rewrite Heq in H1; inv H1].
   intros Heq; rewrite Heq in H1; inv H1.
   exploit function_ptr_translated; eauto. intros FP.
-  exists (Linear_Callstate nil (transf_fundef (Internal f))
-            (Locmap.setlist (Conventions1.loc_arguments (fn_sig f)) 
-              (val_casted.encode_longs (sig_args (fn_sig f)) vals2)
-              (Locmap.init Vundef))).
+  set (tf := transf_function f).
+  exists (Linear_CallstateIn nil (Internal tf)
+           (init_locset (sig_args (fn_sig f)) vals2) 
+           (mk_load_frame (init_locset (sig_args (fn_sig f)) vals2) tf)).
   split.
     destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
     subst. inv A. rewrite C in Heqzz. inv Heqzz.
@@ -1219,7 +1359,8 @@ Proof. intros.
     simpl.
     case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
     rewrite D.
-    assert (val_casted.val_has_type_list_func vals2 (sig_args (funsig (Internal (transf_function f))))=true) as ->.
+    assert (val_casted.val_has_type_list_func vals2 
+             (sig_args (funsig (Internal (transf_function f))))=true) as ->.
     { eapply val_casted.val_list_inject_hastype; eauto.
       eapply forall_inject_val_list_inject; eauto.
       destruct (val_casted.vals_defined vals1); auto.
@@ -1235,9 +1376,9 @@ Proof. intros.
     intros CONTRA. solve[elimtype False; auto].
   destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
      VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
-    as [AA [BB [CC [DD [EE [FF GG]]]]]].
-  split.
-    eapply match_states_call; try eassumption.
+    as [AA [BB [CC [DD [EE [FF GG]]]]]]. 
+  split. 
+    eapply match_states_initial; try eassumption.
     { (*agree_regs*) 
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; trivial.
       eapply agree_regs_setlist.
@@ -1255,6 +1396,12 @@ Proof. intros.
         red; intros. apply Conventions1.loc_arguments_rec_charact in H. 
            destruct l; try contradiction.
            destruct sl; try contradiction. trivial. }
+    { (*agree_init*) 
+      rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; trivial.
+      rewrite initial_SM_as_inj. unfold vis, initial_SM; simpl. 
+      apply init_locset_val_inject.
+      apply restrict_forall_vals_inject; auto.
+      intros b0 GET. apply REACH_nil. rewrite orb_comm, GET; auto. }
     constructor.
   rewrite initial_SM_as_inj.
   intuition.
@@ -1454,10 +1601,12 @@ Proof. intros.
     intuition.
 (* Ltailcall *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
-  specialize (match_parent_locset _ _ _ STACKS); intros parentsAGREE.
+  specialize (match_parent_locset _ _ _ _ _ AGREE0 STACKS); intros parentsAGREE.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in parentsAGREE; trivial.
-  assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) (LTL.return_regs (parent_locset s) rs) (LTL.return_regs (parent_locset ts) tls)).
-     eapply agree_regs_return; eassumption. 
+  assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) 
+                               (LTL.return_regs (parent_locset0 rs0 s) rs) 
+                               (LTL.return_regs (parent_locset0 tls0 ts) tls)).
+  { eapply agree_regs_return; eassumption. }
   exploit agree_find_function_translated; try eassumption.
     eapply agree_regs_incr; try eapply AGREERET. apply restrict_incr.
   intros TFD.
@@ -1524,6 +1673,10 @@ Proof. intros.
         eapply intern_incr_restrict; eassumption.
       rewrite restrict_sm_all, vis_restrict_sm, restrict_nest; trivial.
         eapply encode_long_inject; eassumption.
+      rewrite restrict_sm_all, vis_restrict_sm, restrict_nest; trivial.
+        intros l. apply val_inject_incr with (f1 := restrict (as_inj mu) (vis mu)). 
+        apply intern_incr_restrict in INC; auto.
+        rewrite restrict_sm_all, vis_restrict_sm, restrict_nest in AGREE0; auto.
       eapply sp_mapped_intern_incr; try eassumption.
          eapply restrict_sm_intern_incr; eassumption.
          apply restrict_sm_WD; trivial.
@@ -1646,9 +1799,11 @@ Proof. intros.
   simpl in H0; rewrite Zplus_0_r in H0.
   rewrite (local_in_all _ WDR _ _ _ H2) in SPB; inv SPB.
 
-  specialize (match_parent_locset _ _ _ STACKS); intros parentsAGREE.
+  specialize (match_parent_locset _ _ _ _ _ AGREE0 STACKS); intros parentsAGREE.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in parentsAGREE; trivial.
-  assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) (LTL.return_regs (parent_locset s) rs) (LTL.return_regs (parent_locset ts) tls)).
+  assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) 
+                               (LTL.return_regs (parent_locset0 rs0 s) rs) 
+                               (LTL.return_regs (parent_locset0 tls0 ts) tls)).
      eapply agree_regs_return; eassumption.
   eexists; eexists; split.
     left; eapply corestep_plus_one.
@@ -1669,6 +1824,24 @@ Proof. intros.
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; eauto.
     intuition. 
       eapply REACH_closed_free; try eassumption.
+
+(* initial function *)
+  eexists; eexists.
+  split. left. eapply corestep_plus_one. econstructor.
+  eexists. split. apply intern_incr_refl. 
+  split. apply sm_inject_separated_same_sminj. split. 
+  rewrite sm_locally_allocatedChar.
+  split. extensionality b. rewrite freshloc_irrefl, orb_comm; auto.
+  split. extensionality b. rewrite freshloc_irrefl, orb_comm; auto.
+  split. extensionality b. rewrite freshloc_irrefl, orb_comm; auto.
+  split. extensionality b. rewrite freshloc_irrefl, orb_comm; auto.
+  split; auto.
+  split; auto.
+  constructor; auto. 
+  intros l. destruct l. simpl; auto. simpl; auto. destruct sl; auto.
+  split; auto.
+  split; auto.
+
 (* internal function *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   edestruct alloc_parallel_intern as 
@@ -1689,6 +1862,10 @@ Proof. intros.
         eapply agree_regs_undef.
         eapply agree_regs_call_regs.
         eapply agree_regs_incr. eassumption. apply intern_incr_restrict; eassumption.
+      rewrite restrict_sm_all, vis_restrict_sm, restrict_nest; trivial.
+        intros l. apply val_inject_incr with (f1 := restrict (as_inj mu) (vis mu)). 
+        apply intern_incr_restrict in IntInc; auto.
+        rewrite restrict_sm_all, vis_restrict_sm, restrict_nest in AGREE0; auto.
       destruct (joinD_Some _ _ _ _ _ mu'SP) as [EXT | [EXT LOC]]; clear mu'SP.
         assert (extern_of mu = extern_of mu') by eapply IntInc.
         rewrite <- H0 in EXT; clear H0.
@@ -1698,7 +1875,8 @@ Proof. intros.
           apply extern_in_all; eassumption.
       split. rewrite restrict_sm_local.
         econstructor. apply restrictI_Some; try eassumption.
-          unfold vis. destruct (local_DomRng _ WD' _ _ _ LOC). rewrite H0; trivial.
+          unfold vis. 
+          destruct (local_DomRng _ WD' _ _ _ LOC). rewrite H0; trivial.
         rewrite Int.add_zero. trivial. 
       intros. inv H0. rewrite restrict_sm_all.
          eexists. apply restrictI_Some. apply local_in_all; eassumption.
@@ -1723,7 +1901,7 @@ Proof. intros.
   exact symbols_preserved.  exact varinfo_preserved.
   econstructor; eauto with coqlib.*)
 (* return *)
-  inv H5. inv H1.
+  inv H6. inv H1.
   eexists; eexists; split.
     left; eapply corestep_plus_one. econstructor; eauto. 
   exists mu.
@@ -1942,10 +2120,12 @@ Proof. intros.
   intuition.
 (* Ltailcall *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
-  specialize (match_parent_locset _ _ _ STACKS); intros parentsAGREE.
+  specialize (match_parent_locset _ _ _ _ _ AGREE0 STACKS); intros parentsAGREE.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in parentsAGREE; trivial.
-  assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) (LTL.return_regs (parent_locset s) rs) (LTL.return_regs (parent_locset ts) tls)).
-     eapply agree_regs_return; eassumption. 
+  assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) 
+                               (LTL.return_regs (parent_locset0 rs0 s) rs) 
+                               (LTL.return_regs (parent_locset0 tls0 ts) tls)).
+  { eapply agree_regs_return; eassumption. }
   exploit agree_find_function_translated; try eassumption.
     eapply agree_regs_incr; try eapply AGREERET. apply restrict_incr.
   intros TFD.
@@ -2020,6 +2200,10 @@ Proof. intros.
         eapply intern_incr_restrict; eassumption.
       rewrite restrict_sm_all, vis_restrict_sm, restrict_nest; trivial.
         eapply encode_long_inject; eassumption.
+      rewrite restrict_sm_all, vis_restrict_sm, restrict_nest; trivial.
+        intros l. apply val_inject_incr with (f1 := restrict (as_inj mu) (vis mu)). 
+        apply intern_incr_restrict in INC; auto.
+        rewrite restrict_sm_all, vis_restrict_sm, restrict_nest in AGREE0; auto.
       eapply sp_mapped_intern_incr; try eassumption.
          eapply restrict_sm_intern_incr; eassumption.
          apply restrict_sm_WD; trivial.
@@ -2150,10 +2334,12 @@ Proof. intros.
   simpl in H0; rewrite Zplus_0_r in H0.
   rewrite (local_in_all _ WDR _ _ _ H2) in SPB; inv SPB.
 
-  specialize (match_parent_locset _ _ _ STACKS); intros parentsAGREE.
+  specialize (match_parent_locset _ _ _ _ _ AGREE0 STACKS); intros parentsAGREE.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in parentsAGREE; trivial.
-  assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) (LTL.return_regs (parent_locset s) rs) (LTL.return_regs (parent_locset ts) tls)).
-     eapply agree_regs_return; eassumption.
+  assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) 
+                               (LTL.return_regs (parent_locset0 rs0 s) rs) 
+                               (LTL.return_regs (parent_locset0 tls0 ts) tls)).
+  { eapply agree_regs_return; eassumption. }
   eexists; eexists; eexists; split. 
     left; eapply effstep_plus_one.
           econstructor; eauto.
@@ -2181,6 +2367,26 @@ Proof. intros.
            destruct H3; subst. 
            eapply visPropagate; try eassumption.
     eapply FreeEffect_PropagateLeft; try eassumption.
+
+(* initial function *)
+  eexists; eexists; eexists.
+  split. left. eapply effstep_plus_one. econstructor.
+  eexists. split. apply intern_incr_refl. 
+  split. apply sm_inject_separated_same_sminj. split. 
+  rewrite sm_locally_allocatedChar.
+  split. extensionality b. rewrite freshloc_irrefl, orb_comm; auto.
+  split. extensionality b. rewrite freshloc_irrefl, orb_comm; auto.
+  split. extensionality b. rewrite freshloc_irrefl, orb_comm; auto.
+  split. extensionality b. rewrite freshloc_irrefl, orb_comm; auto.
+  split; auto.
+  split; auto.
+  split; auto.
+  constructor; auto. 
+  intros l. destruct l. simpl; auto. simpl; auto. destruct sl; auto.
+  split; auto.
+  split; auto.
+  intros ? ? EFF. unfold EmptyEffect in EFF. congruence.
+
 (* internal function *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   edestruct alloc_parallel_intern as 
@@ -2201,6 +2407,10 @@ Proof. intros.
         eapply agree_regs_undef.
         eapply agree_regs_call_regs.
         eapply agree_regs_incr. eassumption. apply intern_incr_restrict; eassumption.
+      rewrite restrict_sm_all, vis_restrict_sm, restrict_nest; trivial.
+        intros l. apply val_inject_incr with (f1 := restrict (as_inj mu) (vis mu)). 
+        apply intern_incr_restrict in IntInc; auto.
+        rewrite restrict_sm_all, vis_restrict_sm, restrict_nest in AGREE0; auto.
       destruct (joinD_Some _ _ _ _ _ mu'SP) as [EXT | [EXT LOC]]; clear mu'SP.
         assert (extern_of mu = extern_of mu') by eapply IntInc.
         rewrite <- H0 in EXT; clear H0.
@@ -2237,7 +2447,7 @@ Proof. intros.
   econstructor; eauto with coqlib.*)
 
 (* return *)
-  inv H5. inv H1.
+  inv H6. inv H1.
   eexists; eexists; eexists; split. 
     left; eapply effstep_plus_one. econstructor; eauto. 
   exists mu.
@@ -2373,27 +2583,27 @@ intros. apply H.
     + exists (tls (R AX)). split; auto. split. 
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
       destruct AGREE as [AGREE_R _]; specialize (AGREE_R AX); auto.
-      inv H6; auto. 
+      inv H7; auto. 
     + inversion 1; subst. exists (tls (R FP0)). split; auto. split.
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
       destruct AGREE as [AGREE_R _]; specialize (AGREE_R FP0); auto.
-      inv H6; auto. 
+      inv H7; auto. 
     + inversion 1; subst. exists (Val.longofwords (tls (R DX)) (tls (R AX))).
       split; auto. split; auto. 
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
       apply val_longofwords_inject; auto.
       solve[destruct AGREE as [AGREE_R _]; specialize (AGREE_R DX); auto].
       solve[destruct AGREE as [AGREE_R _]; specialize (AGREE_R AX); auto].
-      inv H6; auto. 
+      inv H7; auto. 
     + inversion 1; subst. exists (tls (R FP0)). split; auto. split; auto.
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
       destruct AGREE as [AGREE_R _]; specialize (AGREE_R FP0); auto.
-      inv H6; auto. }
+      inv H7; auto. }
     { inversion 1; subst. simpl in *.
       inv MC. simpl. exists (tls (R AX)). split; trivial.
       split. rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
         destruct AGREE as [AGREE_R _]. apply (AGREE_R AX).
-      inv H7; auto. } }
+      inv H8; auto. } }
 (*atExternal*)
   { intros. destruct H as [MTCH CD]; subst cd.
     exploit MATCH_atExternal; try eassumption.

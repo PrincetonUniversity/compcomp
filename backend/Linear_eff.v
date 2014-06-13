@@ -25,118 +25,125 @@ Variable ge: genv.
 
 Inductive linear_effstep: (block -> Z -> bool) -> Linear_core -> mem -> Linear_core -> mem -> Prop :=
   | lin_effexec_Lgetstack:
-      forall s f sp sl ofs ty dst b rs m rs',
+      forall s f sp sl ofs ty dst b rs m rs' lf,
       rs' = Locmap.set (R dst) (rs (S sl ofs ty)) (undef_regs (destroyed_by_getstack sl) rs) ->
       linear_effstep EmptyEffect 
-        (Linear_State s f sp (Lgetstack sl ofs ty dst :: b) rs) m
-        (Linear_State s f sp b rs') m
+        (Linear_State s f sp (Lgetstack sl ofs ty dst :: b) rs lf) m
+        (Linear_State s f sp b rs' lf) m
   | lin_effexec_Lsetstack:
-      forall s f sp src sl ofs ty b rs m rs',
+      forall s f sp src sl ofs ty b rs m rs' lf,
       rs' = Locmap.set (S sl ofs ty) (rs (R src)) (undef_regs (destroyed_by_setstack ty) rs) ->
       linear_effstep EmptyEffect 
-        (Linear_State s f sp (Lsetstack src sl ofs ty :: b) rs) m
-        (Linear_State s f sp b rs') m
+        (Linear_State s f sp (Lsetstack src sl ofs ty :: b) rs lf) m
+        (Linear_State s f sp b rs' lf) m
   | lin_effexec_Lop:
-      forall s f sp op args res b rs m v rs',
+      forall s f sp op args res b rs m v rs' lf,
       eval_operation ge sp op (reglist rs args) m = Some v ->
       rs' = Locmap.set (R res) v (undef_regs (destroyed_by_op op) rs) ->
       linear_effstep EmptyEffect 
-        (Linear_State s f sp (Lop op args res :: b) rs) m
-        (Linear_State s f sp b rs') m
+        (Linear_State s f sp (Lop op args res :: b) rs lf) m
+        (Linear_State s f sp b rs' lf) m
   | lin_effexec_Lload:
-      forall s f sp chunk addr args dst b rs m a v rs',
+      forall s f sp chunk addr args dst b rs m a v rs' lf,
       eval_addressing ge sp addr (reglist rs args) = Some a ->
       Mem.loadv chunk m a = Some v ->
       rs' = Locmap.set (R dst) v (undef_regs (destroyed_by_load chunk addr) rs) ->
       linear_effstep EmptyEffect 
-        (Linear_State s f sp (Lload chunk addr args dst :: b) rs) m
-        (Linear_State s f sp b rs') m
+        (Linear_State s f sp (Lload chunk addr args dst :: b) rs lf) m
+        (Linear_State s f sp b rs' lf) m
   | lin_effexec_Lstore:
-      forall s f sp chunk addr args src b rs m m' a rs',
+      forall s f sp chunk addr args src b rs m m' a rs' lf,
       eval_addressing ge sp addr (reglist rs args) = Some a ->
       Mem.storev chunk m a (rs (R src)) = Some m' ->
       rs' = undef_regs (destroyed_by_store chunk addr) rs ->
       linear_effstep (StoreEffect a (encode_val chunk (rs (R src))))
-        (Linear_State s f sp (Lstore chunk addr args src :: b) rs) m
-        (Linear_State s f sp b rs') m'
+        (Linear_State s f sp (Lstore chunk addr args src :: b) rs lf) m
+        (Linear_State s f sp b rs' lf) m'
   | lin_effexec_Lcall:
-      forall s f sp sig ros b rs m f',
+      forall s f sp sig ros b rs m f' lf,
       find_function ge ros rs = Some f' ->
       sig = funsig f' ->
       linear_effstep EmptyEffect 
-        (Linear_State s f sp (Lcall sig ros :: b) rs) m
-        (Linear_Callstate (Stackframe f sp rs b:: s) f' rs) m
+        (Linear_State s f sp (Lcall sig ros :: b) rs lf) m
+        (Linear_Callstate (Stackframe f sp rs b:: s) f' rs lf) m
   | lin_effexec_Ltailcall:
-      forall s f stk sig ros b rs m rs' f' m',
-      rs' = return_regs (parent_locset s) rs ->
+      forall s f stk sig ros b rs m rs' f' m' rs0 f0,
+      let lf := mk_load_frame rs0 f0 in
+      rs' = return_regs (parent_locset0 rs0 s) rs ->
       find_function ge ros rs' = Some f' ->
       sig = funsig f' ->
       Mem.free m stk 0 f.(fn_stacksize) = Some m' ->
       linear_effstep (FreeEffect m 0 (f.(fn_stacksize)) stk)
-        (Linear_State s f (Vptr stk Int.zero) (Ltailcall sig ros :: b) rs) m
-        (Linear_Callstate s f' rs') m'
+        (Linear_State s f (Vptr stk Int.zero) (Ltailcall sig ros :: b) rs lf) m
+        (Linear_Callstate s f' rs' lf) m'
   | lin_effexec_Lbuiltin:
-      forall s f sp rs m ef args res b t vl rs' m',
+      forall s f sp rs m ef args res b t vl rs' m' lf,
       external_call' ef ge (reglist rs args) m t vl m' ->
       observableEF ef = false ->
       rs' = Locmap.setlist (map R res) vl (undef_regs (destroyed_by_builtin ef) rs) ->
       linear_effstep (BuiltinEffect ge ef (decode_longs (sig_args (ef_sig ef)) (reglist rs args)) m)
-         (Linear_State s f sp (Lbuiltin ef args res :: b) rs) m
-         (Linear_State s f sp b rs') m'
+         (Linear_State s f sp (Lbuiltin ef args res :: b) rs lf) m
+         (Linear_State s f sp b rs' lf) m'
 (*NO ANNOTS YET
   | lin_effexec_Lannot:
       forall s f sp rs m ef args b t v m',
       external_call' ef ge (map rs args) m t v m' ->
-      linear_effstep (Linear_State s f sp (Lannot ef args :: b) rs) m
-         (Linear_State s f sp b rs) m'*)
+      linear_effstep (Linear_State s f sp (Lannot ef args :: b) rs lf) m
+         (Linear_State s f sp b rs lf) m'*)
   | lin_effexec_Llabel:
-      forall s f sp lbl b rs m,
+      forall s f sp lbl b rs m lf,
       linear_effstep EmptyEffect 
-        (Linear_State s f sp (Llabel lbl :: b) rs) m
-        (Linear_State s f sp b rs) m
+        (Linear_State s f sp (Llabel lbl :: b) rs lf) m
+        (Linear_State s f sp b rs lf) m
   | lin_effexec_Lgoto:
-      forall s f sp lbl b rs m b',
+      forall s f sp lbl b rs m b' lf,
       find_label lbl f.(fn_code) = Some b' ->
       linear_effstep EmptyEffect 
-        (Linear_State s f sp (Lgoto lbl :: b) rs) m
-        (Linear_State s f sp b' rs) m
+        (Linear_State s f sp (Lgoto lbl :: b) rs lf) m
+        (Linear_State s f sp b' rs lf) m
   | lin_effexec_Lcond_true:
-      forall s f sp cond args lbl b rs m rs' b',
+      forall s f sp cond args lbl b rs m rs' b' lf,
       eval_condition cond (reglist rs args) m = Some true ->
       rs' = undef_regs (destroyed_by_cond cond) rs ->
       find_label lbl f.(fn_code) = Some b' ->
       linear_effstep EmptyEffect 
-        (Linear_State s f sp (Lcond cond args lbl :: b) rs) m
-        (Linear_State s f sp b' rs') m
+        (Linear_State s f sp (Lcond cond args lbl :: b) rs lf) m
+        (Linear_State s f sp b' rs' lf) m
   | lin_effexec_Lcond_false:
-      forall s f sp cond args lbl b rs m rs',
+      forall s f sp cond args lbl b rs m rs' lf,
       eval_condition cond (reglist rs args) m = Some false ->
       rs' = undef_regs (destroyed_by_cond cond) rs ->
       linear_effstep EmptyEffect 
-        (Linear_State s f sp (Lcond cond args lbl :: b) rs) m
-        (Linear_State s f sp b rs') m
+        (Linear_State s f sp (Lcond cond args lbl :: b) rs lf) m
+        (Linear_State s f sp b rs' lf) m
   | lin_effexec_Ljumptable:
-      forall s f sp arg tbl b rs m n lbl b' rs',
+      forall s f sp arg tbl b rs m n lbl b' rs' lf,
       rs (R arg) = Vint n ->
       list_nth_z tbl (Int.unsigned n) = Some lbl ->
       find_label lbl f.(fn_code) = Some b' ->
       rs' = undef_regs (destroyed_by_jumptable) rs ->
       linear_effstep EmptyEffect 
-        (Linear_State s f sp (Ljumptable arg tbl :: b) rs) m
-        (Linear_State s f sp b' rs') m
+        (Linear_State s f sp (Ljumptable arg tbl :: b) rs lf) m
+        (Linear_State s f sp b' rs' lf) m
   | lin_effexec_Lreturn:
-      forall s f stk b rs m m',
+      forall s f stk b rs m m' rs0 f0,
+      let lf := mk_load_frame rs0 f0 in
       Mem.free m stk 0 f.(fn_stacksize) = Some m' ->
       linear_effstep (FreeEffect m 0 (f.(fn_stacksize)) stk)
-        (Linear_State s f (Vptr stk Int.zero) (Lreturn :: b) rs) m
-        (Linear_Returnstate s (sig_res (fn_sig f)) (return_regs (parent_locset s) rs)) m'
+        (Linear_State s f (Vptr stk Int.zero) (Lreturn :: b) rs lf) m
+        (Linear_Returnstate s (sig_res (fn_sig f)) (return_regs (parent_locset0 rs0 s) rs) lf) m'
+  | lin_effexec_function_internal0:
+      forall s f rs m rs0 f0,
+      linear_effstep EmptyEffect 
+                     (Linear_CallstateIn s (Internal f) rs (mk_load_frame rs0 f0)) m
+                     (Linear_Callstate s (Internal f) rs (mk_load_frame (call_regs rs0) f0)) m
   | lin_effexec_function_internal:
-      forall s f rs m rs' m' stk,
+      forall s f rs m rs' m' stk lf,
       Mem.alloc m 0 f.(fn_stacksize) = (m', stk) ->
       rs' = undef_regs destroyed_at_function_entry (call_regs rs) ->
       linear_effstep EmptyEffect 
-        (Linear_Callstate s (Internal f) rs) m
-        (Linear_State s f (Vptr stk Int.zero) f.(fn_code) rs') m'
+        (Linear_Callstate s (Internal f) rs lf) m
+        (Linear_State s f (Vptr stk Int.zero) f.(fn_code) rs' lf) m'
 (*NO RULE FOR EXTERNAL CALLS
   | lin_effexec_function_external:
       forall s ef args res rs1 rs2 m t m',
@@ -146,10 +153,10 @@ Inductive linear_effstep: (block -> Z -> bool) -> Linear_core -> mem -> Linear_c
       linear_effstep (Linear_Callstate s (External ef) rs1) m
           (Linear_Returnstate s rs2) m'*)
   | lin_effexec_return:
-      forall s f sp rs0 c retty rs m,
+      forall s f sp lf c retty rs m rs_init,
       linear_effstep EmptyEffect 
-        (Linear_Returnstate (Stackframe f sp rs0 c :: s) retty rs) m
-        (Linear_State s f sp c rs) m.
+        (Linear_Returnstate (Stackframe f sp lf c :: s) retty rs rs_init) m
+        (Linear_State s f sp c rs rs_init) m.
 
 End EFFSEM.
 
@@ -196,6 +203,8 @@ intros.
   split. unfold corestep, coopsem; simpl. econstructor; eassumption.
          eapply FreeEffect_free; eassumption. 
   split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+         eapply Mem.unchanged_on_refl.
+  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
          eapply Mem.alloc_unchanged_on; eassumption. 
   (*no external call*) 
   split. unfold corestep, coopsem; simpl. econstructor; eassumption.
@@ -223,6 +232,7 @@ intros. unfold corestep, coopsem in H; simpl in H.
     eexists. eapply lin_effexec_Lcond_false; try eassumption; trivial.
     eexists. eapply lin_effexec_Ljumptable; try eassumption; trivial.
     eexists. eapply lin_effexec_Lreturn; eassumption.
+    eexists. eapply lin_effexec_function_internal0; eassumption.
     eexists. eapply lin_effexec_function_internal; try eassumption; trivial.
     eexists. eapply lin_effexec_return.
 Qed.
@@ -250,5 +260,4 @@ eapply Build_EffectSem with (sem := Linear_coop_sem)(effstep:=linear_effstep).
 apply linearstep_effax1.
 apply linearstep_effax2.
 apply linear_effstep_valid.
-(*intros. eapply linear_effstep_sub_val; eassumption.*)
 Defined.
