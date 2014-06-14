@@ -15,6 +15,10 @@ Require Import CminorSel.
 Require Import CminorSel_coop.
 Require Import BuiltinEffects.
 
+Section CMINSEL_EFF.
+
+Variable hf : I64Helpers.helper_functions.
+
 Inductive cminsel_effstep (ge:genv):  (block -> Z -> bool) ->
             CMinSel_core -> mem -> CMinSel_core -> mem -> Prop :=
 
@@ -34,14 +38,14 @@ Inductive cminsel_effstep (ge:genv):  (block -> Z -> bool) ->
          (CMinSel_Returnstate Vundef k) m'
 
   | cminsel_effstep_assign: forall f id a k sp e m v
-      (SIL: silent ge a),
+      (SIL: silent hf ge a),
       CminorSel.eval_expr ge sp e m nil a v ->
       cminsel_effstep ge EmptyEffect
          (CMinSel_State f (Sassign id a) k sp e) m
          (CMinSel_State f Sskip k sp (PTree.set id v e)) m
 
   | cminsel_effstep_store: forall f chunk addr al b k sp e m vl v vaddr m'
-      (SIL: silent ge b) (SILS: silentExprList ge al),
+      (SIL: silent hf ge b) (SILS: silentExprList hf ge al),
       CminorSel.eval_exprlist ge sp e m nil al vl ->
       CminorSel.eval_expr ge sp e m nil b v ->
       Op.eval_addressing ge sp addr vl = Some vaddr ->
@@ -51,7 +55,7 @@ Inductive cminsel_effstep (ge:genv):  (block -> Z -> bool) ->
         (CMinSel_State f Sskip k sp e) m'
 
   | cminsel_effstep_call:forall f optid sig a bl k sp e m vf vargs fd
-      (SIL: silentEOS ge a) (SILS: silentExprList ge bl),
+      (SIL: silentEOS hf ge a) (SILS: silentExprList hf ge bl),
       CminorSel.eval_expr_or_symbol ge sp e m nil a vf ->
       CminorSel.eval_exprlist ge sp e m nil bl vargs ->
       Genv.find_funct ge vf = Some fd ->
@@ -61,7 +65,7 @@ Inductive cminsel_effstep (ge:genv):  (block -> Z -> bool) ->
          (CMinSel_Callstate fd vargs (Kcall optid f sp e k)) m
 
   | cminsel_effstep_tailcall: forall f sig a bl k sp e m vf vargs fd m'
-      (SIL: silentEOS ge a) (SILS: silentExprList ge bl),
+      (SIL: silentEOS hf ge a) (SILS: silentExprList hf ge bl),
       CminorSel.eval_expr_or_symbol ge (Vptr sp Int.zero) e m nil a vf ->
       CminorSel.eval_exprlist ge (Vptr sp Int.zero) e m nil bl vargs ->
       Genv.find_funct ge vf = Some fd ->
@@ -72,10 +76,10 @@ Inductive cminsel_effstep (ge:genv):  (block -> Z -> bool) ->
         (CMinSel_Callstate fd vargs (call_cont k)) m'
 
   | cminsel_effstep_builtin: forall f optid ef al k sp e m vl t v m'
-      (SILS: silentExprList ge al),
+      (SILS: silentExprList hf ge al),
       CminorSel.eval_exprlist ge sp e m nil al vl ->
       external_call ef ge vl m t v m' ->
-      observableEF ef = false ->
+      observableEF hf ef = false ->
       cminsel_effstep ge (BuiltinEffect ge ef vl m)
           (CMinSel_State f (Sbuiltin optid ef al) k sp e) m
           (CMinSel_State f Sskip k sp (Cminor.set_optvar optid v e)) m'
@@ -85,7 +89,7 @@ Inductive cminsel_effstep (ge:genv):  (block -> Z -> bool) ->
          (CMinSel_State f s1 (Kseq s2 k) sp e) m
 
   | cminsel_effstep_ifthenelse:  forall f c s1 s2 k sp e m b
-      (SIL: silentCondExpr ge c),
+      (SIL: silentCondExpr hf ge c),
       CminorSel.eval_condexpr ge sp e m nil c b ->
       cminsel_effstep ge EmptyEffect 
          (CMinSel_State f (Sifthenelse c s1 s2) k sp e) m
@@ -114,7 +118,7 @@ Inductive cminsel_effstep (ge:genv):  (block -> Z -> bool) ->
          (CMinSel_State f (Sexit n) k sp e) m
 
   | cminsel_effstep_switch: forall f a cases default k sp e m n
-      (SIL: silent ge a),
+      (SIL: silent hf ge a),
       CminorSel.eval_expr ge sp e m nil a (Vint n) ->
       cminsel_effstep ge EmptyEffect 
          (CMinSel_State f (Sswitch a cases default) k sp e) m
@@ -127,7 +131,7 @@ Inductive cminsel_effstep (ge:genv):  (block -> Z -> bool) ->
          (CMinSel_Returnstate Vundef (call_cont k)) m'
 
   | cminsel_effstep_return_1: forall f a k sp e m v m'
-      (SIL: silent ge a),
+      (SIL: silent hf ge a),
       CminorSel.eval_expr ge (Vptr sp Int.zero) e m nil a v ->
       Mem.free m sp 0 f.(fn_stackspace) = Some m' ->
       cminsel_effstep ge (FreeEffect m 0 (f.(fn_stackspace)) sp) 
@@ -166,7 +170,7 @@ Inductive cminsel_effstep (ge:genv):  (block -> Z -> bool) ->
 
 Lemma cminselstep_effax1: forall (M : block -> Z -> bool) g c m c' m',
       cminsel_effstep g M c m c' m' ->
-      (corestep cminsel_coop_sem g c m c' m' /\
+      (corestep (cminsel_coop_sem hf) g c m c' m' /\
        Mem.unchanged_on (fun (b : block) (ofs : Z) => M b ofs = false) m m').
 Proof. 
 intros.
@@ -219,7 +223,7 @@ intros.
 Qed.
 
 Lemma cminselstep_effax2: forall  g c m c' m',
-      corestep cminsel_coop_sem g c m c' m' ->
+      corestep (cminsel_coop_sem hf) g c m c' m' ->
       exists M, cminsel_effstep g M c m c' m'.
 Proof.
 intros. inv H.
@@ -269,8 +273,10 @@ Qed.
  
 Program Definition cminsel_eff_sem : 
   @EffectSem genv CMinSel_core.
-eapply Build_EffectSem with (sem := cminsel_coop_sem)(effstep:=cminsel_effstep).
+eapply Build_EffectSem with (sem := cminsel_coop_sem hf)(effstep:=cminsel_effstep).
 apply cminselstep_effax1.
 apply cminselstep_effax2.
 apply cminsel_effstep_valid.
 Defined.
+
+End CMINSEL_EFF.

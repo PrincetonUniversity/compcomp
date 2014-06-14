@@ -17,6 +17,9 @@ Require Import RTL.
 Require Import RTL_coop.
 Require Import BuiltinEffects.
 
+Section RTL_EFF.
+Variable hf : I64Helpers.helper_functions.
+
 Inductive RTL_effstep (ge:genv):  (block -> Z -> bool) ->
             RTL_core -> mem -> RTL_core -> mem -> Prop :=
   | rtl_effstep_exec_Inop:
@@ -67,7 +70,7 @@ Inductive RTL_effstep (ge:genv):  (block -> Z -> bool) ->
       forall s f sp pc rs m ef args res pc' t v m',
       (fn_code f)!pc = Some(Ibuiltin ef args res pc') ->
       external_call ef ge rs##args m t v m' ->
-      observableEF ef = false -> 
+      observableEF hf ef = false -> 
       RTL_effstep ge (BuiltinEffect ge ef (rs##args) m)
          (RTL_State s f sp pc rs) m
          (RTL_State s f sp pc' (rs#res <- v)) m'
@@ -108,7 +111,7 @@ Inductive RTL_effstep (ge:genv):  (block -> Z -> bool) ->
         m'
   | rtl_effstep_exec_function_external:
       forall s ef args res t m m'
-      (OBS: observableEF ef = false),
+      (OBS: observableEF hf ef = false),
       external_call ef ge args m t res m' ->
       RTL_effstep ge (BuiltinEffect ge ef args m)
           (RTL_Callstate s (External ef) args) m
@@ -145,7 +148,7 @@ Qed.
 
 Lemma rtl_effax1: forall (M : block -> Z -> bool) g c m c' m',
       RTL_effstep g M c m c' m' ->
-      (corestep rtl_coop_sem g c m c' m' /\
+      (corestep (rtl_coop_sem hf) g c m c' m' /\
        Mem.unchanged_on (fun (b : block) (ofs : Z) => M b ofs = false) m m').
 Proof. 
 intros.
@@ -194,7 +197,7 @@ intros.
 Qed.
 
 Lemma rtl_effax2: forall  g c m c' m',
-      corestep rtl_coop_sem g c m c' m' ->
+      corestep (rtl_coop_sem hf) g c m c' m' ->
       exists M, RTL_effstep g M c m c' m'.
 Proof.
 intros. inv H.
@@ -239,9 +242,10 @@ Qed.
 
 Program Definition rtl_eff_sem : 
   @EffectSem genv RTL_core.
-eapply Build_EffectSem with (sem := rtl_coop_sem)(effstep:=RTL_effstep).
+eapply Build_EffectSem with (sem := rtl_coop_sem hf)(effstep:=RTL_effstep).
 apply rtl_effax1.
 apply rtl_effax2.
 apply rtl_effstep_valid.
 Defined.
 
+End RTL_EFF.

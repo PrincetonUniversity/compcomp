@@ -80,7 +80,7 @@ BACKEND=\
   Op.v OpEFF.v \
   CminorSel.v CminorSel_coop.v CminorSel_eff.v \
   SelectOp.v SelectDiv.v SelectLong.v Selection.v \
-  SelectionNEW.v SelectLongNEW.v \
+  I64Helpers.v BuiltinEffects.v SelectionNEW.v SelectLongNEW.v \
   SelectOpproof.v SelectDivproof.v SelectLongproof.v \
   Selectionproof.v SelectionproofEFF.v \
   Registers.v RTL.v RTL_coop.v RTL_eff.v \

@@ -13,10 +13,14 @@ Require Import effect_semantics.
 
 Require Import Op. (*for eval_operation etc*)
 Require Import Locations. (*for locmap.set etc*)
+Require Import Conventions. (*for loc_result*)
 
 Require Import LTL.
 Require Import LTL_coop.
 Require Import BuiltinEffects.
+
+Section LTL_EFF.
+Variable hf : I64Helpers.helper_functions.
 
 Inductive ltl_effstep (g:genv):  (block -> Z -> bool) ->
             LTL_core -> mem -> LTL_core -> mem -> Prop :=
@@ -65,7 +69,7 @@ Inductive ltl_effstep (g:genv):  (block -> Z -> bool) ->
         (LTL_Callstate s fd rs') m'
   | ltl_effstep_Lbuiltin: forall s f sp ef args res bb rs m t vl rs' m',
       external_call' ef g (reglist rs args) m t vl m' ->
-      observableEF ef =false ->
+      observableEF hf ef =false ->
       rs' = Locmap.setlist (map R res) vl (undef_regs (destroyed_by_builtin ef) rs) ->
       ltl_effstep g (BuiltinEffect g ef (decode_longs (sig_args (ef_sig ef)) (reglist rs args)) m)
          (LTL_Block s f sp (Lbuiltin ef args res :: bb) rs) m
@@ -104,13 +108,16 @@ Inductive ltl_effstep (g:genv):  (block -> Z -> bool) ->
       ltl_effstep g EmptyEffect 
         (LTL_Callstate s (Internal f) rs) m
         (LTL_State s f (Vptr sp Int.zero) f.(fn_entrypoint) rs') m'
-(*no external call
-  | effstep_function_external: forall s ef t args res rs m rs' m',
+
+  | ltl_effstep_function_external: forall s ef t args res rs m rs' m'
+      (OBS: observableEF hf ef = false),
       args = map rs (loc_arguments (ef_sig ef)) ->
-      external_call' ef ge args m t res m' ->
+      external_call' ef g args m t res m' ->
       rs' = Locmap.setlist (map R (loc_result (ef_sig ef))) res rs ->
-      ltl_effstep (LTL_Callstate s (External ef) rs m)
-         t (LTL_Returnstate s rs' m')*)
+      ltl_effstep g (BuiltinEffect g ef args m)
+          (LTL_Callstate s (External ef) rs) m
+          (LTL_Returnstate s (sig_res (ef_sig ef)) rs') m'
+
   | ltl_effstep_return: forall f sp rs1 bb s retty rs m,
       ltl_effstep g EmptyEffect 
         (LTL_Returnstate (Stackframe f sp rs1 bb :: s) retty rs) m
@@ -118,7 +125,7 @@ Inductive ltl_effstep (g:genv):  (block -> Z -> bool) ->
 
 Lemma ltlstep_effax1: forall (M : block -> Z -> bool) g c m c' m',
       ltl_effstep g M c m c' m' ->
-      (corestep LTL_coop_sem g c m c' m' /\
+      (corestep (LTL_coop_sem hf) g c m c' m' /\
        Mem.unchanged_on (fun (b : block) (ofs : Z) => M b ofs = false) m m').
 Proof. 
 intros.
@@ -156,13 +163,18 @@ intros.
          eapply FreeEffect_free; eassumption. 
   split. unfold corestep, coopsem; simpl. econstructor; eassumption.
          eapply Mem.alloc_unchanged_on; eassumption. 
-  (*no external call*) 
+  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+         inv H0.
+         eapply mem_unchanged_on_sub.
+           eapply BuiltinEffect_unchOn; eassumption. 
+         simpl. unfold BuiltinEffect. intros.
+           destruct ef; trivial. 
   split. unfold corestep, coopsem; simpl. econstructor; eassumption.
          apply Mem.unchanged_on_refl.
 Qed.
 
 Lemma ltlstep_effax2: forall  g c m c' m',
-      corestep LTL_coop_sem g c m c' m' ->
+      corestep (LTL_coop_sem hf) g c m c' m' ->
       exists M, ltl_effstep g M c m c' m'.
 Proof.
 intros. unfold corestep, coopsem in H; simpl in H.
@@ -182,6 +194,7 @@ intros. unfold corestep, coopsem in H; simpl in H.
     eexists. eapply ltl_effstep_Ljumptable; try eassumption; trivial.
     eexists. eapply ltl_effstep_Lreturn; eassumption.
     eexists. eapply ltl_effstep_function_internal; try eassumption; trivial.
+    eexists. eapply ltl_effstep_function_external; try eassumption; trivial.
     eexists. eapply ltl_effstep_return.
 Qed.
 
@@ -200,13 +213,15 @@ intros.
   eapply FreeEffect_validblock; eassumption.
   eapply BuiltinEffect_valid_block; eassumption.
   eapply FreeEffect_validblock; eassumption.
+  eapply BuiltinEffect_valid_block; eassumption.
 Qed.
 
 Program Definition LTL_eff_sem : 
   @EffectSem genv LTL_core.
-eapply Build_EffectSem with (sem := LTL_coop_sem)(effstep:=ltl_effstep).
+eapply Build_EffectSem with (sem := LTL_coop_sem hf)(effstep:=ltl_effstep).
 apply ltlstep_effax1.
 apply ltlstep_effax2.
 apply ltl_effstep_valid.
-(*intros. eapply ltl_effstep_sub_val; eassumption.*)
 Defined.
+
+End LTL_EFF.

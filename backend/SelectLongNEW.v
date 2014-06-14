@@ -19,7 +19,7 @@ Require Import Floats.
 Require Import Op.
 Require Import CminorSel.
 Require Import SelectOp.
-Require Import BuiltinEffects.
+Require Import I64Helpers.
 
 Open Local Scope cminorsel_scope.
 
@@ -27,7 +27,7 @@ Open Local Scope cminorsel_scope.
   runtime library functions.  The following record type collects
   the names of these functions. *)
 
-(*LENB: MOVED TO BuiltinEffects.v
+(*MOVED TO I64Helpers.v
 Record helper_functions : Type := mk_helper_functions {
   i64_dtos: ident;                      (**r float -> signed long *)
   i64_dtou: ident;                      (**r float -> unsigned long *)
@@ -48,19 +48,10 @@ Record helper_functions : Type := mk_helper_functions {
   i64_sar: ident                        (**r shift right signed *)
 }.
 *)
-Definition sig_l_l := mksignature (Tlong :: nil) (Some Tlong).
-Definition sig_l_f := mksignature (Tlong :: nil) (Some Tfloat).
-Definition sig_l_s := mksignature (Tlong :: nil) (Some Tsingle).
-Definition sig_f_l := mksignature (Tfloat :: nil) (Some Tlong).
-Definition sig_ll_l := mksignature (Tlong :: Tlong :: nil) (Some Tlong).
-Definition sig_li_l := mksignature (Tlong :: Tint :: nil) (Some Tlong).
-Definition sig_ii_l := mksignature (Tint :: Tint :: nil) (Some Tlong).
 
 Section SELECT.
 
-(*LENB: MOVED TO BuiltinEffects.v
 Variable hf: helper_functions.
-*)
 
 Definition makelong (h l: expr): expr :=
   Eop Omakelong (h ::: l ::: Enil).
@@ -479,36 +470,3 @@ Definition cmpl (c: comparison) (e1 e2: expr) :=
   end.
 
 End SELECT.
-
-(** Setting up the helper functions *)
-
-Require Import Errors.
-
-Local Open Scope string_scope.
-Local Open Scope error_monad_scope.
-
-Parameter get_helper: Cminor.genv -> String.string -> signature -> res ident.
-Parameter get_builtin: String.string -> signature -> res ident.
-
-Definition get_helpers (ge: Cminor.genv): res helper_functions :=
-  do i64_dtos <- get_helper ge "__i64_dtos" sig_f_l ;
-  do i64_dtou <- get_helper ge "__i64_dtou" sig_f_l ;
-  do i64_stod <- get_helper ge "__i64_stod" sig_l_f ;
-  do i64_utod <- get_helper ge "__i64_utod" sig_l_f ;
-  do i64_stof <- get_helper ge "__i64_stof" sig_l_s ;
-  do i64_utof <- get_helper ge "__i64_utof" sig_l_s ;
-  do i64_neg <- get_builtin "__builtin_negl" sig_l_l ;
-  do i64_add <- get_builtin "__builtin_addl" sig_ll_l ;
-  do i64_sub <- get_builtin "__builtin_subl" sig_ll_l ;
-  do i64_mul <- get_builtin "__builtin_mull" sig_ll_l ;
-  do i64_sdiv <- get_helper ge "__i64_sdiv" sig_ll_l ;
-  do i64_udiv <- get_helper ge "__i64_udiv" sig_ll_l ;
-  do i64_smod <- get_helper ge "__i64_smod" sig_ll_l ;
-  do i64_umod <- get_helper ge "__i64_umod" sig_ll_l ;
-  do i64_shl <- get_helper ge "__i64_shl" sig_li_l ;
-  do i64_shr <- get_helper ge "__i64_shr" sig_li_l ;
-  do i64_sar <- get_helper ge "__i64_sar" sig_li_l ;
-  OK (mk_helper_functions
-     i64_dtos i64_dtou i64_stod i64_utod i64_stof i64_utof
-     i64_neg i64_add i64_sub i64_mul i64_sdiv i64_udiv i64_smod i64_umod
-     i64_shl i64_shr i64_sar).

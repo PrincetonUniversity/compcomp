@@ -1,4 +1,3 @@
-
 Require Import Coqlib.
 Require Import Maps.
 Require Import Globalenvs.
@@ -6,7 +5,6 @@ Require Import Registers.
 Require Import Values.
 Require Import RTL.
 Require Import StructuredInjections.
-
 
 Definition regset_inject j (rs rs': regset) : Prop :=
   forall r, val_inject j (rs#r) (rs'#r).

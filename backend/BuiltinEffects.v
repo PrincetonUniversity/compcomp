@@ -16,6 +16,8 @@ Require Import effect_semantics.
 Require Import effect_properties.
 Require Import effect_simulations. 
 
+Require Import I64Helpers.
+
 Definition memcpy_Effect sz vargs m:=
        match vargs with 
           Vptr b1 ofs1 :: Vptr b2 ofs2 :: nil =>
@@ -150,51 +152,85 @@ Proof. intros.
                     eapply Mem.fresh_block_alloc; eassumption.
 Qed.
 
-Record helper_functions : Type := mk_helper_functions {
-  i64_dtos: ident;                      (**r float -> signed long *)
-  i64_dtou: ident;                      (**r float -> unsigned long *)
-  i64_stod: ident;                      (**r signed long -> float *)
-  i64_utod: ident;                      (**r unsigned long -> float *)
-  i64_stof: ident;                      (**r signed long -> float32 *)
-  i64_utof: ident;                      (**r unsigned long -> float32 *)
-  i64_neg: ident;                       (**r opposite *)
-  i64_add: ident;                       (**r addition *)
-  i64_sub: ident;                       (**r subtraction *)
-  i64_mul: ident;                       (**r multiplication 32x32->64 *)
-  i64_sdiv: ident;                      (**r signed division *)
-  i64_udiv: ident;                      (**r unsigned division *)
-  i64_smod: ident;                      (**r signed remainder *)
-  i64_umod: ident;                      (**r unsigned remainder *)
-  i64_shl: ident;                       (**r shift left *)
-  i64_shr: ident;                       (**r shift right unsigned *)
-  i64_sar: ident                        (**r shift right signed *)
-}.
-Variable hf: helper_functions.
-Definition hf_names := hf.(i64_dtos)::hf.(i64_dtou) :: 
-  hf.(i64_stod) ::  hf.(i64_utod) :: hf.(i64_stof) ::
-  hf.(i64_utof) :: hf.(i64_neg) :: hf.(i64_add) :: 
-  hf.(i64_sub) :: hf.(i64_mul) :: hf.(i64_sdiv) ::
-  hf.(i64_udiv) :: hf.(i64_smod) :: hf.(i64_umod) ::
-  hf.(i64_shl) :: hf.(i64_shr) :: hf.(i64_sar) :: nil.
+Section BUILTINS.
 
+Context {F V: Type} (ge: Genv.t (AST.fundef F) V).
+Variable hf : I64Helpers.helper_functions.
+
+Definition builtin_implements (id: ident) (sg: signature)
+      (vargs: list val) (vres: val) : Prop :=
+  forall m, external_call (EF_builtin id sg) ge vargs m E0 vres m.
+(*
+Definition observableEF (ef: external_function): Prop :=
+  match ef with
+    EF_malloc => False (*somewhat arbitrary*)
+  | EF_free => False (*somewhat arbitrary*)
+  | EF_memcpy _ _ => False
+  | EF_builtin x sg => ~ is_I64_helper hf x sg
+  | EF_external x sg => ~ is_I64_helper hf x sg
+  | _ => True
+  end.*)
+(*Computational variant is preferable, since observability is used
+  in the definition of classify_call, in SelectionNEW.v*)
 Definition observableEF (ef: external_function): bool :=
   match ef with
     EF_malloc => false (*somewhat arbitrary*)
   | EF_free => false (*somewhat arbitrary*)
   | EF_memcpy _ _ => false
-  | EF_builtin x _ => negb (existsb (ident_eq x) hf_names)  
-  | EF_external x _ => negb (existsb (ident_eq x) hf_names)
+  | EF_builtin x sg => negb (is_I64_helper hf x sg)
+  | EF_external x sg => negb (is_I64_helper hf x sg)
   | _ => true
   end.
 
+Definition helper_implements 
+     (id: ident) (sg: signature) (vargs: list val) (vres: val) : Prop :=
+  exists b, exists ef,
+     Genv.find_symbol ge id = Some b
+  /\ Genv.find_funct_ptr ge b = Some (External ef)
+  /\ ef_sig ef = sg
+  /\ (forall m, external_call ef ge vargs m E0 vres m)
+  (*NEW*) /\  observableEF ef = false
+  (*NEW*) /\ helper_injects ge ef vargs vres.
+
+Definition i64_helpers_correct: Prop :=
+    (forall x z, Val.longoffloat x = Some z -> helper_implements hf.(i64_dtos) sig_f_l (x::nil) z)
+  /\(forall x z, Val.longuoffloat x = Some z -> helper_implements hf.(i64_dtou) sig_f_l (x::nil) z)
+  /\(forall x z, Val.floatoflong x = Some z -> helper_implements hf.(i64_stod) sig_l_f (x::nil) z)
+  /\(forall x z, Val.floatoflongu x = Some z -> helper_implements hf.(i64_utod) sig_l_f (x::nil) z)
+  /\(forall x z, Val.singleoflong x = Some z -> helper_implements hf.(i64_stof) sig_l_s (x::nil) z)
+  /\(forall x z, Val.singleoflongu x = Some z -> helper_implements hf.(i64_utof) sig_l_s (x::nil) z)
+  /\(forall x, builtin_implements hf.(i64_neg) sig_l_l (x::nil) (Val.negl x))
+  /\(forall x y, builtin_implements hf.(i64_add) sig_ll_l (x::y::nil) (Val.addl x y))
+  /\(forall x y, builtin_implements hf.(i64_sub) sig_ll_l (x::y::nil) (Val.subl x y))
+  /\(forall x y, builtin_implements hf.(i64_mul) sig_ii_l (x::y::nil) (Val.mull' x y))
+  /\(forall x y z, Val.divls x y = Some z -> helper_implements hf.(i64_sdiv) sig_ll_l (x::y::nil) z)
+  /\(forall x y z, Val.divlu x y = Some z -> helper_implements hf.(i64_udiv) sig_ll_l (x::y::nil) z)
+  /\(forall x y z, Val.modls x y = Some z -> helper_implements hf.(i64_smod) sig_ll_l (x::y::nil) z)
+  /\(forall x y z, Val.modlu x y = Some z -> helper_implements hf.(i64_umod) sig_ll_l (x::y::nil) z)
+  /\(forall x y, helper_implements hf.(i64_shl) sig_li_l (x::y::nil) (Val.shll x y))
+  /\(forall x y, helper_implements hf.(i64_shr) sig_li_l (x::y::nil) (Val.shrlu x y))
+  /\(forall x y, helper_implements hf.(i64_sar) sig_li_l (x::y::nil) (Val.shrl x y)).
+
+End BUILTINS.
+
+Require Import Errors.
+
+(*Moved here from Selection phase. We removed the dependence of
+get_helpers on ge since the implementation actually does not look at
+it.*)
+
+Axiom get_helpers_correct:
+  forall F V (ge:Genv.t (AST.fundef F) V) (hf : helper_functions), 
+  get_helpers = OK hf ->  i64_helpers_correct ge hf.
+
 Lemma BuiltinEffect_unchOn:
-    forall {F V:Type} ef (g : Genv.t F V) vargs m t vres m'
-    (OBS: observableEF ef = false),
+    forall {F V:Type} hf ef (g : Genv.t F V) vargs m t vres m'
+    (OBS: observableEF hf ef = false),
     external_call ef g vargs m t vres m' -> 
     Mem.unchanged_on
       (fun b z=> BuiltinEffect g ef vargs m b z = false) m m'.
 Proof. intros.
-  destruct ef; try solve [inv OBS].
+  destruct ef.
     (*EF_external*)
        inv H. apply Mem.unchanged_on_refl.
 (*       simpl in *. rewrite negb_false_iff, orb_false_r in *.
@@ -236,6 +272,11 @@ Proof. intros.
        discriminate.*)
     (*EF_builtin - same proof as previous case*)
        inv H. apply Mem.unchanged_on_refl.
+    simpl in OBS; inv OBS.
+    simpl in OBS; inv OBS.
+    simpl in OBS; inv OBS.
+    simpl in OBS; inv OBS.
+    simpl in OBS; inv OBS.
 (*       simpl in *. rewrite negb_false_iff, orb_false_r in *.
        unfold ident_eq in OBS.
        destruct (peq name (i64_dtos hf)); simpl in *. 
@@ -274,12 +315,15 @@ Proof. intros.
         subst name. inv H. apply Mem.unchanged_on_refl.
        discriminate.*)
     (*case EF_malloc*)
-       eapply  malloc_Effect_unchOn; eassumption.
+       eapply  malloc_Effect_unchOn. eassumption.
     (*case EF_free*)
        eapply free_Effect_unchOn; eassumption.
     (*case EE_memcpy*)
        inv H. clear - H1 H6 H7.
        eapply memcpy_Effect_unchOn; try eassumption. omega.
+    simpl in OBS; inv OBS.
+    simpl in OBS; inv OBS.
+    simpl in OBS; inv OBS.
 Qed.
 
 Lemma BuiltinEffect_valid_block:
@@ -422,10 +466,10 @@ Qed.
   Mem-Unchanged_on condition loc_out_of_reach, rather than
   local_out_of_reach as in external calls.*)
 Lemma inlineable_extern_inject: forall {F V TF TV:Type}
-       (ge:Genv.t F V) (tge:Genv.t TF TV) (GDE: genvs_domain_eq ge tge) 
-          ef vargs m t vres m1 mu tm vargs'
+       (ge:Genv.t (AST.fundef F) V) (tge:Genv.t TF TV) (GDE: genvs_domain_eq ge tge) 
+        hf ef vargs m t vres m1 mu tm vargs'
        (WD: SM_wd mu) (SMV: sm_valid mu m tm) (RC: REACH_closed m (vis mu))
-       (OBS: observableEF ef = false),
+       (OBS: observableEF hf ef = false),
        meminj_preserves_globals ge (as_inj mu) ->
        external_call ef ge vargs m t vres m1 ->
        Mem.inject (as_inj mu) m tm ->
@@ -442,9 +486,14 @@ Lemma inlineable_extern_inject: forall {F V TF TV:Type}
          SM_wd mu' /\ sm_valid mu' m1 tm1 /\
          (REACH_closed m (vis mu) -> REACH_closed m1 (vis mu')).
 Proof. intros.
-destruct ef; simpl in H0; try solve [inv OBS].
-    (*EFexternal*) admit.
+destruct ef; simpl in H0. 
+    (*EFexternal*)
+      unfold observableEF in OBS. rewrite negb_false_iff in OBS. admit. 
     (*EF_builtin*) admit.
+    simpl in OBS; try solve [inv OBS].
+    simpl in OBS; try solve [inv OBS].
+    simpl in OBS; try solve [inv OBS].
+    simpl in OBS; try solve [inv OBS].
     (*case EF_malloc*)
     inv H0. inv H2. inv H8. inv H6. 
     exploit alloc_parallel_intern; eauto. apply Zle_refl. apply Zle_refl. 
@@ -643,6 +692,9 @@ destruct ef; simpl in H0; try solve [inv OBS].
             Focus 2. apply eq_sym. eassumption. 
             eapply H15. clear - H5 H4. split. specialize (Zle_0_nat (length bts1)). intros. omega.
             apply inj_lt in H5. rewrite nat_of_Z_eq in H5; omega.
+    simpl in OBS; try solve [inv OBS].
+    simpl in OBS; try solve [inv OBS].
+    simpl in OBS; try solve [inv OBS].
 Qed.
 
 Lemma BuiltinEffect_Propagate: forall {F V TF TV:Type}

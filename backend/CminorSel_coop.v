@@ -17,6 +17,10 @@ Require Import val_casted.
 Require Import effect_semantics. (*for EmptyEffect*)
 Require Import BuiltinEffects.
 
+Section CMINSEL_COOP.
+
+Variable hf : I64Helpers.helper_functions.
+
 Fixpoint silent (ge:genv) (a:expr) := 
   match a with 
     Eop _ al => silentExprList ge al
@@ -24,7 +28,7 @@ Fixpoint silent (ge:genv) (a:expr) :=
   | Econdition con a1 a2 => silentCondExpr ge con 
        /\ silent ge a1 /\ silent ge a2
   | Elet a1 a2 => silent ge a1 /\ silent ge a2
-  | Ebuiltin ef al => observableEF ef = false 
+  | Ebuiltin ef al => observableEF hf ef = false 
        /\ silentExprList ge al
        /\ (forall args m, BuiltinEffect ge ef args m = EmptyEffect)
   | Eexternal x sg al => silentExprList ge al /\
@@ -32,7 +36,7 @@ Fixpoint silent (ge:genv) (a:expr) :=
           None => True
         | Some b =>
             match Genv.find_funct_ptr ge b with
-              Some (External ef) => observableEF ef = false
+              Some (External ef) => observableEF hf ef = false
                 /\ (forall args m, BuiltinEffect ge ef args m = EmptyEffect)
             | _ => True
             end
@@ -100,7 +104,7 @@ Definition CMinSel_at_external (c: CMinSel_core) : option (external_function * s
   | CMinSel_Callstate fd args k => 
       match fd with
         Internal f => None
-      | External ef => if observableEF ef 
+      | External ef => if observableEF hf ef 
                        then Some (ef, ef_sig ef, args)
                        else None
       end
@@ -112,7 +116,7 @@ Definition CMinSel_after_external (vret: option val) (c: CMinSel_core) : option 
     CMinSel_Callstate fd args k => 
          match fd with
             Internal f => None
-          | External ef => if observableEF ef 
+          | External ef => if observableEF hf ef 
                            then match vret with
                                 None => Some (CMinSel_Returnstate Vundef k)
                               | Some v => Some (CMinSel_Returnstate v k)
@@ -175,7 +179,7 @@ Inductive CMinSel_corestep (ge : genv) : CMinSel_core -> mem ->
       (SILS: silentExprList ge al),
       eval_exprlist ge sp e m nil al vl ->
       external_call ef ge vl m t v m' ->
-      observableEF ef = false ->
+      observableEF hf ef = false ->
       CMinSel_corestep ge (CMinSel_State f (Sbuiltin optid ef al) k sp e) m
          (CMinSel_State f Sskip k sp (Cminor.set_optvar optid v e)) m'
 
@@ -273,7 +277,7 @@ Lemma CMinSel_after_at_external_excl : forall retv q q',
   Proof. intros.
        destruct q; simpl in *; try inv H.
        destruct f; try inv H1; simpl; trivial.
-       remember (observableEF e) as d. 
+       remember (observableEF hf e) as d. 
        destruct d; try inv H0.
        destruct retv; inv H1; simpl; trivial.
 Qed.
@@ -332,3 +336,5 @@ Program Definition cminsel_coop_sem :
 apply Build_CoopCoreSem with (coopsem := CMinSel_core_sem).
   apply CMinSel_forward.
 Defined.
+
+End CMINSEL_COOP.

@@ -10,6 +10,9 @@ Require Import Smallstep.
 Require Import Op.
 Require Import Registers.
 
+Require Import core_semantics.
+Require Import val_casted.
+
 Require Import RTL.
 Require Import BuiltinEffects.
 
@@ -47,6 +50,7 @@ Definition state2core (s:state): RTL_core * mem :=
   end.
 
 Section RELSEM.
+Variable hf : I64Helpers.helper_functions.
 
 Inductive RTL_corestep (ge:genv): RTL_core -> mem -> RTL_core -> mem -> Prop :=
   | rtl_corestep_exec_Inop:
@@ -94,7 +98,7 @@ Inductive RTL_corestep (ge:genv): RTL_core -> mem -> RTL_core -> mem -> Prop :=
       forall s f sp pc rs m ef args res pc' t v m',
       (fn_code f)!pc = Some(Ibuiltin ef args res pc') ->
       external_call ef ge rs##args m t v m' ->
-      observableEF ef = false ->      
+      observableEF hf ef = false ->      
       RTL_corestep ge (RTL_State s f sp pc rs) m
          (RTL_State s f sp pc' (rs#res <- v)) m'
 
@@ -130,7 +134,7 @@ Inductive RTL_corestep (ge:genv): RTL_core -> mem -> RTL_core -> mem -> Prop :=
         m'
   | rtl_corestep_exec_function_external:
       forall s ef args res t m m'
-      (OBS: observableEF ef = false),
+      (OBS: observableEF hf ef = false),
       external_call ef ge args m t res m' ->
       RTL_corestep ge (RTL_Callstate s (External ef) args) m
           (RTL_Returnstate s res) m'
@@ -138,10 +142,6 @@ Inductive RTL_corestep (ge:genv): RTL_core -> mem -> RTL_core -> mem -> Prop :=
       forall res f sp pc rs s vres m,
       RTL_corestep ge (RTL_Returnstate (Stackframe res f sp pc rs :: s) vres) m
         (RTL_State s f sp pc (rs#res <- vres)) m.
-End RELSEM.
-
-Require Import core_semantics.
-Require Import val_casted.
 
 (* New initial state *)
 Definition RTL_initial_core (ge: genv) (v:val)(args: list val): option RTL_core:=
@@ -183,7 +183,7 @@ Definition RTL_at_external (c: RTL_core): option (external_function * signature 
     | RTL_Callstate stack f args => 
         match f with
           Internal _ => None
-        | External ef =>  if observableEF ef 
+        | External ef =>  if observableEF hf ef 
                           then Some(ef, ef_sig ef, args)
                           else None
         end
@@ -259,3 +259,5 @@ Program Definition rtl_coop_sem :
 apply Build_CoopCoreSem with (coopsem := RTL_core_sem).
   apply rtl_coop_forward.
 Defined.
+
+End RELSEM.

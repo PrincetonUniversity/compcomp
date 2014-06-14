@@ -44,6 +44,9 @@ Inductive LTL_core : Type :=
              (ls: locset),            (**r location state of callee *)
       LTL_core.
 
+Section LTL_COOP.
+Variable hf : I64Helpers.helper_functions.
+
 Definition LTL_at_external (c: LTL_core) : option (external_function * signature * list val) :=
   match c with
     | LTL_State _ _ _ _ _ => None
@@ -52,7 +55,7 @@ Definition LTL_at_external (c: LTL_core) : option (external_function * signature
       match f with
         | Internal f => None
         | External ef => 
-           if observableEF ef 
+           if observableEF hf ef 
            then Some (ef, ef_sig ef, decode_longs (sig_args (ef_sig ef)) 
                                      (map rs (loc_arguments (ef_sig ef))))
            else None
@@ -78,57 +81,53 @@ Definition LTL_after_external (vret: option val) (c: LTL_core) : option LTL_core
     | _ => None
   end.
 
-Section RELSEM.
-
-Variable ge: genv.
-
-Inductive ltl_corestep: LTL_core -> mem -> LTL_core -> mem -> Prop :=
+Inductive ltl_corestep (ge:genv): LTL_core -> mem -> LTL_core -> mem -> Prop :=
   | ltl_exec_start_block: forall s f sp pc rs m bb,
       (fn_code f)!pc = Some bb ->
-      ltl_corestep (LTL_State s f sp pc rs) m
+      ltl_corestep ge (LTL_State s f sp pc rs) m
         (LTL_Block s f sp bb rs) m
   | ltl_exec_Lop: forall s f sp op args res bb rs m v rs',
       eval_operation ge sp op (reglist rs args) m = Some v ->
       rs' = Locmap.set (R res) v (undef_regs (destroyed_by_op op) rs) ->
-      ltl_corestep (LTL_Block s f sp (Lop op args res :: bb) rs) m
+      ltl_corestep ge (LTL_Block s f sp (Lop op args res :: bb) rs) m
         (LTL_Block s f sp bb rs') m
   | ltl_exec_Lload: forall s f sp chunk addr args dst bb rs m a v rs',
       eval_addressing ge sp addr (reglist rs args) = Some a ->
       Mem.loadv chunk m a = Some v ->
       rs' = Locmap.set (R dst) v (undef_regs (destroyed_by_load chunk addr) rs) ->
-      ltl_corestep (LTL_Block s f sp (Lload chunk addr args dst :: bb) rs) m
+      ltl_corestep ge (LTL_Block s f sp (Lload chunk addr args dst :: bb) rs) m
         (LTL_Block s f sp bb rs') m
   | ltl_exec_Lgetstack: forall s f sp sl ofs ty dst bb rs m rs',
       rs' = Locmap.set (R dst) (rs (S sl ofs ty)) (undef_regs (destroyed_by_getstack sl) rs) ->
-      ltl_corestep (LTL_Block s f sp (Lgetstack sl ofs ty dst :: bb) rs) m
+      ltl_corestep ge (LTL_Block s f sp (Lgetstack sl ofs ty dst :: bb) rs) m
         (LTL_Block s f sp bb rs') m
   | ltl_exec_Lsetstack: forall s f sp src sl ofs ty bb rs m rs',
       rs' = Locmap.set (S sl ofs ty) (rs (R src)) (undef_regs (destroyed_by_setstack ty) rs) ->
-      ltl_corestep (LTL_Block s f sp (Lsetstack src sl ofs ty :: bb) rs) m
+      ltl_corestep ge (LTL_Block s f sp (Lsetstack src sl ofs ty :: bb) rs) m
         (LTL_Block s f sp bb rs') m
   | ltl_exec_Lstore: forall s f sp chunk addr args src bb rs m a rs' m',
       eval_addressing ge sp addr (reglist rs args) = Some a ->
       Mem.storev chunk m a (rs (R src)) = Some m' ->
       rs' = undef_regs (destroyed_by_store chunk addr) rs ->
-      ltl_corestep (LTL_Block s f sp (Lstore chunk addr args src :: bb) rs) m
+      ltl_corestep ge (LTL_Block s f sp (Lstore chunk addr args src :: bb) rs) m
         (LTL_Block s f sp bb rs') m'
   | ltl_exec_Lcall: forall s f sp sig ros bb rs m fd,
       find_function ge ros rs = Some fd ->
       funsig fd = sig ->
-      ltl_corestep (LTL_Block s f sp (Lcall sig ros :: bb) rs) m
+      ltl_corestep ge (LTL_Block s f sp (Lcall sig ros :: bb) rs) m
         (LTL_Callstate (Stackframe f sp rs bb :: s) fd rs) m
   | ltl_exec_Ltailcall: forall s f sp sig ros bb rs m fd rs' m',
       rs' = return_regs (parent_locset s) rs ->
       find_function ge ros rs' = Some fd ->
       funsig fd = sig ->
       Mem.free m sp 0 f.(fn_stacksize) = Some m' ->
-      ltl_corestep (LTL_Block s f (Vptr sp Int.zero) (Ltailcall sig ros :: bb) rs) m
+      ltl_corestep ge (LTL_Block s f (Vptr sp Int.zero) (Ltailcall sig ros :: bb) rs) m
         (LTL_Callstate s fd rs') m'
   | ltl_exec_Lbuiltin: forall s f sp ef args res bb rs m t vl rs' m',
       external_call' ef ge (reglist rs args) m t vl m' ->
-      observableEF ef = false ->
+      observableEF hf ef = false ->
       rs' = Locmap.setlist (map R res) vl (undef_regs (destroyed_by_builtin ef) rs) ->
-      ltl_corestep (LTL_Block s f sp (Lbuiltin ef args res :: bb) rs) m
+      ltl_corestep ge (LTL_Block s f sp (Lbuiltin ef args res :: bb) rs) m
          (LTL_Block s f sp bb rs') m'
 (* WE DON'T SUPPORT ANNOT YET
   | ltl_exec_Lannot: forall s f sp ef args bb rs m t vl m',
@@ -136,45 +135,46 @@ Inductive ltl_corestep: LTL_core -> mem -> LTL_core -> mem -> Prop :=
       ltl_corestep (LTL_Block s f sp (Lannot ef args :: bb) rs) m
          (LTL_Block s f sp bb rs) m' *)
   | ltl_exec_Lbranch: forall s f sp pc bb rs m,
-      ltl_corestep (LTL_Block s f sp (Lbranch pc :: bb) rs) m
+      ltl_corestep ge (LTL_Block s f sp (Lbranch pc :: bb) rs) m
         (LTL_State s f sp pc rs) m
   | ltl_exec_Lcond: forall s f sp cond args pc1 pc2 bb rs b pc rs' m,
       eval_condition cond (reglist rs args) m = Some b ->
       pc = (if b then pc1 else pc2) ->
       rs' = undef_regs (destroyed_by_cond cond) rs ->
-      ltl_corestep (LTL_Block s f sp (Lcond cond args pc1 pc2 :: bb) rs) m
+      ltl_corestep ge (LTL_Block s f sp (Lcond cond args pc1 pc2 :: bb) rs) m
         (LTL_State s f sp pc rs') m
   | ltl_exec_Ljumptable: forall s f sp arg tbl bb rs m n pc rs',
       rs (R arg) = Vint n ->
       list_nth_z tbl (Int.unsigned n) = Some pc ->
       rs' = undef_regs (destroyed_by_jumptable) rs ->
-      ltl_corestep (LTL_Block s f sp (Ljumptable arg tbl :: bb) rs) m
+      ltl_corestep ge (LTL_Block s f sp (Ljumptable arg tbl :: bb) rs) m
         (LTL_State s f sp pc rs') m
   | ltl_exec_Lreturn: forall s f sp bb rs m m',
       Mem.free m sp 0 f.(fn_stacksize) = Some m' ->
-      ltl_corestep (LTL_Block s f (Vptr sp Int.zero) (Lreturn :: bb) rs) m
+      ltl_corestep ge (LTL_Block s f (Vptr sp Int.zero) (Lreturn :: bb) rs) m
         (LTL_Returnstate s (sig_res (fn_sig f)) (return_regs (parent_locset s) rs)) m'
   | ltl_exec_function_internal: forall s f rs m m' sp rs',
       Mem.alloc m 0 f.(fn_stacksize) = (m', sp) ->
       rs' = undef_regs destroyed_at_function_entry (call_regs rs) ->
-      ltl_corestep (LTL_Callstate s (Internal f) rs) m
+      ltl_corestep ge (LTL_Callstate s (Internal f) rs) m
         (LTL_State s f (Vptr sp Int.zero) f.(fn_entrypoint) rs') m'
-(*no external call
-  | exec_function_external: forall s ef t args res rs m rs' m',
+
+  | exec_function_external: forall s ef t args res rs m rs' m'
+      (OBS: observableEF hf ef = false),
       args = map rs (loc_arguments (ef_sig ef)) ->
       external_call' ef ge args m t res m' ->
       rs' = Locmap.setlist (map R (loc_result (ef_sig ef))) res rs ->
-      ltl_corestep (LTL_Callstate s (External ef) rs m)
-         t (LTL_Returnstate s rs' m')*)
+      ltl_corestep ge (LTL_Callstate s (External ef) rs) m
+          (LTL_Returnstate s (sig_res (ef_sig ef)) rs') m'
+
   | ltl_exec_return: forall f sp rs1 bb s retty rs m,
-      ltl_corestep (LTL_Returnstate (Stackframe f sp rs1 bb :: s) retty rs) m
+      ltl_corestep ge (LTL_Returnstate (Stackframe f sp rs1 bb :: s) retty rs) m
         (LTL_Block s f sp bb rs) m.
 
-End RELSEM.
-
-Lemma LTL_corestep_not_at_external:
-       forall ge m q m' q', ltl_corestep ge q m q' m' -> LTL_at_external q = None.
-  Proof. intros. inv H; try reflexivity. Qed.
+Lemma LTL_corestep_not_at_external ge m q m' q':
+      ltl_corestep ge q m q' m' -> LTL_at_external q = None.
+  Proof. intros. inv H; try reflexivity. simpl in *. 
+    rewrite OBS. trivial. Qed.
 
 Definition LTL_halted (q : LTL_core): option val :=
     match q with 
@@ -214,7 +214,7 @@ Inductive final_state: state -> int -> Prop :=
       final_state (Returnstate nil rs m) retcode.
 *)
 
-Lemma LTL_corestep_not_halted : forall ge m q m' q', 
+Lemma LTL_corestep_not_halted ge m q m' q':
        ltl_corestep ge q m q' m' -> LTL_halted q = None.
   Proof. intros. inv H; reflexivity. Qed.
     
@@ -307,6 +307,8 @@ Lemma LTL_forward : forall g c m c' m' (CS: ltl_corestep g c m c' m'),
            eapply free_forward; eassumption.
          (*internal function*)
            eapply alloc_forward; eassumption.
+         (*external unobservable function*)
+           inv H0. eapply external_call_mem_forward; eassumption.
 Qed.
 
 Program Definition LTL_coop_sem : 
@@ -315,3 +317,4 @@ apply Build_CoopCoreSem with (coopsem := LTL_core_sem).
   apply LTL_forward.
 Defined.
 
+End LTL_COOP.

@@ -431,6 +431,8 @@ Hypothesis TRANSL: transl_program prog = OK tprog.
 Let ge : CminorSel.genv := Genv.globalenv prog.
 Let tge : RTL.genv := Genv.globalenv tprog.
 
+(*NEW*) Variable hf : I64Helpers.helper_functions.
+
 (** Relationship between the global environments for the original
   CminorSel program and the generated RTL program. *)
 
@@ -536,7 +538,7 @@ Lemma tr_move_correct:
   forall r1 ns r2 nd cs f sp rs m,
   tr_move f.(fn_code) ns r1 nd r2 ->
   exists rs',
-  corestep_star rtl_eff_sem tge
+  corestep_star (rtl_eff_sem hf) tge
      (RTL_State cs f sp ns rs) m 
      (RTL_State cs f sp nd rs') m /\
   rs'#r2 = rs#r1 /\
@@ -560,7 +562,7 @@ Lemma transl_switch_correct:
   match_env j map e nil rs ->
   comptree_match i t = Some act ->
   exists nd, exists rs',
-  corestep_star rtl_eff_sem  tge (RTL_State cs f sp ns rs) m (RTL_State cs f sp nd rs') m /\
+  corestep_star (rtl_eff_sem hf) tge (RTL_State cs f sp ns rs) m (RTL_State cs f sp nd rs') m /\
   nth_error nexits act = Some nd /\
   match_env j map e nil rs'.
 Proof.
@@ -595,7 +597,7 @@ Proof.
   set (rs1 := rs#rt <- (Vint(Int.sub i ofs))).
   assert (ME1: match_env j map e nil rs1).
     unfold rs1. eauto with rtlg.
-  assert (EX1: RTL_corestep tge (RTL_State cs f sp n rs) m (RTL_State cs f sp n1 rs1) m).
+  assert (EX1: RTL_corestep hf tge (RTL_State cs f sp n rs) m (RTL_State cs f sp n1 rs1) m).
     eapply rtl_corestep_exec_Iop; eauto. 
     predSpec Int.eq Int.eq_spec ofs Int.zero; simpl.
     rewrite H10. rewrite Int.sub_zero_l. congruence.
@@ -700,7 +702,7 @@ Definition transl_expr_prop
          (RC: REACH_closed m (vis mu))
          (Glob: forall b, isGlobalBlock ge b = true -> 
                   frgnBlocksSrc mu b = true)
-         (OBS: silent ge a)
+         (OBS: silent hf ge a)
 
     (MWF: map_wf map)
     (TE: tr_expr f.(fn_code) map pr a ns nd rd dst)
@@ -713,7 +715,7 @@ Definition transl_expr_prop
   /\ SM_wd mu'
   /\ sm_valid mu' m tm'
   /\ REACH_closed m (vis mu'))
-  /\ corestep_star rtl_eff_sem tge
+  /\ corestep_star (rtl_eff_sem hf) tge
         (RTL_State cs f sp' ns rs) tm (RTL_State cs f sp' nd rs') tm' 
   /\ match_env (restrict (as_inj mu') (vis mu')) map (set_optvar dst v e) le rs'
   /\ val_inject (restrict (as_inj mu') (vis mu')) v rs'#rd
@@ -729,7 +731,7 @@ Definition transl_exprlist_prop
          (RC: REACH_closed m (vis mu))
          (Glob: forall b, isGlobalBlock ge b = true -> 
                   frgnBlocksSrc mu b = true)
-         (OBS: silentExprList ge al)
+         (OBS: silentExprList hf ge al)
 
     (MWF: map_wf map)
     (TE: tr_exprlist f.(fn_code) map pr al ns nd rl)
@@ -742,7 +744,7 @@ Definition transl_exprlist_prop
   /\ SM_wd mu'
   /\ sm_valid mu' m tm'
   /\ REACH_closed m (vis mu'))
-  /\ corestep_star rtl_eff_sem tge
+  /\ corestep_star (rtl_eff_sem hf) tge
        (RTL_State cs f sp' ns rs) tm (RTL_State cs f sp' nd rs') tm'
   /\ match_env (restrict (as_inj mu') (vis mu')) map e le rs'
   /\ val_list_inject (restrict (as_inj mu') (vis mu')) vl rs'##rl
@@ -758,7 +760,7 @@ Definition transl_condexpr_prop
          (RC: REACH_closed m (vis mu))
          (Glob: forall b, isGlobalBlock ge b = true -> 
                   frgnBlocksSrc mu b = true)
-         (OBS: silentCondExpr ge a)
+         (OBS: silentCondExpr hf ge a)
 
     (MWF: map_wf map)
     (TE: tr_condition f.(fn_code) map pr a ns ntrue nfalse)
@@ -771,7 +773,7 @@ Definition transl_condexpr_prop
   /\ SM_wd mu'
   /\ sm_valid mu' m tm'
   /\ REACH_closed m (vis mu'))
-  /\ corestep_plus rtl_eff_sem tge
+  /\ corestep_plus (rtl_eff_sem hf) tge
        (RTL_State cs f sp' ns rs) tm (RTL_State cs f sp' (if v then ntrue else nfalse) rs') tm'
   /\ match_env (restrict (as_inj mu') (vis mu')) map e le rs'
   /\ (forall r, In r pr -> rs'#r = rs#r)
@@ -1138,6 +1140,19 @@ Proof.
   assumption. 
 Qed.
 
+Lemma silentD_Eexternal name ef al b:  forall
+  (SIL: silent hf ge (Eexternal name (ef_sig ef) al))
+  (FS: Genv.find_symbol ge name = Some b)
+  (FFP: Genv.find_funct_ptr ge b = Some (External ef)),
+  silentExprList hf ge al /\ observableEF hf ef = false
+   /\ forall (args : list val) (m : mem),
+             BuiltinEffect ge ef args m = EmptyEffect.
+Proof. intros.  
+unfold silent in SIL.
+rewrite FS, FFP in SIL.
+intuition.
+Qed.
+
 Lemma transl_expr_Eexternal_correct:
   forall le id sg al b ef vl v,
   Genv.find_symbol ge id = Some b ->
@@ -1149,7 +1164,8 @@ Lemma transl_expr_Eexternal_correct:
   transl_expr_prop le (Eexternal id sg al) v.
 Proof.
   intros; red; intros. inv TE.
-  simpl in OBS. rewrite H, H0 in OBS. destruct OBS as [SilentArgs [ObsEF EffectEF]].
+  destruct (silentD_Eexternal _ _ _ _ OBS H H0)
+    as [SilentArgs [ObsEF EffectEF]]; clear OBS.
   exploit H3; eauto. 
   intros [rs1 [tm1 [mu' [MU' [EX1 [ME1 [RR1 [RO1 EXT1]]]]]]]].
   assert (PG': meminj_preserves_globals ge (as_inj mu')).     
@@ -1477,7 +1493,7 @@ Lemma Efftr_move_correct:
   forall r1 ns r2 nd cs f sp rs m,
   tr_move f.(fn_code) ns r1 nd r2 ->
   exists rs',
-  effstep_star rtl_eff_sem tge EmptyEffect
+  effstep_star (rtl_eff_sem hf) tge EmptyEffect
      (RTL_State cs f sp ns rs) m 
      (RTL_State cs f sp nd rs') m /\
   rs'#r2 = rs#r1 /\
@@ -1499,7 +1515,7 @@ Lemma Efftransl_switch_correct:
   match_env j map e nil rs ->
   comptree_match i t = Some act ->
   exists nd, exists rs',
-  effstep_star rtl_eff_sem  tge EmptyEffect
+  effstep_star (rtl_eff_sem hf) tge EmptyEffect
         (RTL_State cs f sp ns rs) m (RTL_State cs f sp nd rs') m /\
   nth_error nexits act = Some nd /\
   match_env j map e nil rs'.
@@ -1538,7 +1554,7 @@ Proof.
   set (rs1 := rs#rt <- (Vint(Int.sub i ofs))).
   assert (ME1: match_env j map e nil rs1).
     unfold rs1. eauto with rtlg.
-  assert (EX1: RTL_effstep tge EmptyEffect (RTL_State cs f sp n rs) m (RTL_State cs f sp n1 rs1) m).
+  assert (EX1: RTL_effstep hf tge EmptyEffect (RTL_State cs f sp n rs) m (RTL_State cs f sp n1 rs1) m).
     eapply rtl_effstep_exec_Iop; eauto. 
     predSpec Int.eq Int.eq_spec ofs Int.zero; simpl.
     rewrite H10. rewrite Int.sub_zero_l. congruence.
@@ -1578,7 +1594,7 @@ Definition Efftransl_expr_prop
          (RC: REACH_closed m (vis mu))
          (Glob: forall b, isGlobalBlock ge b = true -> 
                   frgnBlocksSrc mu b = true)
-         (OBS: silent ge a)
+         (OBS: silent hf ge a)
 
     (MWF: map_wf map)
     (TE: tr_expr f.(fn_code) map pr a ns nd rd dst)
@@ -1591,7 +1607,7 @@ Definition Efftransl_expr_prop
   /\ SM_wd mu'
   /\ sm_valid mu' m tm'
   /\ REACH_closed m (vis mu'))
-  /\ effstep_star rtl_eff_sem tge EmptyEffect
+  /\ effstep_star (rtl_eff_sem hf) tge EmptyEffect
         (RTL_State cs f sp' ns rs) tm (RTL_State cs f sp' nd rs') tm'
   /\ match_env (restrict (as_inj mu') (vis mu')) map (set_optvar dst v e) le rs'
   /\ val_inject (restrict (as_inj mu') (vis mu')) v rs'#rd
@@ -1607,7 +1623,7 @@ Definition Efftransl_exprlist_prop
          (RC: REACH_closed m (vis mu))
          (Glob: forall b, isGlobalBlock ge b = true -> 
                   frgnBlocksSrc mu b = true)
-         (OBS: silentExprList ge al)
+         (OBS: silentExprList hf ge al)
 
     (MWF: map_wf map)
     (TE: tr_exprlist f.(fn_code) map pr al ns nd rl)
@@ -1620,7 +1636,7 @@ Definition Efftransl_exprlist_prop
   /\ SM_wd mu'
   /\ sm_valid mu' m tm'
   /\ REACH_closed m (vis mu'))
-  /\ effstep_star rtl_eff_sem tge EmptyEffect
+  /\ effstep_star (rtl_eff_sem hf) tge EmptyEffect
        (RTL_State cs f sp' ns rs) tm (RTL_State cs f sp' nd rs') tm'
   /\ match_env (restrict (as_inj mu') (vis mu')) map e le rs'
   /\ val_list_inject (restrict (as_inj mu') (vis mu')) vl rs'##rl
@@ -1636,7 +1652,7 @@ Definition Efftransl_condexpr_prop
          (RC: REACH_closed m (vis mu))
          (Glob: forall b, isGlobalBlock ge b = true -> 
                   frgnBlocksSrc mu b = true)
-         (OBS: silentCondExpr ge a)
+         (OBS: silentCondExpr hf ge a)
 
     (MWF: map_wf map)
     (TE: tr_condition f.(fn_code) map pr a ns ntrue nfalse)
@@ -1649,7 +1665,7 @@ Definition Efftransl_condexpr_prop
   /\ SM_wd mu'
   /\ sm_valid mu' m tm'
   /\ REACH_closed m (vis mu'))
-  /\ effstep_plus rtl_eff_sem tge EmptyEffect
+  /\ effstep_plus (rtl_eff_sem hf) tge EmptyEffect
        (RTL_State cs f sp' ns rs) tm (RTL_State cs f sp' (if v then ntrue else nfalse) rs') tm'
   /\ match_env (restrict (as_inj mu') (vis mu')) map e le rs'
   /\ (forall r, In r pr -> rs'#r = rs#r)
@@ -2028,7 +2044,8 @@ Lemma Efftransl_expr_Eexternal_correct:
   Efftransl_expr_prop le (Eexternal id sg al) v.
 Proof.
   intros; red; intros. inv TE.
-  simpl in OBS. rewrite H, H0 in OBS. destruct OBS as [SilentArgs [ObsEF EffectEF]].
+  destruct (silentD_Eexternal _ _ _ _ OBS H H0)
+    as [SilentArgs [ObsEF EffectEF]]; clear OBS.
   exploit H3; eauto. 
   intros [rs1 [tm1 [mu' [MU' [EX1 [ME1 [RR1 [RO1 EXT1]]]]]]]].
   assert (PG': meminj_preserves_globals ge (as_inj mu')).     
@@ -2803,7 +2820,7 @@ Lemma MATCH_restrict: forall d mu c1 m1 c2 m2 X
   (RX: REACH_closed m1 X), 
   MATCH d (restrict_sm mu X) c1 m1 c2 m2.
 Proof. intros.
-  destruct MC as [MS [RC [PG [GFP [Glob [SMV [WD INJ (* RCT]*)]]]]]]].
+  destruct MC as [MS [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
 assert (WDR: SM_wd (restrict_sm mu X)).
    apply restrict_sm_WD; assumption.
 split.
@@ -2861,7 +2878,7 @@ Lemma MATCH_initial: forall v1 v2 sig entrypoints
                     Genv.find_funct_ptr ge b = Some f1 /\
                     Genv.find_funct_ptr tge b = Some f2)
       vals1 c1 m1 j vals2 m2 (DomS DomT : block -> bool)
-      (Ini: initial_core cminsel_eff_sem ge v1 vals1 = Some c1)
+      (Ini: initial_core (cminsel_eff_sem hf) ge v1 vals1 = Some c1)
       (Inj: Mem.inject j m1 m2)
       (VInj: Forall2 (val_inject j) vals1 vals2)
       (PG:meminj_preserves_globals ge j)
@@ -2876,10 +2893,9 @@ Lemma MATCH_initial: forall v1 v2 sig entrypoints
                /\ Ple (Mem.nextblock m0) (Mem.nextblock m2))   
       (GDE: genvs_domain_eq ge tge)
       (HDomS: forall b : block, DomS b = true -> Mem.valid_block m1 b)
-      (HDomT: forall b : block, DomT b = true -> Mem.valid_block m2 b)
-      (*(RCT: REACH_closed m2 DomT)*),
+      (HDomT: forall b : block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
-  initial_core rtl_eff_sem tge v2 vals2 = Some c2 /\
+  initial_core (rtl_eff_sem hf) tge v2 vals2 = Some c2 /\
   MATCH c1
     (initial_SM DomS DomT
        (REACH m1 (fun b : block => isGlobalBlock ge b || getBlocks vals1 b))
@@ -2967,11 +2983,11 @@ Qed.
 
 Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
        (MTCH: MATCH c1 mu c1 m1 c2 m2)
-       (AtExtSrc: at_external cminsel_eff_sem c1 = Some (e, ef_sig, vals1)),
+       (AtExtSrc: at_external (cminsel_eff_sem hf) c1 = Some (e, ef_sig, vals1)),
      Mem.inject (as_inj mu) m1 m2 /\
      exists vals2,
        Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\
-       at_external rtl_eff_sem c2 = Some (e, ef_sig, vals2) /\
+       at_external (rtl_eff_sem hf) c2 = Some (e, ef_sig, vals2) /\
       (forall pubSrc' pubTgt',
        pubSrc' = (fun b => locBlocksSrc mu b && REACH m1 (exportedSrc mu vals1) b) ->
        pubTgt' = (fun b => locBlocksTgt mu b && REACH m2 (exportedTgt mu vals2) b) ->
@@ -2982,7 +2998,7 @@ destruct MTCH as [MC [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
 inv MC; simpl in AtExtSrc; inv AtExtSrc.
 destruct f; simpl in *; inv H0.
 inv TF.
-destruct (observableEF e0); inv H1.
+destruct (observableEF hf e0); inv H1.
 split; trivial.
 rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AINJ; trivial.
 exploit val_list_inject_forall_inject; try eassumption. intros ARGS'.
@@ -3037,7 +3053,7 @@ Lemma MATCH_atExternal_strong mu c1 m1 c2 m2 e vals1 sg: forall
       REACH_closed m1 (exportedSrc nu vals1)
       (*/\  (vals_def vals1=true -> REACH_closed m2 (exportedTgt nu vals2))*).
 Proof. intros.
- destruct MTCH as [MC [RC [PG [GFP [Glob [SMV [WDmu INJ (*RCT]*)]]]]]]].
+ destruct MTCH as [MC [RC [PG [GFP [Glob [SMV [WDmu INJ]]]]]]].
  split; trivial. 
  simpl in *. inv MC; simpl in *; inv ATEXT.
  destruct f; inv H0. 
@@ -3234,7 +3250,7 @@ Proof. intros.
   exploit MATCH_atExternal_strong; try eassumption. intros [INJ [vals2 H]].
   split; trivial. exists vals2. intuition.
   eapply (H2 _ _ H1 H3 _ H4).
-  destruct MTCH as [MC [RC [PG [GFP [Glob [SMV [WDmu [_ RCT]]]]]]]].
+  destruct MTCH as [MC [RC [PG [GFP [Glob [SMV [WDmu _]]]]]]].
   eapply inject_shared_replace_locals; try eassumption.
   subst. apply forall_vals_inject_restrictD in H0.
          eapply replace_locals_wd_AtExternal; assumption.
@@ -3245,8 +3261,8 @@ Lemma MATCH_afterExternal: forall
       mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
       (MemInjMu : Mem.inject (as_inj mu) m1 m2)
       (MatchMu: MATCH st1 mu st1 m1 st2 m2)
-      (AtExtSrc : at_external cminsel_eff_sem st1 = Some (e, ef_sig, vals1))
-      (AtExtTgt : at_external rtl_eff_sem st2 = Some (e', ef_sig', vals2))
+      (AtExtSrc : at_external (cminsel_eff_sem hf) st1 = Some (e, ef_sig, vals1))
+      (AtExtTgt : at_external (rtl_eff_sem hf) st2 = Some (e', ef_sig', vals2))
       (ValInjMu : Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2)
       (pubSrc' : block -> bool)
       (pubSrcHyp : pubSrc' =
@@ -3277,20 +3293,19 @@ Lemma MATCH_afterExternal: forall
        mu' (Mu'Hyp: mu' = replace_externs nu' frgnSrc' frgnTgt')
        (UnchPrivSrc: Mem.unchanged_on
                (fun b z => locBlocksSrc nu b = true /\ pubBlocksSrc nu b = false) m1 m1')
-       (UnchLOOR: Mem.unchanged_on (local_out_of_reach nu m1) m2 m2')
-       (*NEW (RCT' : REACH_closed m2' (DomTgt nu'))*),
+       (UnchLOOR: Mem.unchanged_on (local_out_of_reach nu m1) m2 m2'),
   exists st1' st2',
-  after_external cminsel_eff_sem (Some ret1) st1 =Some st1' /\
-  after_external rtl_eff_sem (Some ret2) st2 = Some st2' /\
+  after_external (cminsel_eff_sem hf) (Some ret1) st1 =Some st1' /\
+  after_external (rtl_eff_sem hf) (Some ret2) st2 = Some st2' /\
   MATCH st1' mu' st1' m1' st2' m2'.
 Proof. intros.
 simpl.
- destruct MatchMu as [MC [RC [PG [GFP [Glob [VAL [WDmu INJ (*RCT]*)]]]]]]].
+ destruct MatchMu as [MC [RC [PG [GFP [Glob [VAL [WDmu INJ]]]]]]].
  simpl in *. inv MC; simpl in *; inv AtExtSrc.
  destruct f; inv H0. 
  destruct tf; inv AtExtTgt.
  inv TF.
- destruct (observableEF e1); inv H0; inv H1.
+ destruct (observableEF hf e1); inv H0; inv H1.
  eexists. eexists.
     split. reflexivity.
     split. reflexivity.
@@ -3581,11 +3596,11 @@ Qed.
 
 Lemma MATCH_corestep: forall 
        st1 m1 st1' m1' 
-       (CS: corestep cminsel_eff_sem ge st1 m1 st1' m1')
+       (CS: corestep (cminsel_eff_sem hf) ge st1 m1 st1' m1')
        st2 mu m2 (MTCH: MATCH st1 mu st1 m1 st2 m2),
 exists st2' m2' mu',
-  (corestep_plus rtl_eff_sem tge st2 m2 st2' m2' \/
-   (corestep_star rtl_eff_sem tge st2 m2 st2' m2' /\ lt_state st1' st1))
+  (corestep_plus (rtl_eff_sem hf) tge st2 m2 st2' m2' \/
+   (corestep_star (rtl_eff_sem hf) tge st2 m2 st2' m2' /\ lt_state st1' st1))
   /\ intern_incr mu mu'
   /\ sm_inject_separated mu mu' m1 m2
   /\ sm_locally_allocated mu mu' m1 m2 m1' m2'
@@ -3630,7 +3645,7 @@ Proof. intros.
   rewrite restrict_sm_all in *.
   assert (fn_stacksize tf = fn_stackspace f).
     inv TF. auto.
-  destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj (*RCT]*)]]]]]].
+  destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   destruct SP as [spb [spb' [X [Y Rsp]]]]; subst sp'; inv X.
   rewrite restrict_sm_local' in *; trivial. 
   edestruct free_parallel_inject as [tm' []]; eauto.
@@ -3843,11 +3858,7 @@ Proof. intros.
 { (* call *)
   inv TS; inv H.
   (* indirect *)
-  destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj (*RCT]*)]]]]]].
-(*  assert (PGR: meminj_preserves_globals ge (restrict (as_inj mu) (vis mu))).
-     rewrite <- restrict_sm_all. 
-     eapply restrict_sm_preserves_globals; try eassumption.
-     unfold vis. intuition. *)
+  destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   rewrite restrict_sm_all in *.
   rewrite restrict_sm_local' in SP; trivial.
   exploit transl_expr_correct; eauto.
@@ -3936,11 +3947,7 @@ Proof. intros.
       assert (FF': frgnBlocksSrc mu' = frgnBlocksSrc mu'') by eapply INC''.
       rewrite <-FF', <-FF; auto. 
   (* direct *)
-  destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj (*RCT]*)]]]]]].
- (* assert (PGR: meminj_preserves_globals ge (restrict (as_inj mu) (vis mu))).
-     rewrite <- restrict_sm_all. 
-     eapply restrict_sm_preserves_globals; try eassumption.
-     unfold vis. intuition. *)
+  destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   rewrite restrict_sm_all in *.
   rewrite restrict_sm_local' in SP; trivial.
   exploit transl_exprlist_correct; eauto.
@@ -4000,7 +4007,7 @@ Proof. intros.
 { (* tailcall *)
   inv TS; inv H.
   (* indirect *)
-  destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj (*RCT]*)]]]]]].
+  destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   rewrite restrict_sm_all in *.
   rewrite restrict_sm_local' in SP; trivial.
   exploit transl_expr_correct; eauto.
@@ -4433,7 +4440,7 @@ Proof. intros.
   inv TS.
   exploit match_stacks_call_cont; eauto. intros [U V].
   inversion TF.
-  destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj (*RCT]*)]]]]]].
+  destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   rewrite restrict_sm_all in *.
   rewrite restrict_sm_local' in SP; trivial.
   destruct SP as [spb [spb' [SPB [SPB' Rsp]]]]; subst sp'; inv SPB.
@@ -4673,13 +4680,13 @@ Qed.
 
 Lemma MATCH_effcore_diagram: forall 
          st1 m1 st1' m1' (U1 : block -> Z -> bool)
-         (CS: effstep cminsel_eff_sem ge U1 st1 m1 st1' m1')
+         (CS: effstep (cminsel_eff_sem hf) ge U1 st1 m1 st1' m1')
          st2 mu m2 
          (UHyp: forall b z, U1 b z = true -> vis mu b = true)
          (MTCH: MATCH st1 mu st1 m1 st2 m2),
 exists st2' m2' mu', exists U2 : block -> Z -> bool,
-  (effstep_plus rtl_eff_sem tge U2 st2 m2 st2' m2' \/
-      effstep_star rtl_eff_sem tge U2 st2 m2 st2' m2' /\ lt_state st1' st1)
+  (effstep_plus (rtl_eff_sem hf) tge U2 st2 m2 st2' m2' \/
+      effstep_star (rtl_eff_sem hf) tge U2 st2 m2 st2' m2' /\ lt_state st1' st1)
  /\ intern_incr mu mu' /\
   sm_inject_separated mu mu' m1 m2 /\
   sm_locally_allocated mu mu' m1 m2 m1' m2' /\
@@ -4730,7 +4737,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   rewrite restrict_sm_all in *.
   assert (fn_stacksize tf = fn_stackspace f).
     inv TF. auto.
-  destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj (*RCT]*)]]]]]].
+  destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   destruct SP as [spb [spb' [X [Y Rsp]]]]; subst sp'; inv X.
   rewrite restrict_sm_local' in *; trivial. 
   edestruct free_parallel_inject as [tm' []]; eauto.
@@ -5149,7 +5156,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
 { (* tailcall *)
   inv TS; inv H.
   (* indirect *)
-  destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj (*RCT]*)]]]]]].
+  destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   rewrite restrict_sm_all in *.
   rewrite restrict_sm_local' in SP; trivial.
   exploit Efftransl_expr_correct; eauto.
@@ -5671,7 +5678,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   inv TS.
   exploit match_stacks_call_cont; eauto. intros [U V].
   inversion TF.
-  destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj (*RCT]*)]]]]]].
+  destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   rewrite restrict_sm_all in *.
   rewrite restrict_sm_local' in SP; trivial.
   destruct SP as [spb [spb' [SPB [SPB' Rsp]]]]; subst sp'; inv SPB.
@@ -5934,11 +5941,11 @@ Qed.
 
 Lemma MATCH_halted cd mu c1 m1 c2 m2 v1: forall
         (MTCH: MATCH cd mu c1 m1 c2 m2)
-        (HALT: halted cminsel_eff_sem c1 = Some v1),
+        (HALT: halted (cminsel_eff_sem hf) c1 = Some v1),
 exists v2 : val,
   Mem.inject (as_inj mu) m1 m2 /\
   val_inject (restrict (as_inj mu) (vis mu)) v1 v2 /\
-  halted rtl_eff_sem c2 = Some v2 
+  halted (rtl_eff_sem hf) c2 = Some v2 
   /\ forall (pubSrc' pubTgt' : block -> bool)
         (pubSrcHyp : pubSrc' =
                  (fun b : block => 
@@ -5952,7 +5959,7 @@ exists v2 : val,
       exportedSrc nu (v1::nil) = mapped (shared_of nu) /\
       REACH_closed m1 (exportedSrc nu (v1::nil)) .
 Proof. intros.
-  destruct MTCH as [MC [RC [PG [GFP [Glob [SMV [WDmu INJ (*RCT]*)]]]]]]]. 
+  destruct MTCH as [MC [RC [PG [GFP [Glob [SMV [WDmu INJ]]]]]]]. 
     destruct c1; inv HALT. destruct k; inv H0.
     inv MC. exists tv.
     rewrite restrict_sm_nest, vis_restrict_sm,
@@ -6120,8 +6127,8 @@ Theorem transl_program_correct:
                 /\ Genv.find_funct_ptr ge b = Some f1
                 /\ Genv.find_funct_ptr tge b = Some f2)
          (init_mem: exists m0, Genv.init_mem prog = Some m0),
-SM_simulation.SM_simulation_inject cminsel_eff_sem
-   rtl_eff_sem ge tge entrypoints.
+SM_simulation.SM_simulation_inject (cminsel_eff_sem hf)
+   (rtl_eff_sem hf) ge tge entrypoints.
 Proof.
 intros.
 assert (GDE: genvs_domain_eq ge tge).

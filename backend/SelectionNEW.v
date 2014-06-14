@@ -32,6 +32,7 @@ Require Import Op.
 Require Import CminorSel.
 Require Import SelectOp.
 Require Import SelectDiv.
+Require Import I64Helpers.
 Require Import BuiltinEffects.
 Require Import SelectLongNEW.
 
@@ -91,17 +92,17 @@ Definition sel_unop (op: Cminor.unary_operation) (arg: expr) : expr :=
   | Cminor.Ointuoffloat => intuoffloat arg
   | Cminor.Ofloatofint => floatofint arg
   | Cminor.Ofloatofintu => floatofintu arg
-  | Cminor.Onegl => negl (*hf*) arg
+  | Cminor.Onegl => negl hf arg
   | Cminor.Onotl => notl arg
   | Cminor.Ointoflong => intoflong arg
   | Cminor.Olongofint => longofint arg
   | Cminor.Olongofintu => longofintu arg
-  | Cminor.Olongoffloat => longoffloat (*hf*) arg
-  | Cminor.Olonguoffloat => longuoffloat (*hf*) arg
-  | Cminor.Ofloatoflong => floatoflong (*hf*) arg
-  | Cminor.Ofloatoflongu => floatoflongu (*hf*) arg
-  | Cminor.Osingleoflong => singleoflong (*hf*) arg
-  | Cminor.Osingleoflongu => singleoflongu (*hf*) arg
+  | Cminor.Olongoffloat => longoffloat hf arg
+  | Cminor.Olonguoffloat => longuoffloat hf arg
+  | Cminor.Ofloatoflong => floatoflong hf arg
+  | Cminor.Ofloatoflongu => floatoflongu hf arg
+  | Cminor.Osingleoflong => singleoflong hf arg
+  | Cminor.Osingleoflongu => singleoflongu hf arg
   end.
 
 Definition sel_binop (op: Cminor.binary_operation) (arg1 arg2: expr) : expr :=
@@ -123,19 +124,19 @@ Definition sel_binop (op: Cminor.binary_operation) (arg1 arg2: expr) : expr :=
   | Cminor.Osubf => subf arg1 arg2
   | Cminor.Omulf => mulf arg1 arg2
   | Cminor.Odivf => divf arg1 arg2
-  | Cminor.Oaddl => addl (*hf*) arg1 arg2
-  | Cminor.Osubl => subl (*hf*) arg1 arg2
-  | Cminor.Omull => mull (*hf*) arg1 arg2
-  | Cminor.Odivl => divl (*hf*) arg1 arg2
-  | Cminor.Odivlu => divlu (*hf*) arg1 arg2
-  | Cminor.Omodl => modl (*hf*) arg1 arg2
-  | Cminor.Omodlu => modlu (*hf*) arg1 arg2
+  | Cminor.Oaddl => addl hf arg1 arg2
+  | Cminor.Osubl => subl hf arg1 arg2
+  | Cminor.Omull => mull hf arg1 arg2
+  | Cminor.Odivl => divl hf arg1 arg2
+  | Cminor.Odivlu => divlu hf arg1 arg2
+  | Cminor.Omodl => modl hf arg1 arg2
+  | Cminor.Omodlu => modlu hf arg1 arg2
   | Cminor.Oandl => andl arg1 arg2
   | Cminor.Oorl => orl arg1 arg2
   | Cminor.Oxorl => xorl arg1 arg2
-  | Cminor.Oshll => shll (*hf*) arg1 arg2
-  | Cminor.Oshrl => shrl (*hf*) arg1 arg2
-  | Cminor.Oshrlu => shrlu (*hf*) arg1 arg2
+  | Cminor.Oshll => shll hf arg1 arg2
+  | Cminor.Oshrl => shrl hf arg1 arg2
+  | Cminor.Oshrlu => shrlu hf arg1 arg2
   | Cminor.Ocmp c => comp c arg1 arg2
   | Cminor.Ocmpu c => compu c arg1 arg2
   | Cminor.Ocmpf c => compf c arg1 arg2
@@ -183,7 +184,7 @@ Definition classify_call (ge: Cminor.genv) (e: Cminor.expr) : call_kind :=
       | None => Call_imm id
       | Some b =>
           match Genv.find_funct_ptr ge b with
-          | Some(External ef) => if ef_inline ef && (*NEW*) negb(observableEF ef)
+          | Some(External ef) => if ef_inline ef && (*NEW*) negb (observableEF hf ef)
                                  then Call_builtin ef else Call_imm id
           | _ => Call_imm id
           end
@@ -234,7 +235,7 @@ Definition sel_function (hf: helper_functions) (ge: Cminor.genv) (f: Cminor.func
     f.(Cminor.fn_params)
     f.(Cminor.fn_vars)
     f.(Cminor.fn_stackspace)
-    (sel_stmt (*hf*) ge f.(Cminor.fn_body)).
+    (sel_stmt hf ge f.(Cminor.fn_body)).
 
 Definition sel_fundef (hf: helper_functions) (ge: Cminor.genv) (f: Cminor.fundef) : fundef :=
   transf_fundef (sel_function hf ge) f.
@@ -245,5 +246,5 @@ Local Open Scope error_monad_scope.
 
 Definition sel_program (p: Cminor.program) : res program :=
   let ge := Genv.globalenv p in
-  do hf <- get_helpers ge; OK (transform_program (sel_fundef hf ge) p).
+  do hf <- get_helpers (*ge*); OK (transform_program (sel_fundef hf ge) p).
 

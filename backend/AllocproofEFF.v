@@ -1762,6 +1762,8 @@ Hypothesis TRANSF: transf_program prog = OK tprog.
 Let ge := Genv.globalenv prog.
 Let tge := Genv.globalenv tprog.
 
+(*NEW*) Variable hf : I64Helpers.helper_functions.
+
 Lemma symbols_preserved:
   forall (s: ident), Genv.find_symbol tge s = Genv.find_symbol ge s.
 Proof.
@@ -1935,7 +1937,7 @@ Lemma exec_moves:
   satisf j rs ls e' ->
   wt_regset env rs ->
   exists ls',
-    corestep_star LTL_eff_sem tge 
+    corestep_star (LTL_eff_sem hf) tge 
                 (LTL_Block s f sp (expand_moves mv bb) ls) m
                 (LTL_Block s f sp bb ls') m
   /\ satisf j rs ls' e.
@@ -1978,7 +1980,7 @@ Lemma Eff_exec_moves:
   satisf j rs ls e' ->
   wt_regset env rs ->
   exists ls',
-    effstep_star LTL_eff_sem tge EmptyEffect
+    effstep_star (LTL_eff_sem hf) tge EmptyEffect
                 (LTL_Block s f sp (expand_moves mv bb) ls) m
                 (LTL_Block s f sp bb ls') m
   /\ satisf j rs ls' e.
@@ -2060,7 +2062,7 @@ Inductive match_stackframes (j:meminj): list RTL.stackframe -> list LTL.stackfra
            Val.has_type v (env res) ->
            agree_callee_save ls ls1 ->
            exists ls2,
-           corestep_star LTL_eff_sem tge 
+           corestep_star (LTL_eff_sem hf) tge 
                            (LTL_Block ts tf sp' bb ls1) m
                            (LTL_State ts tf sp' pc ls2) m
            /\ satisf jj (rs#res <- v) ls2 e)
@@ -2071,7 +2073,7 @@ Inductive match_stackframes (j:meminj): list RTL.stackframe -> list LTL.stackfra
            Val.has_type v (env res) ->
            agree_callee_save ls ls1 ->
            exists ls2,
-           effstep_star LTL_eff_sem tge EmptyEffect
+           effstep_star (LTL_eff_sem hf) tge EmptyEffect
                            (LTL_Block ts tf sp' bb ls1) m
                            (LTL_State ts tf sp' pc ls2) m
            /\ satisf jj (rs#res <- v) ls2 e),
@@ -2448,7 +2450,7 @@ Lemma MATCH_initial: forall v1 v2 sig entrypoints
                     Genv.find_funct_ptr ge b = Some f1 /\
                     Genv.find_funct_ptr tge b = Some f2)
       vals1 c1 m1 j vals2 m2 (DomS DomT : block -> bool)
-      (Ini: initial_core rtl_eff_sem ge v1 vals1 = Some c1)
+      (Ini: initial_core (rtl_eff_sem hf) ge v1 vals1 = Some c1)
       (Inj: Mem.inject j m1 m2)
       (VInj: Forall2 (val_inject j) vals1 vals2)
       (PG:meminj_preserves_globals ge j)
@@ -2465,7 +2467,7 @@ Lemma MATCH_initial: forall v1 v2 sig entrypoints
       (HDomS: forall b : block, DomS b = true -> Mem.valid_block m1 b)
       (HDomT: forall b : block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
-  initial_core LTL_eff_sem tge v2 vals2 = Some c2 /\
+  initial_core (LTL_eff_sem hf) tge v2 vals2 = Some c2 /\
   MATCH
     (initial_SM DomS DomT
        (REACH m1 (fun b : block => isGlobalBlock ge b || getBlocks vals1 b))
@@ -2616,8 +2618,8 @@ Lemma MATCH_afterExternal: forall
       mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
       (MemInjMu : Mem.inject (as_inj mu) m1 m2)
       (MatchMu: MATCH mu st1 m1 st2 m2)
-      (AtExtSrc : at_external rtl_eff_sem st1 = Some (e, ef_sig, vals1))
-      (AtExtTgt : at_external LTL_eff_sem st2 = Some (e', ef_sig', vals2))
+      (AtExtSrc : at_external (rtl_eff_sem hf) st1 = Some (e, ef_sig, vals1))
+      (AtExtTgt : at_external (LTL_eff_sem hf) st2 = Some (e', ef_sig', vals2))
       (ValInjMu : Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2)
       (pubSrc' : block -> bool)
       (pubSrcHyp : pubSrc' =
@@ -2650,8 +2652,8 @@ Lemma MATCH_afterExternal: forall
                (fun b z => locBlocksSrc nu b = true /\ pubBlocksSrc nu b = false) m1 m1')
        (UnchLOOR: Mem.unchanged_on (local_out_of_reach nu m1) m2 m2'),
   exists st1' st2',
-  after_external rtl_eff_sem (Some ret1) st1 =Some st1' /\
-  after_external LTL_eff_sem (Some ret2) st2 = Some st2' /\
+  after_external (rtl_eff_sem hf) (Some ret1) st1 =Some st1' /\
+  after_external (LTL_eff_sem hf) (Some ret2) st2 = Some st2' /\
   MATCH mu' st1' m1' st2' m2'.
 Proof. intros.
 simpl.
@@ -2660,7 +2662,7 @@ simpl.
  destruct f; inv AtExtSrc. 
  destruct tf; inv AtExtTgt.
  inv FUN.
- destruct (observableEF e1); inv H0; inv H1.
+ destruct (observableEF hf e1); inv H0; inv H1.
  eexists. eexists.
     split. reflexivity.
     split. reflexivity.
@@ -2898,10 +2900,10 @@ Qed.
 
 Lemma MATCH_corestep: forall 
        st1 m1 st1' m1' 
-       (CS: corestep rtl_eff_sem ge st1 m1 st1' m1')
+       (CS: corestep (rtl_eff_sem hf) ge st1 m1 st1' m1')
        st2 mu m2 (MTCH: MATCH mu st1 m1 st2 m2),
 exists st2' m2' mu',
-   corestep_plus LTL_eff_sem tge st2 m2 st2' m2'
+   corestep_plus (LTL_eff_sem hf) tge st2 m2 st2' m2'
   /\ intern_incr mu mu'
   /\ sm_inject_separated mu mu' m1 m2
   /\ sm_locally_allocated mu mu' m1 m2 m1' m2'
@@ -2911,7 +2913,7 @@ Proof. intros.
    destruct CS; intros; destruct MTCH as [MSTATE PRE];
    inv MSTATE; try UseShape.
 
-(* nop *)
+{ (* nop *)
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   exploit exec_moves; eauto. intros [ls1 [X Y]]. 
   eexists; exists m2, mu; split.
@@ -2930,10 +2932,10 @@ Proof. intros.
   split. exploit satisf_successors; eauto. simpl; eauto. intros [enext [U V]]. 
          split. econstructor; eauto.
          intuition.
-  split; trivial.
+  split; trivial. }
 
-(* op move *)
-- generalize (wt_exec_Iop _ _ _ _ _ _ _ _ _ _ _ WTI H0 WTRS). intros WTRS'.
+{ (* op move *)
+  generalize (wt_exec_Iop _ _ _ _ _ _ _ _ _ _ _ WTI H0 WTRS). intros WTRS'.
   simpl in H0. inv H0.  
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   exploit (exec_moves mv); eauto. intros [ls1 [X Y]]. 
@@ -2952,10 +2954,10 @@ Proof. intros.
          intros [enext [U V]]. 
          split. econstructor; eauto.
          intuition.
-  split; trivial.
+  split; trivial. }
 
-(* op makelong *)
-- generalize (wt_exec_Iop _ _ _ _ _ _ _ _ _ _ _ WTI H0 WTRS). intros WTRS'.
+{ (* op makelong *)
+  generalize (wt_exec_Iop _ _ _ _ _ _ _ _ _ _ _ WTI H0 WTRS). intros WTRS'.
   simpl in H0. inv H0.  
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   exploit (exec_moves mv); eauto. intros [ls1 [X Y]]. 
@@ -2975,10 +2977,10 @@ Proof. intros.
          intros [enext [U V]]. 
          split. econstructor; eauto.
          intuition.
-  split; trivial.
+  split; trivial. }
 
-(* op lowlong *)
-- generalize (wt_exec_Iop _ _ _ _ _ _ _ _ _ _ _ WTI H0 WTRS). intros WTRS'.
+{ (* op lowlong *)
+  generalize (wt_exec_Iop _ _ _ _ _ _ _ _ _ _ _ WTI H0 WTRS). intros WTRS'.
   simpl in H0. inv H0. 
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   exploit (exec_moves mv); eauto. intros [ls1 [X Y]]. 
@@ -2998,10 +3000,10 @@ Proof. intros.
          intros [enext [U V]]. 
          split. econstructor; eauto.
          intuition.
-  split; trivial.
+  split; trivial. }
 
-(* op highlong *)
-- generalize (wt_exec_Iop _ _ _ _ _ _ _ _ _ _ _ WTI H0 WTRS). intros WTRS'.
+{ (* op highlong *)
+  generalize (wt_exec_Iop _ _ _ _ _ _ _ _ _ _ _ WTI H0 WTRS). intros WTRS'.
   simpl in H0. inv H0. 
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   exploit (exec_moves mv); eauto. intros [ls1 [X Y]]. 
@@ -3021,10 +3023,10 @@ Proof. intros.
          intros [enext [U V]]. 
          split. econstructor; eauto.
          intuition.
-  split; trivial.
+  split; trivial. }
 
-(* op regular *)
-- generalize (wt_exec_Iop _ _ _ _ _ _ _ _ _ _ _ WTI H0 WTRS). intros WTRS'.
+{ (* op regular *)
+  generalize (wt_exec_Iop _ _ _ _ _ _ _ _ _ _ _ WTI H0 WTRS). intros WTRS'.
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   exploit (exec_moves mv1); eauto. intros [ls1 [A1 B1]]. 
 (*  exploit transfer_use_def_satisf; eauto. intros [X Y].*)
@@ -3063,10 +3065,10 @@ Proof. intros.
          split. econstructor; try eassumption.
                 exists b, b'; eauto.
          intuition.
-  split; trivial. 
+  split; trivial. }
 
-(* op dead *)
-- destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
+{ (* op dead *)
+  destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   exploit exec_moves; eauto. intros [ls1 [X Y]]. 
   eexists; exists m2, mu; split.
     eapply corestep_plus_star_trans.
@@ -3085,10 +3087,10 @@ Proof. intros.
          split. econstructor; eauto.
                  eapply wt_exec_Iop; eauto.
          intuition.
-  split; trivial.  
+  split; trivial. }
 
-(* load regular *)
-- generalize (wt_exec_Iload _ _ _ _ _ _ _ _ _ _ _ WTI H1 WTRS). intros WTRS'.
+{ (* load regular *)
+  generalize (wt_exec_Iload _ _ _ _ _ _ _ _ _ _ _ WTI H1 WTRS). intros WTRS'.
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   exploit (exec_moves mv1); eauto. intros [ls1 [A1 B1]]. 
 
@@ -3133,10 +3135,10 @@ Proof. intros.
          split. econstructor; eauto.
                 exists b, b'; eauto.
          intuition.
-  split; trivial. 
+  split; trivial. }
 
-(* load pair *)
-- generalize (wt_exec_Iload _ _ _ _ _ _ _ _ _ _ _ WTI H1 WTRS). intros WTRS'.
+{ (* load pair *)
+  generalize (wt_exec_Iload _ _ _ _ _ _ _ _ _ _ _ WTI H1 WTRS). intros WTRS'.
   exploit Mem.loadv_int64_split; eauto. intros (v1 & v2 & LOAD1 & LOAD2 & V12).
   set (v2' := if big_endian then v2 else v1) in *.
   set (v1' := if big_endian then v1 else v2) in *.
@@ -3228,10 +3230,10 @@ Proof. intros.
          split. econstructor; eauto.
                 exists b, b'; eauto.
          intuition.
-  split; trivial. 
+  split; trivial. }
 
-(* load first word of a pair *)
-- generalize (wt_exec_Iload _ _ _ _ _ _ _ _ _ _ _ WTI H1 WTRS). intros WTRS'.
+{ (* load first word of a pair *)
+  generalize (wt_exec_Iload _ _ _ _ _ _ _ _ _ _ _ WTI H1 WTRS). intros WTRS'.
   exploit Mem.loadv_int64_split; eauto. intros (v1 & v2 & LOAD1 & LOAD2 & V12).
   set (v2' := if big_endian then v2 else v1) in *.
   set (v1' := if big_endian then v1 else v2) in *.
@@ -3289,10 +3291,10 @@ Proof. intros.
          split. econstructor; eauto.
                 exists b, b'; eauto.
          intuition.
-  split; trivial. 
+  split; trivial. }
 
-(* load second word of a pair *)
-- generalize (wt_exec_Iload _ _ _ _ _ _ _ _ _ _ _ WTI H1 WTRS). intros WTRS'.
+{ (* load second word of a pair *)
+  generalize (wt_exec_Iload _ _ _ _ _ _ _ _ _ _ _ WTI H1 WTRS). intros WTRS'.
   exploit Mem.loadv_int64_split; eauto. intros (v1 & v2 & LOAD1 & LOAD2 & V12).
   set (v2' := if big_endian then v2 else v1) in *.
   set (v1' := if big_endian then v1 else v2) in *.
@@ -3352,10 +3354,10 @@ Proof. intros.
          split. econstructor; eauto.
                 exists b, b'; eauto.
          intuition.
-  split; trivial. 
+  split; trivial. }
 
-(* load dead *)
-- exploit exec_moves; eauto. intros [ls1 [X Y]].
+{ (* load dead *)
+  exploit exec_moves; eauto. intros [ls1 [X Y]].
   eexists; exists m2, mu; split.
     eapply corestep_plus_star_trans. 
       eapply corestep_plus_one. 
@@ -3373,10 +3375,10 @@ Proof. intros.
          split. econstructor; eauto.
                 eapply wt_exec_Iload; eauto.
          intuition.
-  split; eapply PRE.
+  split; eapply PRE. }
 
-(* store *)
-- exploit exec_moves; eauto. intros [ls1 [X Y]].
+{ (* store *)
+  exploit exec_moves; eauto. intros [ls1 [X Y]].
 
   (*exploit add_equations_lessdef; eauto. intros LD. simpl in LD. inv LD. *)
   exploit add_equations_inject; eauto. intros LD. simpl in LD. inv LD. 
@@ -3437,10 +3439,10 @@ Proof. intros.
            eapply val_inject_incr; try eassumption. eapply restrict_incr.
            eapply val_inject_incr; try eassumption. eapply restrict_incr.
          intros [m2'' [ST2 INJ]]. rewrite ST2 in P. inv P. eassumption. 
-   split; trivial.
+   split; trivial. }
 
-(* store 2 *)
-- exploit Mem.storev_int64_split; eauto. 
+{ (* store 2 *)
+  exploit Mem.storev_int64_split; eauto. 
   replace (if big_endian then Val.hiword rs#src else Val.loword rs#src)
      with (sel_val kind_first_word rs#src)
        by (unfold kind_first_word; destruct big_endian; reflexivity).
@@ -3599,10 +3601,10 @@ Proof. intros.
             rewrite (Int.add_commut (Int.repr delta)) in STORE2'.
             rewrite ST2 in STORE2'. inv STORE2'. assumption.
   }
-  split; trivial.
+  split; trivial. }
 
-(* call *)
-- set (sg := RTL.funsig fd) in *.
+{ (* call *)
+  set (sg := RTL.funsig fd) in *.
   set (args' := loc_arguments sg) in *.
   set (res' := map R (loc_result sg)) in *.
   exploit (exec_moves mv1); eauto. intros [ls1 [A1 B1]]. 
@@ -3665,10 +3667,10 @@ Proof. intros.
                    simpl. red; auto.
                    inv WTI. rewrite SIG. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto.
          intuition.
-   split; trivial.
+   split; trivial. }
 
-(* tailcall *)
-- set (sg := RTL.funsig fd) in *.
+{ (* tailcall *)
+  set (sg := RTL.funsig fd) in *.
   set (args' := loc_arguments sg) in *.
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
   assert (PGR: meminj_preserves_globals ge (restrict (as_inj mu) (vis mu))).
@@ -3713,10 +3715,10 @@ Proof. intros.
                   rewrite SIG. inv WTI. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto.
          intuition.
          eapply REACH_closed_free; eassumption.
-  split; trivial. 
+  split; trivial. }
 
-(* builtin *) 
-- assert (WTRS': wt_regset env (rs#res <- v)) by (eapply wt_exec_Ibuiltin; eauto).
+{ (* builtin *) 
+  assert (WTRS': wt_regset env (rs#res <- v)) by (eapply wt_exec_Ibuiltin; eauto).
   exploit (exec_moves mv1); eauto. intros [ls1 [A1 B1]].
   unfold satisf in B1.
   assert (ArgsInj: val_list_inject (restrict (as_inj mu) (vis mu)) rs ## args
@@ -3773,9 +3775,10 @@ Proof. intros.
           eapply intern_incr_as_inj; eassumption.
     assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
           rewrite <- FRG. eapply (H6 _ H13).
-  split; trivial. 
-(* annot *)
-- admit. (* We don't treat annotations yet.
+  split; trivial. }
+
+{ (* annot *)
+  admit. (* We don't treat annotations yet.
    exploit (exec_moves mv); eauto. intros [ls1 [A1 B1]]. 
    exploit external_call_mem_extends; eauto. eapply add_equations_args_lessdef; eauto.
   inv WTI. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto. 
@@ -3796,10 +3799,10 @@ Proof. intros.
   econstructor; eauto.
   change (destroyed_by_builtin (EF_annot txt typ)) with (@nil mreg). 
   simpl. subst v. assumption.
-  apply wt_regset_assign; auto. subst v. constructor. *)
+  apply wt_regset_assign; auto. subst v. constructor. *) }
 
-(* cond *)
-- exploit (exec_moves mv); eauto. intros [ls1 [A1 B1]].
+{ (* cond *)
+  exploit (exec_moves mv); eauto. intros [ls1 [A1 B1]].
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
   assert (MInjR : Mem.inject (restrict (as_inj mu) (vis mu)) m m2).
     eapply inject_restrict; eassumption.
@@ -3821,10 +3824,10 @@ Proof. intros.
            intros [enext [U V]].  
            split. econstructor; eauto.
            intuition.
-  split; trivial.
+  split; trivial. }
 
-(* jumptable *)
-- exploit (exec_moves mv); eauto. intros [ls1 [A1 B1]].
+{ (* jumptable *)
+  exploit (exec_moves mv); eauto. intros [ls1 [A1 B1]].
   assert (val_inject (restrict (as_inj mu) (vis mu)) (Vint n) (ls1 (R arg'))).
     rewrite <- H0. eapply add_equation_inject with (q := Eq Full arg (R arg')); eauto.
   inv H2.  
@@ -3845,10 +3848,10 @@ Proof. intros.
          intros [enext [U V]]. 
          split. econstructor; eauto.
          intuition.
-  split; trivial.
+  split; trivial. }
 
-(* return *)
-- destruct (transf_function_inv _ _ FUN).
+{ (* return *)
+  destruct (transf_function_inv _ _ FUN).
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
   assert (MInjR : Mem.inject (restrict (as_inj mu) (vis mu)) m m2).
     eapply inject_restrict; eassumption.
@@ -3913,10 +3916,10 @@ Proof. intros.
            destruct (restrictD_Some _ _ _ _ _ Rsp).   
              eapply free_free_inject; try eassumption.
              simpl. rewrite Zplus_0_r. rewrite H10. apply P. 
-  split; trivial.
+  split; trivial. }
 
-(* internal function *)
-- monadInv FUN. simpl in *.
+{ (* internal function *)
+  monadInv FUN. simpl in *.
   destruct (transf_function_inv _ _ EQ).
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
   assert (PGR: meminj_preserves_globals ge (restrict (as_inj mu) (vis mu))).
@@ -3980,11 +3983,62 @@ Proof. intros.
            eapply intern_incr_as_inj; eassumption.
         assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply IntInc'.
           apply Glob in H10. rewrite <-FF; trivial.
-  split; trivial.
+  split; trivial. }
 
-(* external function : no case*)
-(* return *)
-- inv STACKS.
+{ (* external function : only nonobservables*)     
+  exploit (inlineable_extern_inject ge tge); try eapply PRE. 
+    eapply GDE_lemma. 
+    eassumption. eassumption. eassumption.
+  intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].
+  simpl in FUN; inv FUN.
+  eexists; exists m'', mu'; split.
+    apply corestep_plus_one. econstructor; eauto. 
+    econstructor. eassumption. reflexivity.
+   (* eapply external_call_symbols_preserved' with (ge1 := ge). 
+    econstructor; eauto. 
+    exact symbols_preserved. exact varinfo_preserved.*)
+  split. assumption. 
+  split. assumption. 
+  split. assumption.
+  destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].  
+  split. (*MATCH*)
+    split. 
+      { (*match_states*)
+        econstructor; eauto.
+          eapply match_stackframes_inject_incr; try eassumption.
+            apply intern_incr_restrict; eassumption.
+          { simpl. replace (map
+             (Locmap.setlist (map R (loc_result (ef_sig ef)))
+                  (encode_long (sig_res (ef_sig ef)) v') ls)
+             (map R (loc_result (ef_sig ef))))
+            with (encode_long (sig_res (ef_sig ef)) v').
+            eapply encode_long_inject; eassumption.
+           unfold encode_long, loc_result.
+           destruct (sig_res (ef_sig ef)) as [[]|]; simpl; 
+             symmetry; f_equal; auto. }
+         { red; intros. rewrite Locmap.gsetlisto. apply AG; auto.
+           apply Loc.notin_iff. intros.  
+           exploit list_in_map_inv; eauto. intros [r [A B]]; subst l'.  
+           destruct l; simpl; auto. red; intros; subst r0; elim H0.
+           eapply loc_result_caller_save; eauto. }
+         simpl. eapply external_call_well_typed; eassumption. 
+     }
+     intuition. 
+     eapply meminj_preserves_incr_sep_vb with (m0:=m)(tm:=m2). eapply PG.
+          intros ? ? ? AI. apply as_inj_DomRng in AI.
+                  split; eapply SMV; eapply AI.
+          assumption.
+        apply intern_incr_as_inj; eassumption.
+        apply sm_inject_separated_mem. assumption.
+        assumption.
+      red; intros ? ? Hb. destruct (GFP _ _ Hb). split; trivial.
+           eapply intern_incr_as_inj; eassumption.
+      assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
+          apply Glob in H1. rewrite <-FF; trivial.
+  split; trivial. }
+
+{ (* return *)
+  inv STACKS.
   exploit STEPS; eauto. eapply Val.has_subtype; eauto. intros [ls2 [A B]].
   eexists; exists m2, mu; split.
     eapply corestep_plus_star_trans.
@@ -3998,19 +4052,19 @@ Proof. intros.
   split. split. econstructor; eauto.
            apply wt_regset_assign; auto. eapply Val.has_subtype; eauto.
          intuition.
-  split; eapply PRE. 
+  split; eapply PRE. }
 Qed.
 
 Lemma Match_effcore_diagram: 
   forall (GDE : genvs_domain_eq ge tge)
       st1 m1 st1' m1' (U1 : block -> Z -> bool)
-      (CS: effstep rtl_eff_sem ge U1 st1 m1 st1' m1')
+      (CS: effstep (rtl_eff_sem hf) ge U1 st1 m1 st1' m1')
       st2 mu m2 
       (EffSrc: forall b ofs, U1 b ofs = true -> vis mu b = true)
       (MTCH: MATCH mu st1 m1 st2 m2)
       (LNR: list_norepet (map fst (prog_defs prog))),
   exists st2' m2' (U2 : block -> Z -> bool),
-     effstep_plus LTL_eff_sem tge U2 st2 m2 st2' m2' 
+     effstep_plus (LTL_eff_sem hf) tge U2 st2 m2 st2' m2' 
   /\ exists mu',
      intern_incr mu mu' /\
      sm_inject_separated mu mu' m1 m2 /\
@@ -4030,7 +4084,7 @@ Proof. intros.
 induction CS; 
    destruct MTCH as [MSTATE PRE]; inv MSTATE; try UseShape.
 
-(* nop *)
+{ (* nop *)
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   exploit Eff_exec_moves; eauto. intros [ls1 [X Y]]. 
   eexists; exists m2, EmptyEffect; split.
@@ -4051,10 +4105,10 @@ induction CS;
   split. exploit satisf_successors; eauto. simpl; eauto. intros [enext [U V]]. 
          split. econstructor; eauto.
          intuition.
-  intuition.
+  intuition. }
 
-(* op move *)
-- (*inv MSTATE. try UseShape. 
+{ (* op move *)
+  (*inv MSTATE. try UseShape. 
   destruct (invert_code _ _ _ _ _ _ _ WTF H EQ) as (eafter & bsh & bb & AFTER & BSH & TCODE & EBS & TR & WTI).
   inv EBS. unfold transfer_aux in TR; MonadInv. 
  unfold transfer_aux in TR; MonadInv.
@@ -4083,10 +4137,10 @@ induction CS;
          intros [enext [U V]]. 
          split. econstructor; eauto.
          intuition.
-  intuition.
+  intuition. }
 
-(* op makelong *)
-- generalize (wt_exec_Iop _ _ _ _ _ _ _ _ _ _ _ WTI H0 WTRS). intros WTRS'.
+{ (* op makelong *)
+  generalize (wt_exec_Iop _ _ _ _ _ _ _ _ _ _ _ WTI H0 WTRS). intros WTRS'.
   simpl in H0. inv H0.  
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   exploit (Eff_exec_moves mv); eauto. intros [ls1 [X Y]]. 
@@ -4108,10 +4162,10 @@ induction CS;
          intros [enext [U V]]. 
          split. econstructor; eauto.
          intuition.
-  intuition.
+  intuition. }
 
-(* op lowlong *)
-- generalize (wt_exec_Iop _ _ _ _ _ _ _ _ _ _ _ WTI H0 WTRS). intros WTRS'.
+{ (* op lowlong *)
+  generalize (wt_exec_Iop _ _ _ _ _ _ _ _ _ _ _ WTI H0 WTRS). intros WTRS'.
   simpl in H0. inv H0. 
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   exploit (Eff_exec_moves mv); eauto. intros [ls1 [X Y]]. 
@@ -4133,10 +4187,10 @@ induction CS;
          intros [enext [U V]]. 
          split. econstructor; eauto.
          intuition.
-  intuition.
+  intuition. }
 
-(* op highlong *)
-- generalize (wt_exec_Iop _ _ _ _ _ _ _ _ _ _ _ WTI H0 WTRS). intros WTRS'.
+{ (* op highlong *)
+  generalize (wt_exec_Iop _ _ _ _ _ _ _ _ _ _ _ WTI H0 WTRS). intros WTRS'.
   simpl in H0. inv H0. 
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   exploit (Eff_exec_moves mv); eauto. intros [ls1 [X Y]]. 
@@ -4158,10 +4212,10 @@ induction CS;
          intros [enext [U V]]. 
          split. econstructor; eauto.
          intuition.
-  intuition.
+  intuition. }
 
-(* op regular *)
-- generalize (wt_exec_Iop _ _ _ _ _ _ _ _ _ _ _ WTI H0 WTRS). intros WTRS'.
+{ (* op regular *)
+  generalize (wt_exec_Iop _ _ _ _ _ _ _ _ _ _ _ WTI H0 WTRS). intros WTRS'.
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   exploit (Eff_exec_moves mv1); eauto. intros [ls1 [A1 B1]]. 
 (*  exploit transfer_use_def_satisf; eauto. intros [X Y].*)
@@ -4202,10 +4256,10 @@ induction CS;
          split. econstructor; try eassumption.
                 exists b, b'; eauto.
          intuition.
-  intuition. 
+  intuition. }
 
-(* op dead *)
-- destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
+{ (* op dead *)
+  destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   exploit Eff_exec_moves; eauto. intros [ls1 [X Y]]. 
   eexists; exists m2, EmptyEffect; split.
     eapply effstep_plus_star_trans'.
@@ -4226,10 +4280,10 @@ induction CS;
          split. econstructor; eauto.
                  eapply wt_exec_Iop; eauto.
          intuition.
-  intuition.  
+  intuition. }
 
-(* load regular *)
-- generalize (wt_exec_Iload _ _ _ _ _ _ _ _ _ _ _ WTI H1 WTRS). intros WTRS'.
+{ (* load regular *)
+  generalize (wt_exec_Iload _ _ _ _ _ _ _ _ _ _ _ WTI H1 WTRS). intros WTRS'.
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   exploit (Eff_exec_moves mv1); eauto. intros [ls1 [A1 B1]]. 
 
@@ -4276,10 +4330,10 @@ induction CS;
          split. econstructor; eauto.
                 exists b, b'; eauto.
          intuition.
-  intuition. 
+  intuition. }
 
-(* load pair *)
-- generalize (wt_exec_Iload _ _ _ _ _ _ _ _ _ _ _ WTI H1 WTRS). intros WTRS'.
+{ (* load pair *)
+  generalize (wt_exec_Iload _ _ _ _ _ _ _ _ _ _ _ WTI H1 WTRS). intros WTRS'.
   exploit Mem.loadv_int64_split; eauto. intros (v1 & v2 & LOAD1 & LOAD2 & V12).
   set (v2' := if big_endian then v2 else v1) in *.
   set (v1' := if big_endian then v1 else v2) in *.
@@ -4373,10 +4427,10 @@ induction CS;
          split. econstructor; eauto.
                 exists b, b'; eauto.
          intuition.
-  intuition. 
+  intuition. }
 
-(* load first word of a pair *)
-- generalize (wt_exec_Iload _ _ _ _ _ _ _ _ _ _ _ WTI H1 WTRS). intros WTRS'.
+{ (* load first word of a pair *)
+  generalize (wt_exec_Iload _ _ _ _ _ _ _ _ _ _ _ WTI H1 WTRS). intros WTRS'.
   exploit Mem.loadv_int64_split; eauto. intros (v1 & v2 & LOAD1 & LOAD2 & V12).
   set (v2' := if big_endian then v2 else v1) in *.
   set (v1' := if big_endian then v1 else v2) in *.
@@ -4436,10 +4490,10 @@ induction CS;
          split. econstructor; eauto.
                 exists b, b'; eauto.
          intuition.
-  intuition.
+  intuition. }
 
-(* load second word of a pair *)
-- generalize (wt_exec_Iload _ _ _ _ _ _ _ _ _ _ _ WTI H1 WTRS). intros WTRS'.
+{ (* load second word of a pair *)
+  generalize (wt_exec_Iload _ _ _ _ _ _ _ _ _ _ _ WTI H1 WTRS). intros WTRS'.
   exploit Mem.loadv_int64_split; eauto. intros (v1 & v2 & LOAD1 & LOAD2 & V12).
   set (v2' := if big_endian then v2 else v1) in *.
   set (v1' := if big_endian then v1 else v2) in *.
@@ -4501,10 +4555,10 @@ induction CS;
          split. econstructor; eauto.
                 exists b, b'; eauto.
          intuition.
-  intuition. 
+  intuition. }
 
-(* load dead *)
-- exploit Eff_exec_moves; eauto. intros [ls1 [X Y]].
+{ (* load dead *)
+  exploit Eff_exec_moves; eauto. intros [ls1 [X Y]].
   eexists; exists m2, EmptyEffect; split.
     eapply effstep_plus_star_trans'. 
       eapply effstep_plus_one. 
@@ -4524,10 +4578,10 @@ induction CS;
          split. econstructor; eauto.
                 eapply wt_exec_Iload; eauto.
          intuition.
-  intuition.
+  intuition. }
 
-(* store *)
-- exploit Eff_exec_moves; eauto. intros [ls1 [X Y]].
+{ (* store *)
+  exploit Eff_exec_moves; eauto. intros [ls1 [X Y]].
 
   (*exploit add_equations_lessdef; eauto. intros LD. simpl in LD. inv LD. *)
   exploit add_equations_inject; eauto. intros LD. simpl in LD. inv LD. 
@@ -4605,10 +4659,10 @@ induction CS;
    intuition. 
       apply StoreEffectD in H2. destruct H2 as [i [VADDR' _]]. subst. 
         inv G; inv H1. eapply visPropagateR; eassumption.
-      eapply StoreEffect_PropagateLeft; eassumption.
+      eapply StoreEffect_PropagateLeft; eassumption. }
 
-(* store 2 *)
-- exploit Mem.storev_int64_split; eauto. 
+{ (* store 2 *)
+  exploit Mem.storev_int64_split; eauto. 
   replace (if big_endian then Val.hiword rs#src else Val.loword rs#src)
      with (sel_val kind_first_word rs#src)
        by (unfold kind_first_word; destruct big_endian; reflexivity).
@@ -4926,10 +4980,10 @@ induction CS;
        rewrite FOUR in VAL.
        exploit Mem.valid_pointer_inject_no_overflow; try eassumption.
        intros. rewrite <- FOUR, URdelta in H4. apply H4.
-       eapply (H (Int.unsigned i)). omega.
+       eapply (H (Int.unsigned i)). omega. }
      
-(* call *)
-- set (sg := RTL.funsig fd) in *.
+{ (* call *)
+  set (sg := RTL.funsig fd) in *.
   set (args' := loc_arguments sg) in *.
   set (res' := map R (loc_result sg)) in *.
   exploit (Eff_exec_moves mv1); eauto. intros [ls1 [A1 B1]]. 
@@ -4994,10 +5048,10 @@ induction CS;
                    simpl. red; auto.
                    inv WTI. rewrite SIG. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto.
          intuition.
-   intuition.
+   intuition. }
 
-(* tailcall *)
-- set (sg := RTL.funsig fd) in *.
+{ (* tailcall *)
+  set (sg := RTL.funsig fd) in *.
   set (args' := loc_arguments sg) in *.
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
   assert (PGR: meminj_preserves_globals ge (restrict (as_inj mu) (vis mu))).
@@ -5052,10 +5106,10 @@ induction CS;
       eapply visPropagateR; eassumption. 
     replace (fn_stacksize tf) with (RTL.fn_stacksize f) in H4.
           eapply FreeEffect_PropagateLeft; eassumption.
-          destruct (transf_function_inv _ _ FUN); auto.
+          destruct (transf_function_inv _ _ FUN); auto. }
 
-(* builtin *) 
-- assert (WTRS': wt_regset env (rs#res <- v)) by (eapply wt_exec_Ibuiltin; eauto).
+{ (* builtin *) 
+  assert (WTRS': wt_regset env (rs#res <- v)) by (eapply wt_exec_Ibuiltin; eauto).
   exploit (Eff_exec_moves mv1); eauto. intros [ls1 [A1 B1]].
   unfold satisf in B1.
   assert (ArgsInj: val_list_inject (restrict (as_inj mu) (vis mu)) rs ## args
@@ -5124,9 +5178,10 @@ induction CS;
   intros. rewrite andb_true_iff in H3.
     rewrite andb_true_iff, orb_false_r in H3. 
     destruct H3 as [[EFF VB] _].
-    eapply BuiltinEffect_Propagate; eassumption.
-(* annot *)
--  admit. (*We don't treat ennotations yet
+    eapply BuiltinEffect_Propagate; eassumption. }
+
+{ (* annot *)
+   admit. (*We don't treat ennotations yet
    exploit (Eff_exec_moves mv); eauto. intros [ls1 [A1 B1]]. 
    exploit external_call_mem_extends; eauto. eapply add_equations_args_lessdef; eauto.
   inv WTI. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto. 
@@ -5147,10 +5202,10 @@ induction CS;
   econstructor; eauto.
   change (destroyed_by_builtin (EF_annot txt typ)) with (@nil mreg). 
   simpl. subst v. assumption.
-  apply wt_regset_assign; auto. subst v. constructor. *)
+  apply wt_regset_assign; auto. subst v. constructor. *) }
 
-(* cond *)
-- exploit (Eff_exec_moves mv); eauto. intros [ls1 [A1 B1]].
+{ (* cond *)
+  exploit (Eff_exec_moves mv); eauto. intros [ls1 [A1 B1]].
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
   assert (MInjR : Mem.inject (restrict (as_inj mu) (vis mu)) m m2).
     eapply inject_restrict; eassumption.
@@ -5174,10 +5229,10 @@ induction CS;
            intros [enext [U V]].  
            split. econstructor; eauto.
            intuition.
-  intuition.
+  intuition. }
 
-(* jumptable *)
-- exploit (Eff_exec_moves mv); eauto. intros [ls1 [A1 B1]].
+{ (* jumptable *)
+  exploit (Eff_exec_moves mv); eauto. intros [ls1 [A1 B1]].
   assert (val_inject (restrict (as_inj mu) (vis mu)) (Vint n) (ls1 (R arg'))).
     rewrite <- H0. eapply add_equation_inject with (q := Eq Full arg (R arg')); eauto.
   inv H2.  
@@ -5200,10 +5255,10 @@ induction CS;
          intros [enext [U V]]. 
          split. econstructor; eauto.
          intuition.
-  intuition.
+  intuition. }
 
-(* return *)
-- destruct (transf_function_inv _ _ FUN).
+{ (* return *)
+  destruct (transf_function_inv _ _ FUN).
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
   assert (MInjR : Mem.inject (restrict (as_inj mu) (vis mu)) m m2).
     eapply inject_restrict; eassumption.
@@ -5295,10 +5350,10 @@ induction CS;
          eapply visPropagateR; eassumption.
       rewrite <- H10 in *.
         destruct (restrictD_Some _ _ _ _ _ Rsp); trivial. 
-        eapply FreeEffect_PropagateLeft; eassumption. 
+        eapply FreeEffect_PropagateLeft; eassumption. }
 
-(* internal function *)
-- monadInv FUN. simpl in *.
+{ (* internal function *)
+  monadInv FUN. simpl in *.
   destruct (transf_function_inv _ _ EQ).
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
   assert (PGR: meminj_preserves_globals ge (restrict (as_inj mu) (vis mu))).
@@ -5364,11 +5419,67 @@ induction CS;
            eapply intern_incr_as_inj; eassumption.
         assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply IntInc'.
           apply Glob in H10. rewrite <-FF; trivial.
-  intuition. 
+  intuition. }
 
-(* external function : no case*)
-(* return *)
-- inv STACKS.
+{ (* external function : only nonobservables*)     
+  exploit (inlineable_extern_inject ge tge); try eapply PRE. 
+    eapply GDE_lemma. 
+    eassumption. eassumption. eassumption.
+  intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].
+  simpl in FUN; inv FUN.
+  eexists; exists m''; eexists; split.
+    apply effstep_plus_one. econstructor; eauto. 
+    econstructor. eassumption. reflexivity.
+   (* eapply external_call_symbols_preserved' with (ge1 := ge). 
+    econstructor; eauto. 
+    exact symbols_preserved. exact varinfo_preserved.*)
+  exists mu'.
+  split. assumption. 
+  split. assumption. 
+  split. assumption.
+  destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].  
+  split. (*MATCH*)
+    split. 
+      { (*match_states*)
+        econstructor; eauto.
+          eapply match_stackframes_inject_incr; try eassumption.
+            apply intern_incr_restrict; eassumption.
+          { simpl. replace (map
+             (Locmap.setlist (map R (loc_result (ef_sig ef)))
+                  (encode_long (sig_res (ef_sig ef)) v') ls)
+             (map R (loc_result (ef_sig ef))))
+            with (encode_long (sig_res (ef_sig ef)) v').
+            eapply encode_long_inject; eassumption.
+           unfold encode_long, loc_result.
+           destruct (sig_res (ef_sig ef)) as [[]|]; simpl; 
+             symmetry; f_equal; auto. }
+         { red; intros. rewrite Locmap.gsetlisto. apply AG; auto.
+           apply Loc.notin_iff. intros.  
+           exploit list_in_map_inv; eauto. intros [r [A B]]; subst l'.  
+           destruct l; simpl; auto. red; intros; subst r0; elim H0.
+           eapply loc_result_caller_save; eauto. }
+         simpl. eapply external_call_well_typed; eassumption. 
+     }
+     intuition. 
+     eapply meminj_preserves_incr_sep_vb with (m0:=m)(tm:=m2). eapply PG.
+          intros ? ? ? AI. apply as_inj_DomRng in AI.
+                  split; eapply SMV; eapply AI.
+          assumption.
+        apply intern_incr_as_inj; eassumption.
+        apply sm_inject_separated_mem. assumption.
+        assumption.
+      red; intros ? ? Hb. destruct (GFP _ _ Hb). split; trivial.
+           eapply intern_incr_as_inj; eassumption.
+      assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
+          apply Glob in H1. rewrite <-FF; trivial.
+  split. trivial. split. trivial.
+  intros. eapply BuiltinEffect_Propagate; try eassumption. 
+      instantiate (1:=tge).
+       unfold BuiltinEffect in H0; simpl in H0.
+       destruct ef; trivial. }
+
+{ (* return *)
+  inv STACKS.
   exploit EFFSTEPS; eauto. eapply Val.has_subtype; eauto. intros [ls2 [A B]].
   eexists; exists m2, EmptyEffect; split.
     eapply effstep_plus_star_trans'.
@@ -5384,7 +5495,7 @@ induction CS;
   split. split. econstructor; eauto.
            apply wt_regset_assign; auto. eapply Val.has_subtype; eauto.
          intuition.
-  intuition.
+  intuition. }
 Qed.
 
 Theorem transl_program_correct:
@@ -5400,8 +5511,8 @@ Theorem transl_program_correct:
                 /\ Genv.find_funct_ptr ge b = Some f1
                 /\ Genv.find_funct_ptr tge b = Some f2)
          (init_mem: exists m0, Genv.init_mem prog = Some m0),
-SM_simulation.SM_simulation_inject rtl_eff_sem 
-  LTL_eff_sem ge tge entrypoints.
+SM_simulation.SM_simulation_inject (rtl_eff_sem hf)
+  (LTL_eff_sem hf) ge tge entrypoints.
 Proof.
 intros.
 assert (GDE:= GDE_lemma).
@@ -5500,7 +5611,7 @@ assert (GDE:= GDE_lemma).
     specialize (forall_vals_inject_restrictD _ _ _ _ ValsInj); intros.
     exploit replace_locals_wd_AtExternal; try eassumption. 
     intros H2. inv FUN. simpl. 
-    destruct (observableEF e0); inv H0.
+    destruct (observableEF hf e0); inv H0.
     eexists; split; eauto. split; auto. simpl. intros. subst.
     (*MATCH*)
     split; auto. split; auto.
