@@ -790,3 +790,13 @@ Proof.
   inv H8.
   inv H8.
 Qed.
+
+Require Import Conventions.
+Lemma BuiltinEffect_decode: forall F V (ge: Genv.t F V) ef tls,
+ BuiltinEffect ge ef (map tls (loc_arguments (ef_sig ef))) =
+ BuiltinEffect ge ef (decode_longs (sig_args (ef_sig ef))
+           (map tls (loc_arguments (ef_sig ef)))).
+Proof. intros.
+  unfold BuiltinEffect. extensionality m. 
+  destruct ef; trivial.
+Qed.

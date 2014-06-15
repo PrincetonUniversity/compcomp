@@ -32,11 +32,10 @@ Inductive load_frame: Type :=
            (tys: list typ),  (**r initial argument types *)
     load_frame.
 
-Section RELSEM.
+Section MACH_COOPSEM.
+Variable hf : I64Helpers.helper_functions.
 
 Variable return_address_offset: function -> code -> int -> Prop.
-
-Variable ge: genv.
 
 Inductive Mach_core: Type :=
   | Mach_State:
@@ -433,23 +432,23 @@ Definition parent_sp0 (sp0 : block) (s: list stackframe) : val :=
   | Stackframe f sp ra c :: s' => sp
   end.
 
-Inductive mach_step: Mach_core -> mem -> Mach_core -> mem -> Prop :=
+Inductive mach_step (ge:genv): Mach_core -> mem -> Mach_core -> mem -> Prop :=
   | Mach_exec_Mlabel:
       forall s f sp lbl c rs m lf,
-      mach_step (Mach_State s f sp (Mlabel lbl :: c) rs lf) m
+      mach_step ge (Mach_State s f sp (Mlabel lbl :: c) rs lf) m
                 (Mach_State s f sp c rs lf) m
 
   | Mach_exec_Mgetstack:
       forall s f sp ofs ty dst c rs m v lf,
       load_stack m sp ty ofs = Some v ->
-      mach_step (Mach_State s f sp (Mgetstack ofs ty dst :: c) rs lf) m
+      mach_step ge (Mach_State s f sp (Mgetstack ofs ty dst :: c) rs lf) m
                 (Mach_State s f sp c (rs#dst <- v) lf) m
 
   | Mach_exec_Msetstack:
       forall s f sp src ofs ty c rs m m' rs' lf,
       store_stack m sp ty ofs (rs src) = Some m' ->
       rs' = undef_regs (destroyed_by_setstack ty) rs ->
-      mach_step (Mach_State s f sp (Msetstack src ofs ty :: c) rs lf) m
+      mach_step ge (Mach_State s f sp (Msetstack src ofs ty :: c) rs lf) m
                 (Mach_State s f sp c rs' lf) m'
 
   | Mach_exec_Mgetparam:
@@ -458,7 +457,7 @@ Inductive mach_step: Mach_core -> mem -> Mach_core -> mem -> Prop :=
       load_stack m sp Tint f.(fn_link_ofs) = Some (parent_sp0 sp0 s) ->
       load_stack m (parent_sp0 sp0 s) ty ofs = Some v ->
       rs' = (rs # temp_for_parent_frame <- Vundef # dst <- v) ->
-      mach_step (Mach_State s fb sp (Mgetparam ofs ty dst :: c) rs 
+      mach_step ge (Mach_State s fb sp (Mgetparam ofs ty dst :: c) rs 
                                     (mk_load_frame sp0 args0 tys0)) m
                 (Mach_State s fb sp c rs' (mk_load_frame sp0 args0 tys0)) m
 
@@ -466,7 +465,7 @@ Inductive mach_step: Mach_core -> mem -> Mach_core -> mem -> Prop :=
       forall s f sp op args res c rs m v rs' lf,
       eval_operation ge sp op rs##args m = Some v ->
       rs' = ((undef_regs (destroyed_by_op op) rs)#res <- v) ->
-      mach_step (Mach_State s f sp (Mop op args res :: c) rs lf) m
+      mach_step ge (Mach_State s f sp (Mop op args res :: c) rs lf) m
                 (Mach_State s f sp c rs' lf) m
 
   | Mach_exec_Mload:
@@ -474,7 +473,7 @@ Inductive mach_step: Mach_core -> mem -> Mach_core -> mem -> Prop :=
       eval_addressing ge sp addr rs##args = Some a ->
       Mem.loadv chunk m a = Some v ->
       rs' = ((undef_regs (destroyed_by_load chunk addr) rs)#dst <- v) ->
-      mach_step (Mach_State s f sp (Mload chunk addr args dst :: c) rs lf) m
+      mach_step ge (Mach_State s f sp (Mload chunk addr args dst :: c) rs lf) m
                 (Mach_State s f sp c rs' lf) m
 
   | Mach_exec_Mstore:
@@ -482,7 +481,7 @@ Inductive mach_step: Mach_core -> mem -> Mach_core -> mem -> Prop :=
       eval_addressing ge sp addr rs##args = Some a ->
       Mem.storev chunk m a (rs src) = Some m' ->
       rs' = undef_regs (destroyed_by_store chunk addr) rs ->
-      mach_step (Mach_State s f sp (Mstore chunk addr args src :: c) rs lf) m
+      mach_step ge (Mach_State s f sp (Mstore chunk addr args src :: c) rs lf) m
                 (Mach_State s f sp c rs' lf) m'
 
   (*NOTE [loader]*)
@@ -491,7 +490,7 @@ Inductive mach_step: Mach_core -> mem -> Mach_core -> mem -> Prop :=
       args_len_rec args tys = Some z -> 
       Mem.alloc m 0 (4*z) = (m1, stk) ->
       store_args m1 stk args tys = Some m2 -> 
-      mach_step (Mach_CallstateIn fb args tys) m
+      mach_step ge (Mach_CallstateIn fb args tys) m
         (Mach_Callstate nil fb (Regmap.init Vundef) (mk_load_frame stk args tys)) m2
 
   | Mach_exec_Mcall_internal:
@@ -501,7 +500,7 @@ Inductive mach_step: Mach_core -> mem -> Mach_core -> mem -> Prop :=
       return_address_offset f c ra ->
       (*NEW: check that the block f' actually contains a (internal) function:*)
       Genv.find_funct_ptr ge f' = Some (Internal callee) ->
-      mach_step (Mach_State s fb sp (Mcall sig ros :: c) rs lf) m
+      mach_step ge (Mach_State s fb sp (Mcall sig ros :: c) rs lf) m
                 (Mach_Callstate (Stackframe fb sp (Vptr fb ra) c :: s) f' rs lf) m
 
   | Mach_exec_Mcall_external:
@@ -513,7 +512,7 @@ Inductive mach_step: Mach_core -> mem -> Mach_core -> mem -> Prop :=
              function, and perform the "extra step":*)
       Genv.find_funct_ptr ge f' = Some (External callee) ->
       extcall_arguments rs m sp (ef_sig callee) args ->
-      mach_step (Mach_State s fb sp (Mcall sig ros :: c) rs lf) m
+      mach_step ge (Mach_State s fb sp (Mcall sig ros :: c) rs lf) m
                 (Mach_CallstateOut (Stackframe fb sp (Vptr fb ra) c :: s) 
                   f' callee args rs lf) m
 
@@ -526,7 +525,7 @@ Inductive mach_step: Mach_core -> mem -> Mach_core -> mem -> Prop :=
       Mem.free m stk 0 f.(fn_stacksize) = Some m' ->
       (*NEW: check that the block f' actually contains a function:*)
       Genv.find_funct_ptr ge f' = Some (Internal callee) ->
-      mach_step (Mach_State s fb (Vptr stk soff) (Mtailcall sig ros :: c) rs
+      mach_step ge (Mach_State s fb (Vptr stk soff) (Mtailcall sig ros :: c) rs
                                  (mk_load_frame sp0 args0 tys0)) m
                 (Mach_Callstate s f' rs (mk_load_frame sp0 args0 tys0)) m'
 
@@ -540,7 +539,7 @@ Inductive mach_step: Mach_core -> mem -> Mach_core -> mem -> Prop :=
       (*NEW: check that the block f' actually contains a function:*)
       Genv.find_funct_ptr ge f' = Some (External callee) ->
       extcall_arguments rs m' (parent_sp0 sp0 s) (ef_sig callee) args ->
-      mach_step (Mach_State s fb (Vptr stk soff) (Mtailcall sig ros :: c) rs
+      mach_step ge (Mach_State s fb (Vptr stk soff) (Mtailcall sig ros :: c) rs
                                  (mk_load_frame sp0 args0 tys0)) m
                 (Mach_CallstateOut s f' callee args rs 
                                    (mk_load_frame sp0 args0 tys0)) m'
@@ -548,9 +547,9 @@ Inductive mach_step: Mach_core -> mem -> Mach_core -> mem -> Prop :=
   | Mach_exec_Mbuiltin:
       forall s f sp rs m ef args res b t vl rs' m' lf,
       external_call' ef ge rs##args m t vl m' ->
-      observableEF ef = false ->
+      observableEF hf ef = false ->
       rs' = set_regs res vl (undef_regs (destroyed_by_builtin ef) rs) ->
-      mach_step (Mach_State s f sp (Mbuiltin ef args res :: b) rs lf) m
+      mach_step ge (Mach_State s f sp (Mbuiltin ef args res :: b) rs lf) m
                 (Mach_State s f sp b rs' lf) m'
 
 (*NO SUPPORT FOR ANNOT YET
@@ -565,7 +564,7 @@ Inductive mach_step: Mach_core -> mem -> Mach_core -> mem -> Prop :=
       forall s fb f sp lbl c rs m c' lf,
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       find_label lbl f.(fn_code) = Some c' ->
-      mach_step (Mach_State s fb sp (Mgoto lbl :: c) rs lf) m
+      mach_step ge (Mach_State s fb sp (Mgoto lbl :: c) rs lf) m
                 (Mach_State s fb sp c' rs lf) m
 
   | Mach_exec_Mcond_true:
@@ -574,14 +573,14 @@ Inductive mach_step: Mach_core -> mem -> Mach_core -> mem -> Prop :=
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       find_label lbl f.(fn_code) = Some c' ->
       rs' = undef_regs (destroyed_by_cond cond) rs ->
-      mach_step (Mach_State s fb sp (Mcond cond args lbl :: c) rs lf) m
+      mach_step ge (Mach_State s fb sp (Mcond cond args lbl :: c) rs lf) m
                 (Mach_State s fb sp c' rs' lf) m
 
   | Mach_exec_Mcond_false:
       forall s f sp cond args lbl c rs m rs' lf,
       eval_condition cond rs##args m = Some false ->
       rs' = undef_regs (destroyed_by_cond cond) rs ->
-      mach_step (Mach_State s f sp (Mcond cond args lbl :: c) rs lf) m
+      mach_step ge (Mach_State s f sp (Mcond cond args lbl :: c) rs lf) m
                 (Mach_State s f sp c rs' lf) m
 
   | Mach_exec_Mjumptable:
@@ -591,7 +590,7 @@ Inductive mach_step: Mach_core -> mem -> Mach_core -> mem -> Prop :=
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       find_label lbl f.(fn_code) = Some c' ->
       rs' = undef_regs destroyed_by_jumptable rs ->
-      mach_step (Mach_State s fb sp (Mjumptable arg tbl :: c) rs lf) m
+      mach_step ge (Mach_State s fb sp (Mjumptable arg tbl :: c) rs lf) m
                 (Mach_State s fb sp c' rs' lf) m
 
   | Mach_exec_Mreturn:
@@ -600,7 +599,7 @@ Inductive mach_step: Mach_core -> mem -> Mach_core -> mem -> Prop :=
       load_stack m (Vptr stk soff) Tint f.(fn_link_ofs) = Some (parent_sp0 sp0 s) ->
       load_stack m (Vptr stk soff) Tint f.(fn_retaddr_ofs) = Some (parent_ra s) ->
       Mem.free m stk 0 f.(fn_stacksize) = Some m' ->
-      mach_step (Mach_State s fb (Vptr stk soff) (Mreturn :: c) rs
+      mach_step ge (Mach_State s fb (Vptr stk soff) (Mreturn :: c) rs
                             (mk_load_frame sp0 args0 tys0)) m
                 (Mach_Returnstate s (sig_res (fn_sig f)) rs
                             (mk_load_frame sp0 args0 tys0)) m'
@@ -613,15 +612,23 @@ Inductive mach_step: Mach_core -> mem -> Mach_core -> mem -> Prop :=
       store_stack m1 sp Tint f.(fn_link_ofs) (parent_sp0 sp0 s) = Some m2 ->
       store_stack m2 sp Tint f.(fn_retaddr_ofs) (parent_ra s) = Some m3 ->
       rs' = undef_regs destroyed_at_function_entry rs ->
-      mach_step (Mach_Callstate s fb rs (mk_load_frame sp0 args0 tys0)) m
+      mach_step ge (Mach_Callstate s fb rs (mk_load_frame sp0 args0 tys0)) m
                 (Mach_State s fb sp f.(fn_code) rs' (mk_load_frame sp0 args0 tys0)) m3
+
+  | Mach_exec_function_external:
+      forall s fb rs m t rs' ef args res m' lf
+      (OBS: observableEF hf ef = false),
+      Genv.find_funct_ptr ge fb = Some (External ef) ->
+      extcall_arguments rs m (parent_sp s) (ef_sig ef) args ->
+      external_call' ef ge args m t res m' ->
+      rs' = set_regs (loc_result (ef_sig ef)) res rs ->
+      mach_step ge (Mach_Callstate s fb rs lf) m
+         (Mach_Returnstate s (sig_res (ef_sig ef)) rs' lf) m'
 
   | Mach_exec_return:
       forall s f sp ra c retty rs m lf,
-      mach_step (Mach_Returnstate (Stackframe f sp ra c :: s) retty rs lf) m
+      mach_step ge (Mach_Returnstate (Stackframe f sp ra c :: s) retty rs lf) m
                 (Mach_State s f sp c rs lf) m.
-
-End RELSEM.
 
 (*NOTE value encoding, which was formerly done here, in Mach_initial_core, 
   is now handled by the simulation invariant [agree_args_match_aux] 
@@ -688,7 +695,7 @@ Definition Mach_at_external (c: Mach_core):
   | Mach_State _ _ _ _ _ _ => None
   | Mach_Callstate _ _ _ _ => None
   | Mach_CallstateOut s fb ef args rs lf => 
-        if observableEF ef
+        if observableEF hf ef
         then Some (ef, ef_sig ef, decode_longs (sig_args (ef_sig ef)) args)
         else None
   | Mach_CallstateIn _ _ _ => None
@@ -722,17 +729,14 @@ Lemma Mach_after_at_external_excl : forall retv q q',
     destruct retv; inv H1; simpl; trivial.
   Qed.
 
-Section MACH_CORESEM.
-Variable return_address_offset: function -> code -> int -> Prop.
+(*Variable return_address_offset: function -> code -> int -> Prop.*)
 
-Lemma Mach_corestep_not_at_external:
-       forall ge m q m' q', mach_step return_address_offset ge q m q' m' -> 
-              Mach_at_external q = None.
+Lemma Mach_corestep_not_at_external ge m q m' q':
+      mach_step ge q m q' m' -> Mach_at_external q = None.
 Proof. intros. inv H; try reflexivity. Qed.
 
-Lemma Mach_corestep_not_halted : forall ge m q m' q', 
-       mach_step return_address_offset ge q m q' m' -> 
-       Mach_halted q = None.
+Lemma Mach_corestep_not_halted ge m q m' q': 
+      mach_step ge q m q' m' -> Mach_halted q = None.
 Proof. intros. inv H; auto. Qed.
 
 Definition Mach_core_sem : CoreSemantics genv Mach_core mem.
@@ -741,22 +745,16 @@ Definition Mach_core_sem : CoreSemantics genv Mach_core mem.
             Mach_at_external
             Mach_after_external
             Mach_halted
-            (mach_step return_address_offset)).
+            mach_step).
     apply Mach_corestep_not_at_external.
     apply Mach_corestep_not_halted.
     apply Mach_at_external_halted_excl.
 Defined.
 
-End MACH_CORESEM.
-
 (******NOW SHOW THAT WE ALSO HAVE A COOPSEM******)
 
-Section MACH_COOPSEM.
-Variable return_address_offset: function -> code -> int -> Prop.
-
-Lemma Mach_forward : forall g c m c' m'
-         (CS: mach_step return_address_offset g c m c' m'), 
-         mem_forward m m'.
+Lemma Mach_forward ge c m c' m': forall
+      (CS: mach_step ge c m c' m'), mem_forward m m'.
   Proof. intros.
    inv CS; try apply mem_forward_refl.
    (*Msetstack*)
@@ -789,11 +787,13 @@ Lemma Mach_forward : forall g c m c' m'
      eapply mem_forward_trans.
        eapply store_forward; eassumption. 
        eapply store_forward; eassumption. 
+    (*external unobservable function*)
+      inv H1. eapply external_call_mem_forward; eassumption.
 Qed.
 
 Program Definition Mach_coop_sem : 
   CoopCoreSem genv Mach_core.
-apply Build_CoopCoreSem with (coopsem := Mach_core_sem return_address_offset).
+apply Build_CoopCoreSem with (coopsem := Mach_core_sem).
   apply Mach_forward.
 Defined.
 

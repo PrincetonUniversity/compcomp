@@ -23,6 +23,7 @@ Require Import Globalenvs.
 Require Import Smallstep.
 Require Import Op.
 Require Import Locations.
+Require Import Conventions.
 Require Import LTL.
 Require Import Tunneling.
 
@@ -160,6 +161,7 @@ Variable prog: program.
 Let tprog := tunnel_program prog.
 Let ge := Genv.globalenv prog.
 Let tge := Genv.globalenv tprog.
+(*NEW*) Variable hf : I64Helpers.helper_functions.
 
 Lemma functions_translated:
   forall v f,
@@ -340,7 +342,7 @@ Proof. intros.
 red; intros. 
 split; intros.
   unfold return_regs.
-  destruct (in_dec mreg_eq r Conventions1.destroyed_at_call).
+  destruct (in_dec mreg_eq r destroyed_at_call).
   eapply AG. eapply parentsAGREE.
 unfold return_regs.
   eapply parentsAGREE.
@@ -718,11 +720,11 @@ Qed.
 
 Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
        (MTCH: MATCH mu c1 m1 c2 m2)
-       (AtExtSrc: at_external LTL_eff_sem c1 = Some (e, ef_sig, vals1)),
+       (AtExtSrc: at_external (LTL_eff_sem hf) c1 = Some (e, ef_sig, vals1)),
      Mem.inject (as_inj mu) m1 m2 /\
      exists vals2,
        Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\
-       at_external LTL_eff_sem c2 = Some (e, ef_sig, vals2) /\
+       at_external (LTL_eff_sem hf) c2 = Some (e, ef_sig, vals2) /\
       (forall pubSrc' pubTgt',
        pubSrc' = (fun b => locBlocksSrc mu b && REACH m1 (exportedSrc mu vals1) b) ->
        pubTgt' = (fun b : block => locBlocksTgt mu b && REACH m2 (exportedTgt mu vals2) b) ->
@@ -733,15 +735,15 @@ destruct MTCH as [MC [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
 inv MC; simpl in AtExtSrc; inv AtExtSrc.
 destruct f; simpl in *; inv H1.
 split; trivial. 
-destruct (observableEF e0); inv H2.
+destruct (observableEF hf e0); inv H2.
 assert (ValsInj: Forall2 (val_inject (restrict (as_inj mu) (vis mu)))
-  (decode_longs (sig_args (ef_sig e)) (map ls (Conventions1.loc_arguments (ef_sig e))))
-  (decode_longs (sig_args (ef_sig e)) (map tls (Conventions1.loc_arguments (ef_sig e))))).
+  (decode_longs (sig_args (ef_sig e)) (map ls (loc_arguments (ef_sig e))))
+  (decode_longs (sig_args (ef_sig e)) (map tls (loc_arguments (ef_sig e))))).
 { rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   eapply val_list_inject_forall_inject.
   apply decode_longs_inject.
   eapply agree_regs_map_outgoing; trivial.
-    red; intros. apply Conventions1.loc_arguments_rec_charact in H0. 
+    red; intros. apply loc_arguments_rec_charact in H0. 
            destruct l; try contradiction.
            destruct sl; try contradiction. trivial. }
 eexists. split. eassumption.
@@ -901,8 +903,8 @@ Lemma MATCH_afterExternal: forall
       mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
       (MemInjMu : Mem.inject (as_inj mu) m1 m2)
       (MatchMu: MATCH mu st1 m1 st2 m2)
-      (AtExtSrc : at_external LTL_eff_sem st1 = Some (e, ef_sig, vals1))
-      (AtExtTgt : at_external LTL_eff_sem st2 = Some (e', ef_sig', vals2))
+      (AtExtSrc : at_external (LTL_eff_sem hf) st1 = Some (e, ef_sig, vals1))
+      (AtExtTgt : at_external (LTL_eff_sem hf) st2 = Some (e', ef_sig', vals2))
       (ValInjMu : Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2)
       (pubSrc' : block -> bool)
       (pubSrcHyp : pubSrc' =
@@ -935,8 +937,8 @@ Lemma MATCH_afterExternal: forall
                (fun b z => locBlocksSrc nu b = true /\ pubBlocksSrc nu b = false) m1 m1')
        (UnchLOOR: Mem.unchanged_on (local_out_of_reach nu m1) m2 m2'),
   exists st1' st2',
-  after_external LTL_eff_sem (Some ret1) st1 =Some st1' /\
-  after_external LTL_eff_sem (Some ret2) st2 = Some st2' /\
+  after_external (LTL_eff_sem hf) (Some ret1) st1 =Some st1' /\
+  after_external (LTL_eff_sem hf) (Some ret2) st2 = Some st2' /\
   MATCH mu' st1' m1' st2' m2'.
 Proof. intros.
 simpl.
@@ -944,7 +946,7 @@ simpl.
  simpl in *. inv MC; simpl in *; inv AtExtSrc.
  destruct f; inv H1. 
  simpl in AtExtTgt. inv AtExtTgt.
- destruct (observableEF e0); inv H1; inv H2.
+ destruct (observableEF hf e0); inv H1; inv H2.
  eexists. eexists.
     split. reflexivity.
     split. reflexivity.
@@ -1199,7 +1201,7 @@ Lemma MATCH_initial: forall (v1 v2 : val) (sig : signature) entrypoints
                     Genv.find_funct_ptr tge b = Some f2)
   (vals1 : list val) c1 (m1 : mem) (j : meminj)
   (vals2 : list val) (m2 : mem) (DomS DomT : Values.block -> bool)
-  (Ini : initial_core LTL_eff_sem ge v1 vals1 = Some c1)
+  (Ini : initial_core (LTL_eff_sem hf) ge v1 vals1 = Some c1)
   (Inj: Mem.inject j m1 m2)
   (VInj: Forall2 (val_inject j) vals1 vals2)
   (PG: meminj_preserves_globals ge j)
@@ -1216,7 +1218,7 @@ Lemma MATCH_initial: forall (v1 v2 : val) (sig : signature) entrypoints
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
-  initial_core LTL_eff_sem tge v2 vals2 = Some c2 /\
+  initial_core (LTL_eff_sem hf) tge v2 vals2 = Some c2 /\
   MATCH 
     (initial_SM DomS DomT
        (REACH m1
@@ -1238,7 +1240,7 @@ Proof. intros.
   intros Heq; rewrite Heq in H1; inv H1.
   exploit function_ptr_translated; eauto. intros FP.
   exists (LTL_Callstate nil (Internal (tunnel_function f))
-            (Locmap.setlist (Conventions1.loc_arguments (fn_sig f)) 
+            (Locmap.setlist (loc_arguments (fn_sig f)) 
               (val_casted.encode_longs (sig_args (fn_sig f)) vals2)
               (Locmap.init Vundef))).
   split.
@@ -1281,7 +1283,7 @@ Proof. intros.
           intros. apply REACH_nil. 
           rewrite orb_true_iff. right. 
           apply (val_casted.getBlocks_encode_longs (sig_args (fn_sig f))); auto.
-        red; intros. apply Conventions1.loc_arguments_rec_charact in H. 
+        red; intros. apply loc_arguments_rec_charact in H. 
            destruct l; try contradiction.
            destruct sl; try contradiction. trivial. }
     constructor.
@@ -1298,12 +1300,12 @@ Proof. intros.
 Qed.
 
 Lemma MATCH_corediagram: forall st1 m1 st1' m1'
-         (CS:corestep LTL_eff_sem ge st1 m1 st1' m1')
+         (CS:corestep (LTL_eff_sem hf) ge st1 m1 st1' m1')
          st2 mu m2 (MTCH:MATCH mu st1 m1 st2 m2),
 exists st2' m2', 
-  (corestep_plus LTL_eff_sem tge st2 m2 st2' m2' \/
+  (corestep_plus (LTL_eff_sem hf) tge st2 m2 st2' m2' \/
    (measure st1' < measure st1)%nat /\
-   corestep_star LTL_eff_sem tge st2 m2 st2' m2')
+   corestep_star (LTL_eff_sem hf) tge st2 m2 st2' m2')
 /\ exists mu',
   intern_incr mu mu' /\
   sm_inject_separated mu mu' m1 m2 /\
@@ -1314,14 +1316,14 @@ Proof. intros.
   assert (GDE:= GDE_lemma). 
   induction CS; intros; try (inv MS).
 
-  (* entering a block *)
+{ (* entering a block *)
   assert (DEFAULT: branch_target f pc = pc ->
     (exists (st2' : LTL_core) (m2' : mem),
-  (corestep_plus LTL_eff_sem tge
+  (corestep_plus (LTL_eff_sem hf) tge
      (LTL_State ts (tunnel_function f) tsp (branch_target f pc) tls) m2 st2'
      m2' \/
    (measure (LTL_Block s f sp bb rs) < measure (LTL_State s f sp pc rs))%nat /\
-   corestep_star LTL_eff_sem tge
+   corestep_star (LTL_eff_sem hf) tge
      (LTL_State ts (tunnel_function f) tsp (branch_target f pc) tls) m2 st2'
      m2') /\
   (exists mu' : SM_Injection,
@@ -1355,9 +1357,9 @@ Proof. intros.
         repeat split; extensionality b; 
           try rewrite freshloc_irrefl; intuition.
     split. rewrite B. econstructor; eauto.
-    intuition.
+    intuition. }
 
-  (* Lop *)
+{ (* Lop *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   exploit (eval_operation_inject'' _ _ ge (as_inj (restrict_sm mu (vis mu)))); try eapply H.
     eapply val_inject_incr; try eapply SPlocal. 
@@ -1383,9 +1385,9 @@ Proof. intros.
       rewrite restrict_sm_all in VINJ.
       eapply agree_regs_set; try eassumption.
       eapply agree_regs_undef; eassumption.
-    intuition.
+    intuition. }
 
-  (* Lload *)
+{ (* Lload *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   assert (WDR: SM_wd (restrict_sm mu (vis mu))).
    apply restrict_sm_WD; try eassumption. trivial.
@@ -1420,9 +1422,9 @@ Proof. intros.
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; trivial.
       rewrite restrict_sm_all in D.
       eapply agree_regs_set; try eassumption.
-    intuition.
-      
-  (* Lgetstack *)
+    intuition. }
+
+{ (* Lgetstack *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   eexists; eexists; split.
      left. eapply corestep_plus_one.
@@ -1438,9 +1440,9 @@ Proof. intros.
       eapply agree_regs_set; try eassumption.
       eapply agree_regs_undef; eassumption.  
       simpl. eapply AGREE.
-    intuition.
+    intuition. }
 
-  (* Lsetstack *)
+{ (* Lsetstack *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   eexists; eexists; split. 
     left. apply corestep_plus_one. econstructor; eauto.
@@ -1453,9 +1455,9 @@ Proof. intros.
     split. econstructor; eauto.
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; trivial.
     eapply agree_regs_setstack; eassumption.
-    intuition.
+    intuition. }
 
-  (* Lstore *)
+{ (* Lstore *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   assert (WDR: SM_wd (restrict_sm mu (vis mu))).
    apply restrict_sm_WD; try eassumption. trivial.
@@ -1509,9 +1511,9 @@ Proof. intros.
                   destruct AGREE as [AGREE_R _].
                   specialize (AGREE_R src). 
                    rewrite H4 in AGREE_R; inv AGREE_R.   
-                   destruct (restrictD_Some _ _ _ _ _ H8); trivial.
+                   destruct (restrictD_Some _ _ _ _ _ H8); trivial. }
 
-  (* Lcall *)
+{ (* Lcall *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   exploit agree_find_function_translated; try eassumption.
     eapply agree_regs_incr; try eapply AGREE. apply restrict_incr. 
@@ -1531,9 +1533,9 @@ Proof. intros.
     constructor; auto.
     constructor; auto.
     rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; trivial.
-  intuition.
+  intuition. }
 
-  (* Ltailcall *)
+{ (* Ltailcall *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   specialize (match_parent_locset _ _ _ H11); intros parentsAGREE.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in parentsAGREE; trivial.
@@ -1571,9 +1573,9 @@ Proof. intros.
     econstructor; eauto.
     rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; trivial.
   intuition.
-      eapply REACH_closed_free; try eassumption.
+      eapply REACH_closed_free; try eassumption. }
 
-  (* Lbuiltin *)
+{ (* Lbuiltin *)
   inv H. 
   assert (ArgsInj: val_list_inject (restrict (as_inj mu) (vis mu))
             (decode_longs (sig_args (ef_sig ef)) (reglist rs args))
@@ -1615,7 +1617,7 @@ Proof. intros.
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
       assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (Glob _ H2).
+          rewrite <- FRG. eapply (Glob _ H2). }
 
   (* Lannot 
   left; simpl; econstructor; split.
@@ -1624,7 +1626,7 @@ Proof. intros.
   exact symbols_preserved. exact varinfo_preserved.
   econstructor; eauto.*)
 
-  (* Lbranch (preserved) *)
+{ (* Lbranch (preserved) *)
   eexists; eexists; split.
     left. eapply corestep_plus_one.
           eapply ltl_exec_Lbranch; eauto.
@@ -1635,9 +1637,9 @@ Proof. intros.
       intuition;
       apply extensionality; intros; rewrite (freshloc_irrefl); intuition.
   split; intuition.
-  fold (branch_target f pc). econstructor; eauto.
+  fold (branch_target f pc). econstructor; eauto. }
 
-  (* Lbranch (eliminated) *)
+{ (* Lbranch (eliminated) *)
   eexists; eexists; split.
     right; split. simpl. omega. apply corestep_star_zero.
   exists mu.
@@ -1647,9 +1649,9 @@ Proof. intros.
       intuition;
       apply extensionality; intros; rewrite (freshloc_irrefl); intuition.
   split; intuition.
-  econstructor; eauto.
+  econstructor; eauto. }
   
-  (* Lcond *)
+{ (* Lcond *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   exploit eval_condition_inject; try eassumption.
     eapply agree_regs_list; try eassumption.
@@ -1666,9 +1668,9 @@ Proof. intros.
       apply extensionality; intros; rewrite (freshloc_irrefl); intuition.
   split; intuition.
   destruct b; econstructor; eauto;
-    rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; eauto.
+    rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; eauto. }
 
-  (* Ljumptable *)
+{ (* Ljumptable *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   assert (Vinj: val_inject (restrict (as_inj mu) (vis mu)) (rs (R arg)) (tls (R arg))).
     eapply AGREE.
@@ -1685,9 +1687,9 @@ Proof. intros.
       apply extensionality; intros; rewrite (freshloc_irrefl); intuition.
   split; intuition.
   econstructor; eauto. 
-    rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; eauto.
+    rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; eauto. }
 
-  (* Lreturn *)
+{ (* Lreturn *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   assert (WDR: SM_wd (restrict_sm mu (vis mu))).
    apply restrict_sm_WD; try eassumption. trivial.
@@ -1720,9 +1722,9 @@ Proof. intros.
   split. econstructor; eauto.
     rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; eauto.
   intuition. 
-      eapply REACH_closed_free; try eassumption. 
+      eapply REACH_closed_free; try eassumption. }
 
-  (* internal function *)
+{ (* internal function *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   edestruct alloc_parallel_intern as 
      [mu' [tm' [b' [Alloc' [MInj' [IntInc [mu'SP [Ai' [SEP [LocAlloc [WD' [SMV' RC']]]]]]]]]]]]; 
@@ -1769,16 +1771,53 @@ Proof. intros.
      red; intros. destruct (GFP _ _ H1). split; trivial.
           eapply intern_incr_as_inj; eassumption.
      assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply IntInc.
-       apply Glob in H1. rewrite <-FF; trivial.
+       apply Glob in H1. rewrite <-FF; trivial. }
 
-  (* external function 
-  left; simpl; econstructor; split.
-  eapply exec_function_external; eauto.
-  eapply external_call_symbols_preserved'; eauto.
-  exact symbols_preserved. exact varinfo_preserved.
-  simpl. econstructor; eauto. *)
+{ (* unobservable external function *) 
+  inv H0. 
+  rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in *; trivial.
+  assert (ArgsInj: val_list_inject (restrict (as_inj mu) (vis mu))
+            (decode_longs (sig_args (ef_sig ef))
+                  (map rs (loc_arguments (ef_sig ef))))
+            (decode_longs (sig_args (ef_sig ef))
+                  (map tls (loc_arguments (ef_sig ef))))).
+    eapply decode_longs_inject.
+    eapply agree_regs_map_outgoing; trivial.
+    red; intros ? LA. apply loc_arguments_rec_charact in LA. 
+           destruct l; try contradiction.
+           destruct sl; try contradiction. trivial.
+  exploit (inlineable_extern_inject ge tge); try eassumption.
+  intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]]. 
+ 
+  eexists; eexists; split.
+    left. eapply corestep_plus_one.
+      eapply ltl_exec_function_external; eauto.
+           econstructor. eassumption. reflexivity.
+  exists mu'.
+  split; trivial. 
+  split; trivial.
+  split; trivial.
+  split. econstructor;
+      try rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; 
+      eauto.
+      eapply agree_regs_set_regs; try eassumption. 
+       eapply agree_regs_incr; try eassumption.
+        eapply intern_incr_restrict; eassumption.
+        eapply encode_long_inject; eassumption.
+      eapply list_match_stackframes_intern_incr; try eassumption.
+        eapply restrict_sm_intern_incr; eassumption.
+        apply restrict_sm_WD; trivial.
+  intuition.
+      apply intern_incr_as_inj in INC; trivial.
+        apply sm_inject_separated_mem in SEP; trivial.
+        eapply meminj_preserves_incr_sep; eassumption. 
+      red; intros ? ? Hb. destruct (GFP _ _ Hb).
+          split; trivial.
+          eapply intern_incr_as_inj; eassumption.
+      assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
+          rewrite <- FRG. eapply (Glob _ H1). }
 
-  (* return *)
+{ (* return *)
   inv H5. inv H1.
   eexists; eexists; split.
   left. apply corestep_plus_one. eapply ltl_exec_return.
@@ -1790,17 +1829,17 @@ Proof. intros.
       repeat split; extensionality b; 
           try rewrite (freshloc_irrefl); intuition.
       split. econstructor; eauto.
-    intuition.
+    intuition. }
 Qed.
 
 Lemma MATCH_effcorediagram: forall st1 m1 st1' m1' U1
-         (CS:effstep LTL_eff_sem ge U1 st1 m1 st1' m1')
+         (CS:effstep (LTL_eff_sem hf) ge U1 st1 m1 st1' m1')
          st2 mu m2 (U1Vis: forall b ofs, U1 b ofs = true -> vis mu b = true)
          (MTCH:MATCH mu st1 m1 st2 m2),
 exists st2' m2' U2, 
-  (effstep_plus LTL_eff_sem tge U2 st2 m2 st2' m2' \/
+  (effstep_plus (LTL_eff_sem hf) tge U2 st2 m2 st2' m2' \/
    (measure st1' < measure st1)%nat /\
-   effstep_star LTL_eff_sem tge U2 st2 m2 st2' m2')
+   effstep_star (LTL_eff_sem hf) tge U2 st2 m2 st2' m2')
 /\ exists mu',
   intern_incr mu mu' /\
   sm_inject_separated mu mu' m1 m2 /\
@@ -1819,14 +1858,14 @@ Proof. intros.
   assert (GDE:= GDE_lemma). 
   induction CS; intros; try (inv MS).
 
-  (* entering a block *)
+{ (* entering a block *)
   assert (DEFAULT: branch_target f pc = pc ->
     (exists (st2' : LTL_core) (m2' : mem) (U2 : block -> Z -> bool),
-  (effstep_plus LTL_eff_sem tge U2
+  (effstep_plus (LTL_eff_sem hf) tge U2
      (LTL_State ts (tunnel_function f) tsp (branch_target f pc) tls) m2 st2'
      m2' \/
    (measure (LTL_Block s f sp bb rs) < measure (LTL_State s f sp pc rs))%nat /\
-   effstep_star LTL_eff_sem tge U2
+   effstep_star (LTL_eff_sem hf) tge U2
      (LTL_State ts (tunnel_function f) tsp (branch_target f pc) tls) m2 st2'
      m2') /\
   (exists mu' : SM_Injection,
@@ -1870,9 +1909,9 @@ Proof. intros.
           try rewrite freshloc_irrefl; intuition.
     split. split. rewrite B. econstructor; eauto.
            intuition.
-    intuition.
+    intuition. }
 
-  (* Lop *)
+{ (* Lop *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   exploit (eval_operation_inject'' _ _ ge (as_inj (restrict_sm mu (vis mu)))); try eapply H.
     eapply val_inject_incr; try eapply SPlocal. 
@@ -1900,9 +1939,9 @@ Proof. intros.
         eapply agree_regs_set; try eassumption.
         eapply agree_regs_undef; eassumption.
       intuition.
-    intuition.
+    intuition. }
 
-  (* Lload *)
+{ (* Lload *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   assert (WDR: SM_wd (restrict_sm mu (vis mu))).
    apply restrict_sm_WD; try eassumption. trivial.
@@ -1939,9 +1978,9 @@ Proof. intros.
         rewrite restrict_sm_all in D.
         eapply agree_regs_set; try eassumption.
       intuition.
-    intuition.
+    intuition. }
       
-  (* Lgetstack *)
+{ (* Lgetstack *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   eexists; eexists; eexists; split.
      left. eapply effstep_plus_one.
@@ -1959,9 +1998,9 @@ Proof. intros.
         eapply agree_regs_undef; eassumption.  
         simpl. eapply AGREE.
       intuition.
-    intuition.
+    intuition. }
 
-  (* Lsetstack *)
+{ (* Lsetstack *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   eexists; eexists; eexists; split. 
     left. apply effstep_plus_one. econstructor; eauto.
@@ -1976,9 +2015,9 @@ Proof. intros.
         rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; trivial.
         eapply agree_regs_setstack; eassumption.
       intuition.
-    intuition.
+    intuition. }
 
-  (* Lstore *)
+{ (* Lstore *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   assert (WDR: SM_wd (restrict_sm mu (vis mu))).
    apply restrict_sm_WD; try eassumption. trivial.
@@ -2040,9 +2079,9 @@ Proof. intros.
             eapply visPropagateR; eassumption.
     eapply StoreEffect_PropagateLeft; try eassumption.
      econstructor. eassumption. trivial.
-     apply C.
+     apply C. }
 
-  (* Lcall *)
+{ (* Lcall *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   exploit agree_find_function_translated; try eassumption.
     eapply agree_regs_incr; try eapply AGREE. apply restrict_incr. 
@@ -2064,9 +2103,9 @@ Proof. intros.
       constructor; auto.
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; trivial.
     intuition.
-  intuition.
+  intuition. }
 
-  (* Ltailcall *)
+{ (* Ltailcall *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   specialize (match_parent_locset _ _ _ H11); intros parentsAGREE.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in parentsAGREE; trivial.
@@ -2112,9 +2151,9 @@ Proof. intros.
     split. apply FreeEffectD in H4.
            destruct H4; subst. 
            eapply visPropagate; try eassumption.
-    eapply FreeEffect_PropagateLeft; try eassumption.
+    eapply FreeEffect_PropagateLeft; try eassumption. }
 
-  (* Lbuiltin *)
+{ (* Lbuiltin *)
   inv H. 
   assert (ArgsInj: val_list_inject (restrict (as_inj mu) (vis mu))
             (decode_longs (sig_args (ef_sig ef)) (reglist rs args))
@@ -2159,7 +2198,7 @@ Proof. intros.
       assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
           rewrite <- FRG. eapply (Glob _ H2).
   intros.
-    eapply BuiltinEffect_Propagate; try eassumption.
+    eapply BuiltinEffect_Propagate; try eassumption. }
 
   (* Lannot 
   left; simpl; econstructor; split.
@@ -2168,7 +2207,7 @@ Proof. intros.
   exact symbols_preserved. exact varinfo_preserved.
   econstructor; eauto.*)
 
-  (* Lbranch (preserved) *)
+{ (* Lbranch (preserved) *)
   eexists; eexists; eexists; split.
     left. eapply effstep_plus_one.
           eapply ltl_effstep_Lbranch; eauto.
@@ -2180,9 +2219,9 @@ Proof. intros.
       apply extensionality; intros; rewrite (freshloc_irrefl); intuition.
   split; intuition.
   split; intuition.
-  fold (branch_target f pc). econstructor; eauto.
+  fold (branch_target f pc). econstructor; eauto. }
 
-  (* Lbranch (eliminated) *)
+{ (* Lbranch (eliminated) *)
   eexists; eexists; eexists; split.
     right; split. simpl. omega. apply effstep_star_zero.
   exists mu.
@@ -2193,9 +2232,9 @@ Proof. intros.
       apply extensionality; intros; rewrite (freshloc_irrefl); intuition.
   split; intuition.
   split; intuition.
-  econstructor; eauto.
+  econstructor; eauto. }
   
-  (* Lcond *)
+{ (* Lcond *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   exploit eval_condition_inject; try eassumption.
     eapply agree_regs_list; try eassumption.
@@ -2213,9 +2252,9 @@ Proof. intros.
   split; intuition.
   split; intuition.
   destruct b; econstructor; eauto;
-    rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; eauto.
+    rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; eauto. }
 
-  (* Ljumptable *)
+{ (* Ljumptable *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   assert (Vinj: val_inject (restrict (as_inj mu) (vis mu)) (rs (R arg)) (tls (R arg))).
     eapply AGREE.
@@ -2233,9 +2272,9 @@ Proof. intros.
   split; intuition.
   split; intuition.
   econstructor; eauto. 
-    rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; eauto.
+    rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; eauto. }
 
-  (* Lreturn *)
+{ (* Lreturn *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   assert (WDR: SM_wd (restrict_sm mu (vis mu))).
    apply restrict_sm_WD; try eassumption. trivial.
@@ -2277,9 +2316,9 @@ Proof. intros.
     split. apply FreeEffectD in H3.
            destruct H3; subst. 
            eapply visPropagate; try eassumption.
-    eapply FreeEffect_PropagateLeft; try eassumption.
+    eapply FreeEffect_PropagateLeft; try eassumption. }
 
-  (* internal function *)
+{ (* internal function *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   edestruct alloc_parallel_intern as 
      [mu' [tm' [b' [Alloc' [MInj' [IntInc [mu'SP [Ai' [SEP [LocAlloc [WD' [SMV' RC']]]]]]]]]]]]; 
@@ -2328,16 +2367,63 @@ Proof. intros.
           eapply intern_incr_as_inj; eassumption.
      assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply IntInc.
        apply Glob in H1. rewrite <-FF; trivial.
-  intuition.
+  intuition. }
 
-  (* external function 
-  left; simpl; econstructor; split.
-  eapply exec_function_external; eauto.
-  eapply external_call_symbols_preserved'; eauto.
-  exact symbols_preserved. exact varinfo_preserved.
-  simpl. econstructor; eauto. *)
+{ (* unobservable external function *) 
+  inv H0. 
+  rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in *; trivial.
+  assert (ArgsInj: val_list_inject (restrict (as_inj mu) (vis mu))
+            (decode_longs (sig_args (ef_sig ef))
+                  (map rs (loc_arguments (ef_sig ef))))
+            (decode_longs (sig_args (ef_sig ef))
+                  (map tls (loc_arguments (ef_sig ef))))).
+    eapply decode_longs_inject.
+    eapply agree_regs_map_outgoing; trivial.
+    red; intros ? LA. apply loc_arguments_rec_charact in LA. 
+           destruct l; try contradiction.
+           destruct sl; try contradiction. trivial.
+  exploit (inlineable_extern_inject ge tge); try eassumption.
+  intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]]. 
+ 
+  eexists; eexists; eexists; split.
+    left. eapply effstep_plus_one.
+      eapply ltl_effstep_function_external; eauto.
+           econstructor. eassumption. reflexivity.
+  exists mu'.
+  split; trivial. 
+  split; trivial.
+  split; trivial.
+  split.
+    split. econstructor;
+      try rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; 
+      eauto.
+      eapply agree_regs_set_regs; try eassumption. 
+       eapply agree_regs_incr; try eassumption.
+        eapply intern_incr_restrict; eassumption.
+        eapply encode_long_inject; eassumption.
+      eapply list_match_stackframes_intern_incr; try eassumption.
+        eapply restrict_sm_intern_incr; eassumption.
+        apply restrict_sm_WD; trivial.
+    intuition.
+      apply intern_incr_as_inj in INC; trivial.
+        apply sm_inject_separated_mem in SEP; trivial.
+        eapply meminj_preserves_incr_sep; eassumption. 
+      red; intros ? ? Hb. destruct (GFP _ _ Hb).
+          split; trivial.
+          eapply intern_incr_as_inj; eassumption.
+      assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
+          rewrite <- FRG. eapply (Glob _ H1).
+  intros. 
+    rewrite BuiltinEffect_decode in H0.
+    exploit @BuiltinEffect_Propagate.
+     apply H.
+     eassumption.  
+     assumption.
+     eassumption.
+     eassumption.
+    rewrite BuiltinEffect_decode; trivial. }
 
-  (* return *)
+{ (* return *)
   inv H5. inv H1.
   eexists; eexists; eexists; split.
   left. apply effstep_plus_one. eapply ltl_effstep_return.
@@ -2349,7 +2435,7 @@ Proof. intros.
       repeat split; extensionality b; 
           try rewrite (freshloc_irrefl); intuition.
       split. econstructor; eauto.
-    intuition.
+    intuition. }
 Qed.
 
 (*program structure not yet updated to module*)
@@ -2366,8 +2452,8 @@ Theorem transl_program_correct:
                 /\ Genv.find_funct_ptr ge b = Some f1
                 /\ Genv.find_funct_ptr tge b = Some f2)
          (init_mem: exists m0, Genv.init_mem prog = Some m0),
-SM_simulation.SM_simulation_inject LTL_eff_sem 
-  LTL_eff_sem ge tge entrypoints.
+SM_simulation.SM_simulation_inject (LTL_eff_sem hf) 
+  (LTL_eff_sem hf) ge tge entrypoints.
 Proof.
 intros.
 eapply (SM_simulation.Build_SM_simulation_inject) with

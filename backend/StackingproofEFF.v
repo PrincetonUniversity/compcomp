@@ -449,6 +449,7 @@ Record agree_args (f: Linear.fundef)
 
 Section PRESERVATION.
 
+(*NEW*) Variable hf : I64Helpers.helper_functions.
 Variable return_address_offset: Mach.function -> Mach.code -> int -> Prop.
 
 Hypothesis return_address_offset_exists:
@@ -1947,7 +1948,7 @@ Lemma save_callee_save_regs_correct:
   frame_perm_freeable m sp ->
   agree_regs j ls rs ->
   exists rs', exists m',
-    corestep_star (Mach_eff_sem return_address_offset) tge 
+    corestep_star (Mach_eff_sem hf return_address_offset) tge 
        (Mach_State cs fb (Vptr sp Int.zero)
          (save_callee_save_regs bound number mkindex ty fe l k) rs lf) m
        (Mach_State cs fb (Vptr sp Int.zero) k rs' lf) m'
@@ -2098,7 +2099,7 @@ Lemma save_callee_save_regs_correct_eff:
   frame_perm_freeable m sp ->
   agree_regs j ls rs ->
   exists rs', exists m', 
-    effstep_star (Mach_eff_sem return_address_offset) tge 
+    effstep_star (Mach_eff_sem hf return_address_offset) tge 
        (SCS_Effect l)
        (Mach_State cs fb (Vptr sp Int.zero)
          (save_callee_save_regs bound number mkindex ty fe l k) rs lf) m
@@ -2238,7 +2239,7 @@ Lemma save_callee_save_correct:
   agree_regs j ls rs -> wt_locset ls ->
   frame_perm_freeable m sp ->
   exists rs', exists m',
-    corestep_star (Mach_eff_sem return_address_offset) tge 
+    corestep_star (Mach_eff_sem hf return_address_offset) tge 
        (Mach_State cs fb (Vptr sp Int.zero) (save_callee_save fe k) rs lf) m
        (Mach_State cs fb (Vptr sp Int.zero) k rs' lf) m'
   /\ (forall r,
@@ -2345,7 +2346,7 @@ Lemma save_callee_save_correct_eff:
   agree_regs j ls rs -> wt_locset ls ->
   frame_perm_freeable m sp ->
   exists rs', exists m', 
-    effstep_star (Mach_eff_sem return_address_offset) tge 
+    effstep_star (Mach_eff_sem hf return_address_offset) tge 
        (PrologueEffect m sp)
        (Mach_State cs fb (Vptr sp Int.zero) (save_callee_save fe k) rs lf) m
        (Mach_State cs fb (Vptr sp Int.zero) k rs' lf) m'
@@ -2487,7 +2488,7 @@ Lemma function_prologue_correct:
      Mem.alloc m1' 0 tf.(fn_stacksize) = (m2', sp')
   /\ store_stack m2' (Vptr sp' Int.zero) Tint tf.(fn_link_ofs) parent = Some m3'
   /\ store_stack m3' (Vptr sp' Int.zero) Tint tf.(fn_retaddr_ofs) ra = Some m4'
-  /\ corestep_star (Mach_eff_sem return_address_offset) tge 
+  /\ corestep_star (Mach_eff_sem hf return_address_offset) tge 
          (Mach_State cs fb (Vptr sp' Int.zero) (save_callee_save fe k) rs1 lf) m4'
          (Mach_State cs fb (Vptr sp' Int.zero) k rs' lf) m5'
   /\ agree_regs (restrict (as_inj mu') (vis mu')) ls1 rs'
@@ -2740,7 +2741,7 @@ Lemma function_prologue_correct_eff:
      Mem.alloc m1' 0 tf.(fn_stacksize) = (m2', sp')
   /\ store_stack m2' (Vptr sp' Int.zero) Tint tf.(fn_link_ofs) parent = Some m3'
   /\ store_stack m3' (Vptr sp' Int.zero) Tint tf.(fn_retaddr_ofs) ra = Some m4'
-  /\ effstep_star (Mach_eff_sem return_address_offset) tge
+  /\ effstep_star (Mach_eff_sem hf return_address_offset) tge
          (PrologueEffect m4' sp')
          (Mach_State cs fb (Vptr sp' Int.zero) (save_callee_save fe k) rs1 lf) m4'
          (Mach_State cs fb (Vptr sp' Int.zero) k rs' lf) m5'
@@ -3018,7 +3019,7 @@ Lemma restore_callee_save_regs_correct:
   list_norepet l -> 
   agree_unused ls0 rs ->
   exists rs',
-    corestep_star (Mach_eff_sem return_address_offset) tge
+    corestep_star (Mach_eff_sem hf return_address_offset) tge
      (Mach_State cs fb (Vptr sp Int.zero)
         (restore_callee_save_regs bound number mkindex ty fe l k) rs lf) m
      (Mach_State cs fb (Vptr sp Int.zero) k rs' lf) m
@@ -3070,7 +3071,7 @@ Lemma restore_callee_save_regs_correct_eff:
   list_norepet l -> 
   agree_unused ls0 rs ->
   exists rs',
-    effstep_star (Mach_eff_sem return_address_offset) tge EmptyEffect
+    effstep_star (Mach_eff_sem hf return_address_offset) tge EmptyEffect
      (Mach_State cs fb (Vptr sp Int.zero)
         (restore_callee_save_regs bound number mkindex ty fe l k) rs lf) m
      (Mach_State cs fb (Vptr sp Int.zero) k rs' lf) m
@@ -3124,7 +3125,7 @@ Lemma restore_callee_save_correct:
   agree_frame j ls ls0 m sp m' sp' pa ra ->
   agree_unused j ls0 rs ->
   exists rs',
-    corestep_star (Mach_eff_sem return_address_offset) tge
+    corestep_star (Mach_eff_sem hf return_address_offset) tge
       (Mach_State cs fb (Vptr sp' Int.zero) (restore_callee_save fe k) rs lf) m'
       (Mach_State cs fb (Vptr sp' Int.zero) k rs' lf) m'
   /\ (forall r, 
@@ -3197,7 +3198,7 @@ Lemma function_epilogue_correct:
      load_stack m' (Vptr sp' Int.zero) Tint tf.(fn_link_ofs) = Some pa
   /\ load_stack m' (Vptr sp' Int.zero) Tint tf.(fn_retaddr_ofs) = Some ra
   /\ Mem.free m' sp' 0 tf.(fn_stacksize) = Some m1'
-  /\ corestep_star (Mach_eff_sem return_address_offset) tge
+  /\ corestep_star (Mach_eff_sem hf return_address_offset) tge
        (Mach_State cs fb (Vptr sp' Int.zero) (restore_callee_save fe k) rs lf) m'
        (Mach_State cs fb (Vptr sp' Int.zero) k rs1 lf) m'
   /\ agree_regs (restrict (as_inj mu) (vis mu)) (return_regs ls0 ls) rs1
@@ -3261,7 +3262,7 @@ Lemma restore_callee_save_correct_eff:
   agree_frame j ls ls0 m sp m' sp' pa ra ->
   agree_unused j ls0 rs ->
   exists rs',
-    effstep_star (Mach_eff_sem return_address_offset) tge EmptyEffect
+    effstep_star (Mach_eff_sem hf return_address_offset) tge EmptyEffect
       (Mach_State cs fb (Vptr sp' Int.zero) (restore_callee_save fe k) rs lf) m'
       (Mach_State cs fb (Vptr sp' Int.zero) k rs' lf) m'
   /\ (forall r, 
@@ -3329,7 +3330,7 @@ Lemma function_epilogue_correct_eff:
      load_stack m' (Vptr sp' Int.zero) Tint tf.(fn_link_ofs) = Some pa
   /\ load_stack m' (Vptr sp' Int.zero) Tint tf.(fn_retaddr_ofs) = Some ra
   /\ Mem.free m' sp' 0 tf.(fn_stacksize) = Some m1'
-  /\ effstep_star (Mach_eff_sem return_address_offset) tge EmptyEffect
+  /\ effstep_star (Mach_eff_sem hf return_address_offset) tge EmptyEffect
        (Mach_State cs fb (Vptr sp' Int.zero) (restore_callee_save fe k) rs lf) m'
        (Mach_State cs fb (Vptr sp' Int.zero) k rs1 lf) m'
   /\ agree_regs (restrict (as_inj mu) (vis mu)) (return_regs ls0 ls) rs1
@@ -4764,7 +4765,7 @@ Lemma MATCH_initial: forall (v1 v2 : val) (sig : signature) entrypoints
                     Genv.find_funct_ptr tge b = Some f2)
   (vals1 : list val) c1 (m1 : mem) (j : meminj)
   (vals2 : list val) (m2 : mem) (DomS DomT : Values.block -> bool)
-  (Ini :initial_core Linear_eff_sem ge v1 vals1 = Some c1)
+  (Ini :initial_core (Linear_eff_sem hf) ge v1 vals1 = Some c1)
   (Inj: Mem.inject j m1 m2)
   (VInj: Forall2 (val_inject j) vals1 vals2)
   (PG: meminj_preserves_globals ge j)
@@ -4781,7 +4782,7 @@ Lemma MATCH_initial: forall (v1 v2 : val) (sig : signature) entrypoints
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
-  initial_core (Mach_eff_sem return_address_offset) tge v2 vals2 = Some c2 /\
+  initial_core (Mach_eff_sem hf return_address_offset) tge v2 vals2 = Some c2 /\
   MATCH c1
     (initial_SM DomS DomT
        (REACH m1
@@ -4886,11 +4887,11 @@ Qed.
 
 Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
        (MTCH: MATCH c1 mu c1 m1 c2 m2)
-       (AtExtSrc: at_external Linear_eff_sem c1 = Some (e, ef_sig, vals1)),
+       (AtExtSrc: at_external (Linear_eff_sem hf) c1 = Some (e, ef_sig, vals1)),
      Mem.inject (as_inj mu) m1 m2 /\
      exists vals2,
        Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\
-       at_external (Mach_eff_sem return_address_offset)  c2 = Some (e, ef_sig, vals2) /\
+       at_external (Mach_eff_sem hf return_address_offset)  c2 = Some (e, ef_sig, vals2) /\
       (forall pubSrc' pubTgt',
        pubSrc' = (fun b => locBlocksSrc mu b && REACH m1 (exportedSrc mu vals1) b) ->
        pubTgt' = (fun b => locBlocksTgt mu b && REACH m2 (exportedTgt mu vals2) b) ->
@@ -4915,8 +4916,8 @@ assert
     (decode_longs (sig_args (AST.ef_sig tf)) ls ## (loc_arguments (AST.ef_sig tf)))
     (decode_longs (sig_args (AST.ef_sig tf)) targs)).
 { apply decode_longs_inject; auto. }
-assert (OBS: observableEF tf=true).
-{ destruct (observableEF tf); try inv H1; auto. }
+assert (OBS: observableEF hf tf=true).
+{ destruct (observableEF hf tf); try inv H1; auto. }
 rewrite OBS in *. inv H1. split. 
 solve[apply val_list_inject_forall_inject; auto].
 exploit replace_locals_wd_AtExternal; try eassumption.
@@ -4984,8 +4985,8 @@ Lemma MATCH_afterExternal: forall
       mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
       (MemInjMu : Mem.inject (as_inj mu) m1 m2)
       (MatchMu: MATCH st1 mu st1 m1 st2 m2)
-      (AtExtSrc : at_external Linear_eff_sem st1 = Some (e, ef_sig, vals1))
-      (AtExtTgt : at_external (Mach_eff_sem return_address_offset) st2 
+      (AtExtSrc : at_external (Linear_eff_sem hf) st1 = Some (e, ef_sig, vals1))
+      (AtExtTgt : at_external (Mach_eff_sem hf return_address_offset) st2 
                   = Some (e', ef_sig', vals2))
       (ValInjMu : Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2)
       (pubSrc' : block -> bool)
@@ -5019,8 +5020,8 @@ Lemma MATCH_afterExternal: forall
                (fun b z => locBlocksSrc nu b = true /\ pubBlocksSrc nu b = false) m1 m1')
        (UnchLOOR: Mem.unchanged_on (local_out_of_reach nu m1) m2 m2'),
   exists st1' st2',
-  after_external Linear_eff_sem (Some ret1) st1 =Some st1' /\
-  after_external (Mach_eff_sem return_address_offset) (Some ret2) st2 = Some st2' /\
+  after_external (Linear_eff_sem hf) (Some ret1) st1 =Some st1' /\
+  after_external (Mach_eff_sem hf return_address_offset) (Some ret2) st2 = Some st2' /\
   MATCH st1' mu' st1' m1' st2' m2'.
 Proof. intros.
 simpl. 
@@ -5030,7 +5031,7 @@ simpl.
  destruct f; inv H0. 
  inv AtExtTgt.
  inv TRANSL.
- destruct (observableEF tf); inv H0; inv H1.
+ destruct (observableEF hf tf); inv H0; inv H1.
  eexists. eexists.
     split. reflexivity.
     split. reflexivity.
@@ -5422,11 +5423,11 @@ Proof.
   clear - OVER. rewrite Zlength_cons in OVER. unfold Z.succ in OVER. omega.
 Qed.
 
-Lemma MATCH_diagram: forall st1 m1 st1' m1'
-      (CS: corestep Linear_eff_sem ge st1 m1 st1' m1')
+Lemma MATCH_corediagram: forall st1 m1 st1' m1'
+      (CS: corestep (Linear_eff_sem hf) ge st1 m1 st1' m1')
       st2 mu m2 (MTCH: MATCH st1 mu st1 m1 st2 m2),
   exists st2' m2',
-    corestep_plus (Mach_eff_sem return_address_offset) tge st2 m2 st2' m2' /\
+    corestep_plus (Mach_eff_sem hf return_address_offset) tge st2 m2 st2' m2' /\
   exists mu', intern_incr mu mu' /\
     sm_inject_separated mu mu' m1 m2 /\
     sm_locally_allocated mu mu' m1 m2 m1' m2' /\
@@ -5446,7 +5447,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
        intro BOUND; simpl in BOUND);
   unfold transl_instr.
 
-  (* Lgetstack *)
+{ (* Lgetstack *)
   destruct BOUND. unfold destroyed_by_getstack; destruct sl.
   (* Lgetstack, local *)
   exploit agree_locals; eauto. intros [v [A B]].
@@ -5467,9 +5468,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     apply agree_regs_set_reg; auto. simpl. apply agree_frame_set_reg; auto. 
       simpl. eapply Val.has_subtype; eauto. 
       solve[eapply agree_wt_ls; eauto].
-  solve[intuition].
+  solve[intuition]. 
 
-  (* Lgetstack, incoming *)
+ (* Lgetstack, incoming *)
   unfold slot_valid in H0. InvBooleans.
   exploit incoming_slot_in_parameters; eauto. intros IN_ARGS.
   inversion STACKS; clear STACKS.
@@ -5539,9 +5540,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     apply caller_save_reg_within_bounds. 
     apply temp_for_parent_frame_caller_save.
     simpl. eapply Val.has_subtype; eauto. eapply agree_wt_ls; eauto.
-  solve[intuition].
+  solve[intuition]. 
 
-  (* Lgetstack, outgoing *)
+ (* Lgetstack, outgoing *)
   exploit agree_outgoing; eauto. intros [v [A B]].
   eexists; eexists; split.
     apply corestep_plus_one. apply Mach_exec_Mgetstack. 
@@ -5560,9 +5561,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     apply agree_regs_set_reg; auto.
     apply agree_frame_set_reg; auto.
     simpl. eapply Val.has_subtype; eauto. eapply agree_wt_ls; eauto.
-  solve[intuition].
+  solve[intuition]. }
 
-(* Lsetstack *)
+{ (* Lsetstack *)
   set (idx := match sl with
               | Local => FI_local ofs ty
               | Incoming => FI_link (*dummy*)
@@ -5630,9 +5631,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       omega.
   split; intros. eapply H5. assumption.
          eapply Mem.store_valid_block_1; try eassumption.
-           eapply H5. assumption.
+           eapply H5. assumption. }
 
-  (* Lop *)
+{ (* Lop *)
   assert (Val.has_type v (mreg_type res)).
     destruct (is_move_operation op args) as [arg|] eqn:?.
     exploit is_move_operation_correct; eauto. intros [EQ1 EQ2]; subst op args. 
@@ -5674,9 +5675,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     rewrite transl_destroyed_by_op.  apply agree_regs_undef_regs; auto. 
     apply agree_frame_set_reg; auto. apply agree_frame_undef_locs; auto.
     apply destroyed_by_op_caller_save.
-  solve[intuition].
+  solve[intuition]. }
 
-  (* Lload *)
+{ (* Lload *)
   assert (exists a',
           eval_addressing ge (Vptr sp' Int.zero) 
                           (transl_addr (make_env (function_bounds f)) addr) rs0##args 
@@ -5712,9 +5713,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     apply destroyed_by_load_caller_save. auto. 
     simpl. eapply Val.has_subtype; eauto. destruct a; simpl in H0; try discriminate. 
       eapply Mem.load_type; eauto.
-  solve[intuition].
+  solve[intuition]. }
 
-  (* Lstore *)
+{ (* Lstore *)
   assert (exists a',
           eval_addressing ge (Vptr sp' Int.zero) 
                           (transl_addr (make_env (function_bounds f)) addr) rs0##args 
@@ -5779,9 +5780,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     intros b' Hb'. rewrite getBlocks_char in Hb'. destruct Hb' as [off Hoff].
        destruct Hoff; try contradiction. subst.   
        rewrite H4 in VINJR. inv VINJR.
-       solve[destruct (restrictD_Some _ _ _ _ _ H9); trivial].
+       solve[destruct (restrictD_Some _ _ _ _ _ H9); trivial]. }
 
-  (* Lcall *)
+{ (* Lcall *)
   exploit find_function_translated; eauto. intros [bf [tf' [A [B C]]]].
   exploit is_tail_transf_function; eauto. intros IST.
   rewrite transl_code_eq in IST. simpl in IST.
@@ -5856,9 +5857,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       induction s; auto. subst. simpl. destruct AGINITF.
         subst; left; auto. solve[right; auto].
   solve[left; apply Zlength_cons_pos].
-  solve[intuition].
+  solve[intuition]. }
 
-  (* Ltailcall_internal *)
+{ (* Ltailcall_internal *)
   destruct PRE as [RC [PG [Glob [SMV WD]]]].
   exploit function_epilogue_correct; eauto.
   intros [rs2 [m1' [P [Q [R [S [T [U V]]]]]]]].
@@ -5960,9 +5961,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       eapply Mem.valid_block_free_1; try eassumption.
         eapply SMV; assumption.
       eapply Mem.valid_block_free_1; try eassumption.
-        solve[eapply SMV; assumption].
+        solve[eapply SMV; assumption]. }
 
-  (* Mbuiltin*)
+{ (* Mbuiltin*)
   destruct PRE as [RC [PG [Glob [SMV WD]]]].
       assert (PGR: meminj_preserves_globals ge (restrict (as_inj mu) (vis mu))).
         rewrite <- restrict_sm_all.
@@ -6026,7 +6027,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     eapply INCR. assumption.
     (* agree_args *)
     eapply agree_args_intern_incr; eauto.
-    apply BuiltinEffect_unchOn in EC.
+    apply (BuiltinEffect_unchOn hf) in EC.
     apply agree_args_invariant with (m' := m2); auto.
     eapply mem_unchanged_on_sub; eauto.
     intros ? ? ?; subst. intros b0 ofs0 RES. 
@@ -6037,9 +6038,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
              apply intern_incr_as_inj; trivial.
              apply sm_inject_separated_mem; eassumption.
   assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-    solve[rewrite <- FRG; eapply (Glob _ H2)].  
+    solve[rewrite <- FRG; eapply (Glob _ H2)]. }
 
-  (* Llabel *)
+{ (* Llabel *)
   eexists; eexists; split.
     apply corestep_plus_one; apply Mach_exec_Mlabel.
   exists mu.
@@ -6053,9 +6054,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
   split.
     econstructor; eauto with coqlib.
-    intuition.
+    intuition. }
 
-  (* Lgoto *)
+{ (* Lgoto *)
   eexists; eexists; split.
     apply corestep_plus_one; eapply Mach_exec_Mgoto; eauto.
     apply transl_find_label; eauto.
@@ -6071,9 +6072,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   split.
     econstructor; eauto. 
       eapply find_label_tail; eauto.
-    intuition.
+    intuition. }
 
-  (* Lcond, true *)
+{ (* Lcond, true *)
   assert (INJR: Mem.inject (restrict (as_inj mu) (vis mu)) m m2).
     eapply inject_restrict; try eassumption. eapply PRE.
   eexists; eexists; split.
@@ -6095,9 +6096,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     apply agree_frame_undef_locs; auto. 
     apply destroyed_by_cond_caller_save; auto.
     eapply find_label_tail; eauto. auto. auto. auto. auto.
-  solve[intuition].
+  solve[intuition]. }
 
-  (* Lcond, false *)
+{ (* Lcond, false *)
   assert (INJR: Mem.inject (restrict (as_inj mu) (vis mu)) m m2).
     eapply inject_restrict; try eassumption. eapply PRE.
   eexists; eexists; split.
@@ -6117,9 +6118,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     econstructor. eauto. eauto. eauto. eauto. eauto. 
     apply agree_frame_undef_locs; auto. apply destroyed_by_cond_caller_save. 
     eauto with coqlib. auto. auto. auto. auto.
-  solve[intuition].
+  solve[intuition]. }
 
-  (* Ljumptable *)
+{ (* Ljumptable *)
   assert (rs0 arg = Vint n).
   { generalize (AGREGS arg). rewrite H. intro IJ; inv IJ; auto. }
   eexists; eexists; split.
@@ -6138,9 +6139,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     econstructor. eauto. eauto. eauto. eauto. eauto. 
     apply agree_frame_undef_locs; auto. apply destroyed_by_jumptable_caller_save.
     eapply find_label_tail; eauto. auto. auto. auto. auto.
-  solve[intuition].
+  solve[intuition]. }
 
-  (* Lreturn *)
+{ (* Lreturn *)
   destruct PRE as [RC [PG [Glob [SMV WD]]]].
   assert (INJR: Mem.inject (restrict (as_inj mu) (vis mu)) m m2).
     eapply inject_restrict; eassumption. 
@@ -6182,10 +6183,10 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       eapply Mem.valid_block_free_1; try eassumption.
         eapply SMV; assumption.
       eapply Mem.valid_block_free_1; try eassumption.
-        eapply SMV; assumption.
+        eapply SMV; assumption. }
 
-(* initial function *)
-{ destruct PRE as [RC [PG [Glob [SMV WD]]]]. 
+{ (* initial function *)
+  destruct PRE as [RC [PG [Glob [SMV WD]]]]. 
   revert TRANSL. unfold transf_fundef, transf_partial_fundef.
   caseEq (transf_function f0); simpl; try congruence.
   intros tfn TRANSL EQ. inversion EQ; clear EQ; subst tf.
@@ -6287,7 +6288,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   unfold RNG in H0. specialize (H0 _ Q). 
   apply Mem.fresh_block_alloc in ALLOC. exfalso. solve[apply ALLOC; auto]. }
 
-(* internal function *)
+{ (* internal function *)
   destruct PRE as [RC [PG [Glob [SMV WD]]]]. 
   revert TRANSL. unfold transf_fundef, transf_partial_fundef.
   caseEq (transf_function f); simpl; try congruence.
@@ -6342,10 +6343,39 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     eapply (intern_incr_meminj_preserves_globals_as_inj _ mu); trivial.
       split; assumption.
     eapply (intern_incr_meminj_preserves_globals_as_inj ge mu); trivial.
-      split; assumption.
+      split; assumption. }
 
-(* external function *) apply bind_inversion in TRANSL. 
-    destruct TRANSL as [ff [FT X]]. discriminate. 
+{ (* external function *)
+     apply bind_inversion in TRANSL. 
+    destruct TRANSL as [ff [FT X]]. discriminate. }
+
+{ monadInv TRANSL. }
+
+{ (*nonobservable extern function*)
+  destruct PRE as [RC [PG [Glob [SMV WD]]]].
+  simpl in TRANSL. inversion TRANSL; subst tf.
+  inv H0. 
+  exploit transl_external_arguments; eauto. intros [vl [ARGS VINJ]].
+  exploit (inlineable_extern_inject _ _ GDE_lemma); try eassumption.
+     eapply decode_longs_inject. eapply VINJ. 
+  intros [mu' [vres' [tm' [EC [RINJ' [MINJ' [UNMAPPED [OUTOFREACH 
+           [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
+  eexists; exists tm'.
+  split. simpl. should operational rule in Mach_coop for nonobservables
+  really start in Mach_callstateOut?
+         eapply corestep_plus_trans. 
+           apply corestep_plus_one. econstructor.
+         eapply Mach_exec_function_external. ; eauto.
+  eapply external_call_symbols_preserved'; eauto.
+  exact symbols_preserved. exact varinfo_preserved.
+  econstructor; eauto.
+  apply match_stacks_change_bounds with (Mem.nextblock m) (Mem.nextblock m'0).
+  inv H0; inv A. eapply match_stack_change_extcall; eauto. apply Ple_refl. apply Ple_refl. 
+  eapply external_call_nextblock'; eauto.
+  eapply external_call_nextblock'; eauto.
+  inv H0. apply wt_setlist_result. eapply external_call_well_typed; eauto. auto.
+  apply agree_regs_set_regs; auto. apply agree_regs_inject_incr with j; auto. 
+  apply agree_callee_save_set_result; auto. }
 
 (* return *)
   inv STACKS. simpl in AGLOCS.  
@@ -6377,7 +6407,7 @@ Lemma MATCH_eff_diagram: forall st1 m1 st1' m1' (U1 : block -> Z -> bool)
         st2 mu m2 (MTCH: MATCH st1 mu st1 m1 st2 m2)
         (HypU1: forall b ofs, U1 b ofs = true -> vis mu b = true),
      exists st2' m2' U2,
-      effstep_plus (Mach_eff_sem return_address_offset) tge U2 st2 m2 st2' m2' /\
+      effstep_plus (Mach_eff_sem hf return_address_offset) tge U2 st2 m2 st2' m2' /\
      exists mu', intern_incr mu mu' /\
           sm_inject_separated mu mu' m1 m2 /\
           sm_locally_allocated mu mu' m1 m2 m1' m2' /\
@@ -7225,7 +7255,7 @@ Theorem transl_program_correct:
                 /\ Genv.find_funct_ptr tge b = Some f2)
          (init_mem: exists m0, Genv.init_mem prog = Some m0),
 SM_simulation.SM_simulation_inject Linear_eff_sem
-   (Mach_eff_sem return_address_offset) ge tge entrypoints.
+   (Mach_eff_sem hf return_address_offset) ge tge entrypoints.
 Proof.
 intros.
 assert (GDE:= GDE_lemma). 

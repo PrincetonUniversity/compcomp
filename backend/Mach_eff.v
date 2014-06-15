@@ -24,29 +24,28 @@ Require Import BuiltinEffects.
 Notation "a ## b" := (List.map a b) (at level 1).
 Notation "a # b <- c" := (Regmap.set b c a) (at level 1, b at next level).
 
-Section EFFSEM.
+Section MACH_EFFSEM.
+Variable hf : I64Helpers.helper_functions.
 Variable return_address_offset: function -> code -> int -> Prop.
 
-Variable ge: genv.
-
-Inductive mach_effstep: (block -> Z -> bool) -> 
+Inductive mach_effstep (ge:genv): (block -> Z -> bool) -> 
                         Mach_core -> mem -> Mach_core -> mem -> Prop :=
   | Mach_effexec_Mlabel:
       forall s f sp lbl c rs m lf,
-      mach_effstep EmptyEffect 
+      mach_effstep ge EmptyEffect 
         (Mach_State s f sp (Mlabel lbl :: c) rs lf) m
         (Mach_State s f sp c rs lf) m
   | Mach_effexec_Mgetstack:
       forall s f sp ofs ty dst c rs m v lf,
       load_stack m sp ty ofs = Some v ->
-      mach_effstep EmptyEffect 
+      mach_effstep ge EmptyEffect 
         (Mach_State s f sp (Mgetstack ofs ty dst :: c) rs lf) m
         (Mach_State s f sp c (rs#dst <- v) lf) m
   | Mach_effexec_Msetstack:
       forall s f sp src ofs ty c rs m m' rs' lf,
       store_stack m sp ty ofs (rs src) = Some m' ->
       rs' = undef_regs (destroyed_by_setstack ty) rs ->
-      mach_effstep 
+      mach_effstep ge 
         (StoreEffect (Val.add sp (Vint ofs)) (encode_val (chunk_of_type ty) (rs src)))
         (Mach_State s f sp (Msetstack src ofs ty :: c) rs lf) m
         (Mach_State s f sp c rs' lf) m'
@@ -56,7 +55,7 @@ Inductive mach_effstep: (block -> Z -> bool) ->
       load_stack m sp Tint f.(fn_link_ofs) = Some (parent_sp0 sp0 s) ->
       load_stack m (parent_sp0 sp0 s) ty ofs = Some v ->
       rs' = (rs # temp_for_parent_frame <- Vundef # dst <- v) ->
-      mach_effstep EmptyEffect 
+      mach_effstep ge EmptyEffect 
                    (Mach_State s fb sp (Mgetparam ofs ty dst :: c) rs 
                                        (mk_load_frame sp0 args0 tys0)) m
                    (Mach_State s fb sp c rs' (mk_load_frame sp0 args0 tys0)) m
@@ -64,7 +63,7 @@ Inductive mach_effstep: (block -> Z -> bool) ->
       forall s f sp op args res c rs m v rs' lf,
       eval_operation ge sp op rs##args m = Some v ->
       rs' = ((undef_regs (destroyed_by_op op) rs)#res <- v) ->
-      mach_effstep EmptyEffect 
+      mach_effstep ge EmptyEffect 
         (Mach_State s f sp (Mop op args res :: c) rs lf) m
         (Mach_State s f sp c rs' lf) m
   | Mach_effexec_Mload:
@@ -72,7 +71,7 @@ Inductive mach_effstep: (block -> Z -> bool) ->
       eval_addressing ge sp addr rs##args = Some a ->
       Mem.loadv chunk m a = Some v ->
       rs' = ((undef_regs (destroyed_by_load chunk addr) rs)#dst <- v) ->
-      mach_effstep EmptyEffect 
+      mach_effstep ge EmptyEffect 
         (Mach_State s f sp (Mload chunk addr args dst :: c) rs lf) m
         (Mach_State s f sp c rs' lf) m
   | Mach_effexec_Mstore:
@@ -80,7 +79,7 @@ Inductive mach_effstep: (block -> Z -> bool) ->
       eval_addressing ge sp addr rs##args = Some a ->
       Mem.storev chunk m a (rs src) = Some m' ->
       rs' = undef_regs (destroyed_by_store chunk addr) rs ->
-      mach_effstep (StoreEffect a (encode_val chunk (rs src)))
+      mach_effstep ge (StoreEffect a (encode_val chunk (rs src)))
         (Mach_State s f sp (Mstore chunk addr args src :: c) rs lf) m
         (Mach_State s f sp c rs' lf) m'
   (*NOTE [loader]*)
@@ -89,7 +88,7 @@ Inductive mach_effstep: (block -> Z -> bool) ->
       args_len_rec args tys = Some z -> 
       Mem.alloc m 0 (4*z) = (m1, stk) ->
       store_args m1 stk args tys = Some m2 -> 
-      mach_effstep EmptyEffect 
+      mach_effstep ge EmptyEffect 
         (Mach_CallstateIn fb args tys) m
         (Mach_Callstate nil fb (Regmap.init Vundef) (mk_load_frame stk args tys)) m2
   | Mach_effexec_Mcall_internal:
@@ -99,7 +98,7 @@ Inductive mach_effstep: (block -> Z -> bool) ->
       return_address_offset f c ra ->
       (*NEW: check that the block f' actually contains a function:*)
       Genv.find_funct_ptr ge f' = Some (Internal callee) ->
-      mach_effstep EmptyEffect 
+      mach_effstep ge EmptyEffect 
         (Mach_State s fb sp (Mcall sig ros :: c) rs lf) m
         (Mach_Callstate (Stackframe fb sp (Vptr fb ra) c :: s) f' rs lf) m
   | Mach_effexec_Mcall_external:
@@ -111,7 +110,7 @@ Inductive mach_effstep: (block -> Z -> bool) ->
              and perform the "extra step":*)
       Genv.find_funct_ptr ge f' = Some (External callee) ->
       extcall_arguments rs m sp (ef_sig callee) args ->
-      mach_effstep EmptyEffect
+      mach_effstep ge EmptyEffect
          (Mach_State s fb sp (Mcall sig ros :: c) rs lf) m
          (Mach_CallstateOut (Stackframe fb sp (Vptr fb ra) c :: s) f' callee args rs lf) m
   | Mach_effexec_Mtailcall_internal:
@@ -123,7 +122,7 @@ Inductive mach_effstep: (block -> Z -> bool) ->
       Mem.free m stk 0 f.(fn_stacksize) = Some m' ->
       (*NEW: check that the block f' actually contains a function:*)
       Genv.find_funct_ptr ge f' = Some (Internal callee) ->
-      mach_effstep (FreeEffect m 0 (f.(fn_stacksize)) stk)
+      mach_effstep ge (FreeEffect m 0 (f.(fn_stacksize)) stk)
         (Mach_State s fb (Vptr stk soff) (Mtailcall sig ros :: c) rs (mk_load_frame sp0 args0 tys0)) m
         (Mach_Callstate s f' rs (mk_load_frame sp0 args0 tys0)) m'
   | Mach_effexec_Mtailcall_external:
@@ -136,15 +135,15 @@ Inductive mach_effstep: (block -> Z -> bool) ->
       (*NEW: check that the block f' actually contains a function:*)
        Genv.find_funct_ptr ge f' = Some (External callee) ->
       extcall_arguments rs m' (parent_sp0 sp0 s) (ef_sig callee) args ->
-      mach_effstep (FreeEffect m 0 (f.(fn_stacksize)) stk)
+      mach_effstep ge (FreeEffect m 0 (f.(fn_stacksize)) stk)
          (Mach_State s fb (Vptr stk soff) (Mtailcall sig ros :: c) rs (mk_load_frame sp0 args0 tys0)) m
          (Mach_CallstateOut s f' callee args rs (mk_load_frame sp0 args0 tys0)) m'
   | Mach_effexec_Mbuiltin:
       forall s f sp rs m ef args res b t vl rs' m' lf,
       external_call' ef ge rs##args m t vl m' ->
-      observableEF ef = false ->
+      observableEF hf ef = false ->
       rs' = set_regs res vl (undef_regs (destroyed_by_builtin ef) rs) ->
-      mach_effstep (BuiltinEffect ge ef (decode_longs (sig_args (ef_sig ef)) (rs##args)) m)
+      mach_effstep ge (BuiltinEffect ge ef (decode_longs (sig_args (ef_sig ef)) (rs##args)) m)
          (Mach_State s f sp (Mbuiltin ef args res :: b) rs lf) m
          (Mach_State s f sp b rs' lf) m'
 (*NO SUPPORT FOR ANNOT YET
@@ -158,7 +157,7 @@ Inductive mach_effstep: (block -> Z -> bool) ->
       forall s fb f sp lbl c rs m c' lf,
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       find_label lbl f.(fn_code) = Some c' ->
-      mach_effstep EmptyEffect 
+      mach_effstep ge EmptyEffect 
         (Mach_State s fb sp (Mgoto lbl :: c) rs lf) m
         (Mach_State s fb sp c' rs lf) m
   | Mach_effexec_Mcond_true:
@@ -167,14 +166,14 @@ Inductive mach_effstep: (block -> Z -> bool) ->
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       find_label lbl f.(fn_code) = Some c' ->
       rs' = undef_regs (destroyed_by_cond cond) rs ->
-      mach_effstep EmptyEffect 
+      mach_effstep ge EmptyEffect 
         (Mach_State s fb sp (Mcond cond args lbl :: c) rs lf) m
         (Mach_State s fb sp c' rs' lf) m
   | Mach_effexec_Mcond_false:
       forall s f sp cond args lbl c rs m rs' lf,
       eval_condition cond rs##args m = Some false ->
       rs' = undef_regs (destroyed_by_cond cond) rs ->
-      mach_effstep EmptyEffect 
+      mach_effstep ge EmptyEffect 
         (Mach_State s f sp (Mcond cond args lbl :: c) rs lf) m
         (Mach_State s f sp c rs' lf) m
   | Mach_effexec_Mjumptable:
@@ -184,7 +183,7 @@ Inductive mach_effstep: (block -> Z -> bool) ->
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       find_label lbl f.(fn_code) = Some c' ->
       rs' = undef_regs destroyed_by_jumptable rs ->
-      mach_effstep EmptyEffect 
+      mach_effstep ge EmptyEffect 
         (Mach_State s fb sp (Mjumptable arg tbl :: c) rs lf) m
         (Mach_State s fb sp c' rs' lf) m
   | Mach_effexec_Mreturn:
@@ -193,7 +192,7 @@ Inductive mach_effstep: (block -> Z -> bool) ->
       load_stack m (Vptr stk soff) Tint f.(fn_link_ofs) = Some (parent_sp0 sp0 s) ->
       load_stack m (Vptr stk soff) Tint f.(fn_retaddr_ofs) = Some (parent_ra s) ->
       Mem.free m stk 0 f.(fn_stacksize) = Some m' ->
-      mach_effstep (FreeEffect m 0 (f.(fn_stacksize)) stk)
+      mach_effstep ge (FreeEffect m 0 (f.(fn_stacksize)) stk)
         (Mach_State s fb (Vptr stk soff) (Mreturn :: c) rs (mk_load_frame sp0 args0 tys0)) m
         (Mach_Returnstate s (sig_res (fn_sig f)) rs (mk_load_frame sp0 args0 tys0)) m'
   | Mach_effexec_function_internal:
@@ -204,23 +203,30 @@ Inductive mach_effstep: (block -> Z -> bool) ->
       store_stack m1 sp Tint f.(fn_link_ofs) (parent_sp0 sp0 s) = Some m2 ->
       store_stack m2 sp Tint f.(fn_retaddr_ofs) (parent_ra s) = Some m3 ->
       rs' = undef_regs destroyed_at_function_entry rs ->
-      mach_effstep EmptyEffect 
+      mach_effstep ge EmptyEffect 
         (Mach_Callstate s fb rs (mk_load_frame sp0 args0 tys0)) m
         (Mach_State s fb sp f.(fn_code) rs' (mk_load_frame sp0 args0 tys0)) m3
+
+  | Mach_effexec_function_external:
+      forall s fb rs m t rs' ef args res m' lf
+      (OBS: observableEF hf ef = false),
+      Genv.find_funct_ptr ge fb = Some (External ef) ->
+      extcall_arguments rs m (parent_sp s) (ef_sig ef) args ->
+      external_call' ef ge args m t res m' ->
+      rs' = set_regs (loc_result (ef_sig ef)) res rs ->
+      mach_effstep ge (BuiltinEffect ge ef args m)
+         (Mach_Callstate s fb rs lf) m
+         (Mach_Returnstate s (sig_res (ef_sig ef)) rs' lf) m'
+
   | Mach_effexec_return:
       forall s f sp ra c retty rs m lf,
-      mach_effstep EmptyEffect 
+      mach_effstep ge EmptyEffect 
         (Mach_Returnstate (Stackframe f sp ra c :: s) retty rs lf) m
         (Mach_State s f sp c rs lf) m.
 
-End EFFSEM.
-
-Section MACH_EFFSEM.
-Variable return_address_offset: function -> code -> int -> Prop.
-
-Lemma machstep_effax1: forall (M : block -> Z -> bool) g c m c' m',
-      mach_effstep return_address_offset g M c m c' m' ->
-      (corestep (Mach_coop_sem return_address_offset) g c m c' m' /\
+Lemma machstep_effax1: forall (M : block -> Z -> bool) ge c m c' m',
+      mach_effstep ge M c m c' m' ->
+      (corestep (Mach_coop_sem hf return_address_offset) ge c m c' m' /\
        Mem.unchanged_on (fun (b : block) (ofs : Z) => M b ofs = false) m m').
 Proof. 
 intros.
@@ -299,13 +305,21 @@ intros.
         rewrite PMap.gso; trivial. 
         rewrite PMap.gso; trivial. 
         eapply EmptyEffect_alloc; eassumption. }
+  { split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+         inv H1.
+         eapply mem_unchanged_on_sub.
+           eapply BuiltinEffect_unchOn; eassumption. 
+         simpl. unfold BuiltinEffect. intros.
+           destruct ef; simpl; trivial. 
+          simpl in H0. inv H0. inv H7. trivial.
+          simpl in H0. inv H0. inv H7. inv H8. trivial. }
   split. econstructor; eassumption.
          apply Mem.unchanged_on_refl.
 Qed.
 
-Lemma  machstep_effax2: forall  g c m c' m',
-      corestep (Mach_coop_sem return_address_offset) g c m c' m' ->
-      exists M, mach_effstep return_address_offset g M c m c' m'.
+Lemma  machstep_effax2 ge c m c' m':
+      corestep (Mach_coop_sem hf return_address_offset) ge c m c' m' ->
+      exists M, mach_effstep ge M c m c' m'.
 Proof.
   intros. unfold corestep, coopsem in H; simpl in H.
   inv H.
@@ -329,12 +343,12 @@ Proof.
     eexists. eapply Mach_effexec_Mjumptable; try eassumption; trivial.
     eexists. eapply Mach_effexec_Mreturn; try eassumption; trivial.
     eexists. eapply Mach_effexec_function_internal; try eassumption; trivial.
-(*    eexists. eapply Mach_effexec_function_external; try eassumption; trivial.*)
+    eexists. eapply Mach_effexec_function_external; try eassumption; trivial.
     eexists. eapply Mach_effexec_return; try eassumption; trivial.
 Qed.
 
-Lemma mach_effstep_valid: forall (M : block -> Z -> bool) g c m c' m',
-      mach_effstep return_address_offset g M c m c' m' ->
+Lemma mach_effstep_valid: forall (M : block -> Z -> bool) ge c m c' m',
+      mach_effstep ge M c m c' m' ->
        forall b z, M b z = true -> Mem.valid_block m b.
 Proof.
 intros.
@@ -356,12 +370,13 @@ intros.
   eapply FreeEffect_validblock; eassumption.
   eapply BuiltinEffect_valid_block; eassumption.
   eapply FreeEffect_validblock; eassumption.
+  eapply BuiltinEffect_valid_block; eassumption.
 Qed.
 
 Program Definition Mach_eff_sem : 
   @EffectSem genv Mach_core.
 eapply Build_EffectSem with 
- (sem := Mach_coop_sem return_address_offset).
+ (sem := Mach_coop_sem hf return_address_offset).
 apply machstep_effax1.
 apply machstep_effax2.
 apply mach_effstep_valid. 

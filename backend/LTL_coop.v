@@ -159,7 +159,7 @@ Inductive ltl_corestep (ge:genv): LTL_core -> mem -> LTL_core -> mem -> Prop :=
       ltl_corestep ge (LTL_Callstate s (Internal f) rs) m
         (LTL_State s f (Vptr sp Int.zero) f.(fn_entrypoint) rs') m'
 
-  | exec_function_external: forall s ef t args res rs m rs' m'
+  | ltl_exec_function_external: forall s ef t args res rs m rs' m'
       (OBS: observableEF hf ef = false),
       args = map rs (loc_arguments (ef_sig ef)) ->
       external_call' ef ge args m t res m' ->
