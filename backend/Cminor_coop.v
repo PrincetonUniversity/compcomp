@@ -118,12 +118,10 @@ Definition CMin_after_external (vret: option val) (c: CMin_core) : option CMin_c
     CMin_Callstate fd args k => 
          match fd with
             Internal f => None
-          | External ef =>  if observableEF hf ef 
-                            then match vret with
+          | External ef =>  match vret with
                                 None => Some (CMin_Returnstate Vundef k)
                               | Some v => Some (CMin_Returnstate v k)
-                                 end
-                            else None
+                            end
          end
   | _ => None
   end.
@@ -270,9 +268,10 @@ Lemma CMin_after_at_external_excl : forall retv q q',
   Proof. intros.
        destruct q; simpl in *; try inv H.
        destruct f; try inv H1; simpl; trivial.
-       remember (observableEF hf e) as d.
+       destruct retv; inv H0; simpl; trivial.
+(*       remember (observableEF hf e) as d.
        destruct d; try inv H0.
-       destruct retv; inv H1; simpl; trivial.
+       destruct retv; inv H1; simpl; trivial.*)
 Qed.
 
 Definition CMin_core_sem : CoreSemantics genv CMin_core mem.

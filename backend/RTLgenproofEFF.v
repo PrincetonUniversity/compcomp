@@ -1099,13 +1099,18 @@ Proof.
   inv TE.
   simpl in OBS.
   exploit H0; eauto. eapply OBS.
+  assert (OBS' : observableEF hf ef = false).
+    (*eapply OBS*)
+    destruct OBS as [OBS [SEL BEFF]]. destruct ef; try inv OBS.  
+         unfold observableEF. rewrite H3. trivial. 
+         unfold observableEF. rewrite H3. trivial. 
   intros [rs1 [tm1 [mu' [MU' [EX1 [ME1 [RR1 [RO1 EXT1]]]]]]]].
   (*WAS: exploit external_call_mem_extends; eauto. 
         intros [v' [tm2 [A [B [C [D E]]]]]].*)
   exploit (inlineable_extern_inject _ _ GDE_lemma);
        try eapply RR1; try eapply H1.
      eapply MU'. eapply MU'. eapply MU'. 
-     eapply OBS.
+     eapply OBS'. 
      eapply intern_incr_meminj_preserves_globals_as_inj.
          eassumption. split; assumption. 
      eapply MU'. eapply MU'. eassumption. 
@@ -1126,7 +1131,6 @@ Proof.
 (* Exec *)
   split. eapply corestep_star_trans. eexact EX1.
          apply corestep_star_one. eapply rtl_corestep_exec_Ibuiltin; try eassumption. 
-         eapply OBS.
 (*  eapply external_call_symbols_preserved; eauto. exact symbols_preserved. exact varinfo_preserved.*)
 (* Match-env *)
   split. eapply match_env_update_dest; try eassumption.
@@ -1144,6 +1148,19 @@ Lemma silentD_Eexternal name ef al b:  forall
   (SIL: silent hf ge (Eexternal name (ef_sig ef) al))
   (FS: Genv.find_symbol ge name = Some b)
   (FFP: Genv.find_funct_ptr ge b = Some (External ef)),
+  silentExprList hf ge al /\ EFisHelper hf ef = true
+   /\ forall (args : list val) (m : mem),
+             BuiltinEffect ge ef args m = EmptyEffect.
+Proof. intros.  
+unfold silent in SIL.
+rewrite FS, FFP in SIL.
+intuition.
+Qed.
+(*
+Lemma silentD_Eexternal name ef al b:  forall
+  (SIL: silent hf ge (Eexternal name (ef_sig ef) al))
+  (FS: Genv.find_symbol ge name = Some b)
+  (FFP: Genv.find_funct_ptr ge b = Some (External ef)),
   silentExprList hf ge al /\ observableEF hf ef = false
    /\ forall (args : list val) (m : mem),
              BuiltinEffect ge ef args m = EmptyEffect.
@@ -1152,7 +1169,7 @@ unfold silent in SIL.
 rewrite FS, FFP in SIL.
 intuition.
 Qed.
-
+*)
 Lemma transl_expr_Eexternal_correct:
   forall le id sg al b ef vl v,
   Genv.find_symbol ge id = Some b ->
@@ -1166,6 +1183,10 @@ Proof.
   intros; red; intros. inv TE.
   destruct (silentD_Eexternal _ _ _ _ OBS H H0)
     as [SilentArgs [ObsEF EffectEF]]; clear OBS.
+  assert (OBS' : observableEF hf ef = false).
+    destruct ef; try inv ObsEF.  
+         unfold observableEF. rewrite H5. trivial. 
+         unfold observableEF. rewrite H5. trivial. 
   exploit H3; eauto. 
   intros [rs1 [tm1 [mu' [MU' [EX1 [ME1 [RR1 [RO1 EXT1]]]]]]]].
   assert (PG': meminj_preserves_globals ge (as_inj mu')).     
@@ -1987,13 +2008,17 @@ Proof.
   inv TE.
   simpl in OBS.
   exploit H0; eauto. eapply OBS.
+  assert (OBS' : observableEF hf ef = false).
+    destruct OBS as [ObsEF _]. destruct ef; try inv ObsEF.  
+         unfold observableEF. rewrite H3. trivial. 
+         unfold observableEF. rewrite H3. trivial. 
   intros [rs1 [tm1 [mu' [MU' [EX1 [ME1 [RR1 [RO1 EXT1]]]]]]]].
   (*WAS: exploit external_call_mem_extends; eauto. 
         intros [v' [tm2 [A [B [C [D E]]]]]].*)
   exploit (inlineable_extern_inject _ _ GDE_lemma);
        try eapply RR1; try eapply H1.
      eapply MU'. eapply MU'. eapply MU'. 
-     eapply OBS.
+     eapply OBS'.
      eapply intern_incr_meminj_preserves_globals_as_inj.
          eassumption. split; assumption. 
      eapply MU'. eapply MU'. eassumption. 
@@ -2046,7 +2071,11 @@ Proof.
   intros; red; intros. inv TE.
   destruct (silentD_Eexternal _ _ _ _ OBS H H0)
     as [SilentArgs [ObsEF EffectEF]]; clear OBS.
-  exploit H3; eauto. 
+  exploit H3; eauto.  
+  assert (OBS' : observableEF hf ef = false).
+    destruct ef; try inv ObsEF.  
+         unfold observableEF. rewrite H5. trivial. 
+         unfold observableEF. rewrite H5. trivial. 
   intros [rs1 [tm1 [mu' [MU' [EX1 [ME1 [RR1 [RO1 EXT1]]]]]]]].
   assert (PG': meminj_preserves_globals ge (as_inj mu')).     
        eapply intern_incr_meminj_preserves_globals_as_inj.

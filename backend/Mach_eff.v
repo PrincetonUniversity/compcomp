@@ -209,7 +209,8 @@ Inductive mach_effstep (ge:genv): (block -> Z -> bool) ->
 
   | Mach_effexec_function_external:
       forall cs f' rs m t rs' callee args res m' lf
-      (OBS: observableEF hf callee = false),
+(*     (OBS: observableEF hf callee = false),*)
+      (OBS: EFisHelper hf callee = true),
       Genv.find_funct_ptr ge f' = Some (External callee) ->
       external_call' callee ge args m t res m' ->
       rs' = set_regs (loc_result (ef_sig callee)) res rs ->
@@ -343,65 +344,16 @@ intros.
         rewrite PMap.gso; trivial. 
         eapply EmptyEffect_alloc; eassumption. }
   { split. unfold corestep, coopsem; simpl. econstructor; try eassumption.
-    inv H0.
-     destruct callee; simpl in *; try discriminate. 
-      admit. (*ia64: todo*) 
-      admit. (*ia64: todo*)
-      inv H2. destruct args; inv H0.
-      admit. (*holds todo*)
-
-      inv H2. destruct args; inv H0. 
-       split; intros. unfold free_Effect in H0. 
-        destruct (eq_block b0 b); simpl in *. subst b0.
-          destruct args. rewrite H1 in H0. 
-          destruct (eq_block b b); simpl in *. clear e.
-          destruct (zlt 0 (Int.unsigned sz)); simpl in *.
-          destruct (zle (Int.unsigned lo - 4) ofs); simpl in *.
-          destruct (zlt ofs (Int.unsigned lo + Int.unsigned sz)); simpl in *. discriminate.
-          split; intros. eapply Mem.perm_free_1; try eassumption. 
-             right. right. omega.
-          eapply Mem.perm_free_3; try eassumption. 
-          split; intros. eapply Mem.perm_free_1; try eassumption. 
-             right. left. omega. 
-          eapply Mem.perm_free_3; try eassumption. 
-           omega. 
-          split; intros. eapply Mem.perm_free_1; try eassumption. 
-             left. trivial. 
-          eapply Mem.perm_free_3; try eassumption. 
-SearchAbout Mem.free.
-          split; intros.
-      destruct (zlt 0 (Int.unsigned sz)); simpl; trivial.
-      destruct (zle (Int.unsigned i - 4) ofs); simpl; trivial.
-      destruct (zlt ofs (Int.unsigned i + Int.unsigned sz)); simpl; trivial. admit.
-eapply free_Effect_unchOn. 
-       simpl. eapply extcall_free_sem_intro. Search extcall_free_sem. econstructor. SearchAbout free_Effect.
-        remember (type_of_chunk chunk) as toc. 
-        destruct toc; destruct args; inv H4.
-      inv H1.  apply Mem.unchanged_on_refl.
-      split. destruct args; inv H0. 
-        remember (type_of_chunk chunk) as toc. 
-        destruct toc; destruct args; inv H4. apply Mem.unchanged_on_refl. split.  SearchAbout EmptyEffect.
-      apply ; trivial. simpl in *.  inv H2; simpl in *.
-     eapply mem_unchanged_on_sub. 
-     eapply BuiltinEffect_unchOn; try eapply H2. eassumption.
-     unfold BuiltinEffect; simpl. intros.
-     destruct callee; simpl; trivial. simpl in *.
-      destruct args; simpl. trivial.
-      destruct v0; simpl; trivial. simpl in *.
-      destruct args; simpl; trivial. inv H2. rewrite H4.
-      destruct (eq_block b b0); simpl; trivial; subst.
-      destruct (zlt 0 (Int.unsigned sz)); simpl; trivial.
-      destruct (zle (Int.unsigned i - 4) ofs); simpl; trivial.
-      destruct (zlt ofs (Int.unsigned i + Int.unsigned sz)); simpl; trivial. admit.
-    unfold memcpy_Effect. unfold memcpy_Effect in H0. inv H2.
-       destruct args. inv H1. inv H1.
-       destruct args. inv H12. inv H12.
-       destruct args; simpl in *; trivial. 
-      destruct (eq_block b bdst); simpl; trivial; subst.
-      destruct (zle (Int.unsigned odst) ofs); simpl; trivial.
-      destruct (zlt ofs (Int.unsigned odst + sz)); simpl; trivial.
-      destruct (valid_block_dec m bdst); simpl; trivial. exfalso. omega.
-           inv H0. constructor.  }
+         inv H0.
+         destruct callee; try inv OBS.
+           eapply mem_unchanged_on_sub.
+             eapply BuiltinEffect_unchOn; try eapply H2. 
+              instantiate(1:=hf). unfold observableEF. rewrite H1. trivial.
+             unfold BuiltinEffect; simpl; intros. trivial.
+           eapply mem_unchanged_on_sub.
+             eapply BuiltinEffect_unchOn; try eapply H2. 
+              instantiate(1:=hf). unfold observableEF. rewrite H1. trivial.
+             unfold BuiltinEffect; simpl; intros. trivial. }
   split. econstructor; eassumption.
          apply Mem.unchanged_on_refl.
 Qed.

@@ -22,6 +22,7 @@ Require Import core_semantics.
 Require Import core_semantics_lemmas.
 
 Require Import Coq.Program.Equality.
+Require Import BuiltinEffects.
 
 Lemma allocvars_blocks_valid: forall vars E m e m1,
  alloc_variables E m vars e m1 -> 
@@ -173,7 +174,9 @@ Let tge: genv := Genv.globalenv tprog.
 
 Let core_data := CSharpMin_core.
 
-(*Lenb -- meminj_preserves_globales is new, and needed since this property is now
+(*NEW*) Variable hf : I64Helpers.helper_functions.
+
+(*Lenb -- meminj_preserves_globals is new, and needed since this property is now
     required by the simulation realtions, rather than only at/efterexternal clauses*)
 Inductive match_cores: core_data -> meminj -> CSharpMin_core -> mem -> CMin_core -> mem -> Prop :=
   | MC_states:
@@ -298,7 +301,7 @@ Lemma init_cores: forall (v1 v2 : val) (sig : signature) entrypoints
         /\ Genv.find_funct_ptr tge b = Some f2)
   (vals1 : list val) (c1 : core_data) (m1 : mem) (j : meminj)
   (vals2 : list val) (m2 : mem)
-  (CSM_Ini : initial_core CSharpMin_core_sem ge v1 vals1 = Some c1)
+  (CSM_Ini : initial_core (CSharpMin_core_sem hf) ge v1 vals1 = Some c1)
   (Inj : Mem.inject j m1 m2)
   (VI: Forall2 (val_inject j) vals1 vals2)
   (PG: meminj_preserves_globals ge j)
@@ -307,7 +310,7 @@ Lemma init_cores: forall (v1 v2 : val) (sig : signature) entrypoints
     /\ Ple (Mem.nextblock m0) (Mem.nextblock m1) 
     /\ Ple (Mem.nextblock m0) (Mem.nextblock m2)),
 exists c2 : CMin_core,
-  initial_core CMin_core_sem tge v2 vals2 = Some c2 /\
+  initial_core (CMin_core_sem hf) tge v2 vals2 = Some c2 /\
   match_cores c1 j c1 m1 c2 m2. 
 Proof. intros.
   inversion CSM_Ini. unfold  CSharpMin_initial_core in H0. unfold ge in *. unfold tge in *.
@@ -369,9 +372,9 @@ Qed.
 Lemma MC_safely_halted: forall (cd : core_data) (j : meminj) (c1 : CSharpMin_core) (m1 : mem)
   (c2 : CMin_core) (m2 : mem) (v1 : val),
 match_cores cd j c1 m1 c2 m2 ->
-halted CSharpMin_core_sem  c1 = Some v1 ->
+halted (CSharpMin_core_sem hf) c1 = Some v1 ->
 exists v2,
-halted CMin_core_sem c2 = Some v2 /\ Mem.inject j m1 m2 /\
+halted (CMin_core_sem hf) c2 = Some v2 /\ Mem.inject j m1 m2 /\
 val_inject j v1 v2.
 Proof.
   intros.
@@ -385,30 +388,31 @@ Qed.
 Lemma MC_at_external: forall (cd : core_data) (j : meminj) (st1 : CSharpMin_core) (m1 : mem)
   (st2 : CMin_core) (m2 : mem) (e : external_function) (vals1 : list val) sig,
 (cd = st1 /\ match_cores cd j st1 m1 st2 m2) ->
-at_external CSharpMin_core_sem st1 = Some (e, sig, vals1) ->
+at_external (CSharpMin_core_sem hf) st1 = Some (e, sig, vals1) ->
 Mem.inject j m1 m2 /\
 Events.meminj_preserves_globals ge j /\
 (exists vals2 : list val,
    Forall2 (val_inject j) vals1 vals2 /\
-   at_external CMin_core_sem st2 = Some (e, sig, vals2)).
+   at_external (CMin_core_sem hf) st2 = Some (e, sig, vals2)).
 Proof.
   intros. destruct H; subst.
   inv H1; simpl in *; inv H0.
+  destruct fd; inv H1.
+  inv TR.
+  destruct (observableEF hf e0); inv H0.
   split; trivial.
   split. destruct (match_callstack_match_globalenvs _ _ _ _ _ _ _ MCS) as [hi Hhi].
-              eapply inj_preserves_globals; eassumption.
-  destruct fd; inv H1.
+              eapply inj_preserves_globals. eassumption.
   exists targs.
   split. eapply val_list_inject_forall_inject; eassumption.
-  inv TR.
-  split; trivial.
+  trivial.
 Qed.
 
 Lemma MC_after_external:forall (d : core_data) (j j' : meminj) (st1 : core_data) (st2 : CMin_core)
   (m1 : mem) (e : external_function) (vals1 : list val) (ret1 : val)
   (m1' m2 m2' : mem) (ret2 : val) (sig : signature),
 d = st1 /\ match_cores d j st1 m1 st2 m2 ->
-at_external CSharpMin_core_sem st1 = Some (e, sig, vals1) ->
+at_external (CSharpMin_core_sem hf) st1 = Some (e, sig, vals1) ->
 Events.meminj_preserves_globals ge j ->
 inject_incr j j' ->
 Events.inject_separated j j' m1 m2 ->
@@ -421,8 +425,8 @@ Mem.unchanged_on (Events.loc_out_of_reach j m1) m2 m2' ->
 exists st1' : core_data,
   exists st2' : CMin_core,
     exists d' : core_data,
-      after_external CSharpMin_core_sem (Some ret1) st1 = Some st1' /\
-      after_external CMin_core_sem (Some ret2) st2 = Some st2' /\
+      after_external (CSharpMin_core_sem hf) (Some ret1) st1 = Some st1' /\
+      after_external (CMin_core_sem hf) (Some ret2) st2 = Some st2' /\
       d' = st1' /\ match_cores d' j' st1' m1' st2' m2'. 
 Proof. intros.
   destruct (MC_at_external _ _ _ _ _ _ _ _ _ H H0) 
@@ -430,14 +434,13 @@ Proof. intros.
   destruct H as [X MC]; subst.
   inv MC; simpl in *; inv H0.
   destruct fd; inv H10.
-  destruct tfd; inv AtExt2.
+  inv TR.
+  destruct (observableEF hf e0); inv AtExt2. inv H0.
   exists (CSharpMin_Returnstate ret1 k). eexists. eexists.
     split. reflexivity.
     split. reflexivity.
     split. reflexivity.
-  simpl in *.
   econstructor; try eassumption.
-  clear TR H10.
   destruct k; simpl in *; try contradiction. (*cases k = Kseq and k=Kblock eliminated*)
   (*k=Kstop*) 
       inv MK; simpl in *.   
@@ -494,7 +497,7 @@ Qed.
 
 Lemma MSI_atExt: forall j c1 m1 c2 m2
 (H: match_statesInj prog j (ToState c1 m1) (Cminor_coop.ToState c2 m2) ),
-(CSharpMin_at_external c1 = None) <-> (CMin_at_external c2 = None).
+(CSharpMin_at_external hf c1 = None) <-> (CMin_at_external hf c2 = None).
 Proof.
   intros.
   destruct c1; destruct c2; simpl in *; inv H; simpl in *; trivial.
@@ -505,7 +508,7 @@ Proof.
      inv ZZ2.
      inv TR.
      inv TR.
-     split; intros; inv H.
+     destruct (observableEF hf e0). split; intros; inv H. intuition.
     intuition. 
 Qed.
 
@@ -528,7 +531,7 @@ forall cenv sz f tfn j m tm  e lenv te sp lo hi cs s k tk xenv
 (*NEW:*) (PG: meminj_preserves_globals ge j),
 exists c2' : CMin_core,
   exists m2' : mem,
-        corestep_plus CMin_core_sem tge (CMin_State tfn Sskip tk (Vptr sp Int.zero) te) tm c2' m2' /\
+        corestep_plus (CMin_core_sem hf) tge (CMin_State tfn Sskip tk (Vptr sp Int.zero) te) tm c2' m2' /\
         match_cores (CSharpMin_State f s k e lenv) j (CSharpMin_State f s k e lenv) m c2' m2'.
 (*   exists c' : CSharpMin_core,
         inj_match_states_star unit match_cores MC_measure (tt,c') j (CSharpMin_State f s k e lenv) m c2' m2'.*)
@@ -568,7 +571,7 @@ forall cenv sz f tfn j m tm e lenv te sp lo hi cs k tk xenv
 (*NEW:*) (PG: meminj_preserves_globals ge j),
 exists c2' : CMin_core,
   exists m2' : mem,
-        corestep_plus CMin_core_sem tge (CMin_State tfn Sskip tk (Vptr sp Int.zero) te) tm c2' m2' /\
+        corestep_plus (CMin_core_sem hf) tge (CMin_State tfn Sskip tk (Vptr sp Int.zero) te) tm c2' m2' /\
          match_cores  (CSharpMin_State f Csharpminor.Sskip k e lenv)   j (CSharpMin_State f Csharpminor.Sskip k e lenv) m c2' m2'
 (*exists c' : CSharpMin_core,
         inj_match_states_star unit match_cores MC_measure (tt,c') j (CSharpMin_State f Csharpminor.Sskip k e le) m c2' m2'*).
@@ -596,7 +599,7 @@ Lemma MS_match_is_call_cont:
   match_cont k tk cenv xenv cs ->
   Csharpminor.is_call_cont k ->
   exists tk',
-    corestep_star CMin_core_sem tge (CMin_State tfn Sskip tk sp te) tm
+    corestep_star (CMin_core_sem hf) tge (CMin_State tfn Sskip tk sp te) tm
                 (CMin_State tfn Sskip tk' sp te) tm
     /\ is_call_cont tk'
     /\ match_cont k tk' cenv nil cs.
@@ -623,7 +626,7 @@ Lemma MS_step_case_SkipCall:
 (*NEW:*) (PG: meminj_preserves_globals ge j),
 exists c2' : CMin_core,
   exists m2' : mem,
-        corestep_plus CMin_core_sem tge (CMin_State  tfn Sskip tk (Vptr sp Int.zero) te) tm c2' m2' /\
+        corestep_plus (CMin_core_sem hf) tge (CMin_State  tfn Sskip tk (Vptr sp Int.zero) te) tm c2' m2' /\
          match_cores  (CSharpMin_Returnstate Vundef k)  j (CSharpMin_Returnstate Vundef k) m' c2' m2'.
 (*exists c' : CSharpMin_core,
        inj_match_states_star unit match_cores MC_measure (tt,c') j 
@@ -653,7 +656,7 @@ forall cenv sz f tfn j m tm e lenv te sp lo hi cs k tk xenv  x a x0 v id
 (*NEW:*) (PG: meminj_preserves_globals ge j),
 exists c2' : CMin_core,
   exists m2' : mem,
-    corestep_plus CMin_core_sem tge
+    corestep_plus (CMin_core_sem hf) tge
      (CMin_State tfn (Sassign id x) tk (Vptr sp Int.zero) te) tm c2' m2' /\
    match_cores
      (CSharpMin_State f Csharpminor.Sskip k e (PTree.set id v lenv)) j
@@ -717,7 +720,7 @@ Lemma make_store_correct:
   val_inject f vaddr tvaddr ->
   val_inject f vrhs tvrhs ->
   exists tm', exists tvrhs',
-  corestep CMin_core_sem tge (CMin_State fn (make_store chunk addr rhs) k sp te) tm
+  corestep (CMin_core_sem hf) tge (CMin_State fn (make_store chunk addr rhs) k sp te) tm
         (CMin_State fn Sskip k sp te) tm'
   /\ Mem.storev chunk tm tvaddr tvrhs' = Some tm'
   /\ Mem.inject f m' tm'.
@@ -748,7 +751,7 @@ forall cenv sz f tfn j m tm e lenv te sp lo hi cs k tk xenv x x0 x1 x2
 (*NEW:*) (PG: meminj_preserves_globals ge j),
 exists c2' : CMin_core,
   exists m2' : mem,
-        corestep_plus CMin_core_sem tge (CMin_State  tfn (make_store chunk x x1) tk (Vptr sp Int.zero) te) tm c2' m2' /\
+        corestep_plus (CMin_core_sem hf) tge (CMin_State  tfn (make_store chunk x x1) tk (Vptr sp Int.zero) te) tm c2' m2' /\
         match_cores (CSharpMin_State f Csharpminor.Sskip k e lenv) j 
                       (CSharpMin_State f Csharpminor.Sskip k e lenv) m' c2' m2' .
 (* exists c' : CSharpMin_core,
@@ -788,7 +791,7 @@ forall cenv sz f tfn j m tm e lenv te sp lo hi cs k tk xenv  x x0 x1 a vf fd opt
 (*NEW:*) (PG: meminj_preserves_globals ge j),
 exists c2' : CMin_core,
   exists m2' : mem,
-        corestep_plus CMin_core_sem tge 
+        corestep_plus (CMin_core_sem hf) tge 
              (CMin_State  tfn (Scall optid (Csharpminor.funsig fd) x x1)  k (Vptr sp Int.zero) te) tm c2' m2' /\
        match_cores (CSharpMin_Callstate fd vargs (Csharpminor.Kcall optid f e lenv tk))  j
               (CSharpMin_Callstate fd vargs (Csharpminor.Kcall optid f e lenv tk)) m c2' m2'.
@@ -883,7 +886,7 @@ forall cenv sz f tfn j m tm e lenv te sp lo hi cs k tk xenv x x0 x1 x2 b v a s1 
 (*NEW:*) (PG: meminj_preserves_globals ge j),
 exists c2' : CMin_core,
   exists m2' : mem,
-        corestep_plus CMin_core_sem tge
+        corestep_plus (CMin_core_sem hf) tge
              (CMin_State tfn (Sifthenelse x x1 x2) tk (Vptr sp Int.zero) te) tm c2' m2' /\
         match_cores  (CSharpMin_State f (if b then s1 else s2) k e lenv)  j
              (CSharpMin_State f (if b then s1 else s2) k e lenv) m c2' m2'.
@@ -913,7 +916,7 @@ forall cenv sz f tfn j m tm e lenv te sp lo hi cs k tk xenv x s
 (*NEW:*) (PG: meminj_preserves_globals ge j),
 exists c2' : CMin_core,
   exists m2' : mem,
-      corestep_plus CMin_core_sem tge (CMin_State tfn (Sloop x) k (Vptr sp Int.zero) te) tm c2' m2' /\
+      corestep_plus (CMin_core_sem hf) tge (CMin_State tfn (Sloop x) k (Vptr sp Int.zero) te) tm c2' m2' /\
       match_cores  (CSharpMin_State f s (Csharpminor.Kseq (Csharpminor.Sloop s) tk) e lenv)  j
           (CSharpMin_State f s (Csharpminor.Kseq (Csharpminor.Sloop s) tk) e lenv) m c2' m2'. 
 (*    exists c',   inj_match_states_star unit match_cores MC_measure (tt,c') j
@@ -940,7 +943,7 @@ forall cenv sz f tfn j m tm e lenv te sp lo hi cs k tk xenv x s
 (*NEW:*) (PG: meminj_preserves_globals ge j),
 exists c2' : CMin_core,
   exists m2' : mem,
-        corestep_plus CMin_core_sem tge (CMin_State tfn (Sblock x) k (Vptr sp Int.zero) te) tm c2' m2' /\
+        corestep_plus (CMin_core_sem hf) tge (CMin_State tfn (Sblock x) k (Vptr sp Int.zero) te) tm c2' m2' /\
         match_cores (CSharpMin_State f s (Csharpminor.Kblock tk) e lenv) j 
                     (CSharpMin_State f s (Csharpminor.Kblock tk) e lenv) m c2' m2'.
 (*    exists c' ,
@@ -966,7 +969,7 @@ forall  cenv sz f tfn j m tm e lenv te sp lo hi cs k tk xenv n s
 (*NEW:*) (PG: meminj_preserves_globals ge j),
 exists c2' : CMin_core,
   exists m2' : mem,
-        corestep_plus CMin_core_sem tge
+        corestep_plus (CMin_core_sem hf) tge
                (CMin_State tfn (Sexit (shift_exit xenv n)) k (Vptr sp Int.zero) te) tm c2' m2'  /\
         match_cores (CSharpMin_State f (Csharpminor.Sexit n) tk e lenv) j
                                (CSharpMin_State f (Csharpminor.Sexit n) tk e lenv) m c2' m2'.
@@ -1007,7 +1010,7 @@ forall  cenv sz f tfn j m tm e lenv te sp lo hi cs k tk xenv
 (*NEW:*) (PG: meminj_preserves_globals ge j),
 exists c2' : CMin_core,
   exists m2' : mem,
-   corestep_plus CMin_core_sem tge 
+   corestep_plus (CMin_core_sem hf) tge 
      (CMin_State tfn (Sexit (shift_exit xenv 0)) k (Vptr sp Int.zero) te) tm c2' m2' /\
    match_cores  (CSharpMin_State f Csharpminor.Sskip tk e lenv) j
                               (CSharpMin_State f Csharpminor.Sskip tk e lenv) m c2' m2'.
@@ -1040,7 +1043,7 @@ forall  cenv sz f tfn j m tm e lenv te sp lo hi cs k tk xenv n
 (*NEW:*) (PG: meminj_preserves_globals ge j),
 exists c2' : CMin_core,
   exists m2' : mem,
-        corestep_plus CMin_core_sem tge
+        corestep_plus (CMin_core_sem hf) tge
           (CMin_State tfn (Sexit (shift_exit xenv (S n))) k (Vptr sp Int.zero) te) tm c2' m2' /\ 
        match_cores (CSharpMin_State f (Csharpminor.Sexit n) tk e lenv)  j
           (CSharpMin_State f (Csharpminor.Sexit n) tk e lenv) m c2' m2'.
@@ -1066,7 +1069,7 @@ Lemma MS_switch_descent:
   exists k',
   transl_lblstmt_cont cenv xenv ls k k'
   /\ (forall f sp e m,
-      corestep_plus CMin_core_sem tge (CMin_State f s k sp e) m (CMin_State f body k' sp e) m).
+      corestep_plus (CMin_core_sem hf) tge (CMin_State f s k sp e) m (CMin_State f body k' sp e) m).
 Proof.
   induction ls; intros.
 (*1*) 
@@ -1092,7 +1095,7 @@ Lemma MS_switch_ascent:
   let ls' := select_switch n ls in
   transl_lblstmt_cont cenv xenv ls k k1 ->
   exists k2,
-  corestep_star CMin_core_sem tge 
+  corestep_star (CMin_core_sem hf) tge 
     (CMin_State f (Sexit (Switch.switch_target n (length tbl) tbl)) k1 sp e) m  
     (CMin_State f (Sexit O) k2 sp e) m
   /\ transl_lblstmt_cont cenv xenv ls' k k2.
@@ -1129,7 +1132,7 @@ Lemma MS_switch_MSI:
     (MK: match_cont k tk cenv xenv cs)
     (TK: transl_lblstmt_cont cenv xenv ls tk tk'),
   exists S, exists mm,
-  corestep_plus CMin_core_sem tge (CMin_State tfn (Sexit O) tk' (Vptr sp Int.zero) te) tm S mm
+  corestep_plus (CMin_core_sem hf) tge (CMin_State tfn (Sexit O) tk' (Vptr sp Int.zero) te) tm S mm
   /\ match_statesInj prog j (Csharpminor.State fn (seq_of_lbl_stmt ls) k e lenv m) (Cminor_coop.ToState S mm).
 Proof.
   intros. destruct ls; simpl.
@@ -1164,7 +1167,7 @@ forall cenv sz f tfn j m tm e lenv te sp lo hi cs k tk xenv a x x0 ts cases n
 (*NEW:*) (PG: meminj_preserves_globals ge j),
 exists c2' : CMin_core,
   exists m2' : mem,
-          corestep_plus CMin_core_sem tge (CMin_State tfn ts tk (Vptr sp Int.zero) te) tm c2' m2' /\
+          corestep_plus (CMin_core_sem hf) tge (CMin_State tfn ts tk (Vptr sp Int.zero) te) tm c2' m2' /\
          match_cores (CSharpMin_State f (seq_of_lbl_stmt (select_switch n cases)) k e lenv)  j
                                (CSharpMin_State f (seq_of_lbl_stmt (select_switch n cases)) k e lenv) m c2' m2'.
 Proof. intros.
@@ -1197,7 +1200,7 @@ forall cenv sz f tfn j m tm e lenv te sp lo hi cs k tk xenv m'
 (*NEW:*) (PG: meminj_preserves_globals ge j),
 exists c2' : CMin_core,
   exists m2' : mem,
-        corestep_plus CMin_core_sem tge (CMin_State tfn (Sreturn None) k (Vptr sp Int.zero) te) tm c2' m2'  /\
+        corestep_plus (CMin_core_sem hf) tge (CMin_State tfn (Sreturn None) k (Vptr sp Int.zero) te) tm c2' m2'  /\
        match_cores (CSharpMin_Returnstate Vundef (Csharpminor.call_cont tk))  j
                              (CSharpMin_Returnstate Vundef (Csharpminor.call_cont tk)) m' c2' m2'.
 Proof. intros.
@@ -1221,7 +1224,7 @@ forall cenv sz f tfn j m tm e lenv te sp lo hi cs k tk xenv a x x0 m' v
 (*NEW:*) (PG: meminj_preserves_globals ge j),
 exists c2' : CMin_core,
   exists m2' : mem,
-        corestep_plus CMin_core_sem tge (CMin_State tfn (Sreturn (Some x)) k (Vptr sp Int.zero) te) tm c2' m2' /\
+        corestep_plus (CMin_core_sem hf) tge (CMin_State tfn (Sreturn (Some x)) k (Vptr sp Int.zero) te) tm c2' m2' /\
         match_cores  (CSharpMin_Returnstate v (Csharpminor.call_cont tk)) j
                  (CSharpMin_Returnstate v (Csharpminor.call_cont tk)) m' c2' m2'.
 Proof. intros.
@@ -1244,7 +1247,7 @@ forall cenv sz f tfn j m tm e lenv te sp lo hi cs k tk xenv lbl x s
 (*NEW:*) (PG: meminj_preserves_globals ge j),
 exists c2' : CMin_core,
   exists m2' : mem,
-       corestep_plus CMin_core_sem tge (CMin_State tfn (Slabel lbl x) tk (Vptr sp Int.zero) te) tm c2' m2' /\ 
+       corestep_plus (CMin_core_sem hf) tge (CMin_State tfn (Slabel lbl x) tk (Vptr sp Int.zero) te) tm c2' m2' /\ 
       match_cores (CSharpMin_State f s k e lenv)  j (CSharpMin_State f s k e lenv) m c2' m2'.
 Proof. intros.
   eexists; eexists; split.
@@ -1265,7 +1268,7 @@ forall cenv sz f tfn j m tm e lenv te sp lo hi cs k tk xenv lbl s' k'
 (*NEW:*) (PG: meminj_preserves_globals ge j),
 exists c2' : CMin_core,
   exists m2' : mem,
-       corestep_plus CMin_core_sem tge (CMin_State tfn (Sgoto lbl) tk (Vptr sp Int.zero) te) tm c2' m2' /\
+       corestep_plus (CMin_core_sem hf) tge (CMin_State tfn (Sgoto lbl) tk (Vptr sp Int.zero) te) tm c2' m2' /\
        match_cores  (CSharpMin_State f s' k' e lenv) j (CSharpMin_State f s' k' e lenv) m c2' m2'.
 Proof. intros.
   exploit transl_find_label_body; eauto. 
@@ -1516,7 +1519,7 @@ forall cenv  f j m tm e cs k tk vargs targs x m1 lenv
 (EQ : transl_function f = OK x)
 (*NEW:*) (PG: meminj_preserves_globals ge j),
 exists (c2' : CMin_core) (m2' : mem),
-  corestep_plus CMin_core_sem tge (CMin_Callstate (AST.Internal x) targs tk) tm c2' m2'
+  corestep_plus (CMin_core_sem hf) tge (CMin_Callstate (AST.Internal x) targs tk) tm c2' m2'
  /\ exists (j' : meminj),
   inject_incr j j' /\
   inject_separated j j' m tm /\
@@ -1564,7 +1567,7 @@ forall j m tm cs f e lenv k tk cenv v tv optid
 (*NEW:*) (PG: meminj_preserves_globals ge j),
 exists c2' : CMin_core,
   exists m2' : mem,
-       corestep_plus CMin_core_sem tge (CMin_Returnstate tv tk) tm c2' m2'  /\
+       corestep_plus (CMin_core_sem hf) tge (CMin_Returnstate tv tk) tm c2' m2'  /\
        match_cores  (CSharpMin_State f Csharpminor.Sskip k e (set_optvar optid v lenv)) j
              (CSharpMin_State f Csharpminor.Sskip k e (set_optvar optid v lenv)) m c2' m2' .
 Proof. intros.

@@ -16,11 +16,7 @@ Require Import core_semantics.
 Require Import val_casted.
 Require Import effect_semantics. (*for EmptyEffect*)
 Require Import BuiltinEffects.
-(*
-Section CMINSEL_COOP.
 
-Variable hf : I64Helpers.helper_functions.
-*)
 Fixpoint silent hf (ge:genv) (a:expr) := 
   match a with 
     Eop _ al => silentExprList hf ge al
@@ -28,7 +24,7 @@ Fixpoint silent hf (ge:genv) (a:expr) :=
   | Econdition con a1 a2 => silentCondExpr hf ge con 
        /\ silent hf ge a1 /\ silent hf ge a2
   | Elet a1 a2 => silent hf ge a1 /\ silent hf ge a2
-  | Ebuiltin ef al => observableEF hf ef = false 
+  | Ebuiltin ef al => (*observableEF hf ef = false *) EFisHelper hf ef = true
        /\ silentExprList hf ge al
        /\ (forall args m, BuiltinEffect ge ef args m = EmptyEffect)
   | Eexternal x sg al => silentExprList hf ge al /\
@@ -36,7 +32,8 @@ Fixpoint silent hf (ge:genv) (a:expr) :=
           None => True
         | Some b =>
             match Genv.find_funct_ptr ge b with
-              Some (External ef) => observableEF hf ef = false
+              Some (External ef) => (*observableEF hf ef = false*)
+                           EFisHelper hf ef = true
                 /\ (forall args m, BuiltinEffect ge ef args m = EmptyEffect)
             | _ => True
             end

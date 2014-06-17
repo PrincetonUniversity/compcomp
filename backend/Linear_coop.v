@@ -186,7 +186,8 @@ Inductive Linear_step (ge:genv): Linear_core -> mem -> Linear_core -> mem -> Pro
 
   | lin_exec_function_external:
       forall s ef args res rs1 rs2 m t m' lf
-      (OBS: observableEF hf ef = false),
+(*     (OBS: observableEF hf ef = false),*)
+      (OBS: EFisHelper hf ef = true),
       args = map rs1 (loc_arguments (ef_sig ef)) ->
       external_call' ef ge args m t res m' ->
       rs2 = Locmap.setlist (map R (loc_result (ef_sig ef))) res rs1 ->
@@ -308,7 +309,10 @@ Definition Linear_after_external (vret: option val) (c: Linear_core) : option Li
 Lemma Linear_corestep_not_at_external ge m q m' q':
       Linear_step ge q m q' m' -> Linear_at_external q = None.
   Proof. intros. inv H; try reflexivity. 
-    simpl. rewrite OBS. trivial. Qed.
+  simpl. unfold observableEF. unfold EFisHelper in OBS.  
+  destruct ef; try inv OBS. 
+  rewrite H0. trivial. rewrite H0. trivial.  
+Qed.
 
 Lemma Linear_corestep_not_halted ge m q m' q' :
        Linear_step ge q m q' m' -> Linear_halted q = None.

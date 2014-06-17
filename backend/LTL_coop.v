@@ -160,7 +160,8 @@ Inductive ltl_corestep (ge:genv): LTL_core -> mem -> LTL_core -> mem -> Prop :=
         (LTL_State s f (Vptr sp Int.zero) f.(fn_entrypoint) rs') m'
 
   | ltl_exec_function_external: forall s ef t args res rs m rs' m'
-      (OBS: observableEF hf ef = false),
+      (*(OBS: observableEF hf ef = false),*)
+      (OBS: EFisHelper hf ef = true),
       args = map rs (loc_arguments (ef_sig ef)) ->
       external_call' ef ge args m t res m' ->
       rs' = Locmap.setlist (map R (loc_result (ef_sig ef))) res rs ->
@@ -174,7 +175,10 @@ Inductive ltl_corestep (ge:genv): LTL_core -> mem -> LTL_core -> mem -> Prop :=
 Lemma LTL_corestep_not_at_external ge m q m' q':
       ltl_corestep ge q m q' m' -> LTL_at_external q = None.
   Proof. intros. inv H; try reflexivity. simpl in *. 
-    rewrite OBS. trivial. Qed.
+  simpl. unfold observableEF. unfold EFisHelper in OBS.  
+  destruct ef; try inv OBS. 
+  rewrite H0. trivial. rewrite H0. trivial.  
+Qed.
 
 Definition LTL_halted (q : LTL_core): option val :=
     match q with 

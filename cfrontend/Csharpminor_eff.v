@@ -28,6 +28,9 @@ Proof. intros L.
     eassumption.
   eapply alloc_forward; eassumption.
 Qed.
+
+Section CSHARPMINOR_EFF.
+Variable hf : I64Helpers.helper_functions.
   
 Inductive csharpmin_effstep (g: Csharpminor.genv):  (block -> Z -> bool) ->
             CSharpMin_core -> mem -> CSharpMin_core -> mem -> Prop :=
@@ -68,7 +71,7 @@ Inductive csharpmin_effstep (g: Csharpminor.genv):  (block -> Z -> bool) ->
   | csharpmin_effstep_builtin: forall f optid ef bl k e le m vargs t vres m',
       eval_exprlist g e le m bl vargs ->
       external_call ef g vargs m t vres m' ->
-      observableEF ef = false ->
+      observableEF hf ef = false ->
       csharpmin_effstep g (BuiltinEffect g ef vargs m)
          (CSharpMin_State f (Sbuiltin optid ef bl) k e le) m
          (CSharpMin_State f Sskip k e (Cminor.set_optvar optid vres le)) m'
@@ -134,7 +137,8 @@ Inductive csharpmin_effstep (g: Csharpminor.genv):  (block -> Z -> bool) ->
       csharpmin_effstep g EmptyEffect 
         (CSharpMin_Callstate (Internal f) vargs k) m
         (CSharpMin_State f f.(fn_body) k e le) m1
-(* no external call
+
+(*All external calls in this language at handled by atExternal
   | csharpmin_effstep_external_function: forall ef vargs k m t vres m',
       external_call ef g vargs m t vres m' ->
       csharpmin_effstep g EmptyEffect (CSharpMin_Callstate (External ef) vargs k) m
@@ -143,16 +147,10 @@ Inductive csharpmin_effstep (g: Csharpminor.genv):  (block -> Z -> bool) ->
   | csharpmin_effstep_return: forall v optid f e le k m,
       csharpmin_effstep g EmptyEffect (CSharpMin_Returnstate v (Kcall optid f e le k)) m
         (CSharpMin_State f Sskip k e (Cminor.set_optvar optid v le)) m.
-(*
-  | csharpmin_effstep_sub_val: forall E EE c m c' m',
-      (forall b ofs, Mem.valid_block m b ->
-                     E b ofs = true -> EE b ofs = true) ->
-      csharpmin_effstep g E c m c' m' ->
-      csharpmin_effstep g EE c m c' m'*)
 
 Lemma csharpminstep_effax1: forall (M : block -> Z -> bool) g c m c' m'
       (H: csharpmin_effstep g M c m c' m'),
-       corestep csharpmin_coop_sem g c m c' m' /\
+       corestep (csharpmin_coop_sem hf) g c m c' m' /\
        Mem.unchanged_on (fun (b : block) (ofs : Z) => M b ofs = false) m m'.
 Proof. 
 intros.
@@ -212,7 +210,7 @@ intros.
 Qed.
 
 Lemma csharpminstep_effax2: forall  g c m c' m',
-      corestep csharpmin_coop_sem g c m c' m' ->
+      corestep (csharpmin_coop_sem hf) g c m c' m' ->
       exists M, csharpmin_effstep g M c m c' m'.
 Proof.
 intros. inv H.
@@ -262,9 +260,11 @@ Qed.
  
 Program Definition csharpmin_eff_sem : 
   @EffectSem Csharpminor.genv CSharpMin_core.
-eapply Build_EffectSem with (sem := csharpmin_coop_sem)(effstep:=csharpmin_effstep).
+eapply Build_EffectSem with (sem := csharpmin_coop_sem hf)
+       (effstep:=csharpmin_effstep).
 apply csharpminstep_effax1.
 apply csharpminstep_effax2. 
 apply csharpmin_effstep_valid. 
-(*csharpmin_effstep_sub_val. *)
 Defined.
+
+End CSHARPMINOR_EFF.

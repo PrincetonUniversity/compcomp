@@ -40,6 +40,7 @@ Require Import CminorSel_coop.
 Require Import CminorSel_eff.
 Require Import Floats.
 
+Require Import I64Helpers.
 (*Require Import Selectionproof.*)
 
 Open Local Scope cminorsel_scope.
@@ -62,6 +63,7 @@ Proof.
   EvalOp.
 Qed.
 *)
+
 Section SILENT.
 
 (*NEW*) Variable hf : I64Helpers.helper_functions.
@@ -205,14 +207,6 @@ Proof. intros; unfold lift.
   apply silent_lift_expr; trivial. 
 Qed.  
 
-Require Import I64Helpers.
-
-Lemma obs_ef name sg : is_I64_helperP hf name sg ->
-    observableEF hf (EF_builtin name sg) = false.
-Proof. intros. unfold observableEF. 
-  apply is64helper_char in H.
-  rewrite H; trivial. Qed.
-
 Lemma silent_mull_base ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
       silent hf ge (mull_base hf e1 e2).
 Proof. intros.
@@ -222,7 +216,8 @@ Proof. intros.
     destruct H as [? [? _]].
     destruct H0 as [? [? _]]. 
     repeat split; eauto. 
-     apply obs_ef. econstructor. 
+     simpl. eapply is64helper_char. constructor.
+     (*apply obs_ef. econstructor. *)
      apply silent_add; simpl. 
                 apply silent_add; simpl; auto.
                 apply silent_mul; simpl; auto. 
@@ -233,7 +228,8 @@ Proof. intros.
                 apply silent_lift; trivial. 
     destruct H as [? [? _]].
       repeat split; eauto.
-      apply obs_ef. econstructor. 
+     simpl. eapply is64helper_char. constructor.
+     (*apply obs_ef. econstructor. *)
       apply silent_lift; trivial. 
       apply silent_add; simpl. 
       apply silent_add. split; eauto. simpl. trivial. 
@@ -248,7 +244,8 @@ Proof. intros.
         split; trivial.
     destruct H0 as [? [? _]].
       repeat split; eauto.
-      apply obs_ef. econstructor. 
+     simpl. eapply is64helper_char. constructor.
+     (*apply obs_ef. econstructor. *)
       apply silent_lift; trivial. 
       apply silent_add; simpl. 
       apply silent_add. split; eauto. simpl. trivial. 
@@ -260,8 +257,9 @@ Proof. intros.
                 apply silent_lift; trivial. 
                 apply silent_lift; trivial. 
     repeat split; eauto. 
-      apply silent_lift; trivial.       
-      apply obs_ef. econstructor. 
+      apply silent_lift; trivial. 
+     simpl. eapply is64helper_char. constructor.
+     (*apply obs_ef. econstructor. *)   
 Qed. 
 
 Lemma silent_divsmul ge z1 z2: silent hf ge (divs_mul z1 z2).
@@ -467,15 +465,19 @@ Proof. intros. unfold addl.
   destruct (is_longconst e1); simpl in *. 
     destruct (is_longconst e2); simpl in *. repeat split; trivial.
     destruct (Int64.eq i Int64.zero); trivial.
-    split. eapply obs_ef. constructor. 
+    split. simpl.  eapply is64helper_char. constructor.
+       (*apply obs_ef. econstructor. *)
     split. simpl. repeat split; trivial. 
     intros. simpl. reflexivity. 
   destruct (is_longconst e2).
     destruct (Int64.eq i Int64.zero); trivial.
-    split. eapply obs_ef. constructor. 
+    split.  eapply is64helper_char. constructor.
+       (*apply obs_ef. econstructor. *)
+      (*destruct ef; try inv H. *)
     split. simpl. repeat split; trivial. 
     intros. simpl. reflexivity.
-  split. eapply obs_ef. constructor. 
+  split. eapply is64helper_char. constructor.
+       (*apply obs_ef. econstructor. *)
     split. simpl. repeat split; trivial. 
     intros. simpl. reflexivity. 
 Qed.
@@ -484,7 +486,8 @@ Lemma silent_negl ge: forall e, silent hf ge e ->
       silent hf ge (negl hf e).
 Proof. intros. unfold negl.
   destruct (is_longconst e). repeat split; trivial.
-    split. eapply obs_ef. constructor. 
+    split. eapply is64helper_char. constructor.
+       (*apply obs_ef. econstructor. *)
     split. simpl. repeat split; trivial. 
     intros. simpl. reflexivity.
 Qed.
@@ -496,15 +499,18 @@ Proof. intros. unfold subl.
     destruct (is_longconst e2); repeat split; trivial.
     destruct (Int64.eq i Int64.zero); trivial.
     apply silent_negl; auto. 
-    split. eapply obs_ef. constructor. 
+    split. eapply is64helper_char. constructor.
+       (*apply obs_ef. econstructor. *)
     split. simpl. repeat split; trivial. 
     intros. simpl. reflexivity.
   destruct (is_longconst e2).
     destruct (Int64.eq i Int64.zero). repeat split; trivial.
-    split. eapply obs_ef. constructor. 
+    split. eapply is64helper_char. constructor.
+       (*apply obs_ef. econstructor. *) 
     split. simpl. repeat split; trivial. 
     intros. simpl. reflexivity.
-  split. eapply obs_ef. constructor. 
+  split. eapply is64helper_char. constructor.
+       (*apply obs_ef. econstructor. *)
     split. simpl. repeat split; trivial. 
     intros. simpl. reflexivity.
 Qed.
@@ -534,14 +540,16 @@ Proof. intros. unfold divl, binop_long.
     destruct (is_longconst e2); simpl in *. repeat split; trivial.
     split. repeat split; trivial. 
     unfold fundef. rewrite FOUND, PTR. split. trivial. 
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE.
-      intros. specialize (EXE m). inv EXE.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
     split. repeat split; trivial.
     unfold fundef. rewrite FOUND, PTR. split. trivial.
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE.
-      intros. specialize (EXE m). inv EXE.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 Qed.
 
 Lemma silent_lowlong ge: forall e, silent hf ge e ->
@@ -570,9 +578,10 @@ Proof. intros. unfold shllimm.
    destruct (IMPL Vundef Vundef)
      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
    unfold fundef; rewrite FOUND, PTR. split. trivial.
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE.
-      intros. specialize (EXE m). inv EXE.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 Qed.
 
 Lemma silent_mullimm ge (HC: i64_helpers_correct ge hf) n e:
@@ -626,9 +635,10 @@ Proof. intros. unfold shrlimm.
     destruct (IMPL Vundef Vundef)
       as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
     unfold fundef; rewrite FOUND, PTR.  split. trivial.
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE.
-      intros. specialize (EXE m). inv EXE.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 Qed.
 
 Lemma silent_shrluimm ge (HC: i64_helpers_correct ge hf) n e:
@@ -653,9 +663,10 @@ Proof. intros; unfold shrluimm.
     destruct (IMPL Vundef Vundef)
       as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
     unfold fundef; rewrite FOUND, PTR.  split. trivial.
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE.
-      intros. specialize (EXE m). inv EXE.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 Qed.
 
 Lemma divlu_dummy:
@@ -680,22 +691,25 @@ Proof. intros. unfold divlu.
     repeat split; trivial.
     split. repeat split; trivial.
     unfold fundef; rewrite FOUND, PTR.  split. trivial.
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE.
-      intros. specialize (EXE m). inv EXE.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
   destruct (is_longconst e2); simpl in *. 
     destruct (Int64.is_power2 i); simpl. 
       apply silent_shrluimm; trivial.
     split. repeat split; trivial.
     unfold fundef; rewrite FOUND, PTR.  split. trivial.
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE.
-      intros. specialize (EXE m). inv EXE.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
   split. repeat split; trivial.
     unfold fundef; rewrite FOUND, PTR.  split. trivial.
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE.
-      intros. specialize (EXE m). inv EXE.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 Qed.
 
 Lemma modls_dummy:
@@ -722,14 +736,16 @@ Proof. intros. unfold modl.
     destruct (is_longconst e2); simpl in *; auto.
     split. repeat split; trivial.
     unfold fundef. rewrite FOUND, PTR. split. trivial.
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE.
-      intros. specialize (EXE m). inv EXE.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
   split. repeat split; trivial.
     unfold fundef. rewrite FOUND, PTR. split. trivial.
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE.
-      intros. specialize (EXE m). inv EXE.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 Qed.
 
 Lemma silent_andl ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
@@ -776,22 +792,25 @@ Proof. intros. unfold modlu.
     destruct (is_longconst e2); simpl in *; auto. 
       split. repeat split; trivial.
       unfold fundef. rewrite FOUND, PTR. split. trivial.
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE.
-      intros. specialize (EXE m). inv EXE.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
     destruct (is_longconst e2); simpl in *; auto.   
       destruct (Int64.is_power2 i); simpl in *; auto.
         apply silent_andl; simpl; auto.
         split. repeat split; trivial.
       unfold fundef. rewrite FOUND, PTR. split. trivial.
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE.
-      intros. specialize (EXE m). inv EXE.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
   split. repeat split; trivial.
     unfold fundef. rewrite FOUND, PTR. split. trivial.
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE.
-      intros. specialize (EXE m). inv EXE.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 Qed.
 
 Lemma silent_orl ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
@@ -848,9 +867,10 @@ Proof. intros. unfold shll.
     destruct (IMPL Vundef Vundef)
       as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
     unfold fundef; rewrite FOUND, PTR. split. trivial.
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE.
-      intros. specialize (EXE m). inv EXE.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 Qed. 
 
 Lemma silent_shrl ge (HC:i64_helpers_correct ge hf) e1 e2:
@@ -865,9 +885,10 @@ Proof. intros. unfold shrl.
   destruct (IMPL Vundef Vundef)
       as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
   unfold fundef; rewrite FOUND, PTR.  split. trivial.
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE.
-      intros. specialize (EXE m). inv EXE.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 Qed. 
 
 Lemma silent_shrlu ge (HC:i64_helpers_correct ge hf) e1 e2:
@@ -882,9 +903,10 @@ Proof. intros. unfold shrlu.
   destruct (IMPL Vundef Vundef)
       as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
   unfold fundef; rewrite FOUND, PTR.  split. trivial.
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE.
-      intros. specialize (EXE m). inv EXE.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 Qed.
 
 Lemma silent_compXimm  ge C cc c n e: silent hf ge e ->
@@ -1154,10 +1176,11 @@ destruct longoffloat_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
       as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
 unfold fundef. rewrite FOUND, PTR. split. trivial.
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE. 
-        apply free_has_effect in H3. contradiction. 
-      intros. specialize (EXE m). inv EXE. 
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      simpl in *. inv OBS.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 
 split. split; trivial.
 assert (IMPL:forall x z : val,
@@ -1168,10 +1191,11 @@ destruct longuoffloat_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
       as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
 unfold fundef. rewrite FOUND, PTR. split. trivial.
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE. 
-        apply free_has_effect in H3. contradiction. 
-      intros. specialize (EXE m). inv EXE. 
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      simpl in *.  inv OBS.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 
 split. split; trivial.
 assert (IMPL:forall x z : val,
@@ -1182,10 +1206,11 @@ destruct floatoflong_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
       as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
 unfold fundef. rewrite FOUND, PTR.  split. trivial.
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE. 
-        apply free_has_effect in H3. contradiction. 
-      intros. specialize (EXE m). inv EXE. 
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      simpl in *.  inv OBS.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 
 split. split; trivial.
 assert (IMPL:forall x z : val,
@@ -1196,10 +1221,11 @@ destruct floatoflongu_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
       as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
 unfold fundef. rewrite FOUND, PTR. split. trivial.
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE. 
-        apply free_has_effect in H3. contradiction. 
-      intros. specialize (EXE m). inv EXE. 
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      simpl in *.  inv OBS.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 
 split. split; trivial.
 assert (IMPL:forall x z : val,
@@ -1210,10 +1236,11 @@ destruct singleoflong_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
       as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
 unfold fundef. rewrite FOUND, PTR. split. trivial.
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE. 
-        apply free_has_effect in H3. contradiction. 
-      intros. specialize (EXE m). inv EXE.  
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      simpl in *.  inv OBS.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 
 split. split; trivial.
 assert (IMPL:forall x z : val,
@@ -1224,10 +1251,11 @@ destruct singleoflongu_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
       as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
 unfold fundef. rewrite FOUND, PTR. split. trivial.
-      destruct ef; simpl; try reflexivity.
-      intros. specialize (EXE m). inv EXE. 
-        apply free_has_effect in H3. contradiction. 
-      intros. specialize (EXE m). inv EXE.  
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      eapply EFhelpersE; eassumption. 
+      eapply EFhelpersB; eassumption. 
+      simpl in *.  inv OBS.
+      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 Qed.
 
 Lemma silent_addressing ge ch e a el: silent hf ge e ->

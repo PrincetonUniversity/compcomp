@@ -2277,7 +2277,9 @@ Proof. intros.
      red; intros. apply Conventions1.loc_arguments_rec_charact in H0. 
            destruct l; try contradiction.
            destruct sl; try contradiction. trivial.
-  exploit (inlineable_extern_inject ge tge); try eassumption.
+  exploit (inlineable_extern_inject _ _ GDE_lemma);
+       try eapply ArgsInj; try eapply H; try assumption.
+     eassumption. eapply EFhelpers; eassumption. assumption. 
   intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED 
          [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].  
   eexists; eexists m''.
@@ -3018,7 +3020,9 @@ Proof. intros.
      red; intros. apply Conventions1.loc_arguments_rec_charact in H0. 
            destruct l; try contradiction.
            destruct sl; try contradiction. trivial.
-  exploit (inlineable_extern_inject ge tge); try eassumption.
+  exploit (inlineable_extern_inject _ _ GDE_lemma);
+       try eapply ArgsInj; try eapply H; try assumption.
+     eassumption. eapply EFhelpers; eassumption. assumption. 
   intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED 
          [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].  
   eexists; eexists m''; eexists.

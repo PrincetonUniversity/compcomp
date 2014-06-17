@@ -182,6 +182,41 @@ Definition observableEF (ef: external_function): bool :=
   | _ => true
   end.
 
+Definition EFisHelper ef :=
+match ef with 
+    EF_builtin name sg => I64Helpers.is_I64_helper hf name sg
+  | EF_external name sg => I64Helpers.is_I64_helper hf name sg
+  | _ => false
+end.
+
+Lemma EFhelpers ef: EFisHelper ef = true -> observableEF ef = false.
+Proof. unfold observableEF; intros.
+destruct ef; try inv H.
+rewrite H1; trivial.
+rewrite H1; trivial.
+Qed. 
+
+Lemma EFhelpersE name sg: 
+  observableEF (EF_external name sg) = false ->
+   is_I64_helper hf name sg = true.
+Proof. 
+unfold observableEF. intros.
+rewrite negb_false_iff in H. trivial.
+Qed.
+Lemma EFhelpersB name sg: 
+  observableEF (EF_builtin name sg) = false ->
+   is_I64_helper hf name sg = true.
+Proof. 
+unfold observableEF. intros.
+rewrite negb_false_iff in H. trivial.
+Qed.
+
+Lemma obs_ef name sg : is_I64_helperP hf name sg ->
+    observableEF (EF_builtin name sg) = false.
+Proof. intros. unfold observableEF. 
+  apply is64helper_char in H.
+  rewrite H; trivial. Qed.
+
 Definition helper_injects ef vargs vres : Prop :=
   forall (TF TV:Type) (tge:Genv.t TF TV) (GDE: genvs_domain_eq ge tge) 
        (SymbPres: forall s, Genv.find_symbol tge s = Genv.find_symbol ge s)
@@ -487,7 +522,7 @@ Qed.
   Mem-Unchanged_on condition loc_out_of_reach, rather than
   local_out_of_reach as in external calls.*)
 Lemma inlineable_extern_inject: forall {F V TF TV:Type}
-       (ge:Genv.t (AST.fundef F) V) (tge:Genv.t TF TV) (GDE: genvs_domain_eq ge tge) 
+       (ge:Genv.t F V) (tge:Genv.t TF TV) (GDE: genvs_domain_eq ge tge) 
         hf ef vargs m t vres m1 mu tm vargs'
        (WD: SM_wd mu) (SMV: sm_valid mu m tm) (RC: REACH_closed m (vis mu))
        (OBS: observableEF hf ef = false),
