@@ -208,6 +208,16 @@ Inductive mach_effstep (ge:genv): (block -> Z -> bool) ->
         (Mach_State s fb sp f.(fn_code) rs' (mk_load_frame sp0 args0 tys0)) m3
 
   | Mach_effexec_function_external:
+      forall cs f' rs m t rs' callee args res m' lf
+      (OBS: observableEF hf callee = false),
+      Genv.find_funct_ptr ge f' = Some (External callee) ->
+      external_call' callee ge args m t res m' ->
+      rs' = set_regs (loc_result (ef_sig callee)) res rs ->
+      mach_effstep ge (BuiltinEffect ge callee args m)
+      (Mach_CallstateOut cs f' callee args rs lf) m
+      (Mach_Returnstate cs (sig_res (ef_sig callee)) rs' lf) m'
+(*
+  | Mach_effexec_function_external:
       forall s fb rs m t rs' ef args res m' lf
       (OBS: observableEF hf ef = false),
       Genv.find_funct_ptr ge fb = Some (External ef) ->
@@ -216,14 +226,41 @@ Inductive mach_effstep (ge:genv): (block -> Z -> bool) ->
       rs' = set_regs (loc_result (ef_sig ef)) res rs ->
       mach_effstep ge (BuiltinEffect ge ef args m)
          (Mach_Callstate s fb rs lf) m
-         (Mach_Returnstate s (sig_res (ef_sig ef)) rs' lf) m'
+         (Mach_Returnstate s (sig_res (ef_sig ef)) rs' lf) m'*)
 
   | Mach_effexec_return:
       forall s f sp ra c retty rs m lf,
       mach_effstep ge EmptyEffect 
         (Mach_Returnstate (Stackframe f sp ra c :: s) retty rs lf) m
         (Mach_State s f sp c rs lf) m.
-
+(*Require Import Axioms.
+Lemma BuiltinEffect_decode: forall F V (ge: Genv.t F V) ef args,
+ BuiltinEffect ge ef args =
+ BuiltinEffect ge ef (decode_longs (sig_args (ef_sig ef))
+           args).
+Proof. intros.
+  unfold BuiltinEffect. apply extensionality; intros m. 
+  destruct ef; trivial.
+  unfold free_Effect in *.
+    destruct args; trivial.
+    destruct v; trivial.
+    destruct args; trivial. simpl.
+    remember (Mem.load Mint32 m b (Int.unsigned i - 4)) as d. 
+    destruct d; simpl; trivial.
+    destruct v0; simpl; trivial.
+    apply extensionality; intros bb. 
+    apply extensionality; intros z. 
+    destruct ( zlt 0 (Int.unsigned i0)); simpl. 
+      destruct (zle (Int.unsigned i - 4) z); simpl.
+       destruct (zlt z (Int.unsigned i + Int.unsigned i0)); simpl. 
+       exfalso. specialize (Int.unsigned_range i). intros [A B]. omega.
+Qed.
+         subst.
+         eapply mem_unchanged_on_sub.
+           eapply BuiltinEffect_unchOn. eassumption. 
+         simpl. unfold BuiltinEffect. intros.
+           destruct ef; simpl; trivial. 
+*)
 Lemma machstep_effax1: forall (M : block -> Z -> bool) ge c m c' m',
       mach_effstep ge M c m c' m' ->
       (corestep (Mach_coop_sem hf return_address_offset) ge c m c' m' /\
@@ -305,14 +342,66 @@ intros.
         rewrite PMap.gso; trivial. 
         rewrite PMap.gso; trivial. 
         eapply EmptyEffect_alloc; eassumption. }
-  { split. unfold corestep, coopsem; simpl. econstructor; eassumption.
-         inv H1.
-         eapply mem_unchanged_on_sub.
-           eapply BuiltinEffect_unchOn; eassumption. 
-         simpl. unfold BuiltinEffect. intros.
-           destruct ef; simpl; trivial. 
-          simpl in H0. inv H0. inv H7. trivial.
-          simpl in H0. inv H0. inv H7. inv H8. trivial. }
+  { split. unfold corestep, coopsem; simpl. econstructor; try eassumption.
+    inv H0.
+     destruct callee; simpl in *; try discriminate. 
+      admit. (*ia64: todo*) 
+      admit. (*ia64: todo*)
+      inv H2. destruct args; inv H0.
+      admit. (*holds todo*)
+
+      inv H2. destruct args; inv H0. 
+       split; intros. unfold free_Effect in H0. 
+        destruct (eq_block b0 b); simpl in *. subst b0.
+          destruct args. rewrite H1 in H0. 
+          destruct (eq_block b b); simpl in *. clear e.
+          destruct (zlt 0 (Int.unsigned sz)); simpl in *.
+          destruct (zle (Int.unsigned lo - 4) ofs); simpl in *.
+          destruct (zlt ofs (Int.unsigned lo + Int.unsigned sz)); simpl in *. discriminate.
+          split; intros. eapply Mem.perm_free_1; try eassumption. 
+             right. right. omega.
+          eapply Mem.perm_free_3; try eassumption. 
+          split; intros. eapply Mem.perm_free_1; try eassumption. 
+             right. left. omega. 
+          eapply Mem.perm_free_3; try eassumption. 
+           omega. 
+          split; intros. eapply Mem.perm_free_1; try eassumption. 
+             left. trivial. 
+          eapply Mem.perm_free_3; try eassumption. 
+SearchAbout Mem.free.
+          split; intros.
+      destruct (zlt 0 (Int.unsigned sz)); simpl; trivial.
+      destruct (zle (Int.unsigned i - 4) ofs); simpl; trivial.
+      destruct (zlt ofs (Int.unsigned i + Int.unsigned sz)); simpl; trivial. admit.
+eapply free_Effect_unchOn. 
+       simpl. eapply extcall_free_sem_intro. Search extcall_free_sem. econstructor. SearchAbout free_Effect.
+        remember (type_of_chunk chunk) as toc. 
+        destruct toc; destruct args; inv H4.
+      inv H1.  apply Mem.unchanged_on_refl.
+      split. destruct args; inv H0. 
+        remember (type_of_chunk chunk) as toc. 
+        destruct toc; destruct args; inv H4. apply Mem.unchanged_on_refl. split.  SearchAbout EmptyEffect.
+      apply ; trivial. simpl in *.  inv H2; simpl in *.
+     eapply mem_unchanged_on_sub. 
+     eapply BuiltinEffect_unchOn; try eapply H2. eassumption.
+     unfold BuiltinEffect; simpl. intros.
+     destruct callee; simpl; trivial. simpl in *.
+      destruct args; simpl. trivial.
+      destruct v0; simpl; trivial. simpl in *.
+      destruct args; simpl; trivial. inv H2. rewrite H4.
+      destruct (eq_block b b0); simpl; trivial; subst.
+      destruct (zlt 0 (Int.unsigned sz)); simpl; trivial.
+      destruct (zle (Int.unsigned i - 4) ofs); simpl; trivial.
+      destruct (zlt ofs (Int.unsigned i + Int.unsigned sz)); simpl; trivial. admit.
+    unfold memcpy_Effect. unfold memcpy_Effect in H0. inv H2.
+       destruct args. inv H1. inv H1.
+       destruct args. inv H12. inv H12.
+       destruct args; simpl in *; trivial. 
+      destruct (eq_block b bdst); simpl; trivial; subst.
+      destruct (zle (Int.unsigned odst) ofs); simpl; trivial.
+      destruct (zlt ofs (Int.unsigned odst + sz)); simpl; trivial.
+      destruct (valid_block_dec m bdst); simpl; trivial. exfalso. omega.
+           inv H0. constructor.  }
   split. econstructor; eassumption.
          apply Mem.unchanged_on_refl.
 Qed.

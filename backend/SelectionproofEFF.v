@@ -62,78 +62,85 @@ Proof.
   EvalOp.
 Qed.
 *)
+Section SILENT.
+
+(*NEW*) Variable hf : I64Helpers.helper_functions.
 
 Lemma silent_addimm (ge: Genv.t fundef unit) n: 
-       forall e, silent ge e -> silent ge (addimm n e). 
+       forall e, silent hf ge e -> silent hf ge (addimm n e). 
 Proof. intros e.
   unfold addimm. intros. 
   destruct (Int.eq n Int.zero); simpl; auto. 
   destruct (addimm_match e); simpl; auto. 
 Qed. 
 
-Lemma silent_add ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
-       silent ge (add e1 e2). 
+Lemma silent_add ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
+       silent hf ge (add e1 e2). 
 Proof. intros.
   unfold add. 
   destruct (add_match e1 e2); simpl in *;
-    try eapply silent_addimm; eauto; intuition.
+    try eapply silent_addimm; eauto; intuition;
+  split; trivial; try apply H; try apply H1. 
 Qed.  
 
-Lemma silent_shlimm ge i: forall e, silent ge e ->
-   silent ge (shlimm e i).
+Lemma silent_shlimm ge i: forall e, silent hf ge e ->
+   silent hf ge (shlimm e i).
 Proof. intros. unfold shlimm.
     destruct (Int.eq i Int.zero); simpl; eauto. 
     destruct (shlimm_match e); simpl; auto. 
-      destruct (Int.ltu (Int.add i n1) Int.iwordsize); simpl; auto.      destruct (shift_is_scale i); simpl; auto.
-      destruct (shift_is_scale i); simpl; auto.  
+      destruct (Int.ltu (Int.add i n1) Int.iwordsize); simpl; auto.
+      destruct (shift_is_scale i); simpl; auto.
+    destruct (shift_is_scale i); simpl; auto.  
 Qed.
 
-Lemma silent_splitlong ge f: forall e, silent ge e ->
-    (forall h l, silent ge h -> silent ge l -> silent ge (f h l)) -> 
-   silent ge (splitlong e f).
+Lemma silent_splitlong ge f: forall e, silent hf ge e ->
+    (forall h l, silent hf ge h -> silent hf ge l -> silent hf ge (f h l)) -> 
+   silent hf ge (splitlong e f).
 Proof. intros. unfold splitlong.
-    destruct (splitlong_match e); simpl in *; eauto. 
-    destruct H as [? [? _]]. apply H0; trivial.
-    split; trivial.
-    apply H0; simpl; split; auto.
+    destruct (splitlong_match e); simpl in *; eauto.
+    destruct H as [? [? _]]. 
+    apply H0; simpl; eauto. 
+    split; eauto. apply H0; simpl; eauto.
 Qed.
 
-Lemma silent_shrimm ge i: forall e, silent ge e ->
-   silent ge (shrimm e i).
+Lemma silent_shrimm ge i: forall e, silent hf ge e ->
+   silent hf ge (shrimm e i).
 Proof. intros. unfold shrimm.
-    destruct (Int.eq i Int.zero); simpl; eauto. 
-    destruct (shrimm_match e); simpl; auto. 
-      destruct (Int.ltu (Int.add i n1) Int.iwordsize); simpl; auto.
+    destruct (Int.eq i Int.zero); simpl; intuition. 
+    destruct (shrimm_match e); simpl; eauto.
+    destruct H. 
+      destruct (Int.ltu (Int.add i n1) Int.iwordsize); simpl; repeat split; auto.
 Qed.
 
-Lemma silent_shruimm ge i: forall e, silent ge e ->
-   silent ge (shruimm e i).
+Lemma silent_shruimm ge i: forall e, silent hf ge e ->
+   silent hf ge (shruimm e i).
 Proof. intros. unfold shruimm.
-    destruct (Int.eq i Int.zero); simpl; eauto. 
-    destruct (shruimm_match e); simpl; auto. 
-      destruct (Int.ltu (Int.add i n1) Int.iwordsize); simpl; auto.
+    destruct (Int.eq i Int.zero); simpl; repeat split; eauto. 
+    destruct (shruimm_match e); simpl; repeat split; auto. 
+    destruct H.
+      destruct (Int.ltu (Int.add i n1) Int.iwordsize); simpl; repeat split; auto.
 Qed.
 
-Lemma silent_shrximm ge i: forall e, silent ge e ->
-   silent ge (shrximm e i).
+Lemma silent_shrximm ge i: forall e, silent hf ge e ->
+   silent hf ge (shrximm e i).
 Proof. intros. unfold shrximm.
-    destruct (Int.eq i Int.zero); simpl; eauto. 
+    destruct (Int.eq i Int.zero); simpl; repeat split; eauto. 
 Qed.
 
-Lemma silent_mulimm_base ge n: forall e, silent ge e ->
-      silent ge (mulimm_base n e).
+Lemma silent_mulimm_base ge n: forall e, silent hf ge e ->
+      silent hf ge (mulimm_base n e).
 Proof. intros.
-    unfold mulimm_base. destruct (Int.one_bits n); simpl; auto.
-    destruct l; simpl; auto.
+    unfold mulimm_base. destruct (Int.one_bits n); simpl; eauto.
+    destruct l; simpl; repeat split; auto.
       eapply silent_shlimm; eauto. 
-    destruct l; simpl; auto. split; trivial.
+    destruct l; simpl; split; eauto. 
      eapply silent_add.
-      eapply silent_shlimm; simpl; eauto.
+      eapply silent_shlimm; simpl; eauto. 
       eapply silent_shlimm; simpl; eauto.
 Qed.  
 
-Lemma silent_mulimm ge n: forall e, silent ge e ->
-       silent ge (mulimm n e). 
+Lemma silent_mulimm ge n: forall e, silent hf ge e ->
+       silent hf ge (mulimm n e). 
 Proof. intros e.
   unfold mulimm. intros. 
   destruct (Int.eq n Int.zero); simpl; auto. 
@@ -145,28 +152,28 @@ Proof. intros e.
     eapply silent_mulimm_base; eauto.  
 Qed. 
 
-Lemma silent_mul ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
-       silent ge (mul e1 e2). 
+Lemma silent_mul ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
+       silent hf ge (mul e1 e2). 
 Proof. intros; unfold mul. 
   destruct (mul_match e1 e2); simpl in *;
     try solve [apply silent_mulimm; eauto]. 
    intuition.
 Qed.  
 
-Lemma silent_sub ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
-       silent ge (sub e1 e2). 
+Lemma silent_sub ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
+       silent hf ge (sub e1 e2). 
 Proof. intros; unfold sub. 
   destruct (sub_match e1 e2); simpl in *;
    try solve [apply silent_addimm; simpl in *; intuition].
    auto. 
 Qed.  
 
-Lemma silent_lift_expr ge: forall e p, silent ge e ->
-       silent ge (lift_expr p e)
-with silent_lift_exprlist ge: forall al p, silentExprList ge al ->
-   silentExprList ge (lift_exprlist p al)
-with silent_lift_condexpr ge: forall con p, silentCondExpr ge con ->
-   silentCondExpr ge (lift_condexpr p con).
+Lemma silent_lift_expr ge: forall e p, silent hf ge e ->
+       silent hf ge (lift_expr p e)
+with silent_lift_exprlist ge: forall al p, silentExprList hf ge al ->
+   silentExprList hf ge (lift_exprlist p al)
+with silent_lift_condexpr ge: forall con p, silentCondExpr hf ge con ->
+   silentCondExpr hf ge (lift_condexpr p con).
 Proof.
   induction e; intros; simpl in *; auto.
     destruct H as [HC [HE1 HE2]]. 
@@ -192,24 +199,31 @@ Proof.
     destruct H. split; auto.
 Qed. 
 
-Lemma silent_lift ge: forall e, silent ge e ->
-       silent ge (lift e). 
+Lemma silent_lift ge: forall e, silent hf ge e ->
+       silent hf ge (lift e). 
 Proof. intros; unfold lift.  
   apply silent_lift_expr; trivial. 
 Qed.  
 
-Lemma silent_mull_base ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
-      silent ge (mull_base e1 e2).
-Proof. intros. unfold mull_base.
+Require Import I64Helpers.
+
+Lemma obs_ef name sg : is_I64_helperP hf name sg ->
+    observableEF hf (EF_builtin name sg) = false.
+Proof. intros. unfold observableEF. 
+  apply is64helper_char in H.
+  rewrite H; trivial. Qed.
+
+Lemma silent_mull_base ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (mull_base hf e1 e2).
+Proof. intros.
+  unfold mull_base.
   unfold splitlong2; simpl. 
-  remember (splitlong2_match e1 e2) as s.
-  destruct s; simpl. simpl in *. 
-  clear Heqs. 
-    destruct H as [? [? _]]. destruct H0 as [? [? _]].
-    destruct (ident_eq (i64_mul hf) (i64_mul hf)); simpl. 
-      repeat rewrite orb_true_r. simpl.
-      split. repeat split; auto. 
-      split. apply silent_add; simpl. 
+  destruct (splitlong2_match e1 e2).
+    destruct H as [? [? _]].
+    destruct H0 as [? [? _]]. 
+    repeat split; eauto. 
+     apply obs_ef. econstructor. 
+     apply silent_add; simpl. 
                 apply silent_add; simpl; auto.
                 apply silent_mul; simpl; auto. 
                 apply silent_lift; trivial. 
@@ -217,49 +231,40 @@ Proof. intros. unfold mull_base.
                 apply silent_mul; simpl; auto. 
                 apply silent_lift; trivial. 
                 apply silent_lift; trivial. 
-      repeat split; trivial. 
-    elim n; trivial. 
-  split; trivial. 
-    destruct (ident_eq (i64_mul hf)  (i64_mul hf)); simpl. 
-      repeat rewrite orb_true_r. simpl.
-      simpl in H. destruct H as [HH1 [HL1 _]].
-      split. repeat split; trivial.
-        apply silent_lift; trivial. 
-      split. apply silent_add; simpl. 
-                apply silent_add; simpl; auto.
-                apply silent_mul; simpl; auto. 
+    destruct H as [? [? _]].
+      repeat split; eauto.
+      apply obs_ef. econstructor. 
+      apply silent_lift; trivial. 
+      apply silent_add; simpl. 
+      apply silent_add. split; eauto. simpl. trivial. 
+       simpl; trivial. 
+      apply silent_mul; simpl. 
                 apply silent_lift; trivial. 
                 apply silent_lift; trivial. 
-                apply silent_mul; simpl; auto. 
+        split; trivial.
+      apply silent_mul; simpl. 
                 apply silent_lift; trivial. 
                 apply silent_lift; trivial. 
-      repeat split; trivial. 
-    elim n; trivial. 
-  split; trivial. 
-    destruct (ident_eq (i64_mul hf)  (i64_mul hf)); simpl. 
-      repeat rewrite orb_true_r. simpl.
-      simpl in H0. destruct H0 as [HH2 [HL2 _]].
-      split. repeat split; trivial.
-        apply silent_lift; trivial. 
-      split. apply silent_add; simpl. 
-                apply silent_add; simpl; auto.
-                apply silent_mul; simpl; auto. 
+        split; trivial.
+    destruct H0 as [? [? _]].
+      repeat split; eauto.
+      apply obs_ef. econstructor. 
+      apply silent_lift; trivial. 
+      apply silent_add; simpl. 
+      apply silent_add. split; eauto. simpl. trivial. 
+       simpl; trivial. 
+      apply silent_mul; simpl. split; trivial.
                 apply silent_lift; trivial. 
                 apply silent_lift; trivial. 
-                apply silent_mul; simpl; auto. 
+      apply silent_mul; simpl. split; trivial.
                 apply silent_lift; trivial. 
                 apply silent_lift; trivial. 
-      repeat split; trivial. 
-    elim n; trivial.
-  split; trivial. 
-    split. apply silent_lift; trivial.
-    destruct (ident_eq (i64_mul hf)  (i64_mul hf)); simpl. 
-      repeat rewrite orb_true_r. simpl.
-      repeat split; trivial.
-    elim n; trivial.  
+    repeat split; eauto. 
+      apply silent_lift; trivial.       
+      apply obs_ef. econstructor. 
 Qed. 
 
-Lemma silent_divsmul ge z1 z2: silent ge (divs_mul z1 z2).
+Lemma silent_divsmul ge z1 z2: silent hf ge (divs_mul z1 z2).
 Proof.
      unfold divs_mul. apply silent_add.
      apply silent_shrimm.
@@ -267,13 +272,13 @@ Proof.
      apply silent_shruimm; simpl; eauto.
 Qed.
 
-Lemma silent_divumul ge z1 z2: silent ge (divu_mul z1 z2).
+Lemma silent_divumul ge z1 z2: silent hf ge (divu_mul z1 z2).
 Proof.
      unfold divu_mul. apply silent_shruimm. simpl. auto.
 Qed.
 
-Lemma silent_divsimm ge n: forall e, silent ge e ->
-      silent ge (divsimm e n).
+Lemma silent_divsimm ge n: forall e, silent hf ge e ->
+      silent hf ge (divsimm e n).
 Proof. intros. unfold divsimm.
   destruct (Int.is_power2 n); simpl.
     destruct (Int.ltu i (Int.repr 31)); simpl. 
@@ -285,8 +290,8 @@ Proof. intros. unfold divsimm.
    repeat split; auto.  
 Qed.
 
-Lemma silent_modsimm ge n: forall e, silent ge e ->
-      silent ge (modsimm e n).
+Lemma silent_modsimm ge n: forall e, silent hf ge e ->
+      silent hf ge (modsimm e n).
 Proof. intros. unfold modsimm.
   destruct (Int.is_power2 n); simpl.
     destruct (Int.ltu i (Int.repr 31)); simpl. 
@@ -300,8 +305,8 @@ Proof. intros. unfold modsimm.
    repeat split; auto.  
 Qed.
 
-Lemma silent_andimm ge n: forall e, silent ge e ->
-      silent ge (andimm n e).
+Lemma silent_andimm ge n: forall e, silent hf ge e ->
+      silent hf ge (andimm n e).
 Proof. intros. unfold andimm.
   destruct (Int.eq n Int.zero); simpl. trivial. 
   destruct (Int.eq n Int.mone); simpl; trivial. 
@@ -309,8 +314,8 @@ Proof. intros. unfold andimm.
   split; trivial. 
 Qed.
 
-Lemma silent_orimm ge n: forall e, silent ge e ->
-      silent ge (orimm n e).
+Lemma silent_orimm ge n: forall e, silent hf ge e ->
+      silent hf ge (orimm n e).
 Proof. intros. unfold orimm.
   destruct (Int.eq n Int.zero); simpl. trivial. 
   destruct (Int.eq n Int.mone); simpl; trivial. 
@@ -318,16 +323,16 @@ Proof. intros. unfold orimm.
   split; trivial. 
 Qed.
 
-Lemma silent_xorimm ge n: forall e, silent ge e ->
-      silent ge (xorimm n e).
+Lemma silent_xorimm ge n: forall e, silent hf ge e ->
+      silent hf ge (xorimm n e).
 Proof. intros. unfold xorimm.
   destruct (Int.eq n Int.zero); simpl. trivial. 
   destruct (xorimm_match e); simpl; trivial. 
   split; trivial. 
 Qed.
 
-Lemma silent_moduimm ge n: forall e, silent ge e ->
-      silent ge (moduimm e n).
+Lemma silent_moduimm ge n: forall e, silent hf ge e ->
+      silent hf ge (moduimm e n).
 Proof. intros. unfold moduimm.
   destruct (Int.is_power2 n); simpl.      
     apply silent_andimm; auto.
@@ -338,8 +343,8 @@ Proof. intros. unfold moduimm.
    repeat split; auto.  
 Qed.
 
-Lemma silent_divuimm ge n: forall e, silent ge e ->
-      silent ge (divuimm e n).
+Lemma silent_divuimm ge n: forall e, silent hf ge e ->
+      silent hf ge (divuimm e n).
 Proof. intros. unfold divuimm.
   destruct (Int.is_power2 n); simpl.
     apply silent_shruimm; auto.
@@ -349,48 +354,48 @@ Proof. intros. unfold divuimm.
    repeat split; auto.  
 Qed.
 
-Lemma silent_divfimm ge n: forall e, silent ge e ->
-      silent ge (divfimm e n).
+Lemma silent_divfimm ge n: forall e, silent hf ge e ->
+      silent hf ge (divfimm e n).
 Proof. intros. unfold divfimm.
   destruct (Float.exact_inverse n); simpl.
    repeat split; auto.  
    repeat split; auto.  
 Qed.
 
-Lemma silent_divu ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
-      silent ge (divu e1 e2).
+Lemma silent_divu ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (divu e1 e2).
 Proof. intros. unfold divu.
   destruct (divu_match e2); simpl in *. 
   apply silent_divuimm; auto. 
   repeat split; auto.
 Qed.
 
-Lemma silent_divs ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
-      silent ge (divs e1 e2).
+Lemma silent_divs ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (divs e1 e2).
 Proof. intros. unfold divs.
   destruct (divs_match e2); simpl in *. 
   apply silent_divsimm; auto. 
   repeat split; auto.
 Qed.
 
-Lemma silent_modu ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
-      silent ge (modu e1 e2).
+Lemma silent_modu ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (modu e1 e2).
 Proof. intros. unfold modu.
   destruct (modu_match e2); simpl in *. 
   apply silent_moduimm; auto. 
   repeat split; auto.
 Qed.
 
-Lemma silent_mods ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
-      silent ge (mods e1 e2).
+Lemma silent_mods ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (mods e1 e2).
 Proof. intros. unfold mods.
   destruct (mods_match e2); simpl in *. 
   apply silent_modsimm; auto. 
   repeat split; auto.
 Qed.
 
-Lemma silent_and ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
-      silent ge (and e1 e2).
+Lemma silent_and ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (and e1 e2).
 Proof. intros. unfold and.
   destruct (and_match e1 e2); simpl in *. 
   apply silent_andimm; auto. 
@@ -398,8 +403,8 @@ Proof. intros. unfold and.
   repeat split; auto.
 Qed.
 
-Lemma silent_or ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
-      silent ge (or e1 e2).
+Lemma silent_or ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (or e1 e2).
 Proof. intros. unfold or.
   destruct (or_match e1 e2); simpl in *. 
   apply silent_orimm; auto. 
@@ -415,8 +420,8 @@ Proof. intros. unfold or.
   repeat split; auto.
 Qed.
 
-Lemma silent_xor ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
-      silent ge (xor e1 e2).
+Lemma silent_xor ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (xor e1 e2).
 Proof. intros. unfold xor.
   destruct (xor_match e1 e2); simpl in *. 
   apply silent_xorimm; auto. 
@@ -424,84 +429,84 @@ Proof. intros. unfold xor.
   repeat split; auto.
 Qed.
 
-Lemma silent_shl ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
-      silent ge (shl e1 e2).
+Lemma silent_shl ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (shl e1 e2).
 Proof. intros. unfold shl.
   destruct (shl_match e2); simpl in *. 
   apply silent_shlimm; auto. 
   repeat split; auto.
 Qed.
 
-Lemma silent_shr ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
-      silent ge (shr e1 e2).
+Lemma silent_shr ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (shr e1 e2).
 Proof. intros. unfold shr.
   destruct (shr_match e2); simpl in *. 
   apply silent_shrimm; auto. 
   repeat split; auto.
 Qed.
 
-Lemma silent_shru ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
-      silent ge (shru e1 e2).
+Lemma silent_shru ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (shru e1 e2).
 Proof. intros. unfold shru.
   destruct (shru_match e2); simpl in *. 
   apply silent_shruimm; auto. 
   repeat split; auto.
 Qed.
 
-Lemma silent_divf ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
-      silent ge (divf e1 e2).
+Lemma silent_divf ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (divf e1 e2).
 Proof. intros. unfold divf.
   destruct (divf_match e2); simpl in *. 
   apply silent_divfimm; auto. 
   repeat split; auto.
 Qed.
 
-Lemma silent_addl ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
-      silent ge (addl e1 e2).
+Lemma silent_addl ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (addl hf e1 e2).
 Proof. intros. unfold addl.
   destruct (is_longconst e1); simpl in *. 
     destruct (is_longconst e2); simpl in *. repeat split; trivial.
-    destruct (Int64.eq i Int64.zero); simpl; trivial.
-    destruct (ident_eq (i64_add hf)(i64_add hf)); simpl. 
-      repeat rewrite orb_true_r. simpl. repeat split; trivial.
-    elim n; trivial.
-  destruct (is_longconst e2); simpl in *. 
-    destruct (Int64.eq i Int64.zero); simpl; trivial.
-    destruct (ident_eq (i64_add hf)(i64_add hf)); simpl. 
-      repeat rewrite orb_true_r. simpl. repeat split; trivial.
-    elim n; trivial.
-    destruct (ident_eq (i64_add hf)(i64_add hf)); simpl. 
-      repeat rewrite orb_true_r. simpl. repeat split; trivial.
-    elim n; trivial.
+    destruct (Int64.eq i Int64.zero); trivial.
+    split. eapply obs_ef. constructor. 
+    split. simpl. repeat split; trivial. 
+    intros. simpl. reflexivity. 
+  destruct (is_longconst e2).
+    destruct (Int64.eq i Int64.zero); trivial.
+    split. eapply obs_ef. constructor. 
+    split. simpl. repeat split; trivial. 
+    intros. simpl. reflexivity.
+  split. eapply obs_ef. constructor. 
+    split. simpl. repeat split; trivial. 
+    intros. simpl. reflexivity. 
 Qed.
 
-Lemma silent_negl ge: forall e, silent ge e ->
-      silent ge (negl e).
+Lemma silent_negl ge: forall e, silent hf ge e ->
+      silent hf ge (negl hf e).
 Proof. intros. unfold negl.
-  destruct (is_longconst e); simpl in *. repeat split; trivial.
-    destruct (ident_eq (i64_neg hf) (i64_neg hf)); simpl. 
-      repeat rewrite orb_true_r. simpl. repeat split; trivial.
-    elim n; trivial. 
+  destruct (is_longconst e). repeat split; trivial.
+    split. eapply obs_ef. constructor. 
+    split. simpl. repeat split; trivial. 
+    intros. simpl. reflexivity.
 Qed.
 
-Lemma silent_subl ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
-      silent ge (subl e1 e2).
+Lemma silent_subl ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (subl hf e1 e2).
 Proof. intros. unfold subl.
-  destruct (is_longconst e1); simpl in *. 
-    destruct (is_longconst e2); simpl in *. repeat split; trivial.
-    destruct (Int64.eq i Int64.zero); simpl; trivial.
-    apply silent_negl; auto.
-    destruct (ident_eq (i64_sub hf)(i64_sub hf)); simpl. 
-      repeat rewrite orb_true_r. simpl. repeat split; trivial.
-    elim n; trivial.
-  destruct (is_longconst e2); simpl in *. 
-    destruct (Int64.eq i Int64.zero); simpl; trivial.
-    destruct (ident_eq (i64_sub hf)(i64_sub hf)); simpl. 
-      repeat rewrite orb_true_r. simpl. repeat split; trivial.
-    elim n; trivial.
-    destruct (ident_eq (i64_sub hf)(i64_sub hf)); simpl. 
-      repeat rewrite orb_true_r. simpl. repeat split; trivial.
-    elim n; trivial.
+  destruct (is_longconst e1).
+    destruct (is_longconst e2); repeat split; trivial.
+    destruct (Int64.eq i Int64.zero); trivial.
+    apply silent_negl; auto. 
+    split. eapply obs_ef. constructor. 
+    split. simpl. repeat split; trivial. 
+    intros. simpl. reflexivity.
+  destruct (is_longconst e2).
+    destruct (Int64.eq i Int64.zero). repeat split; trivial.
+    split. eapply obs_ef. constructor. 
+    split. simpl. repeat split; trivial. 
+    intros. simpl. reflexivity.
+  split. eapply obs_ef. constructor. 
+    split. simpl. repeat split; trivial. 
+    intros. simpl. reflexivity.
 Qed.
 
 Lemma divsdummy: Val.divls (Vlong Int64.one) (Vlong Int64.one) 
@@ -516,19 +521,19 @@ Proof.
 Qed. 
 
 Lemma silent_divl (ge: Genv.t fundef unit) 
-                  (HC: i64_helpers_correct ge) e1 e2:
-      silent ge e1 -> silent ge e2 -> silent ge (divl e1 e2).
+                  (HC: i64_helpers_correct ge hf) e1 e2:
+      silent hf ge e1 -> silent hf ge e2 -> silent hf ge (divl hf e1 e2).
 Proof. intros. unfold divl, binop_long.
   assert (IMPL: forall x y z : val,
         Val.divls x y = Some z ->
-        helper_implements ge (i64_sdiv hf) sig_ll_l (x :: y :: nil) z) 
+        helper_implements ge hf (i64_sdiv hf) sig_ll_l (x :: y :: nil) z)
       by eapply HC. 
   destruct (IMPL _ _ _ divsdummy) 
-     as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
+     as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
   destruct (is_longconst e1); simpl in *.
     destruct (is_longconst e2); simpl in *. repeat split; trivial.
     split. repeat split; trivial. 
-    unfold fundef. rewrite FOUND, PTR. split. trivial.
+    unfold fundef. rewrite FOUND, PTR. split. trivial. 
       destruct ef; simpl; try reflexivity.
       intros. specialize (EXE m). inv EXE.
       intros. specialize (EXE m). inv EXE.
@@ -539,14 +544,14 @@ Proof. intros. unfold divl, binop_long.
       intros. specialize (EXE m). inv EXE.
 Qed.
 
-Lemma silent_lowlong ge: forall e, silent ge e ->
-   silent ge (lowlong e).
+Lemma silent_lowlong ge: forall e, silent hf ge e ->
+   silent hf ge (lowlong e).
 Proof. intros. unfold lowlong.
     destruct (lowlong_match e); simpl in *; eauto. eapply H.
 Qed.
         
-Lemma silent_shllimm ge (HC:i64_helpers_correct ge) i e:
-      silent ge e -> silent ge (shllimm e i).
+Lemma silent_shllimm ge (HC:i64_helpers_correct ge hf) i e:
+      silent hf ge e -> silent hf ge (shllimm hf e i).
 Proof. intros. unfold shllimm.
     destruct (Int.eq i Int.zero); simpl; eauto. 
     destruct (Int.ltu i Int.iwordsize); simpl; auto. 
@@ -560,18 +565,18 @@ Proof. intros. unfold shllimm.
        split; trivial.
     split. repeat split; trivial.
     assert (IMPL: forall x y : val,
-        helper_implements ge (i64_shl hf) sig_li_l 
+        helper_implements ge hf (i64_shl hf) sig_li_l 
           (x :: y :: nil) (Val.shll x y)) by eapply HC.
    destruct (IMPL Vundef Vundef)
-     as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
+     as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
    unfold fundef; rewrite FOUND, PTR. split. trivial.
       destruct ef; simpl; try reflexivity.
       intros. specialize (EXE m). inv EXE.
       intros. specialize (EXE m). inv EXE.
 Qed.
 
-Lemma silent_mullimm ge (HC: i64_helpers_correct ge) n e:
-      silent ge e -> silent ge (mullimm e n). 
+Lemma silent_mullimm ge (HC: i64_helpers_correct ge hf) n e:
+      silent hf ge e -> silent hf ge (mullimm hf e n). 
 Proof. intros. unfold mullimm. 
   destruct (Int64.eq n Int64.zero); simpl; auto. 
   destruct (Int64.eq n Int64.one); simpl; auto. 
@@ -580,8 +585,8 @@ Proof. intros. unfold mullimm.
     apply silent_mull_base; simpl; trivial. auto. 
 Qed. 
 
-Lemma silent_mull ge (HC: i64_helpers_correct ge) e1 e2: 
-      silent ge e1 -> silent ge e2 -> silent ge (mull e1 e2).
+Lemma silent_mull ge (HC: i64_helpers_correct ge hf) e1 e2: 
+      silent hf ge e1 -> silent hf ge e2 -> silent hf ge (mull hf e1 e2).
 Proof. intros. unfold mull.
   destruct (is_longconst e1); simpl in *. 
     destruct (is_longconst e2); simpl in *. repeat split; trivial.
@@ -592,15 +597,15 @@ Proof. intros. unfold mull.
 Qed.
 
 Lemma silent_highlong ge e: 
-      silent ge e -> silent ge (highlong e).
+      silent hf ge e -> silent hf ge (highlong e).
 Proof. intros; unfold highlong.
   destruct (highlong_match e); simpl in *. 
     eapply H. 
     split; trivial. 
 Qed. 
 
-Lemma silent_shrlimm ge (HC:i64_helpers_correct ge) i e:
-      silent ge e -> silent ge (shrlimm e i).
+Lemma silent_shrlimm ge (HC:i64_helpers_correct ge hf) i e:
+      silent hf ge e -> silent hf ge (shrlimm hf e i).
 Proof. intros. unfold shrlimm.
     destruct (Int.eq i Int.zero); simpl; eauto. 
     destruct (Int.ltu i Int.iwordsize); simpl; auto. 
@@ -616,18 +621,18 @@ Proof. intros. unfold shrlimm.
        split; trivial. apply silent_shrimm; simpl; auto. 
     split. repeat split; trivial.
     assert (IMPL: forall x y : val,
-        helper_implements ge (i64_sar hf) sig_li_l 
+        helper_implements ge hf (i64_sar hf) sig_li_l 
           (x :: y :: nil) (Val.shrl x y)) by eapply HC.
     destruct (IMPL Vundef Vundef)
-      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
+      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
     unfold fundef; rewrite FOUND, PTR.  split. trivial.
       destruct ef; simpl; try reflexivity.
       intros. specialize (EXE m). inv EXE.
       intros. specialize (EXE m). inv EXE.
 Qed.
 
-Lemma silent_shrluimm ge (HC: i64_helpers_correct ge) n e:
-       silent ge e -> silent ge (shrluimm e n).
+Lemma silent_shrluimm ge (HC: i64_helpers_correct ge hf) n e:
+       silent hf ge e -> silent hf ge (shrluimm hf e n).
 Proof. intros; unfold shrluimm.
   destruct (Int.eq n Int.zero); simpl; trivial.
   destruct (Int.ltu n Int.iwordsize); simpl.
@@ -643,10 +648,10 @@ Proof. intros; unfold shrluimm.
     apply silent_highlong; trivial.
   split. repeat split; trivial.
     assert (IMPL: forall x y : val,
-        helper_implements ge (i64_shr hf) sig_li_l 
+        helper_implements ge hf (i64_shr hf) sig_li_l 
           (x :: y :: nil) (Val.shrlu x y)) by eapply HC.
     destruct (IMPL Vundef Vundef)
-      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
+      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
     unfold fundef; rewrite FOUND, PTR.  split. trivial.
       destruct ef; simpl; try reflexivity.
       intros. specialize (EXE m). inv EXE.
@@ -662,14 +667,14 @@ assert (Int64.eq Int64.one Int64.zero = false).
 simpl; rewrite H. trivial. 
 Qed.
 
-Lemma silent_divlu ge (HC:i64_helpers_correct ge) e1 e2:
-      silent ge e1 -> silent ge e2 -> silent ge (divlu e1 e2).
+Lemma silent_divlu ge (HC:i64_helpers_correct ge hf) e1 e2:
+      silent hf ge e1 -> silent hf ge e2 -> silent hf ge (divlu hf e1 e2).
 Proof. intros. unfold divlu.
     assert (IMPL: forall x y z : val,
         Val.divlu x y = Some z ->
-        helper_implements ge (i64_udiv hf) sig_ll_l (x :: y :: nil) z) by eapply HC.
+        helper_implements ge hf (i64_udiv hf) sig_ll_l (x :: y :: nil) z) by eapply HC.
     destruct (IMPL _ _ _ divlu_dummy)
-      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
+      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
   destruct (is_longconst e1); simpl in *. 
     destruct (is_longconst e2); simpl in *.
     repeat split; trivial.
@@ -703,16 +708,16 @@ assert (Int64.eq Int64.one Int64.zero = false).
 simpl; rewrite H. simpl. trivial. 
 Qed.
 
-Lemma silent_modl ge (HC:i64_helpers_correct ge) e1 e2:
-       silent ge e1 -> silent ge e2 -> silent ge (modl e1 e2).
+Lemma silent_modl ge (HC:i64_helpers_correct ge hf) e1 e2:
+       silent hf ge e1 -> silent hf ge e2 -> silent hf ge (modl hf e1 e2).
 Proof. intros. unfold modl.
   unfold binop_long.
   assert (IMPL: forall x y z : val,
         Val.modls x y = Some z ->
-        helper_implements ge (i64_smod hf) sig_ll_l (x :: y :: nil) z)
+        helper_implements ge hf (i64_smod hf) sig_ll_l (x :: y :: nil) z)
         by eapply HC.
   destruct (IMPL _ _ _ modls_dummy)
-      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
+      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
   destruct (is_longconst e1); simpl in *; auto. 
     destruct (is_longconst e2); simpl in *; auto.
     split. repeat split; trivial.
@@ -727,8 +732,8 @@ Proof. intros. unfold modl.
       intros. specialize (EXE m). inv EXE.
 Qed.
 
-Lemma silent_andl ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
-      silent ge (andl e1 e2).
+Lemma silent_andl ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (andl e1 e2).
 Proof. intros. unfold andl. unfold splitlong2.
   remember (splitlong2_match e1 e2) as s. 
   destruct s; simpl in *.
@@ -758,15 +763,15 @@ assert (Int64.eq Int64.one Int64.zero = false).
 simpl; rewrite H. simpl. trivial. 
 Qed.
 
-Lemma silent_modlu ge (HC: i64_helpers_correct ge) e1 e2:
-      silent ge e1 -> silent ge e2 -> silent ge (modlu e1 e2).
+Lemma silent_modlu ge (HC: i64_helpers_correct ge hf) e1 e2:
+      silent hf ge e1 -> silent hf ge e2 -> silent hf ge (modlu hf e1 e2).
 Proof. intros. unfold modlu.
   assert (IMPL: forall x y z : val,
         Val.modlu x y = Some z ->
-        helper_implements ge (i64_umod hf) sig_ll_l (x :: y :: nil) z)
+        helper_implements ge hf (i64_umod hf) sig_ll_l (x :: y :: nil) z)
     by eapply HC.
   destruct (IMPL _ _ _ modlu_dummy)
-      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
+      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
   destruct (is_longconst e1); simpl in *; auto. 
     destruct (is_longconst e2); simpl in *; auto. 
       split. repeat split; trivial.
@@ -789,8 +794,8 @@ Proof. intros. unfold modlu.
       intros. specialize (EXE m). inv EXE.
 Qed.
 
-Lemma silent_orl ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
-      silent ge (orl e1 e2).
+Lemma silent_orl ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (orl e1 e2).
 Proof. intros. unfold orl. unfold splitlong2.
   remember (splitlong2_match e1 e2) as s. 
   destruct s; simpl in *; clear Heqs.
@@ -810,8 +815,8 @@ Proof. intros. unfold orl. unfold splitlong2.
   repeat split; trivial. apply silent_lift; trivial.
 Qed. 
 
-Lemma silent_xorl ge: forall e1 e2, silent ge e1 -> silent ge e2 ->
-      silent ge (xorl e1 e2).
+Lemma silent_xorl ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (xorl e1 e2).
 Proof. intros. unfold xorl. unfold splitlong2.
   remember (splitlong2_match e1 e2) as s. 
   destruct s; simpl in *; clear Heqs.
@@ -831,59 +836,59 @@ Proof. intros. unfold xorl. unfold splitlong2.
   repeat split; trivial. apply silent_lift; trivial.
 Qed. 
 
-Lemma silent_shll ge (HC:i64_helpers_correct ge) e1 e2:
-       silent ge e1 -> silent ge e2 -> silent ge (shll e1 e2).
+Lemma silent_shll ge (HC:i64_helpers_correct ge hf) e1 e2:
+       silent hf ge e1 -> silent hf ge e2 -> silent hf ge (shll hf e1 e2).
 Proof. intros. unfold shll. 
   destruct (is_intconst e2); simpl in *; auto. 
     apply silent_shllimm; trivial. 
   split. repeat split; trivial.
     assert (IMPL: forall x y : val,
-        helper_implements ge (i64_shl hf) sig_li_l 
+        helper_implements ge hf (i64_shl hf) sig_li_l 
           (x :: y :: nil) (Val.shll x y)) by eapply HC.
     destruct (IMPL Vundef Vundef)
-      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
+      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
     unfold fundef; rewrite FOUND, PTR. split. trivial.
       destruct ef; simpl; try reflexivity.
       intros. specialize (EXE m). inv EXE.
       intros. specialize (EXE m). inv EXE.
 Qed. 
 
-Lemma silent_shrl ge (HC:i64_helpers_correct ge) e1 e2:
-      silent ge e1 -> silent ge e2 -> silent ge (shrl e1 e2).
+Lemma silent_shrl ge (HC:i64_helpers_correct ge hf) e1 e2:
+      silent hf ge e1 -> silent hf ge e2 -> silent hf ge (shrl hf e1 e2).
 Proof. intros. unfold shrl. 
   destruct (is_intconst e2); simpl in *; auto. 
     apply silent_shrlimm; trivial. 
   split. repeat split; trivial.
   assert (IMPL: forall x y : val,
-        helper_implements ge (i64_sar hf) sig_li_l 
+        helper_implements ge hf (i64_sar hf) sig_li_l 
           (x :: y :: nil) (Val.shrl x y)) by eapply HC.
   destruct (IMPL Vundef Vundef)
-      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
+      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
   unfold fundef; rewrite FOUND, PTR.  split. trivial.
       destruct ef; simpl; try reflexivity.
       intros. specialize (EXE m). inv EXE.
       intros. specialize (EXE m). inv EXE.
 Qed. 
 
-Lemma silent_shrlu ge (HC:i64_helpers_correct ge) e1 e2:
-      silent ge e1 -> silent ge e2 -> silent ge (shrlu e1 e2).
+Lemma silent_shrlu ge (HC:i64_helpers_correct ge hf) e1 e2:
+      silent hf ge e1 -> silent hf ge e2 -> silent hf ge (shrlu hf e1 e2).
 Proof. intros. unfold shrlu. 
   destruct (is_intconst e2); simpl in *; auto.   
     apply silent_shrluimm; trivial. 
   split. repeat split; trivial.
   assert (IMPL: forall x y : val,
-        helper_implements ge (i64_shr hf) sig_li_l 
+        helper_implements ge hf (i64_shr hf) sig_li_l 
           (x :: y :: nil) (Val.shrlu x y)) by eapply HC.
   destruct (IMPL Vundef Vundef)
-      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
+      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
   unfold fundef; rewrite FOUND, PTR.  split. trivial.
       destruct ef; simpl; try reflexivity.
       intros. specialize (EXE m). inv EXE.
       intros. specialize (EXE m). inv EXE.
 Qed.
 
-Lemma silent_compXimm  ge C cc c n e: silent ge e ->
-   silent ge (compimm C cc c e n).
+Lemma silent_compXimm  ge C cc c n e: silent hf ge e ->
+   silent hf ge (compimm C cc c e n).
 Proof. intros. unfold compimm.
   destruct (compimm_match c e); simpl in *; auto.
     destruct (Int.eq_dec n Int.zero); simpl in *; auto.
@@ -895,40 +900,40 @@ Proof. intros. unfold compimm.
       destruct (Int.eq_dec n Int.zero); simpl in *; auto.
 Qed.      
 
-Lemma silent_comp ge c e1 e2: silent ge e1 -> silent ge e2 ->
-      silent ge (comp c e1 e2).
+Lemma silent_comp ge c e1 e2: silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (comp c e1 e2).
 Proof. intros. unfold comp. 
   destruct (comp_match e1 e2); simpl in *; auto. 
     apply silent_compXimm; auto.
     apply silent_compXimm; auto.
 Qed.   
 
-Lemma silent_compu ge c e1 e2: silent ge e1 -> silent ge e2 ->
-      silent ge (compu c e1 e2).
+Lemma silent_compu ge c e1 e2: silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (compu c e1 e2).
 Proof. intros. unfold compu. 
   destruct (compu_match e1 e2); simpl in *; auto. 
     apply silent_compXimm; auto.
     apply silent_compXimm; auto.
 Qed.   
 
-Lemma silent_cmpl_eq_zero ge e: silent ge e ->
-      silent ge (cmpl_eq_zero e).
+Lemma silent_cmpl_eq_zero ge e: silent hf ge e ->
+      silent hf ge (cmpl_eq_zero e).
 Proof. intros. unfold cmpl_eq_zero.
   apply silent_splitlong; trivial.
   intros; simpl. apply silent_comp; simpl; auto. 
   apply silent_or; trivial.
 Qed.  
 
-Lemma silent_cmpl_ne_zero ge e: silent ge e ->
-      silent ge (cmpl_ne_zero e).
+Lemma silent_cmpl_ne_zero ge e: silent hf ge e ->
+      silent hf ge (cmpl_ne_zero e).
 Proof. intros. unfold cmpl_ne_zero.
   apply silent_splitlong; trivial.
   intros; simpl. apply silent_comp; simpl; auto. 
   apply silent_or; trivial.
 Qed.  
 
-Lemma silent_cmpl_gen ge C D e1 e2: silent ge e1 -> silent ge e2 ->
-      silent ge (cmpl_gen C D e1 e2).
+Lemma silent_cmpl_gen ge C D e1 e2: silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (cmpl_gen C D e1 e2).
 Proof. intros. unfold cmpl_gen.
   unfold splitlong2. 
   destruct (splitlong2_match e1 e2); simpl in *; auto. 
@@ -946,8 +951,8 @@ Proof. intros. unfold cmpl_gen.
     apply silent_lift; trivial.
 Qed.  
 
-Lemma silent_cmplu_gen ge C D e1 e2: silent ge e1 -> 
-      silent ge e2 -> silent ge (cmplu_gen C D e1 e2).
+Lemma silent_cmplu_gen ge C D e1 e2: silent hf ge e1 -> 
+      silent hf ge e2 -> silent hf ge (cmplu_gen C D e1 e2).
 Proof. intros. unfold cmplu_gen.
   unfold splitlong2. 
   destruct (splitlong2_match e1 e2); simpl in *; auto. 
@@ -965,8 +970,8 @@ Proof. intros. unfold cmplu_gen.
     apply silent_lift; trivial.
 Qed.  
 
-Lemma silent_cmpl ge c e1 e2: silent ge e1 -> silent ge e2 ->
-      silent ge (cmpl c e1 e2).
+Lemma silent_cmpl ge c e1 e2: silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (cmpl c e1 e2).
 Proof. intros. unfold cmpl. 
   destruct c; simpl; auto.
     destruct (is_longconst_zero e2); simpl in *; auto. 
@@ -987,8 +992,8 @@ Proof. intros. unfold cmpl.
       apply silent_cmpl_gen; auto. 
 Qed.   
 
-Lemma silent_cmplu ge c e1 e2: silent ge e1 -> silent ge e2 ->
-      silent ge (cmplu c e1 e2).
+Lemma silent_cmplu ge c e1 e2: silent hf ge e1 -> silent hf ge e2 ->
+      silent hf ge (cmplu c e1 e2).
 Proof. intros. unfold cmplu. 
   destruct c; simpl; auto.
     destruct (is_longconst_zero e2); simpl in *; auto. 
@@ -1005,9 +1010,9 @@ Proof. intros. unfold cmplu.
     apply silent_cmplu_gen; auto. 
 Qed.   
 
-Lemma silent_binop ge (HC:i64_helpers_correct ge) e1 e2 b
-   (Silent1: silent ge e1) (Silent2: silent ge e2):
-   silent ge (sel_binop b e1 e2).
+Lemma silent_binop ge (HC:i64_helpers_correct ge hf) e1 e2 b
+   (Silent1: silent hf ge e1) (Silent2: silent hf ge e2):
+   silent hf ge (sel_binop hf b e1 e2).
 Proof. intros.
 destruct b; simpl; try solve [repeat split; auto].
 apply silent_add; trivial.
@@ -1043,27 +1048,27 @@ apply silent_cmpl; auto.
 apply silent_cmplu; auto.
 Qed.
 
-Lemma silent_cast8unsigned ge e: silent ge e ->
-   silent ge (cast8unsigned e).
+Lemma silent_cast8unsigned ge e: silent hf ge e ->
+   silent hf ge (cast8unsigned e).
 Proof. intros. unfold cast8unsigned.
   destruct (cast8unsigned_match e); simpl; auto. 
 Qed.
 
-Lemma silent_cast16unsigned ge e: silent ge e ->
-   silent ge (cast16unsigned e).
+Lemma silent_cast16unsigned ge e: silent hf ge e ->
+   silent hf ge (cast16unsigned e).
 Proof. intros. unfold cast16unsigned.
   destruct (cast16unsigned_match e); simpl; auto. 
 Qed.
 
-Lemma silent_notl ge e: silent ge e ->
-   silent ge (notl e).
+Lemma silent_notl ge e: silent hf ge e ->
+   silent hf ge (notl e).
 Proof. intros. unfold notl.
   apply silent_splitlong; trivial.
   intros; simpl; auto.  
 Qed.
 
-Lemma silent_intoflong ge e: silent ge e ->
-   silent ge (intoflong e).
+Lemma silent_intoflong ge e: silent hf ge e ->
+   silent hf ge (intoflong e).
 Proof. intros. unfold intoflong.
   apply silent_lowlong; trivial.
 Qed.
@@ -1131,8 +1136,8 @@ Proof. intros N.
   eapply (Mem.free_range_perm _ _ _ _ _ N). omega. 
 Qed.
 
-Lemma silent_unop ge (HC:i64_helpers_correct ge) u e: 
-      silent ge e -> silent ge (sel_unop u e).
+Lemma silent_unop ge (HC:i64_helpers_correct ge hf) u e: 
+      silent hf ge e -> silent hf ge (sel_unop hf u e).
 Proof. intros.
 destruct u; simpl; try solve [repeat split; auto].
 apply silent_cast8unsigned; trivial. 
@@ -1143,11 +1148,11 @@ apply silent_intoflong; trivial.
 split. repeat split; trivial.
 assert (IMPL:forall x z : val,
         Val.longoffloat x = Some z ->
-        helper_implements ge (i64_dtos hf) sig_f_l (x :: nil) z)
+        helper_implements ge hf (i64_dtos hf) sig_f_l (x :: nil) z)
      by eapply HC.
 destruct longoffloat_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
-      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
+      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
 unfold fundef. rewrite FOUND, PTR. split. trivial.
       destruct ef; simpl; try reflexivity.
       intros. specialize (EXE m). inv EXE. 
@@ -1157,11 +1162,11 @@ unfold fundef. rewrite FOUND, PTR. split. trivial.
 split. split; trivial.
 assert (IMPL:forall x z : val,
         Val.longuoffloat x = Some z ->
-        helper_implements ge (i64_dtou hf) sig_f_l (x :: nil) z)
+        helper_implements ge hf (i64_dtou hf) sig_f_l (x :: nil) z)
      by eapply HC.
 destruct longuoffloat_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
-      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
+      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
 unfold fundef. rewrite FOUND, PTR. split. trivial.
       destruct ef; simpl; try reflexivity.
       intros. specialize (EXE m). inv EXE. 
@@ -1171,11 +1176,11 @@ unfold fundef. rewrite FOUND, PTR. split. trivial.
 split. split; trivial.
 assert (IMPL:forall x z : val,
         Val.floatoflong x = Some z ->
-        helper_implements ge (i64_stod hf) sig_l_f (x :: nil) z)
+        helper_implements ge hf (i64_stod hf) sig_l_f (x :: nil) z)
      by eapply HC.
 destruct floatoflong_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
-      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
+      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
 unfold fundef. rewrite FOUND, PTR.  split. trivial.
       destruct ef; simpl; try reflexivity.
       intros. specialize (EXE m). inv EXE. 
@@ -1185,11 +1190,11 @@ unfold fundef. rewrite FOUND, PTR.  split. trivial.
 split. split; trivial.
 assert (IMPL:forall x z : val,
         Val.floatoflongu x = Some z ->
-        helper_implements ge (i64_utod hf) sig_l_f (x :: nil) z)
+        helper_implements ge hf (i64_utod hf) sig_l_f (x :: nil) z)
      by eapply HC.
 destruct floatoflongu_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
-      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
+      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
 unfold fundef. rewrite FOUND, PTR. split. trivial.
       destruct ef; simpl; try reflexivity.
       intros. specialize (EXE m). inv EXE. 
@@ -1199,11 +1204,11 @@ unfold fundef. rewrite FOUND, PTR. split. trivial.
 split. split; trivial.
 assert (IMPL:forall x z : val,
         Val.singleoflong x = Some z ->
-        helper_implements ge (i64_stof hf) sig_l_s (x :: nil) z)
+        helper_implements ge hf (i64_stof hf) sig_l_s (x :: nil) z)
      by eapply HC.
 destruct singleoflong_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
-      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
+      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
 unfold fundef. rewrite FOUND, PTR. split. trivial.
       destruct ef; simpl; try reflexivity.
       intros. specialize (EXE m). inv EXE. 
@@ -1213,11 +1218,11 @@ unfold fundef. rewrite FOUND, PTR. split. trivial.
 split. split; trivial.
 assert (IMPL:forall x z : val,
         Val.singleoflongu x = Some z ->
-        helper_implements ge (i64_utof hf) sig_l_s (x :: nil) z)
+        helper_implements ge hf (i64_utof hf) sig_l_s (x :: nil) z)
      by eapply HC.
 destruct singleoflongu_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
-      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
+      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
 unfold fundef. rewrite FOUND, PTR. split. trivial.
       destruct ef; simpl; try reflexivity.
       intros. specialize (EXE m). inv EXE. 
@@ -1225,14 +1230,14 @@ unfold fundef. rewrite FOUND, PTR. split. trivial.
       intros. specialize (EXE m). inv EXE.  
 Qed.
 
-Lemma silent_addressing ge ch e a el: silent ge e ->
-      (a, el) = addressing ch e -> silentExprList ge el.
+Lemma silent_addressing ge ch e a el: silent hf ge e ->
+      (a, el) = addressing ch e -> silentExprList hf ge el.
 Proof. intros. unfold addressing in H0.
   destruct (addressing_match e); inv H0; simpl in *; auto. 
 Qed.    
 
-Lemma sel_expr_silent ge (HC:i64_helpers_correct ge) e:
-      silent ge (sel_expr e).
+Lemma sel_expr_silent ge (HC:i64_helpers_correct ge hf) e:
+      silent hf ge (sel_expr hf e).
 Proof. intros.
   induction e; simpl; trivial.
   destruct c; simpl; auto.
@@ -1241,37 +1246,40 @@ Proof. intros.
     destruct (Int.eq i0 Int.zero); simpl; eauto.
   apply silent_unop; trivial. 
   apply silent_binop; trivial. 
-  unfold load. remember (addressing m (sel_expr e)) as a. 
+  unfold load. remember (addressing m (sel_expr hf e)) as a. 
     destruct a; simpl.
     eapply silent_addressing; eauto.
 Qed. 
 
-Lemma sel_exprlist_silent ge (HC:i64_helpers_correct ge) al:
-      silentExprList ge (sel_exprlist al).
+Lemma sel_exprlist_silent ge (HC:i64_helpers_correct ge hf) al:
+      silentExprList hf ge (sel_exprlist hf al).
 Proof. induction al; simpl; trivial.
   split; auto.
   apply sel_expr_silent; trivial.
 Qed.
 
-Lemma sel_condexpr_silent ge (HC:i64_helpers_correct ge) a: 
-      silentCondExpr ge (condexpr_of_expr (sel_expr a)).
+Lemma sel_condexpr_silent ge (HC:i64_helpers_correct ge hf) a: 
+      silentCondExpr hf ge (condexpr_of_expr (sel_expr hf a)).
 Proof. intros.
   specialize (sel_expr_silent ge HC a). intros.
-  remember (sel_expr a) as e. clear Heqe.
+  remember (sel_expr hf a) as e. clear Heqe.
   induction e; simpl in *; auto.
   destruct o; simpl; auto. 
   destruct H as [HH1 [HH2 HH3]]; auto.
   destruct H as [HH1 HH3]; auto. 
 Qed.
 
+End SILENT.
+
 Section PRESERVATION.
 
 Variable prog: Cminor.program.
 Let ge := Genv.globalenv prog.
-(*Variable hf: helper_functions.*)
+Variable hf: helper_functions.
 Let tprog := transform_program (sel_fundef hf ge) prog.
 Let tge := Genv.globalenv tprog.
-Hypothesis HELPERS: i64_helpers_correct ge (*hf*).
+
+Hypothesis HELPERS: i64_helpers_correct ge hf.
 
 Lemma symbols_preserved:
   forall (s: ident), Genv.find_symbol tge s = Genv.find_symbol ge s.
@@ -1370,20 +1378,16 @@ Proof.
   apply Genv.find_var_info_transf.
 Qed.
 
-Lemma helper_implements_preserved:
-  forall id sg vargs vres,
-  helper_implements ge id sg vargs vres ->
-  helper_implements tge id sg vargs vres.
+Lemma GDE_lemma: genvs_domain_eq ge tge.
 Proof.
-  intros. destruct H as (b & ef & A & B & C & D & E).
-  exploit function_ptr_translated; eauto. simpl. intros. 
-  exists b; exists ef. 
-  split. rewrite symbols_preserved. auto.
-  split. auto.
-  split. auto.
-  split. intros. eapply external_call_symbols_preserved; eauto. 
-         exact symbols_preserved. exact varinfo_preserved.
-  trivial.
+    unfold genvs_domain_eq, genv2blocks.
+    simpl; split; intros. 
+     split; intros; destruct H as [id Hid].
+       rewrite <- symbols_preserved in Hid.
+       exists id; trivial.
+     rewrite symbols_preserved in Hid.
+       exists id; trivial.
+    rewrite varinfo_preserved. intuition.
 Qed.
 
 Lemma builtin_implements_preserved:
@@ -1395,6 +1399,30 @@ Proof.
   eapply external_call_symbols_preserved; eauto. 
   exact symbols_preserved. exact varinfo_preserved.
 Qed.
+
+Lemma helper_implements_preserved:
+  forall id sg vargs vres,
+  helper_implements ge hf id sg vargs vres ->
+  helper_implements tge hf id sg vargs vres.
+Proof.
+  intros. destruct H as (b & ef & A & B & C & D & E & F).
+  exploit function_ptr_translated; eauto. simpl. intros. 
+  exists b; exists ef. 
+  split. rewrite symbols_preserved. auto.
+  split. auto.
+  split. auto.
+  split. intros. eapply external_call_symbols_preserved; eauto. 
+         exact symbols_preserved. exact varinfo_preserved.
+  split; trivial.
+  red. intros. eapply F; try assumption.
+    eapply genvs_domain_eq_trans. apply GDE_lemma. trivial.
+    intros. rewrite SymbPres. apply symbols_preserved. 
+   eapply meminj_preserves_genv2blocks. 
+     eapply genvs_domain_eq_preserves. apply GDE_lemma.
+     eapply meminj_preserves_genv2blocks. assumption.
+   admit. (*trace mismatch*)
+Qed.
+
 (*
 Lemma helpers_correct_preserved:
   forall h, i64_helpers_correct ge h -> i64_helpers_correct tge h.
@@ -1405,25 +1433,13 @@ Proof.
   try (eapply builtin_implements_preserved; eauto).
 Qed.*)
 Lemma helpers_correct_preserved:
-  i64_helpers_correct tge.
+  i64_helpers_correct tge hf.
 Proof.
   unfold i64_helpers_correct; intros.
   unfold i64_helpers_correct in HELPERS.
   repeat (match goal with [ H: _ /\ _ |- _ /\ _ ] => destruct H; split end);
   intros; try (eapply helper_implements_preserved; eauto);
   try (eapply builtin_implements_preserved; eauto).
-Qed.
-
-Lemma GDE_lemma: genvs_domain_eq ge tge.
-Proof.
-    unfold genvs_domain_eq, genv2blocks.
-    simpl; split; intros. 
-     split; intros; destruct H as [id Hid].
-       rewrite <- symbols_preserved in Hid.
-       exists id; trivial.
-     rewrite symbols_preserved in Hid.
-       exists id; trivial.
-    rewrite varinfo_preserved. intuition.
 Qed.
 
 Section CMCONSTR.
@@ -1469,12 +1485,12 @@ Lemma eval_addressing': forall (ge : genv) (sp : val) (e : env)
          (le : letenv) (chunk : memory_chunk) (a : expr) 
          (v : val) (b : block) (ofs : int),
        eval_expr ge sp e m le a v ->
-       v = Vptr b ofs -> silent ge a ->
+       v = Vptr b ofs -> silent hf ge a ->
        let (mode, args) := addressing chunk a in
        exists vl : list val,
          eval_exprlist ge sp e m le args vl /\
          Op.eval_addressing ge sp mode vl = Some v /\
-         silentExprList ge args.
+         silentExprList hf ge args.
 Proof.
   intros until v. unfold addressing; case (addressing_match a); intros; InvEval.
   inv H. exists vl; auto.
@@ -1487,8 +1503,8 @@ Lemma eval_coopstore:
   eval_expr tge sp e m nil a1 v1 ->
   eval_expr tge sp e m nil a2 v2 ->
   Mem.storev chunk m v1 v2 = Some m' ->
-  forall (SIL1: silent tge a1) (SIL2: silent tge a2),
-  CMinSel_corestep tge (CMinSel_State f (store chunk a1 a2) k sp e) m
+  forall (SIL1: silent hf tge a1) (SIL2: silent hf tge a2),
+  CMinSel_corestep hf tge (CMinSel_State f (store chunk a1 a2) k sp e) m
         (CMinSel_State f Sskip k sp e) m'.
 Proof.
   intros. generalize H1; destruct v1; simpl; intro; try discriminate.
@@ -1503,8 +1519,8 @@ Lemma eval_effstore:
   eval_expr tge sp e m nil a1 v1 ->
   eval_expr tge sp e m nil a2 v2 ->
   Mem.storev chunk m v1 v2 = Some m' ->
-  forall (SIL1: silent tge a1) (SIL2: silent tge a2),
-  cminsel_effstep tge (StoreEffect v1 (encode_val chunk v2))
+  forall (SIL1: silent hf tge a1) (SIL2: silent hf tge a2),
+  cminsel_effstep hf tge (StoreEffect v1 (encode_val chunk v2))
         (CMinSel_State f (store chunk a1 a2) k sp e) m
         (CMinSel_State f Sskip k sp e) m'.
 (*(Sstore chunk addr al b)
@@ -1523,7 +1539,7 @@ Lemma eval_sel_unop:
   forall le op a1 v1 v,
   eval_expr tge sp e m le a1 v1 ->
   eval_unop op v1 = Some v ->
-  exists v', eval_expr tge sp e m le (sel_unop (*hf*) op a1) v' /\ Val.lessdef v v'.
+  exists v', eval_expr tge sp e m le (sel_unop hf op a1) v' /\ Val.lessdef v v'.
 Proof.
   assert (THELPERS:= helpers_correct_preserved).
   destruct op; simpl; intros; FuncInv; try subst v.
@@ -1558,7 +1574,7 @@ Lemma eval_sel_binop:
   eval_expr tge sp e m le a1 v1 ->
   eval_expr tge sp e m le a2 v2 ->
   eval_binop op v1 v2 m = Some v ->
-  exists v', eval_expr tge sp e m le (sel_binop (*hf*) op a1 a2) v' /\ Val.lessdef v v'.
+  exists v', eval_expr tge sp e m le (sel_binop hf op a1 a2) v' /\ Val.lessdef v v'.
 Proof.
   assert (THELPERS:= helpers_correct_preserved).
   destruct op; simpl; intros; FuncInv; try subst v.
@@ -1618,10 +1634,10 @@ Lemma classify_call_correct:
   forall sp e m a v fd,
   Cminor.eval_expr ge sp e m a v ->
   Genv.find_funct ge v = Some fd ->
-  match classify_call ge a with
+  match classify_call hf ge a with
   | Call_default => True
   | Call_imm id => exists b, Genv.find_symbol ge id = Some b /\ v = Vptr b Int.zero
-  | Call_builtin ef => fd = External ef /\ (*NEW*) observableEF ef = false
+  | Call_builtin ef => fd = External ef /\ (*NEW*) observableEF hf ef = false
   end.
 Proof.
   unfold classify_call; intros. 
@@ -1632,7 +1648,7 @@ Proof.
   rewrite Genv.find_funct_find_funct_ptr in H0. 
   rewrite H0. 
   destruct fd. exists b; auto. 
-  remember (observableEF e0) as d. 
+  remember (observableEF hf e0) as d. 
   destruct d; simpl in *. 
     rewrite andb_false_r. exists b; auto.
   rewrite andb_true_r.
@@ -1935,7 +1951,7 @@ Lemma sel_expr_inject:
      (GD: genvs_domain_eq ge tge)
      (NoRepet: list_norepet (map fst (prog_defs prog)))
      sp' (SP: sp_preserved j sp sp'),
-  exists v', CminorSel.eval_expr tge sp' e' m' le (sel_expr (*hf*) a) v' /\ 
+  exists v', CminorSel.eval_expr tge sp' e' m' le (sel_expr hf a) v' /\ 
              val_inject j v v'.
 Proof.
   induction 1; intros; simpl.
@@ -2036,7 +2052,7 @@ Lemma sel_exprlist_inject:
      (GD: genvs_domain_eq ge tge)
      (NoRepet: list_norepet (map fst (prog_defs prog)))
      sp' (SP: sp_preserved j sp sp'),
-  exists v', CminorSel.eval_exprlist tge sp' e' m' le (sel_exprlist (*hf*) a) v' /\ 
+  exists v', CminorSel.eval_exprlist tge sp' e' m' le (sel_exprlist hf a) v' /\ 
              val_list_inject j v v'.
 Proof.
   induction 1; intros; simpl. 
@@ -2054,7 +2070,7 @@ Inductive match_cont (*NEW:*)(j:meminj): Cminor.cont -> CminorSel.cont -> Prop :
       match_cont j Cminor.Kstop Kstop
   | match_cont_seq: forall s k k',
       match_cont j k k' ->
-      match_cont j (Cminor.Kseq s k) (Kseq (sel_stmt (*hf*) ge s) k')
+      match_cont j (Cminor.Kseq s k) (Kseq (sel_stmt hf ge s) k')
   | match_cont_block: forall k k',
       match_cont j k k' ->
       match_cont j (Cminor.Kblock k) (Kblock k')
@@ -2067,7 +2083,7 @@ Inductive match_cont (*NEW:*)(j:meminj): Cminor.cont -> CminorSel.cont -> Prop :
 
 Inductive match_states (j:meminj) : CMin_core -> mem -> CMinSel_core -> mem -> Prop :=
   | match_state: forall f s k s' k' sp e m sp' e' m',
-      s' = sel_stmt (*hf*) ge s ->
+      s' = sel_stmt hf ge s ->
       match_cont j k k' ->
       (*      env_lessdef e e' -> Mem.extends m m' ->*)
       env_inject j e e' -> Mem.inject j m m' -> sp_preserved j sp sp' ->
@@ -2094,7 +2110,7 @@ Inductive match_states (j:meminj) : CMin_core -> mem -> CMinSel_core -> mem -> P
       val_list_inject j args args' -> env_inject j e e' -> Mem.inject j m m' -> 
       sp_preserved j sp sp' ->
       CminorSel.eval_exprlist tge sp' e' m' nil al args' ->
-      (*NEW*) observableEF ef = false ->
+      (*NEW*) observableEF hf ef = false ->
       match_states j
         (CMin_Callstate (External ef) args (Cminor.Kcall optid f sp e k)) m
         (CMinSel_State (sel_function hf ge f) (Sbuiltin optid ef al) k' sp' e') m'
@@ -2140,28 +2156,28 @@ Qed.
 Remark find_label_commut:
   forall j lbl s k k',
   match_cont j k k' ->
-  match Cminor.find_label lbl s k, find_label lbl (sel_stmt (*hf*) ge s) k' with
+  match Cminor.find_label lbl s k, find_label lbl (sel_stmt hf ge s) k' with
   | None, None => True
-  | Some(s1, k1), Some(s1', k1') => s1' = sel_stmt (*hf*) ge s1 /\ match_cont j k1 k1'
+  | Some(s1, k1), Some(s1', k1') => s1' = sel_stmt hf ge s1 /\ match_cont j k1 k1'
   | _, _ => False
   end.
 Proof.
   induction s; intros; simpl; auto.
 (* store *)
-  unfold store. destruct (addressing m (sel_expr (*hf*) e)); simpl; auto.
+  unfold store. destruct (addressing m (sel_expr hf e)); simpl; auto.
 (* call *)
-  destruct (classify_call ge e); simpl; auto.
+  destruct (classify_call hf ge e); simpl; auto.
 (* tailcall *)
-  destruct (classify_call ge e); simpl; auto.
+  destruct (classify_call hf ge e); simpl; auto.
 (* seq *)
   exploit (IHs1 (Cminor.Kseq s2 k)). constructor; eauto. 
   destruct (Cminor.find_label lbl s1 (Cminor.Kseq s2 k)) as [[sx kx] | ];
-  destruct (find_label lbl (sel_stmt (*hf*) ge s1) (Kseq (sel_stmt (*hf*) ge s2) k')) as [[sy ky] | ];
+  destruct (find_label lbl (sel_stmt hf ge s1) (Kseq (sel_stmt hf ge s2) k')) as [[sy ky] | ];
   intuition. apply IHs2; auto.
 (* ifthenelse *)
   exploit (IHs1 k); eauto. 
   destruct (Cminor.find_label lbl s1 k) as [[sx kx] | ];
-  destruct (find_label lbl (sel_stmt (*hf*) ge s1) k') as [[sy ky] | ];
+  destruct (find_label lbl (sel_stmt hf ge s1) k') as [[sy ky] | ];
   intuition. apply IHs2; auto.
 (* loop *)
   apply IHs. constructor; auto.
@@ -2236,11 +2252,11 @@ Qed.
 
 Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
        (MTCH: MATCH c1 mu c1 m1 c2 m2)
-       (AtExtSrc: at_external cmin_eff_sem c1 = Some (e, ef_sig, vals1)),
+       (AtExtSrc: at_external (cmin_eff_sem hf) c1 = Some (e, ef_sig, vals1)),
      Mem.inject (as_inj mu) m1 m2 /\
      exists vals2,
        Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\
-       at_external cminsel_eff_sem c2 = Some (e, ef_sig, vals2) /\
+       at_external (cminsel_eff_sem hf) c2 = Some (e, ef_sig, vals2) /\
       (forall pubSrc' pubTgt',
        pubSrc' = (fun b => locBlocksSrc mu b && REACH m1 (exportedSrc mu vals1) b) ->
        pubTgt' = (fun b => locBlocksTgt mu b && REACH m2 (exportedTgt mu vals2) b) ->
@@ -2249,7 +2265,7 @@ Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
 Proof. intros.
   destruct MTCH as [MC [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
   destruct c1; inv AtExtSrc. destruct f; inv H0.
-  remember (observableEF e0) as obs.
+  remember (observableEF hf e0) as obs.
   destruct obs; inv H1.
   split; trivial. 
   inv MC; simpl.
@@ -2437,7 +2453,7 @@ Lemma MATCH_init_cores: forall (v1 v2 : val) (sig : signature) entrypoints
                     Genv.find_funct_ptr tge b = Some f2)
   (vals1 : list val) (c1 : CMin_core) (m1 : mem) (j : meminj)
   (vals2 : list val) (m2 : mem) (DomS DomT : Values.block -> bool)
-  (CSM_Ini :initial_core cmin_eff_sem ge v1 vals1 = Some c1)
+  (CSM_Ini :initial_core (cmin_eff_sem hf) ge v1 vals1 = Some c1)
   (Inj: Mem.inject j m1 m2)
   (VInj: Forall2 (val_inject j) vals1 vals2)
   (PG: meminj_preserves_globals ge j)
@@ -2454,7 +2470,7 @@ Lemma MATCH_init_cores: forall (v1 v2 : val) (sig : signature) entrypoints
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
 exists c2 : CMinSel_core,
-  initial_core cminsel_eff_sem tge v2 vals2 = Some c2 /\
+  initial_core (cminsel_eff_sem hf) tge v2 vals2 = Some c2 /\
   MATCH c1
     (initial_SM DomS DomT
        (REACH m1
@@ -2539,8 +2555,8 @@ Lemma MATCH_AfterExternal:
 forall mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
   (MemInjMu : Mem.inject (as_inj mu) m1 m2)
   (MatchMu : MATCH st1 mu st1 m1 st2 m2)
-  (AtExtSrc : at_external cmin_eff_sem st1 = Some (e, ef_sig, vals1))
-  (AtExtTgt : at_external cminsel_eff_sem st2 = Some (e', ef_sig', vals2))
+  (AtExtSrc : at_external (cmin_eff_sem hf) st1 = Some (e, ef_sig, vals1))
+  (AtExtTgt : at_external (cminsel_eff_sem hf) st2 = Some (e', ef_sig', vals2))
   (ValInjMu : Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2)
   (pubSrc' : Values.block -> bool)
   (pubSrcHyp : pubSrc' =
@@ -2581,8 +2597,8 @@ forall mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
                 m1')
   (UnchLOOR : Mem.unchanged_on (local_out_of_reach nu m1) m2 m2'),
 exists (st1' : CMin_core) (st2' : CMinSel_core),
-  after_external cmin_eff_sem (Some ret1) st1 = Some st1' /\
-  after_external cminsel_eff_sem (Some ret2) st2 = Some st2' /\
+  after_external (cmin_eff_sem hf) (Some ret1) st1 = Some st1' /\
+  after_external (cminsel_eff_sem hf) (Some ret2) st2 = Some st2' /\
   MATCH st1' mu' st1' m1' st2' m2'.
 Proof. intros.
  destruct MatchMu as [MC [RC [PG [GFP [Glob [VAL [WDmu INJ]]]]]]].
@@ -2590,7 +2606,7 @@ Proof. intros.
  simpl in *.
  destruct f; inv AtExtSrc.
  simpl in *.
- remember (observableEF e0) as obs. destruct obs; inv H3.
+ remember (observableEF hf e0) as obs. destruct obs; inv H3.
   apply eq_sym in AtExtTgt. inv AtExtTgt.
   exists (CMin_Returnstate ret1 k). eexists.
     split. reflexivity.
@@ -2815,13 +2831,13 @@ intuition.
 Qed. 
 
 Lemma MATCH_diagram: forall (GDE : genvs_domain_eq ge tge)
-      st1 m1 st1' m1' (CS: corestep cmin_eff_sem ge st1 m1 st1' m1')
+      st1 m1 st1' m1' (CS: corestep (cmin_eff_sem hf) ge st1 m1 st1' m1')
       st2 mu m2 (MC: MATCH st1 mu st1 m1 st2 m2)
       (R: list_norepet (map fst (prog_defs prog))),
   exists st2' m2',
-    (corestep_plus cminsel_eff_sem tge st2 m2 st2' m2' \/
+    (corestep_plus (cminsel_eff_sem hf) tge st2 m2 st2' m2' \/
       (measure st1' < measure st1)%nat /\
-       corestep_star cminsel_eff_sem tge st2 m2 st2' m2')
+       corestep_star (cminsel_eff_sem hf) tge st2 m2 st2' m2')
   /\ exists mu',
      intern_incr mu mu' /\
      sm_inject_separated mu mu' m1 m2 /\
@@ -2833,7 +2849,7 @@ Proof.
   intros.
   assert (THELPERS:= helpers_correct_preserved); clear HELPERS.
    inv CS; simpl in *.
-  (*skip seq*)
+{ (*skip seq*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *; inv H8. 
       eexists. eexists.
@@ -2848,8 +2864,8 @@ Proof.
         try rewrite freshloc_irrefl; intuition.
       econstructor.
         econstructor; eauto.
-        intuition.
-  (*skip block*)
+        intuition. }
+{ (*skip block*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. inv H8.
       eexists. eexists.
@@ -2864,8 +2880,8 @@ Proof.
         try rewrite freshloc_irrefl; intuition.
       econstructor.
         econstructor; eauto.
-        intuition.
-  (* skip call *)
+        intuition. }
+{ (* skip call *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -2905,8 +2921,8 @@ Proof.
       intuition. (*
         eapply REACH_closed_free; eassumption.
         destruct (restrictD_Some _ _ _ _ _ Jsp). 
-        eapply free_free_inject; eassumption. *)
-  (* assign *)
+        eapply free_free_inject; eassumption. *) }
+{ (* assign *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -2933,8 +2949,8 @@ Proof.
             inv H0. exists v'; auto.
             eauto.
           (*WAS:apply set_var_lessdef; auto.*)
-      intuition.
-  (* store *)
+      intuition. }
+{ (* store *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -2985,8 +3001,8 @@ Proof.
         apply restrict_incr. 
       destruct (Mem.storev_mapped_inject _ _ _ _ _ _ _ _ _ 
           INJ H1 VaddrMu VMu) as [mm [Hmm1 Hmm2]].
-      rewrite Hmm1 in P. inv P. assumption.
-  (* Scall *)
+      rewrite Hmm1 in P. inv P. assumption. }
+{ (* Scall *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -2997,7 +3013,7 @@ Proof.
      exploit sel_exprlist_inject; eauto.
      (*WAS: exploit sel_exprlist_correct; eauto.*) intros [vargs' [C D]].
      exploit classify_call_correct; eauto. 
-     destruct (classify_call ge a) as [ | id | ef].  
+     destruct (classify_call hf ge a) as [ | id | ef].  
      (* indirect *)
        exploit sel_expr_inject; eauto. 
        (*exploit sel_expr_correct; eauto.*) intros [vf' [A B]].
@@ -3060,8 +3076,8 @@ Proof.
            try rewrite freshloc_irrefl; intuition.
        econstructor.
          eapply match_builtin_1; try eassumption. 
-         intuition.
-  (* Stailcall *) 
+         intuition. }
+{ (* Stailcall *) 
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -3082,7 +3098,7 @@ Proof.
       split. left.
         apply corestep_plus_one. 
         exploit classify_call_correct; eauto.    
-        destruct (classify_call ge a) as [ | id | ef]; intros.
+        destruct (classify_call hf ge a) as [ | id | ef]; intros.
             econstructor. 
               simpl. apply sel_expr_silent; trivial.
               apply sel_exprlist_silent; trivial.
@@ -3126,8 +3142,8 @@ Proof.
          constructor; auto. 
            apply call_cont_commut; auto.
            eapply inject_restrict; eassumption.
-         intuition.
-  (* Sbuiltin *) 
+         intuition. }
+{  (* Sbuiltin *) 
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -3168,8 +3184,8 @@ Proof.
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
         assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-          rewrite <- FRG. eapply (Glob _ H3). 
-  (* Seq *)
+          rewrite <- FRG. eapply (Glob _ H3). }
+{ (* Seq *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [Glob [SMV [WD INJ]]]]].
@@ -3189,8 +3205,8 @@ Proof.
            rewrite freshloc_irrefl; intuition.
        econstructor.
          econstructor; eauto. econstructor; eauto. 
-         intuition.
-  (* Sifthenelse *)
+         intuition. }
+{ (* Sifthenelse *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -3203,7 +3219,7 @@ Proof.
       assert (Val.bool_of_val v' b). 
         inv H0; inv B; econstructor.
       exists (CMinSel_State (sel_function hf ge f) 
-           (if b then sel_stmt (*hf*) ge s1 else sel_stmt (*hf*) ge s2) k' (Vptr spb' i) e').
+           (if b then sel_stmt hf ge s1 else sel_stmt hf ge s2) k' (Vptr spb' i) e').
       exists m2.
       split. left. 
         apply corestep_plus_one. 
@@ -3219,8 +3235,8 @@ Proof.
        econstructor.
          econstructor; eauto. destruct b; trivial.
          exists spb, i, spb'. split; trivial. split; trivial.
-       intuition.
-  (* Sloop *)
+       intuition. }
+{ (* Sloop *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       eexists; eexists.
@@ -3235,8 +3251,8 @@ Proof.
            rewrite freshloc_irrefl; intuition.
        econstructor.
          econstructor; eauto. econstructor; eauto. 
-       intuition.
-  (* Sblock *)
+       intuition. }
+{ (* Sblock *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       eexists; eexists.
@@ -3251,8 +3267,8 @@ Proof.
            rewrite freshloc_irrefl; intuition.
        econstructor.
          econstructor; eauto. econstructor; eauto. 
-       intuition.
-  (* Sexit_seq *)
+       intuition. }
+{ (* Sexit_seq *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. inv H8.
       eexists; eexists.
@@ -3267,8 +3283,8 @@ Proof.
            rewrite freshloc_irrefl; intuition.
        econstructor.
          econstructor; eauto. econstructor; eauto. 
-       intuition.
-  (* Sexit0_block *)
+       intuition. }
+{ (* Sexit0_block *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. inv H8.
       eexists; eexists.
@@ -3283,8 +3299,8 @@ Proof.
            rewrite freshloc_irrefl; intuition.
        econstructor.
          econstructor; eauto. econstructor; eauto. 
-       intuition.
-  (* Sexit_seq *)
+       intuition. }
+{ (* Sexit_seq *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. inv H8.
       eexists; eexists.
@@ -3299,8 +3315,8 @@ Proof.
            rewrite freshloc_irrefl; intuition.
        econstructor.
          econstructor; eauto. econstructor; eauto. 
-       intuition.
-  (* Sswitch *)
+       intuition. }
+{ (* Sswitch *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -3322,8 +3338,8 @@ Proof.
            rewrite freshloc_irrefl; intuition.
        econstructor.
          econstructor; eauto. 
-       intuition.
- (* Sreturn None *)
+       intuition. }
+{ (* Sreturn None *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -3359,8 +3375,8 @@ Proof.
          eapply REACH_closed_free; eassumption.
         destruct (restrictD_Some _ _ _ _ _ Hsp). 
         eapply free_free_inject; try eassumption.
-          simpl.  rewrite Zplus_0_r. apply P. 
-  (* Sreturn Some *)
+          simpl.  rewrite Zplus_0_r. apply P. }
+{ (* Sreturn Some *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -3398,8 +3414,8 @@ Proof.
          eapply REACH_closed_free; eassumption.
         destruct (restrictD_Some _ _ _ _ _ Hsp). 
         eapply free_free_inject; try eassumption. 
-          simpl. rewrite Zplus_0_r. apply P. 
-  (* Slabel *)
+          simpl. rewrite Zplus_0_r. apply P. }
+{ (* Slabel *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -3419,8 +3435,8 @@ Proof.
            rewrite freshloc_irrefl; intuition.
        econstructor.
          econstructor; eauto. 
-       intuition. 
-  (* Sgoto *)
+       intuition. }
+{ (* Sgoto *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -3432,7 +3448,7 @@ Proof.
               (Cminor.fn_body f) (Cminor.call_cont k)).
         apply call_cont_commut; eauto.
       rewrite H. 
-      destruct (find_label lbl (sel_stmt (*hf*) ge (Cminor.fn_body f)) (call_cont k'0))
+      destruct (find_label lbl (sel_stmt hf ge (Cminor.fn_body f)) (call_cont k'0))
           as [[s'' k'']|] eqn:?; intros; try contradiction.
       destruct H. 
       eexists; eexists.
@@ -3447,8 +3463,8 @@ Proof.
            rewrite freshloc_irrefl; intuition.
        econstructor.
          econstructor; eauto. 
-       intuition.
-  (* internal function *)
+       intuition. }
+{ (* internal function *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -3501,13 +3517,14 @@ Proof.
     red; intros. destruct (GFP _ _ H6). split; trivial.
          eapply intern_incr_as_inj; eassumption.
     assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply IntInc'.
-      apply Glob in H6. rewrite <-FF; trivial.
-(* external call  no case*) 
-(* return *) 
-      destruct MC as [SMC PRE].
-      inv SMC.
-     inv H1.
-  eexists; eexists. 
+      apply Glob in H6. rewrite <-FF; trivial. }
+(*No external call cases -- Cminor does not have 
+  unobservable external calls*)
+{ (* return *) 
+  destruct MC as [SMC PRE].
+  inv SMC.
+  { inv H1.
+    eexists; eexists. 
     split. left. eapply corestep_plus_one.
           econstructor. 
     exists mu; simpl. intuition.
@@ -3521,8 +3538,8 @@ Proof.
          destruct optid; simpl.
            eapply set_var_inject; auto.
          assumption.
-       intuition.
-  (* return of an external call turned into a Sbuiltin *)
+       intuition. }
+  { (* return of an external call turned into a Sbuiltin *)
   eexists; eexists.
   split. right; split. omega.
          eapply corestep_star_zero.
@@ -3537,21 +3554,21 @@ Proof.
          destruct optid; simpl.
            eapply set_var_inject; auto.
          assumption.
-       intuition.
+       intuition. } }
 Qed.
 
 Lemma MATCH_effcore_diagram: 
   forall (GDE : genvs_domain_eq ge tge)
       st1 m1 st1' m1' (U1 : block -> Z -> bool)
-      (CS: effstep cmin_eff_sem ge U1 st1 m1 st1' m1')
+      (CS: effstep (cmin_eff_sem hf) ge U1 st1 m1 st1' m1')
       st2 mu m2 
       (EffSrc: forall b ofs, U1 b ofs = true -> vis mu b = true)
       (MC: MATCH st1 mu st1 m1 st2 m2)
       (R: list_norepet (map fst (prog_defs prog))),
   exists st2' m2' (U2 : block -> Z -> bool),
-    (effstep_plus cminsel_eff_sem tge U2 st2 m2 st2' m2' \/
+    (effstep_plus (cminsel_eff_sem hf) tge U2 st2 m2 st2' m2' \/
       (measure st1' < measure st1)%nat /\
-       effstep_star cminsel_eff_sem tge U2 st2 m2 st2' m2')
+       effstep_star (cminsel_eff_sem hf) tge U2 st2 m2 st2' m2')
   /\ exists mu',
      intern_incr mu mu' /\
      sm_inject_separated mu mu' m1 m2 /\
@@ -3570,8 +3587,8 @@ Lemma MATCH_effcore_diagram:
 Proof.
   intros. 
   assert (THELPERS:= helpers_correct_preserved); clear HELPERS.
-induction CS; simpl in *.
-  (*skip seq*)
+  induction CS; simpl in *.
+{ (*skip seq*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. inv H8.
       eexists. eexists. eexists.
@@ -3586,8 +3603,8 @@ induction CS; simpl in *.
         try rewrite freshloc_irrefl; intuition.
       econstructor.
         econstructor; eauto.
-        intuition.
-  (*skip block*)
+        intuition. }
+{ (*skip block*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. inv H8.
       eexists. eexists. eexists.
@@ -3602,8 +3619,8 @@ induction CS; simpl in *.
         try rewrite freshloc_irrefl; intuition.
       econstructor.
         econstructor; eauto.
-        intuition.
-  (* skip call *)
+        intuition. }
+{ (* skip call *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -3645,8 +3662,8 @@ induction CS; simpl in *.
         eapply free_free_inject; eassumption. *)
       apply FreeEffectD in H3. destruct H3 as [? [VB Arith2]]; subst.
         eapply visPropagateR; eassumption.
-      eapply FreeEffect_PropagateLeft; eassumption.
-  (* assign *)
+      eapply FreeEffect_PropagateLeft; eassumption. }
+{ (* assign *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -3673,8 +3690,8 @@ induction CS; simpl in *.
             inv H0. exists v'; auto.
             eauto.
           (*WAS:apply set_var_lessdef; auto.*)
-      intuition.
-  (* store *)
+      intuition. }
+{ (* store *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -3728,8 +3745,8 @@ induction CS; simpl in *.
         rewrite Hmm1 in P. inv P. assumption.
       apply StoreEffectD in H2. destruct H2 as [i [VADDR' _]]. subst.
         inv B; inv H1. eapply visPropagateR; eassumption.
-      eapply StoreEffect_PropagateLeft; eassumption.
-  (* Scall *)
+      eapply StoreEffect_PropagateLeft; eassumption. }
+{ (* Scall *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -3740,7 +3757,7 @@ induction CS; simpl in *.
      exploit sel_exprlist_inject; eauto.
      (*WAS: exploit sel_exprlist_correct; eauto.*) intros [vargs' [C D]].
      exploit classify_call_correct; eauto. 
-     destruct (classify_call ge a) as [ | id | ef].  
+     destruct (classify_call hf ge a) as [ | id | ef].  
      (* indirect *)
        exploit sel_expr_inject; eauto. 
        (*exploit sel_expr_correct; eauto.*) intros [vf' [A B]].
@@ -3803,8 +3820,8 @@ induction CS; simpl in *.
            try rewrite freshloc_irrefl; intuition.
        econstructor.
          eapply match_builtin_1; try eassumption. 
-         intuition.
-  (* Stailcall *) 
+         intuition. }
+{ (* Stailcall *) 
       destruct MC as [SMC PRE].
       inv SMC. simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -3825,7 +3842,7 @@ induction CS; simpl in *.
       split. left. simpl in *.
         apply effstep_plus_one. 
         exploit classify_call_correct; eauto.    
-        destruct (classify_call ge a) as [ | id | ef]; intros.
+        destruct (classify_call hf ge a) as [ | id | ef]; intros.
             econstructor.
             simpl. apply sel_expr_silent; trivial.
             apply sel_exprlist_silent; trivial.
@@ -3871,8 +3888,8 @@ induction CS; simpl in *.
          intuition.
          apply FreeEffectD in H5. destruct H5 as [? [VB Arith2]]; subst.
            eapply visPropagateR; eassumption.
-      eapply FreeEffect_PropagateLeft; eassumption.         
-  (* Sbuiltin *) 
+      eapply FreeEffect_PropagateLeft; eassumption.  }
+{ (* Sbuiltin *) 
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -3916,8 +3933,8 @@ induction CS; simpl in *.
          assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
             rewrite <- FRG. eapply (Glob _ H3).
        split; trivial. split; trivial.
-       eapply BuiltinEffect_Propagate; eassumption. 
-  (* Seq *)
+       eapply BuiltinEffect_Propagate; eassumption. }
+{ (* Seq *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -3937,8 +3954,8 @@ induction CS; simpl in *.
            rewrite freshloc_irrefl; intuition.
        econstructor.
          econstructor; eauto. econstructor; eauto. 
-         intuition.
-  (* Sifthenelse *)
+         intuition. }
+{ (* Sifthenelse *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -3951,7 +3968,7 @@ induction CS; simpl in *.
       assert (Val.bool_of_val v' b). 
         inv H0; inv B; econstructor.
       exists (CMinSel_State (sel_function hf ge f) 
-           (if b then sel_stmt (*hf*) ge s1 else sel_stmt (*hf*) ge s2) k' (Vptr spb' i) e').
+           (if b then sel_stmt hf ge s1 else sel_stmt hf ge s2) k' (Vptr spb' i) e').
       exists m2. exists EmptyEffect.
       split. left. 
         apply effstep_plus_one. 
@@ -3967,8 +3984,8 @@ induction CS; simpl in *.
        econstructor.
          econstructor; eauto. destruct b; trivial.
          exists spb, i, spb'. split; trivial. split; trivial.
-       intuition.
-  (* Sloop *)
+       intuition. }
+{ (* Sloop *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       eexists; eexists. exists EmptyEffect.
@@ -3983,8 +4000,8 @@ induction CS; simpl in *.
            rewrite freshloc_irrefl; intuition.
        econstructor.
          econstructor; eauto. econstructor; eauto. 
-       intuition.
-  (* Sblock *)
+       intuition. }
+{ (* Sblock *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       eexists; eexists. exists EmptyEffect.
@@ -3999,8 +4016,8 @@ induction CS; simpl in *.
            rewrite freshloc_irrefl; intuition.
        econstructor.
          econstructor; eauto. econstructor; eauto. 
-       intuition.
-  (* Sexit_seq *)
+       intuition. }
+{ (* Sexit_seq *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. inv H8.
       eexists; eexists. exists EmptyEffect.
@@ -4015,8 +4032,8 @@ induction CS; simpl in *.
            rewrite freshloc_irrefl; intuition.
        econstructor.
          econstructor; eauto. econstructor; eauto. 
-       intuition.
-  (* Sexit0_block *)
+       intuition. }
+{ (* Sexit0_block *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. inv H8.
       eexists; eexists. exists EmptyEffect.
@@ -4031,8 +4048,8 @@ induction CS; simpl in *.
            rewrite freshloc_irrefl; intuition.
        econstructor.
          econstructor; eauto. econstructor; eauto. 
-       intuition.
-  (* Sexit_seq *)
+       intuition. }
+{ (* Sexit_seq *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. inv H8.
       eexists; eexists. exists EmptyEffect.
@@ -4047,8 +4064,8 @@ induction CS; simpl in *.
            rewrite freshloc_irrefl; intuition.
        econstructor.
          econstructor; eauto. econstructor; eauto. 
-       intuition.
-  (* Sswitch *)
+       intuition. }
+{ (* Sswitch *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -4070,8 +4087,8 @@ induction CS; simpl in *.
            rewrite freshloc_irrefl; intuition.
        econstructor.
          econstructor; eauto. 
-       intuition.
- (* Sreturn None *)
+       intuition. }
+{ (* Sreturn None *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -4111,8 +4128,8 @@ induction CS; simpl in *.
         apply FreeEffectD in H0. destruct H0 as [? [VB Arith2]]; subst.
           eapply visPropagateR; eassumption.
         destruct (restrictD_Some _ _ _ _ _ Hsp).
-          eapply FreeEffect_PropagateLeft; eassumption.  
-  (* Sreturn Some *)
+          eapply FreeEffect_PropagateLeft; eassumption. }
+{ (* Sreturn Some *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -4154,8 +4171,8 @@ induction CS; simpl in *.
         apply FreeEffectD in H1. destruct H1 as [? [VB Arith2]]; subst.
           eapply visPropagateR; eassumption.
         destruct (restrictD_Some _ _ _ _ _ Hsp).
-        eapply FreeEffect_PropagateLeft; eassumption.
-  (* Slabel *)
+        eapply FreeEffect_PropagateLeft; eassumption. }
+{ (* Slabel *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -4175,8 +4192,8 @@ induction CS; simpl in *.
            rewrite freshloc_irrefl; intuition.
        econstructor.
          econstructor; eauto. 
-       intuition. 
-  (* Sgoto *)
+       intuition. }
+{ (* Sgoto *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -4188,7 +4205,7 @@ induction CS; simpl in *.
           lbl (Cminor.fn_body f) (Cminor.call_cont k)).
         apply call_cont_commut; eauto.
       rewrite H. 
-      destruct (find_label lbl (sel_stmt (*hf*) ge (Cminor.fn_body f)) (call_cont k'0))
+      destruct (find_label lbl (sel_stmt hf ge (Cminor.fn_body f)) (call_cont k'0))
           as [[s'' k'']|] eqn:?; intros; try contradiction.
       destruct H0. 
       eexists; eexists. eexists.
@@ -4203,8 +4220,8 @@ induction CS; simpl in *.
            rewrite freshloc_irrefl; intuition.
        econstructor.
          econstructor; eauto. 
-       intuition.
-  (* internal function *)
+       intuition. }
+{ (* internal function *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
       destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -4257,12 +4274,13 @@ induction CS; simpl in *.
     red; intros. destruct (GFP _ _ H6). split; trivial.
          eapply intern_incr_as_inj; eassumption.
     assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply IntInc'.
-      apply Glob in H6. rewrite <-FF; trivial.
-(* no case for external calls *)
-(* return *) 
-    destruct MC as [SMC PRE].
-    inv SMC.
-    inv H1.
+      apply Glob in H6. rewrite <-FF; trivial. }
+(*No external call cases -- Cminor does not have 
+  unobservable external calls*)
+{ (* return *) 
+  destruct MC as [SMC PRE].
+  inv SMC.
+  { inv H1.
     eexists; eexists. exists EmptyEffect.
     split. left. eapply effstep_plus_one.
           econstructor.
@@ -4277,12 +4295,12 @@ induction CS; simpl in *.
          destruct optid; simpl.
            eapply set_var_inject; auto.
          assumption.
-       intuition.
-  (* return of an external call turned into a Sbuiltin *)
-  eexists; eexists. exists EmptyEffect.
-  split. right; split. omega.
+       intuition. }
+  { (* return of an external call turned into a Sbuiltin *)
+   eexists; eexists. exists EmptyEffect.
+   split. right; split. omega.
          eapply effstep_star_zero.
-  exists mu; simpl. intuition.
+   exists mu; simpl. intuition.
        apply intern_incr_refl. 
        apply sm_inject_separated_same_sminj.
        apply sm_locally_allocatedChar.
@@ -4293,10 +4311,9 @@ induction CS; simpl in *.
          destruct optid; simpl.
            eapply set_var_inject; auto.
          assumption.
-       intuition.
+       intuition. } }
 Qed. 
 
-(*program structure not yet updated to module*)
 Theorem transl_program_correct:
   forall (TRANSL: sel_program prog = OK tprog)
          (R: list_norepet (map fst (prog_defs prog)))
@@ -4310,8 +4327,8 @@ Theorem transl_program_correct:
                 /\ Genv.find_funct_ptr ge b = Some f1
                 /\ Genv.find_funct_ptr tge b = Some f2)
          (init_mem: exists m0, Genv.init_mem prog = Some m0),
-SM_simulation.SM_simulation_inject cmin_eff_sem 
-   cminsel_eff_sem ge tge entrypoints.
+SM_simulation.SM_simulation_inject (cmin_eff_sem hf)
+   (cminsel_eff_sem hf) ge tge entrypoints.
 Proof.
 intros.
 assert (GDE: genvs_domain_eq ge tge).
