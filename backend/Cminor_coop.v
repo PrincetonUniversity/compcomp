@@ -15,6 +15,10 @@ Require Import core_semantics.
 Require Import val_casted.
 Require Import BuiltinEffects.
 
+Section CMINOR_COOP.
+
+Variable hf : I64Helpers.helper_functions.
+
 (*Obtained from Cminor.state by deleting the memory components.*)
 Inductive CMin_core: Type :=
   | CMin_State:                      (**r Execution within a function *)
@@ -102,7 +106,7 @@ Definition CMin_at_external (c: CMin_core) : option (external_function * signatu
   | CMin_State f s k sp e => None
   | CMin_Callstate fd args k => match fd with
                                   Internal f => None
-                                | External ef => if observableEF ef 
+                                | External ef => if observableEF hf ef 
                                                  then Some (ef, ef_sig ef, args)
                                                  else None
                               end
@@ -114,12 +118,10 @@ Definition CMin_after_external (vret: option val) (c: CMin_core) : option CMin_c
     CMin_Callstate fd args k => 
          match fd with
             Internal f => None
-          | External ef =>  if observableEF ef 
-                            then match vret with
+          | External ef =>  match vret with
                                 None => Some (CMin_Returnstate Vundef k)
                               | Some v => Some (CMin_Returnstate v k)
-                                 end
-                            else None
+                            end
          end
   | _ => None
   end.
@@ -169,7 +171,7 @@ Inductive CMin_corestep (ge : genv) : CMin_core -> mem -> CMin_core -> mem -> Pr
   | cmin_corestep_builtin: forall f optid ef bl k sp e m vargs t vres m',
       eval_exprlist ge sp e m bl vargs ->
       external_call ef ge vargs m t vres m' ->
-      observableEF ef = false ->
+      observableEF hf ef = false ->
       CMin_corestep ge (CMin_State f (Sbuiltin optid ef bl) k sp e) m
          (CMin_State f Sskip k sp (set_optvar optid vres e)) m'
 
@@ -210,6 +212,7 @@ Inductive CMin_corestep (ge : genv) : CMin_core -> mem -> CMin_core -> mem -> Pr
       Mem.free m sp 0 f.(fn_stackspace) = Some m' ->
       CMin_corestep ge (CMin_State f (Sreturn None) k (Vptr sp Int.zero) e) m
        (CMin_Returnstate Vundef (call_cont k)) m'
+
   | cmin_corestep_return_1: forall f a k sp e m v m',
       eval_expr ge (Vptr sp Int.zero) e m a v ->
       Mem.free m sp 0 f.(fn_stackspace) = Some m' ->
@@ -230,7 +233,8 @@ Inductive CMin_corestep (ge : genv) : CMin_core -> mem -> CMin_core -> mem -> Pr
       set_locals f.(fn_vars) (set_params vargs f.(fn_params)) = e ->
       CMin_corestep ge (CMin_Callstate (Internal f) vargs k) m
        (CMin_State f f.(fn_body) k (Vptr sp Int.zero) e) m'
-(*no external call
+
+(*All external calls in this language at handled by atExternal
   | step_external_function: forall ef vargs k m t vres m',
       external_call ef ge vargs m t vres m' ->
       sCMin_coretep (CMin_Callstate (External ef) vargs k) m
@@ -264,9 +268,10 @@ Lemma CMin_after_at_external_excl : forall retv q q',
   Proof. intros.
        destruct q; simpl in *; try inv H.
        destruct f; try inv H1; simpl; trivial.
-       remember (observableEF e) as d.
+       destruct retv; inv H0; simpl; trivial.
+(*       remember (observableEF hf e) as d.
        destruct d; try inv H0.
-       destruct retv; inv H1; simpl; trivial.
+       destruct retv; inv H1; simpl; trivial.*)
 Qed.
 
 Definition CMin_core_sem : CoreSemantics genv CMin_core mem.
@@ -304,3 +309,5 @@ Program Definition cmin_coop_sem :
 apply Build_CoopCoreSem with (coopsem := CMin_core_sem).
   apply CMin_forward.
 Defined.
+
+End CMINOR_COOP.

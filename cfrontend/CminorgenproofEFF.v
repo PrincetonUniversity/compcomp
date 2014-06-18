@@ -41,6 +41,8 @@ Hypothesis TRANSL: transl_program prog = OK tprog.
 Let ge : Csharpminor.genv := Genv.globalenv prog.
 Let tge: genv := Genv.globalenv tprog.
 
+(*NEW*) Variable hf : I64Helpers.helper_functions.
+
 Lemma valid_init_is_global :
   forall (R: list_norepet (map fst (prog_defs prog)))
   m (G: Genv.init_mem prog = Some m)  
@@ -820,7 +822,7 @@ Lemma Match_init_core: forall (v1 v2 : val) (sig : signature) entrypoints
                     Genv.find_funct_ptr tge b = Some f2)
   (vals1 : list val) (c1 : CSharpMin_core) (m1 : mem) (j : meminj)
   (vals2 : list val) (m2 : mem) (DomS DomT : Values.block -> bool)
-  (CSM_Ini :initial_core csharpmin_eff_sem ge v1 vals1 = Some c1)
+  (CSM_Ini :initial_core (csharpmin_eff_sem hf) ge v1 vals1 = Some c1)
   (Inj: Mem.inject j m1 m2)
   (VInj: Forall2 (val_inject j) vals1 vals2)
   (PG: meminj_preserves_globals ge j)
@@ -837,7 +839,7 @@ Lemma Match_init_core: forall (v1 v2 : val) (sig : signature) entrypoints
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
 exists c2 : CMin_core,
-  initial_core cmin_eff_sem tge v2 vals2 = Some c2 /\
+  initial_core (cmin_eff_sem hf) tge v2 vals2 = Some c2 /\
   MATCH c1
     (initial_SM DomS DomT
        (REACH m1
@@ -917,8 +919,8 @@ Lemma Match_AfterExternal:
 forall mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
   (MemInjMu : Mem.inject (as_inj mu) m1 m2)
   (MatchMu : MATCH st1 mu st1 m1 st2 m2)
-  (AtExtSrc : at_external csharpmin_eff_sem st1 = Some (e, ef_sig, vals1))
-  (AtExtTgt : at_external cmin_eff_sem st2 = Some (e', ef_sig', vals2))
+  (AtExtSrc : at_external (csharpmin_eff_sem hf) st1 = Some (e, ef_sig, vals1))
+  (AtExtTgt : at_external (cmin_eff_sem hf) st2 = Some (e', ef_sig', vals2))
   (ValInjMu : Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2)
   (pubSrc' : Values.block -> bool)
   (pubSrcHyp : pubSrc' =
@@ -959,8 +961,8 @@ forall mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
                 m1')
   (UnchLOOR : Mem.unchanged_on (local_out_of_reach nu m1) m2 m2'),
 exists (st1' : CSharpMin_core) (st2' : CMin_core),
-  after_external csharpmin_eff_sem (Some ret1) st1 = Some st1' /\
-  after_external cmin_eff_sem (Some ret2) st2 = Some st2' /\
+  after_external (csharpmin_eff_sem hf) (Some ret1) st1 = Some st1' /\
+  after_external (cmin_eff_sem hf) (Some ret2) st2 = Some st2' /\
   MATCH st1' mu' st1' m1' st2' m2'.
 Proof. intros. 
  destruct MatchMu as [MC [RC [PG [GF [VAL [WDmu INJ]]]]]].
@@ -972,7 +974,7 @@ Proof. intros.
   destruct fd; inv H0.
   destruct tfd; inv AtExtTgt.
   inv TR.
-  remember (observableEF e1) as obs.
+  remember (observableEF hf e1) as obs.
   destruct obs; inv H0; inv H1.
   exists (CSharpMin_Returnstate ret1 k). eexists.
     split. reflexivity.
@@ -1165,8 +1167,8 @@ Qed.
 
 Lemma MATCH_safely_halted: forall cd mu c1 m1 c2 m2 v1
      (SMC: structured_match_cores cd mu c1 m1 c2 m2)
-     (HALT: halted CSharpMin_core_sem  c1 = Some v1),
-exists v2, halted CMin_core_sem c2 = Some v2 /\ 
+     (HALT: halted (CSharpMin_core_sem hf) c1 = Some v1),
+exists v2, halted (CMin_core_sem hf) c2 = Some v2 /\ 
            val_inject (restrict (as_inj mu) (vis mu)) v1 v2.
 Proof.
   intros.
@@ -1177,15 +1179,15 @@ Qed.
 
 Lemma Match_at_external: forall mu st1 m1 st2 m2 e vals1 sig
      (MC: structured_match_cores st1 mu st1 m1 st2 m2) 
-     (AtExt: at_external CSharpMin_core_sem st1 = Some (e, sig, vals1)),
+     (AtExt: at_external (CSharpMin_core_sem hf) st1 = Some (e, sig, vals1)),
   exists vals2, Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\
-                at_external CMin_core_sem st2 = Some (e, sig, vals2).
+                at_external (CMin_core_sem hf) st2 = Some (e, sig, vals2).
 Proof.
   intros. 
   inv MC; simpl in *; inv AtExt.
   destruct fd; inv H0.
   inv TR.
-  destruct (observableEF e0); inv H1.
+  destruct (observableEF hf e0); inv H1.
   exists targs.
   split; trivial. apply val_list_inject_forall_inject; eassumption. 
 Qed.
@@ -1205,11 +1207,11 @@ Qed.
 
 Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
        (MTCH: MATCH c1 mu c1 m1 c2 m2)
-       (AtExtSrc: at_external csharpmin_eff_sem c1 = Some (e, ef_sig, vals1)),
+       (AtExtSrc: at_external (csharpmin_eff_sem hf) c1 = Some (e, ef_sig, vals1)),
      Mem.inject (as_inj mu) m1 m2 /\
      exists vals2,
        Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\
-       at_external cmin_eff_sem c2 = Some (e, ef_sig, vals2) /\
+       at_external (cmin_eff_sem hf) c2 = Some (e, ef_sig, vals2) /\
       (forall pubSrc' pubTgt',
        pubSrc' = (fun b => locBlocksSrc mu b && REACH m1 (exportedSrc mu vals1) b) ->
        pubTgt' = (fun b => locBlocksTgt mu b && REACH m2 (exportedTgt mu vals2) b) ->
@@ -1933,7 +1935,7 @@ vargs targs x m1
 (ARGSINJ : val_list_inject (restrict (as_inj mu) (vis mu)) vargs targs)
 (EQ : transl_function f = OK x),
 exists (c2' : CMin_core) m2' mu',
-  corestep_plus CMin_core_sem tge (CMin_Callstate (AST.Internal x) targs tk) tm c2' m2'
+  corestep_plus (CMin_core_sem hf) tge (CMin_Callstate (AST.Internal x) targs tk) tm c2' m2'
  /\ intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m1 m2' /\ SM_wd mu' /\
@@ -2010,7 +2012,7 @@ Lemma MS_step_case_SkipSeq: forall
 (MK : match_cont (Csharpminor.Kseq s k) tk cenv xenv cs),
 exists st2' : CMin_core, 
   exists m2' mu',
-   corestep_plus CMin_core_sem tge
+   corestep_plus (CMin_core_sem hf) tge
      (CMin_State tfn Sskip tk (Vptr sp Int.zero) te) tm st2' m2' 
   /\ intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
@@ -2068,7 +2070,7 @@ Lemma MS_step_case_SkipBlock: forall
 (MK : match_cont (Csharpminor.Kblock k) tk cenv xenv cs),
 exists st2' : CMin_core,
   exists m2' mu',
-        corestep_plus CMin_core_sem tge (CMin_State tfn Sskip tk (Vptr sp Int.zero) te) tm st2' m2'      
+        corestep_plus (CMin_core_sem hf) tge (CMin_State tfn Sskip tk (Vptr sp Int.zero) te) tm st2' m2'      
   /\ intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m m2' /\
@@ -2111,7 +2113,7 @@ Lemma MS_match_is_call_cont: forall
  v (MK: match_cont k tk cenv xenv cs)
    (CC: Csharpminor.is_call_cont k),
   exists tk',
-    corestep_star CMin_core_sem tge (CMin_State tfn Sskip tk v te) tm
+    corestep_star (CMin_core_sem hf) tge (CMin_State tfn Sskip tk v te) tm
                 (CMin_State tfn Sskip tk' v te) tm
     /\ is_call_cont tk'
     /\ match_cont k tk' cenv nil cs.
@@ -2136,7 +2138,7 @@ Lemma MS_step_case_SkipCall:forall
 (MK : match_cont k tk cenv xenv cs),
 exists st2' : CMin_core,
   exists m2' mu',
-        corestep_plus CMin_core_sem tge (CMin_State  tfn Sskip tk (Vptr sp Int.zero) te) tm st2' m2'      
+        corestep_plus (CMin_core_sem hf) tge (CMin_State  tfn Sskip tk (Vptr sp Int.zero) te) tm st2' m2'      
   /\ intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m' m2' /\
@@ -2187,7 +2189,7 @@ Lemma MS_step_case_Assign: forall
 (EQ : transl_expr cenv a = OK (x, x0)),
 exists st2' : CMin_core,
   exists m2' mu',
-        corestep_plus CMin_core_sem tge (CMin_State tfn (Sassign id x) tk (Vptr sp Int.zero) te) tm st2' m2'
+        corestep_plus (CMin_core_sem hf) tge (CMin_State tfn (Sassign id x) tk (Vptr sp Int.zero) te) tm st2' m2'
   /\ intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m m2' /\
@@ -2236,7 +2238,7 @@ Lemma MS_step_case_Store: forall
 (EQ1 : transl_expr cenv a = OK (x1, x2)),
 exists st2' : CMin_core,
   exists m2' mu',
-        corestep_plus CMin_core_sem tge (CMin_State tfn (make_store chunk x x1) tk (Vptr sp Int.zero) te) tm st2' m2'
+        corestep_plus (CMin_core_sem hf) tge (CMin_State tfn (make_store chunk x x1) tk (Vptr sp Int.zero) te) tm st2' m2'
   /\ intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m' m2' /\
@@ -2313,7 +2315,7 @@ Lemma MS_step_case_Call: forall
 (EQ1 : transl_exprlist cenv bl = OK x1),
 exists c2' : CMin_core,
   exists m2' mu',
-        corestep_plus CMin_core_sem tge 
+        corestep_plus (CMin_core_sem hf) tge 
              (CMin_State  tfn (Scall optid (Csharpminor.funsig fd) x x1) tk (Vptr sp Int.zero) te) tm c2' m2'
 /\ intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
@@ -2353,11 +2355,11 @@ Qed. (*
 Lemma Builtin_mem_inject:
     forall vargs m1 t vres m2 f m1' vargs',
     meminj_preserves_globals ge (restrict (as_inj mu) (vis mu)) ->
-    csharpmin_eff_sem vargs m1 t vres m2 ->
+    (csharpmin_eff_sem hf) vargs m1 t vres m2 ->
     Mem.inject (restrict (as_inj mu) (vis mu)) m1 m1' ->
     val_list_inject (restrict (as_inj mu) (vis mu)) vargs vargs' ->
     exists mu', exists vres', exists m2',
-       cmin_eff_sem tge vargs' m1' t vres' m2'
+       (cmin_eff_sem hf) tge vargs' m1' t vres' m2'
     /\ val_inject (restrict (as_inj mu') (vis mu')) vres vres'
     /\ Mem.inject (restrict (as_inj mu') (vis mu')) m2 m2'
     /\ Mem.unchanged_on (loc_unmapped (as_inj mu)) m1 m2
@@ -2385,10 +2387,10 @@ forall x t ef optid vres m' bl vargs
         (Mem.nextblock m) (Mem.nextblock tm))
 (EQ : transl_exprlist cenv bl = OK x)
 (MK : match_cont k tk cenv xenv cs)
-(OBS: observableEF ef = false),
+(OBS: observableEF hf ef = false),
 exists c2' : CMin_core,
   exists m2' mu', 
-      corestep_plus CMin_core_sem tge
+      corestep_plus (CMin_core_sem hf) tge
            (CMin_State tfn (Sbuiltin optid ef x) tk (Vptr sp Int.zero) te) tm c2' m2' /\
   intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
@@ -2448,7 +2450,7 @@ forall x t ef optid vres m' bl vargs
 (EQ : transl_exprlist cenv bl = OK x),
 exists c2' : CMin_core,
   exists m2' mu', 
-      corestep_plus CMin_core_sem tge
+      corestep_plus (CMin_core_sem hf) tge
            (CMin_State tfn (Sbuiltin optid ef x) tk (Vptr sp Int.zero) te) tm c2' m2' /\
   intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
@@ -2517,7 +2519,7 @@ Lemma MS_step_case_Ite: forall
 (EQ0 : transl_stmt cenv xenv s2 = OK x2),
 exists c2' : CMin_core,
   exists m2' mu',
-        corestep_plus CMin_core_sem tge
+        corestep_plus (CMin_core_sem hf) tge
      (CMin_State tfn (Sifthenelse x x1 x2) tk (Vptr sp Int.zero) te) tm c2' m2' /\
      intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
@@ -2554,7 +2556,7 @@ Lemma MS_step_case_Loop: forall
 (EQ : transl_stmt cenv xenv s = OK x),
 exists c2' : CMin_core,
   exists m2' mu',
-      corestep_plus CMin_core_sem tge
+      corestep_plus (CMin_core_sem hf) tge
      (CMin_State tfn (Sloop x) tk (Vptr sp Int.zero) te) tm c2' m2' /\
      intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
@@ -2589,7 +2591,7 @@ Lemma MS_step_case_Block: forall
 (EQ : transl_stmt cenv (true :: xenv) s = OK x),
 exists c2' : CMin_core,
   exists m2' mu',
-        corestep_plus CMin_core_sem tge
+        corestep_plus (CMin_core_sem hf) tge
            (CMin_State tfn (Sblock x) tk (Vptr sp Int.zero) te) tm c2' m2' /\
      intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
@@ -2622,7 +2624,7 @@ Lemma MS_step_case_ExitSeq: forall
 (MK : match_cont (Csharpminor.Kseq s k) tk cenv xenv cs),
 exists c2' : CMin_core,
   exists m2' mu',
-        corestep_plus CMin_core_sem tge
+        corestep_plus (CMin_core_sem hf) tge
                (CMin_State tfn (Sexit (shift_exit xenv n)) tk (Vptr sp Int.zero) te) tm c2' m2'  /\
         MATCH (CSharpMin_State f (Csharpminor.Sexit n) k e lenv) mu'
     (CSharpMin_State f (Csharpminor.Sexit n) k e lenv) m c2' m2'
@@ -2668,7 +2670,7 @@ Lemma MS_step_case_ExitBlockZero: forall
 (MK : match_cont (Csharpminor.Kblock k) tk cenv xenv cs),
 exists c2' : CMin_core,
   exists m2' mu',
-   corestep_plus CMin_core_sem tge
+   corestep_plus (CMin_core_sem hf) tge
      (CMin_State tfn (Sexit (shift_exit xenv 0)) tk (Vptr sp Int.zero) te) tm c2' m2'
   /\ MATCH (CSharpMin_State f Csharpminor.Sskip k e lenv) mu'
     (CSharpMin_State f Csharpminor.Sskip k e lenv) m c2' m2'
@@ -2707,7 +2709,7 @@ Lemma MS_step_case_ExitBlockNonzero: forall
  n (MK : match_cont (Csharpminor.Kblock k) tk cenv xenv cs),
 exists c2' : CMin_core,
   exists m2' mu',
-        corestep_plus CMin_core_sem tge
+        corestep_plus (CMin_core_sem hf) tge
      (CMin_State tfn (Sexit (shift_exit xenv (S n))) tk (Vptr sp Int.zero) te) tm c2' m2' /\ 
        MATCH (CSharpMin_State f (Csharpminor.Sexit n) k e lenv) mu'
     (CSharpMin_State f (Csharpminor.Sexit n) k e lenv) m c2' m2'
@@ -2748,7 +2750,7 @@ Lemma MS_switch_MSI: forall
     (MK: match_cont k tk cenv xenv cs)
     (TK: transl_lblstmt_cont cenv xenv ls tk tk'),
   exists S, exists m2' mu',
-  corestep_plus CMin_core_sem  tge (CMin_State tfn (Sexit O) tk' (Vptr sp Int.zero) te) tm S m2'
+  corestep_plus (CMin_core_sem hf)  tge (CMin_State tfn (Sexit O) tk' (Vptr sp Int.zero) te) tm S m2'
   /\ MATCH (CSharpMin_State f (seq_of_lbl_stmt ls) k e lenv) mu'
                  (CSharpMin_State f (seq_of_lbl_stmt ls) k e lenv) m
                  S m2'
@@ -2802,7 +2804,7 @@ Lemma MS_step_case_Switch: forall
       OK ts),
 exists c2' : CMin_core,
   exists m2' mu',
-          corestep_plus CMin_core_sem tge
+          corestep_plus (CMin_core_sem hf) tge
              (CMin_State tfn ts tk (Vptr sp Int.zero) te) tm c2' m2' /\
          MATCH (CSharpMin_State f (seq_of_lbl_stmt (select_switch n cases)) k e lenv) mu'
     (CSharpMin_State f (seq_of_lbl_stmt (select_switch n cases)) k e lenv) m c2' m2'
@@ -2831,80 +2833,79 @@ Proof. intros.
 Qed.
 End CORESTEPS.
 
-Lemma MATCHtep: forall st1 m1 st1' m1'
-      (CS1:corestep csharpmin_eff_sem ge st1 m1 st1' m1')
+Lemma MATCH_corediagram: forall st1 m1 st1' m1'
+      (CS1:corestep (csharpmin_eff_sem hf) ge st1 m1 st1' m1')
       st2 mu m2 (MC: MATCH st1 mu st1 m1 st2 m2),
   exists st2' m2' mu',  intern_incr mu mu' /\
           sm_inject_separated mu mu' m1 m2 /\
           sm_locally_allocated mu mu' m1 m2 m1' m2' /\
           MATCH st1' mu' st1' m1' st2' m2' /\
           SM_wd mu' /\ sm_valid mu' m1' m2' /\
-          (corestep_plus cmin_eff_sem tge st2 m2 st2' m2' \/
+          (corestep_plus (cmin_eff_sem hf) tge st2 m2 st2' m2' \/
            (MC_measure st1' < MC_measure st1)%nat /\
-            corestep_star cmin_eff_sem tge st2 m2 st2' m2').
+            corestep_star (cmin_eff_sem hf) tge st2 m2 st2' m2').
 Proof.
   intros. unfold core_data in *.
-   inv CS1.
-  (*skip seq*)
+   inv CS1. 
+{ (*skip seq*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       monadInv TR.
       destruct (MS_step_case_SkipSeq _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
         PRE TRF MCS MK) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'. 
-      intuition.
-  (*skip Block*)
+      intuition. }
+{ (*skip Block*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       monadInv TR.
       destruct (MS_step_case_SkipBlock _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
         PRE TRF MCS MK) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'. 
-      intuition.
-  (*skip Call*)
+      intuition. }
+{ (*skip Call*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       monadInv TR.
       destruct (MS_step_case_SkipCall _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
         PRE TRF MCS _ H H0 MK) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'. 
-      intuition.
-  (*assign*)
+      intuition. }
+{ (*assign*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       monadInv TR.
       destruct (MS_step_case_Assign _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
         PRE TRF MCS _ _ id _ _ H MK EQ) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'. 
-      intuition.
-  (*store*)
+      intuition. }
+{ (*store*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       monadInv TR.
       destruct (MS_step_case_Store _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
         PRE TRF MCS _ _ _ _ _ _ _ _ _ _ H1 MK H H0 EQ EQ1) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'. 
-      intuition. 
-   (*call*)
+      intuition. }
+{  (*call*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       monadInv TR.
       destruct (MS_step_case_Call _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
        PRE TRF MCS _ _ _ _ _ _ optid _ _ MK H H0 H1 EQ EQ1) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'. 
-      intuition. 
-   (*builtin*) 
+      intuition. }
+{  (*builtin*) 
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       monadInv TR.
-(*      destruct PRE as [RC [PG [GFP [SMV [WD INJ]]]]].*)
       exploit transl_exprlist_correct; try eassumption. eapply PRE. eapply PRE.
       intros [tvargs [EVAL2 VINJ2]].
       exploit MS_step_case_Builtin; try eassumption.
       intros [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2', m2', mu'. intuition. eassumption.
-      left. eassumption. 
-   (* seq *)
+      left. eassumption.  }
+ { (* seq *)
      destruct MC as [SMC PRE].
      inv SMC. 
       (*Case 1*) 
@@ -2936,64 +2937,64 @@ Proof.
                   econstructor; eauto.
                   intuition. 
          right. split. simpl. omega.
-                exists O. constructor.
-(* ifthenelse *)
+                exists O. constructor. }
+{ (* ifthenelse *)
       destruct MC as [SMC PRE].
       inv SMC. 
       monadInv TR.
       destruct (MS_step_case_Ite _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
         PRE TRF MCS _ _ _ _ _ _ _ _ _ H H0 MK EQ EQ1 EQ0) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'.
-      intuition.
-(* loop *) 
+      intuition. }
+{ (* loop *) 
       destruct MC as [SMC PRE].
       inv SMC. 
       monadInv TR.
       destruct (MS_step_case_Loop _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
         PRE TRF MCS _ _ MK EQ) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'.
-      intuition.
-(* block *)
+      intuition. }
+{ (* block *)
       destruct MC as [SMC PRE].
       inv SMC. 
       monadInv TR.
       destruct (MS_step_case_Block _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
         PRE TRF MCS _ _ MK EQ) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'.
-      intuition.
-  (*exit seq*)
+      intuition. }
+{ (*exit seq*)
       destruct MC as [SMC PRE].
       inv SMC. 
       monadInv TR.
       destruct (MS_step_case_ExitSeq _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
         PRE TRF MCS n  _ MK) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'.
-      intuition.
-  (*exit block zero*)
+      intuition. }
+{ (*exit block zero*)
       destruct MC as [SMC PRE].
       inv SMC.
       monadInv TR.
       destruct (MS_step_case_ExitBlockZero _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
         PRE TRF MCS MK) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'.
-      intuition.
-  (*exit block nonzero*)
+      intuition. }
+{ (*exit block nonzero*)
       destruct MC as [SMC PRE].
       inv SMC.
       monadInv TR.
       destruct (MS_step_case_ExitBlockNonzero _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
         PRE TRF MCS n MK) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'.
-      intuition.
-  (*switch*)
+      intuition. }
+{ (*switch*)
       destruct MC as [SMC PRE].
       inv SMC.
       monadInv TR.
       destruct (MS_step_case_Switch _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
           PRE TRF MCS _ _ _ _ _ _ MK H EQ EQ0) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'.
-      intuition.
-  (*return none*)
+      intuition. }
+{ (*return none*)
       destruct MC as [SMC PRE].
       inv SMC. 
       monadInv TR.
@@ -3022,8 +3023,8 @@ Proof.
          constructor.
          intuition. 
            eapply REACH_closed_freelist; try eassumption.
-       apply SMV'.
-  (*return some*)
+       apply SMV'. }
+{ (*return some*)
       destruct MC as [SMC PRE].
       inv SMC. 
       monadInv TR.
@@ -3055,8 +3056,8 @@ Proof.
          assumption.
          intuition. 
            eapply REACH_closed_freelist; try eassumption.
-       apply SMV'.
-  (*label*)
+       apply SMV'. }
+{ (*label*)
       destruct MC as [SMC PRE].
       inv SMC. 
       monadInv TR.
@@ -3072,8 +3073,8 @@ Proof.
       econstructor; eauto.
         econstructor; eauto.
         intuition.
-       assumption.
-  (*goto*)
+       assumption. }
+{ (*goto*)
       destruct MC as [SMC PRE].
       inv SMC. 
       monadInv TR.
@@ -3091,16 +3092,16 @@ Proof.
       econstructor; eauto.
         econstructor; eauto.
         intuition.
-       assumption.
-(* internal call *) 
+       assumption. }
+{ (* internal call *) 
       destruct MC as [SMC PRE].
       inv SMC. 
       monadInv TR. 
       exploit MS_step_case_InternalCall; try eassumption.
       intros. destruct H4 as [c2' [m2' [mu' XX]]].
-      exists c2', m2', mu'. intuition.
+      exists c2', m2', mu'. intuition. }
 (* external call - no case*) 
-(* return *) 
+{ (* return *) 
       destruct MC as [SMC PRE].
       inv SMC.
   inv MK. simpl.
@@ -3117,7 +3118,7 @@ Proof.
         unfold set_optvar. destruct optid; simpl option_map; econstructor; eauto.
         eapply match_temps_assign. assumption. assumption.
       simpl; intuition.
-      assumption.
+      assumption. }
 Qed. 
 
 Lemma orb_same: forall b b', b = b || b && b'.
@@ -3132,7 +3133,7 @@ Lemma EFF_switch_descent:
   exists k',
   transl_lblstmt_cont cenv xenv ls k k'
   /\ (forall f sp e m,
-     effstep_plus cmin_eff_sem tge EmptyEffect
+     effstep_plus (cmin_eff_sem hf) tge EmptyEffect
          (CMin_State f s k sp e) m (CMin_State f body k' sp e) m).
 Proof.
   induction ls; intros.
@@ -3167,7 +3168,7 @@ Lemma EFF_switch_ascent:
   let ls' := select_switch n ls in
   transl_lblstmt_cont cenv xenv ls k k1 ->
   exists k2,
-  effstep_star cmin_eff_sem tge EmptyEffect 
+  effstep_star (cmin_eff_sem hf) tge EmptyEffect 
     (CMin_State f (Sexit (Switch.switch_target n (length tbl) tbl)) k1 sp e) m  
     (CMin_State f (Sexit O) k2 sp e) m
   /\ transl_lblstmt_cont cenv xenv ls' k k2.
@@ -3208,7 +3209,7 @@ Lemma eff_make_store_correct:
   val_inject f vaddr tvaddr ->
   val_inject f vrhs tvrhs ->
   exists tm', exists tvrhs',
-  cmin_effstep tge (StoreEffect tvaddr (encode_val chunk tvrhs')) (CMin_State fn (make_store chunk addr rhs) k sp te) tm
+  cmin_effstep hf tge (StoreEffect tvaddr (encode_val chunk tvrhs')) (CMin_State fn (make_store chunk addr rhs) k sp te) tm
         (CMin_State fn Sskip k sp te) tm'
   /\ Mem.storev chunk tm tvaddr tvrhs' = Some tm'
   /\ Mem.inject f m' tm'.
@@ -3254,7 +3255,7 @@ Lemma EFF_step_case_SkipSeq: forall
 (MK : match_cont (Csharpminor.Kseq s k) tk cenv xenv cs),
 exists st2' : CMin_core, 
   exists m2' mu',
-   effstep_plus cmin_eff_sem tge EmptyEffect
+   effstep_plus (cmin_eff_sem hf) tge EmptyEffect
      (CMin_State tfn Sskip tk (Vptr sp Int.zero) te) tm st2' m2' 
   /\ intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
@@ -3314,7 +3315,7 @@ Lemma EFF_step_case_SkipBlock: forall
 (MK : match_cont (Csharpminor.Kblock k) tk cenv xenv cs),
 exists st2' : CMin_core,
   exists m2' mu',
-     effstep_plus cmin_eff_sem tge EmptyEffect
+     effstep_plus (cmin_eff_sem hf) tge EmptyEffect
         (CMin_State tfn Sskip tk (Vptr sp Int.zero) te) tm st2' m2'      
   /\ intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
@@ -3360,7 +3361,7 @@ Lemma EFF_match_is_call_cont: forall
  v (MK: match_cont k tk cenv xenv cs)
    (CC: Csharpminor.is_call_cont k),
   exists tk',
-    effstep_star cmin_eff_sem tge EmptyEffect
+    effstep_star (cmin_eff_sem hf) tge EmptyEffect
                 (CMin_State tfn Sskip tk v te) tm
                 (CMin_State tfn Sskip tk' v te) tm
     /\ is_call_cont tk'
@@ -3391,7 +3392,7 @@ Lemma EFF_step_case_SkipCall: forall
 (MK : match_cont k tk cenv xenv cs),
 exists st2' : CMin_core,
   exists m2' mu',
-    effstep_plus cmin_eff_sem tge (FreeEffect tm 0 (fn_stackspace tfn) sp)
+    effstep_plus (cmin_eff_sem hf) tge (FreeEffect tm 0 (fn_stackspace tfn) sp)
       (CMin_State tfn Sskip tk (Vptr sp Int.zero) te) tm st2' m2'      
   /\ intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
@@ -3446,7 +3447,7 @@ Lemma EFF_step_case_Assign: forall
 (EQ : transl_expr cenv a = OK (x, x0)),
 exists st2' : CMin_core,
   exists m2' mu',
-    effstep_plus cmin_eff_sem tge EmptyEffect
+    effstep_plus (cmin_eff_sem hf) tge EmptyEffect
        (CMin_State tfn (Sassign id x) tk (Vptr sp Int.zero) te) tm st2' m2'
   /\ intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
@@ -3505,7 +3506,7 @@ exists tv',
 exists st2' : CMin_core,
   exists m2' mu',
 exists vv, 
-       effstep_plus cmin_eff_sem tge (StoreEffect tv' (encode_val chunk vv))
+       effstep_plus (cmin_eff_sem hf) tge (StoreEffect tv' (encode_val chunk vv))
           (CMin_State tfn (make_store chunk x x1) tk 
           (Vptr sp Int.zero) te) tm st2' m2' /\ 
   Mem.storev chunk tm tv' vv = Some m2' /\
@@ -3588,7 +3589,7 @@ Lemma EFF_step_case_Call: forall
 (EQ1 : transl_exprlist cenv bl = OK x1),
 exists c2' : CMin_core,
   exists m2' mu',
-        effstep_plus cmin_eff_sem tge EmptyEffect 
+        effstep_plus (cmin_eff_sem hf) tge EmptyEffect 
              (CMin_State  tfn (Scall optid (Csharpminor.funsig fd) x x1) tk (Vptr sp Int.zero) te) tm c2' m2'
 /\ intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
@@ -3640,7 +3641,7 @@ Lemma EFF_step_case_Ite: forall
 (EQ0 : transl_stmt cenv xenv s2 = OK x2),
 exists c2' : CMin_core,
   exists m2' mu',
-     effstep_plus cmin_eff_sem tge EmptyEffect 
+     effstep_plus (cmin_eff_sem hf) tge EmptyEffect 
      (CMin_State tfn (Sifthenelse x x1 x2) tk (Vptr sp Int.zero) te) tm c2' m2' /\
      intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
@@ -3676,7 +3677,7 @@ Lemma EFF_step_case_Loop: forall
 (EQ : transl_stmt cenv xenv s = OK x),
 exists c2' : CMin_core,
   exists m2' mu',
-     effstep_plus cmin_eff_sem tge EmptyEffect 
+     effstep_plus (cmin_eff_sem hf) tge EmptyEffect 
      (CMin_State tfn (Sloop x) tk (Vptr sp Int.zero) te) tm c2' m2' /\
      intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
@@ -3711,7 +3712,7 @@ Lemma EFF_step_case_Block: forall
 (EQ : transl_stmt cenv (true :: xenv) s = OK x),
 exists c2' : CMin_core,
   exists m2' mu',
-      effstep_plus cmin_eff_sem tge EmptyEffect 
+      effstep_plus (cmin_eff_sem hf) tge EmptyEffect 
          (CMin_State tfn (Sblock x) tk (Vptr sp Int.zero) te) tm c2' m2' /\
   intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
@@ -3744,7 +3745,7 @@ Lemma EFF_step_case_ExitSeq: forall
 (MK : match_cont (Csharpminor.Kseq s k) tk cenv xenv cs),
 exists c2' : CMin_core,
   exists m2' mu',
-       effstep_plus cmin_eff_sem tge EmptyEffect 
+       effstep_plus (cmin_eff_sem hf) tge EmptyEffect 
                (CMin_State tfn (Sexit (shift_exit xenv n)) tk (Vptr sp Int.zero) te) tm c2' m2'  /\
         MATCH (CSharpMin_State f (Csharpminor.Sexit n) k e lenv) mu'
     (CSharpMin_State f (Csharpminor.Sexit n) k e lenv) m c2' m2'
@@ -3796,7 +3797,7 @@ Lemma EFF_step_case_ExitBlockZero: forall
 (MK : match_cont (Csharpminor.Kblock k) tk cenv xenv cs),
 exists c2' : CMin_core,
   exists m2' mu',
-   effstep_plus cmin_eff_sem tge EmptyEffect 
+   effstep_plus (cmin_eff_sem hf) tge EmptyEffect 
      (CMin_State tfn (Sexit (shift_exit xenv 0)) tk (Vptr sp Int.zero) te) tm c2' m2'
   /\ MATCH (CSharpMin_State f Csharpminor.Sskip k e lenv) mu'
     (CSharpMin_State f Csharpminor.Sskip k e lenv) m c2' m2'
@@ -3839,7 +3840,7 @@ Lemma EFF_step_case_ExitBlockNonzero: forall
  n (MK : match_cont (Csharpminor.Kblock k) tk cenv xenv cs),
 exists c2' : CMin_core,
   exists m2' mu',
-       effstep_plus cmin_eff_sem tge EmptyEffect 
+       effstep_plus (cmin_eff_sem hf) tge EmptyEffect 
      (CMin_State tfn (Sexit (shift_exit xenv (S n))) tk (Vptr sp Int.zero) te) tm c2' m2' /\ 
        MATCH (CSharpMin_State f (Csharpminor.Sexit n) k e lenv) mu'
     (CSharpMin_State f (Csharpminor.Sexit n) k e lenv) m c2' m2'
@@ -3884,7 +3885,7 @@ Lemma EFF_switch_MSI: forall
     (MK: match_cont k tk cenv xenv cs)
     (TK: transl_lblstmt_cont cenv xenv ls tk tk'),
   exists S, exists m2' mu',
-  effstep_plus cmin_eff_sem tge EmptyEffect 
+  effstep_plus (cmin_eff_sem hf) tge EmptyEffect 
       (CMin_State tfn (Sexit O) tk' (Vptr sp Int.zero) te) tm S m2'
   /\ MATCH (CSharpMin_State f (seq_of_lbl_stmt ls) k e lenv) mu'
                  (CSharpMin_State f (seq_of_lbl_stmt ls) k e lenv) m
@@ -3945,7 +3946,7 @@ Lemma EFF_step_case_Switch: forall
       OK ts),
 exists c2' : CMin_core,
   exists m2' mu',
-       effstep_plus cmin_eff_sem tge EmptyEffect 
+       effstep_plus (cmin_eff_sem hf) tge EmptyEffect 
              (CMin_State tfn ts tk (Vptr sp Int.zero) te) tm c2' m2' /\
          MATCH (CSharpMin_State f (seq_of_lbl_stmt (select_switch n cases)) k e lenv) mu'
     (CSharpMin_State f (seq_of_lbl_stmt (select_switch n cases)) k e lenv) m c2' m2'
@@ -3986,10 +3987,10 @@ forall x t ef optid vres m' bl vargs tvargs
 (MK : match_cont k tk cenv xenv cs)
 (Vinj: val_list_inject (restrict (as_inj mu) (vis mu)) vargs tvargs)
 (EVAL2: eval_exprlist tge (Vptr sp Int.zero) te tm x tvargs)
-(OBS: observableEF ef = false),
+(OBS: observableEF hf ef = false),
 exists c2' : CMin_core,
   exists m2' mu', 
-      effstep_plus cmin_eff_sem tge (BuiltinEffect tge ef tvargs tm)
+      effstep_plus (cmin_eff_sem hf) tge (BuiltinEffect tge ef tvargs tm)
            (CMin_State tfn (Sbuiltin optid ef x) tk (Vptr sp Int.zero) te) tm c2' m2' /\
   intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
@@ -4083,7 +4084,7 @@ vargs targs x m1
 (ARGSINJ : val_list_inject (restrict (as_inj mu) (vis mu)) vargs targs)
 (EQ : transl_function f = OK x),
 exists (c2' : CMin_core) m2' mu',
-  effstep_plus cmin_eff_sem tge EmptyEffect
+  effstep_plus (cmin_eff_sem hf) tge EmptyEffect
     (CMin_Callstate (AST.Internal x) targs tk) tm c2' m2'
  /\ intern_incr mu mu' /\
   sm_inject_separated mu mu' m tm /\
@@ -4128,7 +4129,7 @@ End EFF_InternalCall.
 
 Lemma Match_effcore_diagram:
 forall st1 m1 st1' m1' (U1 : Values.block -> Z -> bool)
-       (EFFSTEP: effstep csharpmin_eff_sem ge U1 st1 m1 st1' m1')
+       (EFFSTEP: effstep (csharpmin_eff_sem hf) ge U1 st1 m1 st1' m1')
        st2 mu m2
        (UHyp: forall b ofs,  U1 b ofs = true -> vis mu b = true)
        (MC: MATCH st1 mu st1 m1 st2 m2),
@@ -4138,9 +4139,9 @@ exists st2' m2' mu',
   sm_locally_allocated mu mu' m1 m2 m1' m2' /\
   MATCH st1' mu' st1' m1' st2' m2' /\
   (exists U2 : Values.block -> Z -> bool,
-     (effstep_plus cmin_eff_sem tge U2 st2 m2 st2' m2' \/
+     (effstep_plus (cmin_eff_sem hf) tge U2 st2 m2 st2' m2' \/
       (MC_measure st1' < MC_measure st1)%nat /\
-      effstep_star cmin_eff_sem tge U2 st2 m2 st2' m2') /\
+      effstep_star (cmin_eff_sem hf) tge U2 st2 m2 st2' m2') /\
      (forall (b : Values.block) (ofs : Z),
       U2 b ofs = true ->
       visTgt mu b = true /\
@@ -4158,7 +4159,8 @@ Proof.
    apply CSharpMin_corestep_not_at_external in CS1.
    inv Ht; simpl in *.*)
 induction EFFSTEP; simpl in *.
-  (*skip seq*)
+
+{ (*skip seq*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       monadInv TR.
@@ -4166,8 +4168,8 @@ induction EFFSTEP; simpl in *.
         PRE TRF MCS MK) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'. 
       intuition.
-      exists EmptyEffect. intuition. 
-  (*skip Block*)
+      exists EmptyEffect. intuition. }
+{ (*skip Block*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       monadInv TR.
@@ -4175,8 +4177,8 @@ induction EFFSTEP; simpl in *.
         PRE TRF MCS MK) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'. 
       intuition.
-      exists EmptyEffect. intuition. 
-  (*skip Call*)
+      exists EmptyEffect. intuition. }
+{ (*skip Call*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       monadInv TR.
@@ -4188,8 +4190,8 @@ induction EFFSTEP; simpl in *.
         apply FreeEffectD in H11. destruct H11 as [? [VB Arith]]; subst.
         inv MCS. unfold visTgt. rewrite SPlocal. trivial.
       apply FreeEffectD in H11. destruct H11 as [? [VB Arith]]; subst.
-        inv MCS. rewrite H14 in SPlocal. discriminate.
-  (*assign*)
+        inv MCS. rewrite H14 in SPlocal. discriminate. }
+{ (*assign*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       monadInv TR.
@@ -4197,8 +4199,8 @@ induction EFFSTEP; simpl in *.
         PRE TRF MCS _ _ id _ _ H MK EQ) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'. 
       intuition.
-      exists EmptyEffect. intuition.
-  (*store*)
+      exists EmptyEffect. intuition. }
+{ (*store*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       monadInv TR.
@@ -4225,21 +4227,21 @@ induction EFFSTEP; simpl in *.
            destruct (zlt ofs (Int.unsigned i + Z.of_nat (length (encode_val chunk u)))); trivial.
            omega.
           omega.
-        elim n. trivial.  
-   (*call*)
-      { destruct MC as [SMC PRE].
-      inv SMC; simpl in *. 
-      monadInv TR.
-      destruct (EFF_step_case_Call _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-       PRE TRF MCS _ _ _ _ _ _ optid vargs _ MK H H0 H1 EQ EQ1) as [c2' [m2' [mu' [cstepPlus MS]]]].
-      exists c2'. exists m2'. exists mu'. 
-      intuition.
-      exists EmptyEffect. intuition. }
-   (*builtin*)
+        elim n. trivial. }
+{  (*call*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       monadInv TR.
-(*      destruct PRE as [RC [PG [GFP [SMV [WD INJ]]]]].*)
+      destruct (EFF_step_case_Call _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+       PRE TRF MCS _ _ _ _ _ _ optid vargs _ MK H H0 H1 EQ EQ1) 
+        as [c2' [m2' [mu' [cstepPlus MS]]]].
+      exists c2'. exists m2'. exists mu'. 
+      intuition.
+      exists EmptyEffect. intuition. }
+{  (*builtin*)
+      destruct MC as [SMC PRE].
+      inv SMC; simpl in *. 
+      monadInv TR.
       exploit transl_exprlist_correct; try eassumption. eapply PRE. eapply PRE.
       intros [tvargs [EVAL2 VINJ2]].
       exploit MS_step_case_Builtin_eff; try eassumption.
@@ -4248,8 +4250,8 @@ induction EFFSTEP; simpl in *.
       exists c2', m2', mu'. intuition. 
       exists (BuiltinEffect tge ef tvargs m2).
       split. left. assumption. 
-      eapply BuiltinEffect_Propagate; eassumption. 
-  (* seq *)
+      eapply BuiltinEffect_Propagate; eassumption. }
+{ (* seq *)
      destruct MC as [SMC PRE].
      inv SMC. 
       (*Case 1*) 
@@ -4284,8 +4286,8 @@ induction EFFSTEP; simpl in *.
          exists EmptyEffect. 
          intuition. right. split. omega.
                 exists O. constructor.
-          trivial. reflexivity.
-(* ifthenelse *) 
+          trivial. reflexivity. }
+{  (* ifthenelse *) 
       destruct MC as [SMC PRE].
       inv SMC. 
       monadInv TR.
@@ -4293,8 +4295,8 @@ induction EFFSTEP; simpl in *.
         PRE TRF MCS _ _ _ _ _ _ _ _ _ H H0 MK EQ EQ1 EQ0) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'.
       intuition.
-      exists EmptyEffect. intuition.
-(* loop *)
+      exists EmptyEffect. intuition. }
+{  (* loop *)
       destruct MC as [SMC PRE].
       inv SMC. 
       monadInv TR.
@@ -4302,8 +4304,8 @@ induction EFFSTEP; simpl in *.
         PRE TRF MCS _ _ MK EQ) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'.
       intuition.
-      exists EmptyEffect. intuition.
-(* block *)
+      exists EmptyEffect. intuition. }
+{  (* block *)
       destruct MC as [SMC PRE].
       inv SMC. 
       monadInv TR.
@@ -4311,8 +4313,8 @@ induction EFFSTEP; simpl in *.
         PRE TRF MCS _ _ MK EQ) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'.
       intuition.
-      exists EmptyEffect. intuition.
-  (*exit seq*)
+      exists EmptyEffect. intuition. }
+{  (*exit seq*)
       destruct MC as [SMC PRE].
       inv SMC. 
       monadInv TR.
@@ -4320,8 +4322,8 @@ induction EFFSTEP; simpl in *.
         PRE TRF MCS n  _ MK) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'.
       intuition.
-      exists EmptyEffect. intuition.
-  (*exit block zero*)
+      exists EmptyEffect. intuition. }
+{  (*exit block zero*)
       destruct MC as [SMC PRE].
       inv SMC.
       monadInv TR.
@@ -4329,8 +4331,8 @@ induction EFFSTEP; simpl in *.
         PRE TRF MCS MK) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'.
       intuition.
-      exists EmptyEffect. intuition.
-  (*exit block nonzero*)
+      exists EmptyEffect. intuition. }
+{  (*exit block nonzero*)
       destruct MC as [SMC PRE].
       inv SMC.
       monadInv TR.
@@ -4338,8 +4340,8 @@ induction EFFSTEP; simpl in *.
         PRE TRF MCS n MK) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'.
       intuition.
-      exists EmptyEffect. intuition.
-  (*switch*)
+      exists EmptyEffect. intuition. }
+{ (*switch*)
       destruct MC as [SMC PRE].
       inv SMC.
       monadInv TR.
@@ -4347,8 +4349,8 @@ induction EFFSTEP; simpl in *.
           PRE TRF MCS _ _ _ _ _ _ MK H EQ EQ0) as [c2' [m2' [mu' [cstepPlus MS]]]].
       exists c2'. exists m2'. exists mu'.
       intuition.
-      exists EmptyEffect. intuition.  
-  (*return none*) 
+      exists EmptyEffect. intuition. }
+{ (*return none*) 
       destruct MC as [SMC PRE].
       inv SMC. 
       monadInv TR.
@@ -4384,8 +4386,8 @@ induction EFFSTEP; simpl in *.
          eapply match_call_cont; eauto.
          constructor.
          intuition. 
-           eapply REACH_closed_freelist; try eassumption.
-  (*return some*)
+           eapply REACH_closed_freelist; try eassumption. }
+{ (*return some*)
       destruct MC as [SMC PRE].
       inv SMC. 
       monadInv TR.
@@ -4424,8 +4426,8 @@ induction EFFSTEP; simpl in *.
          eapply match_call_cont; eauto.
          assumption.
          intuition. 
-           eapply REACH_closed_freelist; try eassumption.
-  (*label*)
+           eapply REACH_closed_freelist; try eassumption. }
+{ (*label*)
       destruct MC as [SMC PRE].
       inv SMC. 
       monadInv TR.
@@ -4441,8 +4443,8 @@ induction EFFSTEP; simpl in *.
           try rewrite freshloc_irrefl; intuition.
       econstructor; eauto.
         econstructor; eauto.
-        intuition.
-  (*goto*)
+        intuition. }
+{  (*goto*)
       destruct MC as [SMC PRE].
       inv SMC. 
       monadInv TR.
@@ -4460,19 +4462,19 @@ induction EFFSTEP; simpl in *.
           try rewrite freshloc_irrefl; intuition.
       econstructor; eauto.
         econstructor; eauto.
-        intuition.
-(* internal call *) 
+        intuition. }
+{  (* internal call *) 
       destruct MC as [SMC PRE].
       inv SMC. 
       monadInv TR. 
       exploit EFF_step_case_InternalCall; try eassumption.
       intros IC. destruct IC as [c2' [m2' [mu' XX]]].
       exists c2', m2', mu'. intuition.
-      exists EmptyEffect. intuition.
-(* external call disappears  
-      destruct st1; simpl in *; try inv H. 
-      discriminate. *)
-(* return *) 
+      exists EmptyEffect. intuition. }
+
+(* no case for external calls *)
+
+{  (* return *) 
       destruct MC as [SMC PRE].
       inv SMC.
       inv MK. simpl.
@@ -4489,20 +4491,7 @@ induction EFFSTEP; simpl in *.
         econstructor; eauto.
         unfold set_optvar. destruct optid; simpl option_map; econstructor; eauto.
         eapply match_temps_assign. assumption. assumption.
-      simpl; intuition.
-(*inductive case - sub_val
-  destruct IHEFFSTEP as [c2' [m2' [mu' X]]].
-    intros. eapply UHyp. apply H. assumption. eassumption.
-    assumption. assumption.
-  exists c2', m2', mu'. intuition.
-  destruct H5 as [U2 [HH1 HH2]].
-  exists U2; split; trivial.
-  intros. destruct (HH2 _ _ H4). clear H4 HH2.
-  split; trivial.
-  intros. destruct (H6 H4) as [b1 [delta [Frg [HE HP]]]]; clear H6.
-  exists b1, delta. split; trivial. split; trivial.
-  apply Mem.perm_valid_block in HP. 
-  apply H; assumption. *)
+      simpl; intuition. }
 Qed. 
 
 (*program structure not yet updated to module*)
@@ -4518,8 +4507,8 @@ Theorem transl_program_correct:
                 /\ Genv.find_funct_ptr ge b = Some f1
                 /\ Genv.find_funct_ptr tge b = Some f2)
          (init_mem: exists m0, Genv.init_mem prog = Some m0),
-SM_simulation.SM_simulation_inject csharpmin_eff_sem 
-   cmin_eff_sem ge tge entrypoints.
+SM_simulation.SM_simulation_inject (csharpmin_eff_sem hf) 
+   (cmin_eff_sem hf) ge tge entrypoints.
 Proof.
 intros.
 assert (GDE:= GDE_lemma).
@@ -4535,22 +4524,6 @@ assert (GDE:= GDE_lemma).
   apply Match_restrict.
 (*match_valid*)
   apply Match_validblocks.
-(*match_protected
-  intros. rewrite REACHAX in H0. destruct H0 as [L HL].
-  generalize dependent b.
-  induction L; simpl; intros; inv HL.
-    inv H.
-    destruct (disjoint_extern_local_Src mu) with (b:=b) as [D |D]; 
-      try eapply H3; rewrite D in *; discriminate.
-  specialize (IHL _ H3).
-    remember (locBlocksSrc mu b') as d'.
-    destruct d'; apply eq_sym in Heqd'.
-      eapply REACH_cons; try eassumption. apply IHL; trivial.
-    remember (frgnBlocksSrc mu b') as q'.
-    destruct q'; apply eq_sym in Heqq'.
-      eapply REACH_cons; try eassumption.
-      apply REACH_nil. trivial.
-     assumption.*)
 (*match_genv*)
   apply Match_genv.
 (*initial_core*)
@@ -4618,7 +4591,7 @@ assert (GDE:= GDE_lemma).
             (nu:=nu) (nu':=nu') (mu':=mu');
      try assumption; try reflexivity. }
 (* core_diagram*)
-  { intros; exploit MATCHtep; eauto.
+  { intros; exploit MATCH_corediagram; eauto.
     intros [st2' [m2' [mu' [? [? [? [? [? [? ?]]]]]]]]].
     exists st2',m2',mu'; split; auto. }
 (* effcore_diagram*)

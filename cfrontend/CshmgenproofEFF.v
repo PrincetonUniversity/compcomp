@@ -130,6 +130,7 @@ Qed.
 (** * Correctness of Csharpminor construction functions *)
 
 Section CONSTRUCTORS.
+(*NEW*) Variable hf : I64Helpers.helper_functions.
 
 Variable ge: genv.
 
@@ -681,7 +682,7 @@ Lemma make_memcpy_correct:
   eval_expr ge e le m src v ->
   assign_loc ty m b ofs v m' ->
   access_mode ty = By_copy ->
-  CSharpMin_corestep ge (CSharpMin_State f (make_memcpy dst src ty) k e le) m
+  CSharpMin_corestep hf ge (CSharpMin_State f (make_memcpy dst src ty) k e le) m
           (CSharpMin_State f Sskip k e le) m'.
 Proof.
   intros. inv H1; try congruence. 
@@ -702,7 +703,7 @@ Lemma make_memcpy_correct_BuiltinEffect:
        assign_loc ty m b ofs v m' ->
        access_mode ty = By_copy ->
   exists b' ofs', v = Vptr b' ofs' /\
-  effstep csharpmin_eff_sem ge
+  effstep (csharpmin_eff_sem hf) ge
           (BuiltinEffect ge (EF_memcpy (sizeof ty) (alignof_blockcopy ty))
                             (Vptr b ofs :: Vptr b' ofs' :: nil) m)
           (CSharpMin_State f (make_memcpy dst src ty) k e le) m
@@ -727,7 +728,7 @@ Lemma make_memcpy_correct_BuiltinEffect:
        assign_loc ty m b ofs v m' ->
        access_mode ty = By_copy ->
   exists b' ofs', v = Vptr b' ofs' /\
-  effstep csharpmin_eff_sem ge
+  effstep (csharpmin_eff_sem hf) ge
           (BuiltinEffect ge (ef_sig (EF_memcpy (sizeof ty) (alignof_blockcopy ty)))
                             (Vptr b ofs :: Vptr b' ofs' :: nil) m)
           (CSharpMin_State f (make_memcpy dst src ty) k e le) m
@@ -752,7 +753,7 @@ Lemma make_memcpy_correct_assignlocEffect:
        assign_loc ty m b ofs v m' ->
        access_mode ty = By_copy ->
   exists b' ofs', v = Vptr b' ofs' /\
-  effstep csharpmin_eff_sem ge
+  effstep (csharpmin_eff_sem hf) ge
           (assign_loc_Effect ty b ofs v)
           (CSharpMin_State f (make_memcpy dst src ty) k e le) m
           (CSharpMin_State f Sskip k e le) m'.
@@ -796,7 +797,7 @@ Lemma make_store_correct:
   eval_expr ge e le m addr (Vptr b ofs) ->
   eval_expr ge e le m rhs v ->
   assign_loc ty m b ofs v m' ->
-  CSharpMin_corestep ge (CSharpMin_State f code k e le) m
+  CSharpMin_corestep hf ge (CSharpMin_State f code k e le) m
                         (CSharpMin_State f Sskip k e le) m'.
 Proof.
   unfold make_store. intros until k; intros MKSTORE EV1 EV2 ASSIGN.
@@ -818,12 +819,12 @@ Lemma make_store_correct_StoreEffect:
   assign_loc ty m b ofs v m' ->
   match access_mode ty with
    By_value chunk =>
-             effstep csharpmin_eff_sem ge 
+             effstep (csharpmin_eff_sem hf) ge 
                 (StoreEffect (Vptr b ofs) (encode_val chunk v))
                 (CSharpMin_State f code k e le) m
                 (CSharpMin_State f Sskip k e le) m'
 | By_copy => exists b' ofs', v = Vptr b' ofs' /\
-             effstep csharpmin_eff_sem ge 
+             effstep (csharpmin_eff_sem hf) ge 
                 (BuiltinEffect ge (EF_memcpy (sizeof ty) (alignof_blockcopy ty))
                                   (Vptr b ofs :: Vptr b' ofs' :: nil) m)
                 (CSharpMin_State f code k e le) m
@@ -855,6 +856,8 @@ Hypothesis TRANSL: transl_program prog = OK tprog.
 
 Let ge : Clight.genv := Genv.globalenv prog.
 Let tge : Csharpminor.genv := Genv.globalenv tprog.
+
+(*NEW*) Variable hf : I64Helpers.helper_functions.
 
 Lemma symbols_preserved:
   forall s, Genv.find_symbol tge s = Genv.find_symbol ge s.
@@ -1754,7 +1757,7 @@ Qed.
 Lemma match_transl_corestep:
   forall ts tk ts' tk' f te le m,
   match_transl (Sblock ts) tk ts' tk' ->
-  corestep_star csharpmin_eff_sem  tge 
+  corestep_star (csharpmin_eff_sem hf)  tge 
        (CSharpMin_State f ts' tk' te le) m
        (CSharpMin_State f ts (Kblock tk) te le) m.
 Proof.
@@ -1766,7 +1769,7 @@ Qed.
 Lemma match_transl_effstep:
   forall ts tk ts' tk' f te le m,
   match_transl (Sblock ts) tk ts' tk' ->
-  effstep_star csharpmin_eff_sem  tge EmptyEffect
+  effstep_star (csharpmin_eff_sem hf)  tge EmptyEffect
        (CSharpMin_State f ts' tk' te le) m
        (CSharpMin_State f ts (Kblock tk) te le) m.
 Proof.
@@ -2173,7 +2176,7 @@ Lemma MATCH_initial: forall v1 v2 sig entrypoints
       (HDomS: forall b : block, DomS b = true -> Mem.valid_block m1 b)
       (HDomT: forall b : block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
-  initial_core csharpmin_eff_sem tge v2 vals2 = Some c2 /\
+  initial_core (csharpmin_eff_sem hf) tge v2 vals2 = Some c2 /\
   MATCH c1 (initial_SM DomS DomT DomS DomT j) c1 m1 c2 m2.
 Proof. intros.
   inversion Ini.
@@ -2246,7 +2249,7 @@ Lemma MATCH_initial: forall v1 v2 sig entrypoints
       (FE_UNCH : forall f vargs m e lenv m', FE f vargs m e lenv m' ->
           Mem.unchanged_on
             (fun (b : block) (z : Z) => EmptyEffect b z = false) m m')
-      (Ini: initial_core (clight_eff_sem FE FE_FWD FE_UNCH) ge v1 vals1 = Some c1)
+      (Ini: initial_core (clight_eff_sem hf FE FE_FWD FE_UNCH) ge v1 vals1 = Some c1)
       (Inj: Mem.inject j m1 m2)
       (VInj: Forall2 (val_inject j) vals1 vals2)
       (PG:meminj_preserves_globals ge j)
@@ -2263,7 +2266,7 @@ Lemma MATCH_initial: forall v1 v2 sig entrypoints
       (HDomS: forall b : block, DomS b = true -> Mem.valid_block m1 b)
       (HDomT: forall b : block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
-  initial_core csharpmin_eff_sem tge v2 vals2 = Some c2 /\
+  initial_core (csharpmin_eff_sem hf) tge v2 vals2 = Some c2 /\
   MATCH c1
     (initial_SM DomS DomT
        (REACH m1 (fun b : block => isGlobalBlock ge b || getBlocks vals1 b))
@@ -2363,8 +2366,8 @@ Lemma MATCH_afterExternal: forall
       mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
       (MemInjMu : Mem.inject (as_inj mu) m1 m2)
       (MatchMu: MATCH st1 mu st1 m1 st2 m2)
-      (AtExtSrc : at_external (clight_eff_sem FE FE_FWD FE_UNCH) st1 = Some (e, ef_sig, vals1))
-      (AtExtTgt : at_external csharpmin_eff_sem st2 = Some (e', ef_sig', vals2))
+      (AtExtSrc : at_external (clight_eff_sem hf FE FE_FWD FE_UNCH) st1 = Some (e, ef_sig, vals1))
+      (AtExtTgt : at_external (csharpmin_eff_sem hf) st2 = Some (e', ef_sig', vals2))
       (ValInjMu : Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2)
       (pubSrc' : block -> bool)
       (pubSrcHyp : pubSrc' =
@@ -2397,8 +2400,8 @@ Lemma MATCH_afterExternal: forall
                (fun b z => locBlocksSrc nu b = true /\ pubBlocksSrc nu b = false) m1 m1')
        (UnchLOOR: Mem.unchanged_on (local_out_of_reach nu m1) m2 m2'),
   exists (st1' : CL_core) (st2' : CSharpMin_core),
-  after_external (clight_eff_sem FE FE_FWD FE_UNCH) (Some ret1) st1 =Some st1' /\
-  after_external csharpmin_eff_sem (Some ret2) st2 = Some st2' /\
+  after_external (clight_eff_sem hf FE FE_FWD FE_UNCH) (Some ret1) st1 =Some st1' /\
+  after_external (csharpmin_eff_sem hf) (Some ret2) st2 = Some st2' /\
   MATCH st1' mu' st1' m1' st2' m2'.
 Proof. intros.
 simpl.
@@ -2406,9 +2409,9 @@ simpl.
  simpl in *. inv MC; simpl in *; inv AtExtSrc.
  destruct fd; inv H0. simpl in TY. inv TY.
  destruct tfd; inv AtExtTgt.
- remember (observableEF e0) as d.
+ remember (observableEF hf e0) as d.
  destruct d; inv H1.
- remember (observableEF e1) as d1.
+ remember (observableEF hf e1) as d1.
  destruct d1; inv H0.
  simpl in *.
  remember (list_typ_eq (sig_args (ef_sig e)) (typlist_of_typelist targs) &&
@@ -2699,23 +2702,14 @@ Qed.
 
 
 Lemma MATCH_corestep: forall
- (*(FE : Clight.function -> list val -> 
-        mem -> Clight.env -> Clight.temp_env -> mem -> Prop)
- (FE_FWD : forall f vargs m e lenv m',
-         FE f vargs m e lenv m' -> mem_forward m m')
- (FE_UNCH : forall f vargs m e lenv m',
-         FE f vargs m e lenv m' ->(
-          Mem.unchanged_on
-            (fun b z => EmptyEffect b z = false) m m'))*)
-  (GDE : genvs_domain_eq ge tge)
   (st1 : CL_core) (m1 : mem) (st1' : CL_core) (m1' : mem)
 (*  (CS: corestep (clight_eff_sem FE FE_FWD FE_UNCH) ge st1 m1 st1' m1')*)
-  (CS: corestep CL_eff_sem2 ge st1 m1 st1' m1')
+  (CS: corestep (CL_eff_sem2 hf) ge st1 m1 st1' m1')
   (st2 : CSharpMin_core) (mu : SM_Injection) (m2 : mem)
   (MC: MATCH st1 mu st1 m1 st2 m2),
 exists (st2' : CSharpMin_core) (m2' : mem) (mu' : SM_Injection),
   
-  corestep_plus csharpmin_eff_sem tge st2 m2 st2' m2' /\
+  corestep_plus (csharpmin_eff_sem hf) tge st2 m2 st2' m2' /\
   intern_incr mu mu' /\
   sm_inject_separated mu mu' m1 m2 /\
   sm_locally_allocated mu mu' m1 m2 m1' m2' /\
@@ -2724,7 +2718,8 @@ exists (st2' : CSharpMin_core) (m2' : mem) (mu' : SM_Injection),
 Proof.
   intros. 
   inv CS; simpl in *.
-(*corestep_assign*)
+
+{ (*corestep_assign*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       try (monadInv TR).
@@ -2814,8 +2809,9 @@ Proof.
         destruct (restrictD_Some _ _ _ _ _ H5). 
         destruct (assign_loc_inject _ _ _ _ _ _ H2 _ _ VI _ _ H6 _ INJ)
            as [m2'' [AL2' INJ'']]. 
-        rewrite (assign_loc_unique _ _ _ _ _ _ _ AL2 AL2'). assumption.*)
-  (*clight_corestep_set*)
+        rewrite (assign_loc_unique _ _ _ _ _ _ _ AL2 AL2'). assumption.*) }
+
+{ (*clight_corestep_set*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       try (monadInv TR).
@@ -2834,8 +2830,9 @@ Proof.
       econstructor.
         eapply match_states_skip; eauto.
         eapply match_tempenv_set; eassumption.
-      intuition.
-  (*clight_corestep_call*)
+      intuition. }
+
+{ (*clight_corestep_call*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       revert TR. simpl. case_eq (classify_fun (typeof a)); try congruence.
@@ -2867,8 +2864,9 @@ Proof.
         econstructor; eauto.
         econstructor; eauto.    
           econstructor.
-      intuition. 
-(* builtin *)
+      intuition. }
+
+{ (* builtin *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       monadInv TR. inv MTR.
@@ -2905,8 +2903,9 @@ Proof.
            split; trivial.
            eapply intern_incr_as_inj; eassumption.
          assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-           rewrite <- FRG. eapply (Glob _ H3).  
-(* seq *)
+           rewrite <- FRG. eapply (Glob _ H3). }
+
+{ (* seq *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *. 
   monadInv TR. inv MTR.
@@ -2923,9 +2922,9 @@ Proof.
         econstructor; eauto.
         econstructor; eauto. 
         econstructor; eauto.  
-      intuition.  
+      intuition. }
 
-(* skip seq *)
+{ (* skip seq *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR. inv MK.
@@ -2941,9 +2940,9 @@ Proof.
       econstructor.
         econstructor; eauto.
         econstructor; eauto. 
-      intuition.   
+      intuition. }
 
-(* continue seq *)
+{ (* continue seq *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR. inv MK.
@@ -2960,8 +2959,9 @@ Proof.
         econstructor; eauto.
         econstructor; eauto. 
         econstructor; eauto. 
-      intuition.   
-(* break seq *)
+      intuition. }
+
+{ (* break seq *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR. inv MK.
@@ -2978,9 +2978,9 @@ Proof.
         econstructor; eauto.
         econstructor; eauto. 
         econstructor; eauto. 
-      intuition.   
+      intuition. }
 
-(* ifthenelse *)
+{ (* ifthenelse *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR.
@@ -3005,9 +3005,9 @@ Proof.
           try rewrite (freshloc_irrefl); intuition.
       econstructor.
         destruct b; econstructor; eauto; constructor.
-      intuition. 
+      intuition. }
 
-(* loop *)
+{ (* loop *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. 
@@ -3035,9 +3035,9 @@ Proof.
         econstructor; try eassumption.
           econstructor.
           econstructor; eassumption. 
-      intuition.  
+      intuition. }
 
-(* skip-or-continue loop *)
+{ (* skip-or-continue loop *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   assert ((ts' = Sskip \/ ts' = Sexit ncnt) /\ tk' = tk).
@@ -3061,9 +3061,9 @@ Proof.
         econstructor; eauto.
         econstructor; eauto. 
         econstructor; eauto. 
-      intuition.  
+      intuition. }
 
-(* break loop1 *)
+{ (* break loop1 *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR. inv MK.
@@ -3086,9 +3086,9 @@ Proof.
           try rewrite (freshloc_irrefl); intuition.
       econstructor.
         eapply match_states_skip; eauto.
-      intuition.  
+      intuition. }
 
-(* skip loop2 *)
+{ (* skip loop2 *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR. inv MK.
@@ -3104,9 +3104,9 @@ Proof.
         econstructor; eauto.    
           simpl. rewrite H5; simpl. rewrite H7; simpl. eauto. 
           constructor. 
-      intuition. 
+      intuition. }
 
-(* break loop2 *)
+{ (* break loop2 *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR. inv MK.
@@ -3122,9 +3122,9 @@ Proof.
           try rewrite (freshloc_irrefl); intuition.
       econstructor.
         eapply match_states_skip; eauto.
-      intuition. 
+      intuition. }
 
-(* return none *)
+{ (* return none *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR.
@@ -3152,9 +3152,9 @@ Proof.
       intuition. 
         eapply REACH_closed_freelist; eassumption.
         eapply freelist_freelist_inject; try eassumption.
-          eapply match_env_restrictD; eassumption.  
+          eapply match_env_restrictD; eassumption. }
 
-(* return some *)
+{ (* return some *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR.
@@ -3192,9 +3192,9 @@ Proof.
       intuition. 
         eapply REACH_closed_freelist; eassumption.
         eapply freelist_freelist_inject; try eassumption.
-          eapply match_env_restrictD; eassumption.  
+          eapply match_env_restrictD; eassumption. }
 
-(* skip call *)
+{ (* skip call *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR.
@@ -3224,9 +3224,9 @@ Proof.
       intuition. 
         eapply REACH_closed_freelist; eassumption.
         eapply freelist_freelist_inject; try eassumption.
-          eapply match_env_restrictD; eassumption.
+          eapply match_env_restrictD; eassumption. }
 
-(* switch *)
+{ (* switch *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR.
@@ -3257,9 +3257,9 @@ Proof.
           apply transl_lbl_stmt_2. apply transl_lbl_stmt_1. eauto.  
           constructor.
           econstructor. eauto.
-      intuition.
+      intuition. }
 
-(* skip or break switch *)
+{ (* skip or break switch *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   assert ((ts' = Sskip \/ ts' = Sexit nbrk) /\ tk' = tk).
@@ -3278,9 +3278,9 @@ Proof.
           try rewrite (freshloc_irrefl); intuition.
       econstructor.
         eapply match_states_skip; eauto.
-      intuition.
+      intuition. }
 
-(* continue switch *)
+{ (* continue switch *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR. inv MK.
@@ -3295,9 +3295,9 @@ Proof.
           try rewrite (freshloc_irrefl); intuition.
       constructor. 
         econstructor; eauto. simpl. reflexivity. constructor.
-      intuition.
+      intuition. }
 
-(* label *)
+{ (* label *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR. 
@@ -3312,9 +3312,9 @@ Proof.
           try rewrite (freshloc_irrefl); intuition.
       constructor. 
         econstructor; eauto. constructor.
-      intuition.
+      intuition. }
 
-(* goto *)
+{ (* goto *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR.
@@ -3334,9 +3334,9 @@ Proof.
           try rewrite (freshloc_irrefl); intuition.
       constructor. 
         econstructor; eauto. constructor.
-      intuition.
+      intuition. }
 
-(* internal function *)
+{ (* internal function *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   destruct PRE as [PC [PG [GF [Glob [SMV [WD INJ]]]]]].
@@ -3372,9 +3372,9 @@ Proof.
         split; trivial. trivial. trivial.
     intuition.
        red; intros. destruct (GF _ _ H8). split; trivial.
-           eapply intern_incr_as_inj; eassumption.
+           eapply intern_incr_as_inj; eassumption. }
 
-(* returnstate *)
+{ (* returnstate *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   inv MK. 
@@ -3394,20 +3394,19 @@ Proof.
         destruct optid. 
           eapply match_tempenv_set; eassumption.
           simpl. assumption.
-      intuition.
+      intuition. }
 Qed.
 
 Lemma Match_effcore_diagram: forall
-  (GDE : genvs_domain_eq ge tge)
   (st1 : CL_core) (m1 : mem) (st1' : CL_core) (m1' : mem)
   (U1 : block -> Z -> bool)
-  (EFFSTEP: effstep CL_eff_sem2 ge U1 st1 m1 st1' m1')
+  (EFFSTEP: effstep (CL_eff_sem2 hf) ge U1 st1 m1 st1' m1')
   (st2 : CSharpMin_core) (mu : SM_Injection) (m2 : mem)
   (UHyp: forall b z, U1 b z = true -> vis mu b = true) 
   (MC: MATCH st1 mu st1 m1 st2 m2),
 exists (st2' : CSharpMin_core) (m2' : mem) (mu' : SM_Injection),
   (exists U2 : block -> Z -> bool,
-     (effstep_plus csharpmin_eff_sem tge U2 st2 m2 st2' m2' /\
+     (effstep_plus (csharpmin_eff_sem hf) tge U2 st2 m2 st2' m2' /\
      (forall (b : block) (ofs : Z),
       U2 b ofs = true ->
       visTgt mu b = true /\
@@ -3424,7 +3423,8 @@ exists (st2' : CSharpMin_core) (m2' : mem) (mu' : SM_Injection),
 Proof.
   intros. 
   induction EFFSTEP; simpl in *.
-(*corestep_assign*)
+
+{ (*corestep_assign*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       try (monadInv TR).
@@ -3578,8 +3578,9 @@ Proof.
               apply (IHMVInj H11).
           split; intros.
             eapply FWD. eapply SMV; assumption.
-            eapply assign_loc_forward; try eassumption. eapply SMV; assumption.
-  (*clight_corestep_set*)
+            eapply assign_loc_forward; try eassumption. eapply SMV; assumption. }
+
+{ (*clight_corestep_set*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       try (monadInv TR).
@@ -3600,8 +3601,9 @@ Proof.
       econstructor.
         eapply match_states_skip; eauto.
         eapply match_tempenv_set; eassumption.
-      intuition.
-  (*clight_corestep_call*)
+      intuition. }
+
+{ (*clight_corestep_call*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
       revert TR. simpl. case_eq (classify_fun (typeof a)); try congruence.
@@ -3635,8 +3637,9 @@ Proof.
         econstructor; eauto.
         econstructor; eauto.    
           econstructor.
-      intuition. 
-  (* builtin *)
+      intuition. }
+
+{ (* builtin *)
     destruct MC as [SMC PRE].
     inv SMC; simpl in *. 
     monadInv TR. inv MTR.
@@ -3675,8 +3678,9 @@ Proof.
            split; trivial.
            eapply intern_incr_as_inj; eassumption.
          assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-           rewrite <- FRG. eapply (Glob _ H3). 
-(* seq *)
+           rewrite <- FRG. eapply (Glob _ H3). }
+
+{ (* seq *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *. 
   monadInv TR. inv MTR.
@@ -3695,9 +3699,9 @@ Proof.
         econstructor; eauto.
         econstructor; eauto. 
         econstructor; eauto.  
-      intuition.  
+      intuition. }
 
-(* skip seq *)
+{ (* skip seq *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR. inv MK.
@@ -3715,9 +3719,9 @@ Proof.
       econstructor.
         econstructor; eauto.
         econstructor; eauto. 
-      intuition.   
+      intuition. }
 
-(* continue seq *)
+{ (* continue seq *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR. inv MK.
@@ -3736,8 +3740,9 @@ Proof.
         econstructor; eauto.
         econstructor; eauto. 
         econstructor; eauto. 
-      intuition.   
-(* break seq *)
+      intuition. }
+
+{ (* break seq *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR. inv MK.
@@ -3756,9 +3761,9 @@ Proof.
         econstructor; eauto.
         econstructor; eauto. 
         econstructor; eauto. 
-      intuition.   
+      intuition. }
 
-(* ifthenelse *)
+{ (* ifthenelse *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR.
@@ -3785,9 +3790,9 @@ Proof.
           try rewrite (freshloc_irrefl); intuition.
       econstructor.
         destruct b; econstructor; eauto; constructor.
-      intuition. 
+      intuition. }
 
-(* loop *)
+{ (* loop *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. 
@@ -3817,9 +3822,9 @@ Proof.
         econstructor; try eassumption.
           econstructor.
           econstructor; eassumption. 
-      intuition.  
+      intuition. }
 
-(* skip-or-continue loop *)
+{ (* skip-or-continue loop *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   assert ((ts' = Sskip \/ ts' = Sexit ncnt) /\ tk' = tk).
@@ -3845,9 +3850,9 @@ Proof.
         econstructor; eauto.
         econstructor; eauto. 
         econstructor; eauto. 
-      intuition.  
+      intuition. }
 
-(* break loop1 *)
+{ (* break loop1 *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR. inv MK.
@@ -3872,9 +3877,9 @@ Proof.
           try rewrite (freshloc_irrefl); intuition.
       econstructor.
         eapply match_states_skip; eauto.
-      intuition.  
+      intuition. }
 
-(* skip loop2 *)
+{ (* skip loop2 *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR. inv MK.
@@ -3892,9 +3897,9 @@ Proof.
         econstructor; eauto.    
           simpl. rewrite H5; simpl. rewrite H7; simpl. eauto. 
           constructor. 
-      intuition. 
+      intuition. }
 
-(* break loop2 *)
+{ (* break loop2 *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR. inv MK.
@@ -3912,9 +3917,9 @@ Proof.
           try rewrite (freshloc_irrefl); intuition.
       econstructor.
         eapply match_states_skip; eauto.
-      intuition. 
+      intuition. }
 
-(* return none *)
+{ (* return none *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR.
@@ -3952,9 +3957,9 @@ Proof.
       intuition. 
         eapply REACH_closed_freelist; eassumption.
         eapply freelist_freelist_inject; try eassumption.
-          eapply match_env_restrictD; eassumption.  
+          eapply match_env_restrictD; eassumption. }
 
-(* return some *)
+{ (* return some *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR.
@@ -4002,9 +4007,9 @@ Proof.
       intuition. 
         eapply REACH_closed_freelist; eassumption.
         eapply freelist_freelist_inject; try eassumption.
-          eapply match_env_restrictD; eassumption.  
+          eapply match_env_restrictD; eassumption. }
 
-(* skip call *)
+{ (* skip call *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR.
@@ -4044,9 +4049,9 @@ Proof.
       intuition. 
         eapply REACH_closed_freelist; eassumption.
         eapply freelist_freelist_inject; try eassumption.
-          eapply match_env_restrictD; eassumption.
+          eapply match_env_restrictD; eassumption. }
 
-(* switch *)
+{ (* switch *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR.
@@ -4079,9 +4084,9 @@ Proof.
           apply transl_lbl_stmt_2. apply transl_lbl_stmt_1. eauto.  
           constructor.
           econstructor. eauto.
-      intuition.
+      intuition. }
 
-(* skip or break switch *)
+{ (* skip or break switch *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   assert ((ts' = Sskip \/ ts' = Sexit nbrk) /\ tk' = tk).
@@ -4102,9 +4107,9 @@ Proof.
           try rewrite (freshloc_irrefl); intuition.
       econstructor.
         eapply match_states_skip; eauto.
-      intuition.
+      intuition. }
 
-(* continue switch *)
+{ (* continue switch *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR. inv MK.
@@ -4121,9 +4126,9 @@ Proof.
           try rewrite (freshloc_irrefl); intuition.
       constructor. 
         econstructor; eauto. simpl. reflexivity. constructor.
-      intuition.
+      intuition. }
 
-(* label *)
+{ (* label *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR. 
@@ -4140,9 +4145,9 @@ Proof.
           try rewrite (freshloc_irrefl); intuition.
       constructor. 
         econstructor; eauto. constructor.
-      intuition.
+      intuition. }
 
-(* goto *)
+{ (* goto *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   monadInv TR. inv MTR.
@@ -4164,9 +4169,9 @@ Proof.
           try rewrite (freshloc_irrefl); intuition.
       constructor. 
         econstructor; eauto. constructor.
-      intuition.
+      intuition. }
 
-(* internal function *)
+{ (* internal function *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   destruct PRE as [PC [PG [GF [Glob [SMV [WD INJ]]]]]].
@@ -4204,9 +4209,9 @@ Proof.
         split; trivial. trivial. trivial.
     intuition.
        red; intros. destruct (GF _ _ H8). split; trivial.
-           eapply intern_incr_as_inj; eassumption.
+           eapply intern_incr_as_inj; eassumption. }
 
-(* returnstate *)
+{ (* returnstate *)
   destruct MC as [SMC PRE].
   inv SMC; simpl in *.
   inv MK. 
@@ -4228,7 +4233,7 @@ Proof.
         destruct optid. 
           eapply match_tempenv_set; eassumption.
           simpl. assumption.
-      intuition.
+      intuition. }
 Qed.
 
 Lemma match_cont_replace_locals: forall mu tp n m k k' PS PT
@@ -4243,11 +4248,11 @@ forall (mu : SM_Injection) (c1 : CL_core) (m1 : mem)
      (c2 : CSharpMin_core) (m2 : mem) (e : external_function)
      (vals1 : list val) (ef_sig : signature),
    MATCH c1 mu c1 m1 c2 m2 ->
-   at_external CL_eff_sem2 c1 = Some (e, ef_sig, vals1) ->
+   at_external (CL_eff_sem2 hf) c1 = Some (e, ef_sig, vals1) ->
    Mem.inject (as_inj mu) m1 m2 /\
    (exists vals2 : list val,
       Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\
-      at_external csharpmin_eff_sem c2 = Some (e, ef_sig, vals2) /\
+      at_external (csharpmin_eff_sem hf) c2 = Some (e, ef_sig, vals2) /\
       (forall pubSrc' pubTgt' : block -> bool,
        pubSrc' =
        (fun b : block =>
@@ -4266,7 +4271,7 @@ Proof. intros. destruct H as [MC [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
     specialize (forall_vals_inject_restrictD _ _ _ _ ValsInj); intros.
     exploit replace_locals_wd_AtExternal; try eassumption. 
     intros WDr.
-    remember (observableEF e0) as obs.
+    remember (observableEF hf e0) as obs.
     destruct obs; inv H0.
     exists args2; intuition.
       destruct tfd; simpl in *.
@@ -4303,23 +4308,14 @@ Theorem transl_program_correct:
                 /\ Genv.find_funct_ptr ge b = Some f1
                 /\ Genv.find_funct_ptr tge b = Some f2)
          (init_mem: exists m0, Genv.init_mem prog = Some m0),
-SM_simulation.SM_simulation_inject CL_eff_sem2
-   csharpmin_eff_sem ge tge entrypoints.
+SM_simulation.SM_simulation_inject (CL_eff_sem2 hf)
+   (csharpmin_eff_sem hf) ge tge entrypoints.
 Proof.
 intros.
-assert (GDE: genvs_domain_eq ge tge).
-    unfold genvs_domain_eq, genv2blocks.
-    simpl; split; intros. 
-     split; intros; destruct H as [id Hid].
-       rewrite <- symbols_preserved in Hid.
-       exists id; trivial.
-     rewrite symbols_preserved in Hid.
-       exists id; trivial.
-    apply varinfo_preserved. 
  eapply effect_simulations_lemmas.inj_simulation_plus with
   (match_states:=MATCH) (measure:=fun x => O).
 (*genvs_dom_eq*)
-  assumption.
+  apply GDE_lemma.
 (*MATCH_wd*)
   apply MATCH_wd. 
 (*MATCH_reachclosed*)
@@ -4375,7 +4371,7 @@ assert (GDE: genvs_domain_eq ge tge).
     apply valid_init_is_global with (b0 := b) in INIT.
     eapply INIT; auto.
     apply R.
-    apply LT. }
+    apply LT. apply GDE_lemma. }
 (*halted*) 
   { intros. destruct H as [MC [RC [PG [GF [Glob [VAL [WD INJ]]]]]]]. 
     destruct c1; inv H0. destruct k; inv H1.
@@ -4386,7 +4382,7 @@ assert (GDE: genvs_domain_eq ge tge).
 (* at_external*)
   { apply MATCH_atExternal. }
 (* after_external*)
-  { apply MATCH_afterExternal. assumption. }
+  { apply MATCH_afterExternal. apply GDE_lemma. }
 (* core_diagram*)
   { intros. exploit MATCH_corestep; try eassumption.
     intros [st2' [m2' [mu' [CS2 MU']]]].

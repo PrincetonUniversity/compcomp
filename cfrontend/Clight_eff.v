@@ -114,6 +114,9 @@ Proof. intros.
    eapply (storebytes_forward _ _ _ _ _ H4).
 Qed.
 
+Section CLIGHT_EFF.
+Variable hf : I64Helpers.helper_functions.
+
 Section EFFSEM.
 Variable FE:function -> list val -> mem -> env -> temp_env -> mem -> Prop.
 
@@ -145,7 +148,7 @@ Inductive clight_effstep (ge:genv): (block -> Z -> bool) ->
   | clight_effstep_builtin:   forall f optid ef tyargs al k e le m vargs t vres m',
       eval_exprlist ge e le m al tyargs vargs ->
       external_call ef ge vargs m t vres m' ->
-      observableEF ef = false ->
+      observableEF hf ef = false ->
       clight_effstep ge (BuiltinEffect ge ef vargs m)
          (CL_State f (Sbuiltin optid ef tyargs al) k e le) m
          (CL_State f Sskip k e (set_opttemp optid vres le)) m'
@@ -245,7 +248,7 @@ Inductive clight_effstep (ge:genv): (block -> Z -> bool) ->
       clight_effstep ge EmptyEffect
         (CL_Callstate (Internal f) vargs k) m
         (CL_State f f.(fn_body) k e le) m'
-(*no external step
+(*All external calls in this language at handled by atExternal
   | step_external_function: forall ef targs tres vargs k m vres t m',
       external_call ef ge vargs m t vres m' ->
       clight_effstep (CL_Callstate (External ef targs tres) vargs k) m
@@ -256,12 +259,6 @@ Inductive clight_effstep (ge:genv): (block -> Z -> bool) ->
       clight_effstep ge EmptyEffect
         (CL_Returnstate v (Kcall optid f e le k)) m
         (CL_State f Sskip k e (set_opttemp optid v le)) m.
-(*
-  | clight_effstep_sub_val: forall E EE c m c' m',
-      (forall b ofs, Mem.valid_block m b ->
-                     E b ofs = true -> EE b ofs = true) ->
-      clight_effstep ge E c m c' m' ->
-      clight_effstep ge EE c m c' m'.*)
 
 Variable FE_FWD: forall f vargs m e le m', FE f vargs m e le m' -> mem_forward m m'.
 Variable FE_UNCH: forall f vargs m e le m', FE f vargs m e le m'->
@@ -269,7 +266,7 @@ Variable FE_UNCH: forall f vargs m e le m', FE f vargs m e le m'->
 
 Lemma clightstep_effax1: forall (M : block -> Z -> bool) ge c m c' m'
       (H: clight_effstep ge M c m c' m'),
-       corestep (CL_coop_sem FE FE_FWD) ge c m c' m' /\
+       corestep (CL_coop_sem hf FE FE_FWD) ge c m c' m' /\
        Mem.unchanged_on (fun (b : block) (ofs : Z) => M b ofs = false) m m'.
 Proof. 
 intros.
@@ -324,17 +321,10 @@ intros.
          eapply FE_UNCH; eassumption.
   split. econstructor; try eassumption.
          apply Mem.unchanged_on_refl.
-  (*effstep_sub_val
-    destruct IHclight_effstep.
-    split; trivial.
-    eapply unchanged_on_validblock; try eassumption.
-    intros; simpl. remember (E b ofs) as d.
-    destruct d; trivial. apply eq_sym in Heqd.
-    rewrite (H _ _ H3 Heqd) in H4. discriminate.*)
 Qed.
 
 Lemma clightstep_effax2: forall ge c m c' m',
-      corestep (CL_coop_sem FE FE_FWD) ge c m c' m' ->
+      corestep (CL_coop_sem hf FE FE_FWD) ge c m c' m' ->
       exists M, clight_effstep ge M c m c' m'.
 Proof.
 intros. inv H.
@@ -397,12 +387,11 @@ Qed.
 
 Definition clight_eff_sem  
   :  @EffectSem Clight.genv CL_core.
-eapply Build_EffectSem with (sem := CL_coop_sem _ FE_FWD)
+eapply Build_EffectSem with (sem := CL_coop_sem hf _ FE_FWD)
          (effstep:=clight_effstep).
 eapply clightstep_effax1. 
 apply clightstep_effax2. 
 eapply clight_effstep_valid.
-(*apply clight_effstep_sub_val. *)
 Defined.
 End EFFSEM.
 
@@ -466,3 +455,5 @@ Definition CL_eff_sem2: @EffectSem Clight.genv CL_core.
   apply function_entry2_forward. 
   apply function_entry2_UNCH.
 Defined.
+
+End CLIGHT_EFF.

@@ -132,9 +132,11 @@ Inductive RTL_corestep (ge:genv): RTL_core -> mem -> RTL_core -> mem -> Prop :=
                   f.(fn_entrypoint)
                   (init_regs args f.(fn_params)))
         m'
+
   | rtl_corestep_exec_function_external:
       forall s ef args res t m m'
-      (OBS: observableEF hf ef = false),
+(*      (OBS: observableEF hf ef = false),*)
+      (OBS: EFisHelper hf ef = true),
       external_call ef ge args m t res m' ->
       RTL_corestep ge (RTL_Callstate s (External ef) args) m
           (RTL_Returnstate s res) m'
@@ -207,7 +209,9 @@ Definition RTL_after_external (vret: option val)(c: RTL_core): option RTL_core :
 Lemma corestep_not_external: forall (ge : genv) (m : mem) (q : RTL_core) (m' : mem) (q' : RTL_core),
                                RTL_corestep ge q m q' m' -> RTL_at_external q = None.
   intros. inv H; try reflexivity. 
-  simpl. rewrite OBS. trivial.
+  simpl. unfold observableEF. unfold EFisHelper in OBS.  
+  destruct ef; try inv OBS. 
+  rewrite H1. trivial. rewrite H1. trivial.  
 Qed.
 
 Lemma corestep_not_halted: forall (ge : genv) (m : mem) (q : RTL_core) (m' : mem) (q' : RTL_core),

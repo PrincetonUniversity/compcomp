@@ -1786,7 +1786,9 @@ Proof. intros.
     red; intros ? LA. apply loc_arguments_rec_charact in LA. 
            destruct l; try contradiction.
            destruct sl; try contradiction. trivial.
-  exploit (inlineable_extern_inject ge tge); try eassumption.
+  specialize (EFhelpers _ _ OBS); intros.
+  exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply H;
+      try eapply ArgsInj; try eassumption. 
   intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]]. 
  
   eexists; eexists; split.
@@ -1808,14 +1810,13 @@ Proof. intros.
         eapply restrict_sm_intern_incr; eassumption.
         apply restrict_sm_WD; trivial.
   intuition.
-      apply intern_incr_as_inj in INC; trivial.
-        apply sm_inject_separated_mem in SEP; trivial.
-        eapply meminj_preserves_incr_sep; eassumption. 
+    eapply (intern_incr_meminj_preserves_globals_as_inj _ mu); trivial.
+      split; assumption.
       red; intros ? ? Hb. destruct (GFP _ _ Hb).
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
-      assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (Glob _ H1). }
+    eapply (intern_incr_meminj_preserves_globals_as_inj _ mu); try eassumption. 
+      split; eassumption. }
 
 { (* return *)
   inv H5. inv H1.
@@ -2382,7 +2383,9 @@ Proof. intros.
     red; intros ? LA. apply loc_arguments_rec_charact in LA. 
            destruct l; try contradiction.
            destruct sl; try contradiction. trivial.
-  exploit (inlineable_extern_inject ge tge); try eassumption.
+  specialize (EFhelpers _ _ OBS); intros.
+  exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply H;
+      try eapply ArgsInj; try eassumption. 
   intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]]. 
  
   eexists; eexists; eexists; split.
@@ -2405,16 +2408,16 @@ Proof. intros.
         eapply restrict_sm_intern_incr; eassumption.
         apply restrict_sm_WD; trivial.
     intuition.
-      apply intern_incr_as_inj in INC; trivial.
-        apply sm_inject_separated_mem in SEP; trivial.
-        eapply meminj_preserves_incr_sep; eassumption. 
+    eapply (intern_incr_meminj_preserves_globals_as_inj _ mu); trivial.
+      split; assumption.
       red; intros ? ? Hb. destruct (GFP _ _ Hb).
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
-      assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (Glob _ H1).
-  intros. 
-    rewrite BuiltinEffect_decode in H0.
+    eapply (intern_incr_meminj_preserves_globals_as_inj _ mu); try eassumption. 
+      split; eassumption.
+
+  intros ? ? BEFF. 
+    rewrite BuiltinEffect_decode in BEFF.
     exploit @BuiltinEffect_Propagate.
      apply H.
      eassumption.  

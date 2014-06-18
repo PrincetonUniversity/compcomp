@@ -1574,9 +1574,9 @@ Proof.
         rewrite <- restrict_sm_all.
         eapply restrict_sm_preserves_globals; try eassumption.
           unfold vis. intuition.
-  exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply H7.
-        eassumption. eassumption. eassumption. eassumption. 
-        eassumption. eassumption. eassumption.
+  specialize (EFhelpers _ _ OBS); intros.
+  exploit (inlineable_extern_inject _ _ GDE_lemma); 
+     try eapply H7; try eassumption.
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
   left. eexists; eexists. 
@@ -1587,14 +1587,13 @@ Proof.
       econstructor; eauto.
         eapply match_stackframes_intern_incr; eassumption.
       intuition. 
-      eapply meminj_preserves_incr_sep. eapply PG. eassumption. 
-             apply intern_incr_as_inj; trivial.
-             apply sm_inject_separated_mem; eassumption.
+    eapply (intern_incr_meminj_preserves_globals_as_inj _ mu); trivial.
+      split; assumption.
       red; intros ? ? Hb. destruct (GFP _ _ Hb).
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
-      assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-          rewrite <- FRG. eapply (Glob _ H1). }
+    eapply (intern_incr_meminj_preserves_globals_as_inj _ mu); try eassumption. 
+      split; eassumption. }
   
 { (* returnstate *)
   destruct PRE as [RC [PG [GFP [Glob [SMV WD]]]]].
@@ -2107,9 +2106,9 @@ Proof.
         rewrite <- restrict_sm_all.
         eapply restrict_sm_preserves_globals; try eassumption.
           unfold vis. intuition.
-  exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply H7.
-        eassumption. eassumption. eassumption. eassumption. 
-        eassumption. eassumption. eassumption.
+  specialize (EFhelpers _ _ OBS); intros.
+  exploit (inlineable_extern_inject _ _ GDE_lemma); 
+    try eapply H7; try eassumption.
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
   left. eexists; eexists; eexists. 
@@ -2123,14 +2122,14 @@ Proof.
       econstructor; eauto.
         eapply match_stackframes_intern_incr; eassumption.
       intuition. 
-      eapply meminj_preserves_incr_sep. eapply PG. eassumption. 
-             apply intern_incr_as_inj; trivial.
-             apply sm_inject_separated_mem; eassumption.
+    eapply (intern_incr_meminj_preserves_globals_as_inj _ mu); trivial.
+      split; assumption.
       red; intros ? ? Hb. destruct (GFP _ _ Hb).
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
-      assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-          rewrite <- FRG. eapply (Glob _ H1).
+    eapply (intern_incr_meminj_preserves_globals_as_inj _ mu); try eassumption. 
+      split; eassumption.
+
   eapply BuiltinEffect_Propagate; eassumption. }
 
 { (* returnstate *)

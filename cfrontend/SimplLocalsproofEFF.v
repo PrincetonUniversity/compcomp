@@ -157,6 +157,8 @@ Hypothesis TRANSF: transf_program prog = OK tprog.
 Let ge := Genv.globalenv prog.
 Let tge := Genv.globalenv tprog.
 
+(*NEW*) Variable hf : I64Helpers.helper_functions.
+
 Lemma symbols_preserved:
   forall (s: ident), Genv.find_symbol tge s = Genv.find_symbol ge s.
 Proof.
@@ -1773,7 +1775,7 @@ Theorem store_params_correct:
   (forall id, In id (var_names params) -> le!id = None) ->
   forall (WD: SM_wd mu) (SMV: sm_valid mu m tm) (RC:REACH_closed m (vis mu)),
   exists tle, exists tm',
-  corestep_star CL_eff_sem2 tge
+  corestep_star (CL_eff_sem2 hf) tge
              (CL_State f (store_params cenv params s) k te tle) tm
              (CL_State f s k te tle) tm'
   /\ bind_parameter_temps params targs tle2 = Some tle
@@ -1915,7 +1917,7 @@ Theorem store_params_correct_eff:
   (forall id, In id (var_names params) -> le!id = None) ->
   forall (WD: SM_wd mu) (SMV: sm_valid mu m tm) (RC:REACH_closed m (vis mu)),
   exists tle, exists tm' EFF,
-  effstep_star CL_eff_sem2 tge EFF
+  effstep_star (CL_eff_sem2 hf) tge EFF
              (CL_State f (store_params cenv params s) k te tle) tm
              (CL_State f s k te tle) tm'
   /\ bind_parameter_temps params targs tle2 = Some tle
@@ -3599,11 +3601,11 @@ End FIND_LABEL.
 
 Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
        (MTCH: MATCH c1 mu c1 m1 c2 m2)
-       (AtExtSrc: at_external CL_eff_sem1 c1 = Some (e, ef_sig, vals1)),
+       (AtExtSrc: at_external (CL_eff_sem1 hf) c1 = Some (e, ef_sig, vals1)),
      Mem.inject (as_inj mu) m1 m2 /\
      exists vals2,
        Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\
-       at_external CL_eff_sem2 c2 = Some (e, ef_sig, vals2) /\
+       at_external (CL_eff_sem2 hf) c2 = Some (e, ef_sig, vals2) /\
       (forall pubSrc' pubTgt',
        pubSrc' = (fun b => locBlocksSrc mu b && REACH m1 (exportedSrc mu vals1) b) ->
        pubTgt' = (fun b : block => locBlocksTgt mu b && REACH m2 (exportedTgt mu vals2) b) ->
@@ -3614,7 +3616,7 @@ destruct MTCH as [MC [RC [PG [Glob [SMV WD]]]]].
     inv MC; simpl in AtExtSrc; inv AtExtSrc.
     destruct fd; simpl in *; inv H0.
     split; trivial. monadInv TRFD.
-    remember (observableEF e0) as obs.
+    remember (observableEF hf e0) as obs.
     destruct obs; inv H1.
     exists tvargs; split; trivial. 
     eapply val_list_inject_forall_inject; try eassumption.
@@ -3643,8 +3645,8 @@ Lemma MATCH_afterExternal: forall
 mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig' 
 (MemInjMu : Mem.inject (as_inj mu) m1 m2)
 (MatchMu : MATCH st1 mu st1 m1 st2 m2)
-(AtExtSrc : at_external CL_eff_sem1 st1 = Some (e, ef_sig, vals1))
-(AtExtTgt : at_external CL_eff_sem2 st2 = Some (e', ef_sig', vals2))
+(AtExtSrc : at_external (CL_eff_sem1 hf) st1 = Some (e, ef_sig, vals1))
+(AtExtTgt : at_external (CL_eff_sem2 hf) st2 = Some (e', ef_sig', vals2))
 (ValInjMu : Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2)
 (pubSrc' : block -> bool)
 (pubSrcHyp : pubSrc' =
@@ -3684,8 +3686,8 @@ mu'
                 m1')
 (UnchLOOR : Mem.unchanged_on (local_out_of_reach nu m1) m2 m2'),
 exists st1' st2' : CL_core,
-  after_external CL_eff_sem1 (Some ret1) st1 = Some st1' /\
-  after_external CL_eff_sem2 (Some ret2) st2 = Some st2' /\
+  after_external (CL_eff_sem1 hf) (Some ret1) st1 = Some st1' /\
+  after_external (CL_eff_sem2 hf) (Some ret2) st2 = Some st2' /\
   MATCH st1' mu' st1' m1' st2' m2'.
 Proof. intros. 
  destruct MatchMu as [MC [RC [PG [GF [SMV WDmu]]]]].
@@ -3695,12 +3697,10 @@ Proof. intros.
         unfold vis; intuition.*)
  inv MC; simpl in *; inv AtExtSrc.
   destruct fd; inv H0.
-  destruct tfd; inv AtExtTgt.
-    remember (observableEF e0) as obs.
-    destruct obs; inv H1. 
-    remember (observableEF e1) as obs'.
-    destruct obs'; inv H0. 
-    simpl in TRFD. inv TRFD. clear Heqobs'.
+  destruct tfd; inv AtExtTgt. 
+  simpl in TRFD. inv TRFD. 
+    remember (observableEF hf e1) as obs.
+    destruct obs; inv H1; inv H0. 
     eexists; eexists.
     split. reflexivity.
     split. reflexivity.
@@ -3979,7 +3979,7 @@ Lemma MATCH_init_core: forall (v1 v2 : val) (sig : signature) entrypoints
                     Genv.find_funct_ptr tge b = Some f2)
   (vals1 : list val) c1 (m1 : mem) (j : meminj)
   (vals2 : list val) (m2 : mem) (DomS DomT : Values.block -> bool)
-  (CSM_Ini :initial_core CL_eff_sem1 ge v1 vals1 = Some c1)
+  (CSM_Ini :initial_core (CL_eff_sem1 hf) ge v1 vals1 = Some c1)
   (Inj: Mem.inject j m1 m2)
   (VInj: Forall2 (val_inject j) vals1 vals2)
   (PG: meminj_preserves_globals ge j)
@@ -3992,11 +3992,11 @@ Lemma MATCH_init_core: forall (v1 v2 : val) (sig : signature) entrypoints
   (InitMem : exists m0 : mem, Genv.init_mem prog = Some m0 
       /\ Ple (Mem.nextblock m0) (Mem.nextblock m1) 
       /\ Ple (Mem.nextblock m0) (Mem.nextblock m2))
-  (GDE: genvs_domain_eq ge tge)
+(*  (GDE: genvs_domain_eq ge tge)*)
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
-  initial_core CL_eff_sem2 tge v2 vals2 = Some c2 /\
+  initial_core (CL_eff_sem2 hf) tge v2 vals2 = Some c2 /\
   MATCH c1
     (initial_SM DomS DomT
        (REACH m1
@@ -4054,17 +4054,17 @@ Proof. intros.
             intros. apply REACH_nil. rewrite H; intuition. 
           apply val_casted_list_funcP; auto.
 destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
-    VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
+    VInj J RCH PG GDE_lemma HDomS HDomT _ (eq_refl _))
    as [AA [BB [CC [DD [EE [FF GG]]]]]].
 intuition. rewrite initial_SM_as_inj. assumption.
 Qed.
 
 Lemma MATCH_corediagram: forall st1 m1 st1' m1' 
-     (CS:corestep CL_eff_sem1 ge st1 m1 st1' m1')
+     (CS:corestep (CL_eff_sem1 hf) ge st1 m1 st1' m1')
      (st2 : CL_core) (mu : SM_Injection) (m2 : mem)
      (MTCH: MATCH st1 mu st1 m1 st2 m2),
 exists st2' m2',
-  corestep_plus CL_eff_sem2 tge st2 m2 st2' m2'
+  corestep_plus (CL_eff_sem2 hf) tge st2 m2 st2' m2'
 /\ exists mu',
    MATCH st1' mu' st1' m1' st2' m2' /\
    intern_incr mu mu' /\
@@ -4072,7 +4072,8 @@ exists st2' m2',
    sm_locally_allocated mu mu' m1 m2 m1' m2'.
 Proof. intros.
 destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; simpl in *; try (monadInv TRS).
-(* assign *)
+
+{ (* assign *)
   assert (INJR: Mem.inject (as_inj (restrict_sm mu (vis mu))) m m2).
     rewrite restrict_sm_all; trivial.
     eapply inject_restrict; try eassumption.
@@ -4199,9 +4200,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       apply extensionality; intros; rewrite (assign_loc_freshloc _ _ _ _ _ _ H2). intuition.
       apply extensionality; intros; rewrite (assign_loc_freshloc _ _ _ _ _ _ X). intuition.
       apply extensionality; intros; rewrite (assign_loc_freshloc _ _ _ _ _ _ H2). intuition.
-      apply extensionality; intros; rewrite (assign_loc_freshloc _ _ _ _ _ _ X). intuition.
+      apply extensionality; intros; rewrite (assign_loc_freshloc _ _ _ _ _ _ X). intuition. }
 
-(* set temporary *)
+{ (* set temporary *)
   exploit match_envs_restrict; try eassumption. instantiate (1:=vis mu); trivial.
   intros MENVR.
   assert (INJR: Mem.inject (as_inj (restrict_sm mu (vis mu))) m m2).
@@ -4229,9 +4230,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition. }
 
-(* call *)
+{ (* call *)
   exploit match_envs_restrict; try eassumption. instantiate (1:=vis mu); trivial.
   intros MENVR.
   assert (INJR: Mem.inject (as_inj (restrict_sm mu (vis mu))) m m2).
@@ -4272,9 +4273,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition. }
 
-(* builtin *)
+{ (* builtin *)
   exploit match_envs_restrict; try eassumption. instantiate (1:=vis mu); trivial.
   intros MENVR.
   assert (INJR: Mem.inject (as_inj (restrict_sm mu (vis mu))) m m2).
@@ -4288,9 +4289,8 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
   intros [CASTED [tvargs [C D]]].
   rewrite restrict_sm_all in D.
   (*exploit external_call_mem_inject; eauto.*)
-  exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply D.
-    eassumption. eassumption. eassumption. eassumption. eassumption. eassumption. assumption.
-(*  apply match_globalenvs_preserves_globals; eauto with compat.*)
+  exploit (inlineable_extern_inject _ _ GDE_lemma);
+    try eapply D; try eassumption. 
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
   eexists; exists tm'.
@@ -4325,8 +4325,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
 (*  inv MENV; xomega. inv MENV; xomega. *)
   eapply Ple_trans; eauto. eapply external_call_nextblock; eauto.
   eapply Ple_trans; eauto. eapply external_call_nextblock; eauto.
-  intuition.
-(* sequence *)
+  intuition. }
+
+{ (* sequence *)
   eexists; eexists; split.
     apply corestep_plus_one. econstructor.
   exists mu; split.
@@ -4339,9 +4340,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition. }
 
-(* skip sequence *)
+{ (* skip sequence *)
   inv MCONT. eexists; eexists; split.
     apply corestep_plus_one. econstructor.
   exists mu; split.
@@ -4354,9 +4355,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition. }
 
-(* continue sequence *)
+{ (* continue sequence *)
   inv MCONT. eexists; eexists; split.
     apply corestep_plus_one. econstructor.
   exists mu; split.
@@ -4369,9 +4370,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition. }
  
-(* break sequence *)
+{ (* break sequence *)
   inv MCONT. eexists; eexists; split.
     apply corestep_plus_one. econstructor.
   exists mu; split.
@@ -4384,9 +4385,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition. }
 
-(* ifthenelse *)
+{ (* ifthenelse *)
   exploit match_envs_restrict; try eassumption. instantiate (1:=vis mu); trivial.
   intros MENVR.
   assert (INJR: Mem.inject (as_inj (restrict_sm mu (vis mu))) m m2).
@@ -4412,9 +4413,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition. }
 
-(* loop *)
+{ (* loop *)
   eexists; eexists; split.
     apply corestep_plus_one. econstructor.
   exists mu; split.
@@ -4427,9 +4428,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition. }
 
-(* skip-or-continue loop *)
+{ (* skip-or-continue loop *)
   inv MCONT. eexists; eexists; split.
   apply corestep_plus_one. econstructor. destruct H; subst x; simpl in *; intuition congruence. 
   exists mu; split.
@@ -4446,9 +4447,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition. }
 
-(* break loop1 *)
+{ (* break loop1 *)
   inv MCONT. eexists; eexists; split. apply corestep_plus_one. eapply clight_corestep_break_loop1.
   exists mu; split.
     split. econstructor; eauto.
@@ -4460,9 +4461,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition. }
 
-(* skip loop2 *)
+{ (* skip loop2 *)
   inv MCONT. eexists; eexists; split. apply corestep_plus_one. eapply clight_corestep_skip_loop2. 
   exists mu; split.
     split. econstructor; eauto with compat. simpl; rewrite H2; rewrite H4; auto. 
@@ -4474,9 +4475,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition. }
 
-(* break loop2 *)
+{ (* break loop2 *)
   inv MCONT. eexists; eexists; split. apply corestep_plus_one. eapply clight_corestep_break_loop2.
   exists mu; split.
     split. econstructor; eauto.
@@ -4488,9 +4489,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition. }
 
-(* return none *)
+{ (* return none *)
   exploit match_envs_free_blocks; eauto. intros [tm' [P Q]].
   eexists; eexists; split. apply corestep_plus_one. econstructor; eauto. 
   exists mu; split.
@@ -4509,9 +4510,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       extensionality b; rewrite (freshloc_free_list _ _ _ H); intuition.
       extensionality b; rewrite (freshloc_free_list _ _ _ P); intuition.
       extensionality b; rewrite (freshloc_free_list _ _ _ H); intuition.
-      extensionality b; rewrite (freshloc_free_list _ _ _ P); intuition.
+      extensionality b; rewrite (freshloc_free_list _ _ _ P); intuition. }
 
-(* return some *)
+{ (* return some *)
   exploit match_envs_restrict; try eassumption. instantiate (1:=vis mu); trivial.
   intros MENVR.
   assert (INJR: Mem.inject (as_inj (restrict_sm mu (vis mu))) m m2).
@@ -4547,9 +4548,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       extensionality b; rewrite (freshloc_free_list _ _ _ H1); intuition.
       extensionality b; rewrite (freshloc_free_list _ _ _ P); intuition.
       extensionality b; rewrite (freshloc_free_list _ _ _ H1); intuition.
-      extensionality b; rewrite (freshloc_free_list _ _ _ P); intuition.
+      extensionality b; rewrite (freshloc_free_list _ _ _ P); intuition. }
     
-(* skip call *)
+{ (* skip call *)
   exploit match_envs_free_blocks; eauto. intros [tm' [P Q]].
   eexists; eexists; split. apply corestep_plus_one. econstructor; eauto.
   eapply match_cont_is_call_cont; eauto.
@@ -4570,9 +4571,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       extensionality b; rewrite (freshloc_free_list _ _ _ H0); intuition.
       extensionality b; rewrite (freshloc_free_list _ _ _ P); intuition.
       extensionality b; rewrite (freshloc_free_list _ _ _ H0); intuition.
-      extensionality b; rewrite (freshloc_free_list _ _ _ P); intuition.
+      extensionality b; rewrite (freshloc_free_list _ _ _ P); intuition. }
     
-(* switch *)
+{ (* switch *)
   exploit match_envs_restrict; try eassumption. instantiate (1:=vis mu); trivial.
   intros MENVR.
   assert (INJR: Mem.inject (as_inj (restrict_sm mu (vis mu))) m m2).
@@ -4600,9 +4601,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition. }
 
-(* skip-break switch *)
+{ (* skip-break switch *)
   inv MCONT. eexists; eexists; split. 
   apply corestep_plus_one. eapply clight_corestep_skip_break_switch. destruct H; subst x; simpl in *; intuition congruence. 
   exists mu; split.
@@ -4619,9 +4620,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition. }
 
-(* continue switch *)
+{ (* continue switch *)
   inv MCONT. eexists; eexists; split. 
   apply corestep_plus_one. eapply clight_corestep_continue_switch.
   exists mu; split.
@@ -4634,9 +4635,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition. }
 
-(* label *)
+{ (* label *)
   eexists; eexists; split. apply corestep_plus_one. econstructor.
   exists mu; split.
     split. econstructor; eauto.
@@ -4648,9 +4649,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition. }
 
-(* goto *)
+{ (* goto *)
   generalize TRF; intros TRF'. monadInv TRF'. 
   exploit (simpl_find_label mu (cenv_for f) m lo tlo lbl (fn_body f) (call_cont k) x (call_cont tk)).
     eauto. eapply match_cont_call_cont. eauto.  
@@ -4668,9 +4669,9 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition. }
 
-(* internal function *)
+{ (* internal function *)
   monadInv TRFD. inv H. 
   generalize EQ; intro EQ'; monadInv EQ'.
   assert (list_norepet (var_names (fn_params f ++ fn_vars f))).
@@ -4731,22 +4732,12 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
            rewrite sm_locally_allocatedChar. rewrite sm_locally_allocatedChar in LocAlloc.
            rewrite (nextblock_eq_freshloc _ _ _ T).
            rewrite (nextblock_eq_freshloc _ _ _ H2).
-           apply LocAlloc. 
-(* external function - case disappears
-  monadInv TRFD. inv FUNTY. 
-  exploit external_call_mem_inject; eauto. apply match_globalenvs_preserves_globals. 
-  eapply match_cont_globalenv. eexact (MCONT VSet.empty). 
-  intros [j' [tvres [tm' [P [Q [R [S [T [U V]]]]]]]]].
-  econstructor; split.
-  apply plus_one. econstructor; eauto. eapply external_call_symbols_preserved; eauto. 
-  exact symbols_preserved. exact varinfo_preserved.
-  econstructor; eauto.
-  intros. apply match_cont_incr_bounds with (Mem.nextblock m) (Mem.nextblock tm).
-  eapply match_cont_extcall; eauto. xomega. xomega.
-  eapply external_call_nextblock; eauto.
-  eapply external_call_nextblock; eauto.*)
+           apply LocAlloc. }
 
-(* return *)
+(* no case for external functions as these are all handled
+  by the coresemantics interface.*)
+
+{ (* return *)
   specialize (MCONT (cenv_for f)). inv MCONT. 
   eexists; eexists; split.
     apply corestep_plus_one. econstructor. 
@@ -4761,7 +4752,7 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-      apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
+      apply extensionality; intros; rewrite (freshloc_irrefl). intuition. }
 Qed.
 
 Lemma FreelistEffect_PropagateLeft cenv mu e le m lo hi te tle tlo thi: forall
@@ -4812,12 +4803,12 @@ Qed.
 
 Lemma MATCH_effcore_diagram: forall st1 m1 st1' m1' 
          (U1 : block -> Z -> bool)
-         (CS: effstep CL_eff_sem1 ge U1 st1 m1 st1' m1')
+         (CS: effstep (CL_eff_sem1 hf) ge U1 st1 m1 st1' m1')
          st2 mu m2
          (U1Hyp: forall (b : block) (ofs : Z), U1 b ofs = true -> vis mu b = true)
          (MTCH: MATCH st1 mu st1 m1 st2 m2),
   exists st2' m2' U2,
-     effstep_plus CL_eff_sem2 tge U2 st2 m2 st2' m2'
+     effstep_plus (CL_eff_sem2 hf) tge U2 st2 m2 st2' m2'
 /\ exists mu',
      MATCH st1' mu' st1' m1' st2' m2' /\
     intern_incr mu mu' /\
@@ -4834,7 +4825,8 @@ Lemma MATCH_effcore_diagram: forall st1 m1 st1' m1'
 Proof. intros.
 destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];
 inv MS; simpl in *; try (monadInv TRS).
-(* assign *)
+
+{ (* assign *)
   assert (INJR: Mem.inject (as_inj (restrict_sm mu (vis mu))) m m2).
     rewrite restrict_sm_all; trivial.
     eapply inject_restrict; try eassumption.
@@ -5029,9 +5021,9 @@ inv MS; simpl in *; try (monadInv TRS).
                                     eapply Mem.storebytes_range_perm; eauto.
                                      split. omega. specialize (Mem.loadbytes_length _ _ _ _ _ H10); intros. rewrite H20. rewrite nat_of_Z_eq. assumption. omega. 
                                   apply perm_any_N.
-                   elim n; trivial. 
+                   elim n; trivial. }
      
-(* set temporary *)
+{ (* set temporary *)
   exploit match_envs_restrict; try eassumption. instantiate (1:=vis mu); trivial.
   intros MENVR.
   assert (INJR: Mem.inject (as_inj (restrict_sm mu (vis mu))) m m2).
@@ -5060,9 +5052,9 @@ inv MS; simpl in *; try (monadInv TRS).
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-  intuition.
+  intuition. }
 
-(* call *)
+{ (* call *)
   exploit match_envs_restrict; try eassumption. instantiate (1:=vis mu); trivial.
   intros MENVR.
   assert (INJR: Mem.inject (as_inj (restrict_sm mu (vis mu))) m m2).
@@ -5104,9 +5096,9 @@ inv MS; simpl in *; try (monadInv TRS).
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-  intuition.
+  intuition. }
 
-(* builtin *)
+{ (* builtin *)
   exploit match_envs_restrict; try eassumption. instantiate (1:=vis mu); trivial.
   intros MENVR.
   assert (INJR: Mem.inject (as_inj (restrict_sm mu (vis mu))) m m2).
@@ -5163,8 +5155,9 @@ inv MS; simpl in *; try (monadInv TRS).
   split; trivial.
   split; trivial.
   clear - H0 D WD MINJ. 
-  eapply BuiltinEffect_Propagate; eassumption.
-(* sequence *)
+  eapply BuiltinEffect_Propagate; eassumption. }
+
+{ (* sequence *)
   eexists; eexists; eexists; split.
     apply effstep_plus_one. econstructor.
   exists mu; split.
@@ -5178,9 +5171,9 @@ inv MS; simpl in *; try (monadInv TRS).
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-  intuition.
+  intuition. }
 
-(* skip sequence *)
+{ (* skip sequence *)
   inv MCONT. eexists; eexists; eexists; split.
     apply effstep_plus_one. econstructor.
   exists mu; split.
@@ -5194,9 +5187,9 @@ inv MS; simpl in *; try (monadInv TRS).
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-  intuition.
+  intuition. }
 
-(* continue sequence *)
+{ (* continue sequence *)
   inv MCONT. eexists; eexists; eexists; split.
     apply effstep_plus_one. econstructor.
   exists mu; split.
@@ -5210,9 +5203,9 @@ inv MS; simpl in *; try (monadInv TRS).
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-  intuition.
+  intuition. }
  
-(* break sequence *)
+{ (* break sequence *)
   inv MCONT. eexists; eexists; eexists; split.
     apply effstep_plus_one. econstructor.
   exists mu; split.
@@ -5226,9 +5219,9 @@ inv MS; simpl in *; try (monadInv TRS).
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-  intuition.
+  intuition. }
 
-(* ifthenelse *)
+{ (* ifthenelse *)
   exploit match_envs_restrict; try eassumption. instantiate (1:=vis mu); trivial.
   intros MENVR.
   assert (INJR: Mem.inject (as_inj (restrict_sm mu (vis mu))) m m2).
@@ -5255,9 +5248,9 @@ inv MS; simpl in *; try (monadInv TRS).
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-  intuition.
+  intuition. }
 
-(* loop *)
+{ (* loop *)
   eexists; eexists; eexists; split.
     apply effstep_plus_one. econstructor.
   exists mu; split.
@@ -5271,9 +5264,9 @@ inv MS; simpl in *; try (monadInv TRS).
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-  intuition.
+  intuition. }
 
-(* skip-or-continue loop *)
+{ (* skip-or-continue loop *)
   inv MCONT. eexists; eexists; eexists; split.
   apply effstep_plus_one. econstructor. destruct H; subst x; simpl in *; intuition congruence. 
   exists mu; split.
@@ -5291,9 +5284,9 @@ inv MS; simpl in *; try (monadInv TRS).
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-  intuition.
+  intuition. }
 
-(* break loop1 *)
+{ (* break loop1 *)
   inv MCONT. eexists; eexists; eexists; split. apply effstep_plus_one. eapply clight_effstep_break_loop1.
   exists mu; split.
     split. econstructor; eauto.
@@ -5306,9 +5299,9 @@ inv MS; simpl in *; try (monadInv TRS).
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-  intuition.
+  intuition. }
 
-(* skip loop2 *)
+{ (* skip loop2 *)
   inv MCONT. eexists; eexists; eexists; split. apply effstep_plus_one. eapply clight_effstep_skip_loop2. 
   exists mu; split.
     split. econstructor; eauto with compat. simpl; rewrite H2; rewrite H4; auto. 
@@ -5321,9 +5314,9 @@ inv MS; simpl in *; try (monadInv TRS).
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-  intuition.
+  intuition. }
 
-(* break loop2 *)
+{ (* break loop2 *)
   inv MCONT. eexists; eexists; eexists; split. apply effstep_plus_one. eapply clight_effstep_break_loop2.
   exists mu; split.
     split. econstructor; eauto.
@@ -5336,9 +5329,9 @@ inv MS; simpl in *; try (monadInv TRS).
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-  intuition.
+  intuition. }
 
-(* return none *)
+{ (* return none *)
   exploit match_envs_free_blocks; eauto. intros [tm' [P Q]].
   eexists; eexists; eexists; split. apply effstep_plus_one. econstructor; eauto. 
   exists mu; split.
@@ -5366,9 +5359,9 @@ inv MS; simpl in *; try (monadInv TRS).
            apply blocks_of_envD in NIB. destruct NIB as [? [? [id ID]]]; subst.
            exploit me_mapped; try eassumption. intros [b [RES EE]].
            eapply visPropagateR; try eassumption.
-         intros. eapply FreelistEffect_PropagateLeft; eassumption. 
+         intros. eapply FreelistEffect_PropagateLeft; eassumption. }
 
-(* return some *)
+{ (* return some *)
   exploit match_envs_restrict; try eassumption. instantiate (1:=vis mu); trivial.
   intros MENVR.
   assert (INJR: Mem.inject (as_inj (restrict_sm mu (vis mu))) m m2).
@@ -5414,9 +5407,9 @@ inv MS; simpl in *; try (monadInv TRS).
            exploit me_mapped; try eassumption. intros [b [RES EE]].
            rewrite restrict_sm_all, restrict_nest, vis_restrict_sm in RES.
            eapply visPropagateR; try eassumption. rewrite vis_restrict_sm. trivial.
-         intros. eapply FreelistEffect_PropagateLeft; eassumption. 
+         intros. eapply FreelistEffect_PropagateLeft; eassumption. }
 
-(* skip call *)
+{ (* skip call *)
   exploit match_envs_free_blocks; eauto. intros [tm' [P Q]].
   eexists; eexists; eexists; split. apply effstep_plus_one. econstructor; eauto.
   eapply match_cont_is_call_cont; eauto.
@@ -5447,8 +5440,9 @@ inv MS; simpl in *; try (monadInv TRS).
            apply blocks_of_envD in NIB. destruct NIB as [? [? [id ID]]]; subst.
            exploit me_mapped; try eassumption. intros [b [RES EE]].
            eapply visPropagateR; try eassumption.
-         intros. eapply FreelistEffect_PropagateLeft; eassumption.
-(* switch *)
+         intros. eapply FreelistEffect_PropagateLeft; eassumption. }
+
+{ (* switch *)
   exploit match_envs_restrict; try eassumption. instantiate (1:=vis mu); trivial.
   intros MENVR.
   assert (INJR: Mem.inject (as_inj (restrict_sm mu (vis mu))) m m2).
@@ -5478,9 +5472,9 @@ inv MS; simpl in *; try (monadInv TRS).
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-  intuition.
+  intuition. }
 
-(* skip-break switch *)
+{ (* skip-break switch *)
   inv MCONT. 
   eexists; eexists; eexists; split. 
     apply effstep_plus_one. eapply clight_effstep_skip_break_switch. destruct H; subst x; simpl in *; intuition congruence. 
@@ -5499,9 +5493,9 @@ inv MS; simpl in *; try (monadInv TRS).
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-  intuition.
+  intuition. }
 
-(* continue switch *)
+{ (* continue switch *)
   inv MCONT. 
   eexists; eexists; eexists; split. 
     apply effstep_plus_one. eapply clight_effstep_continue_switch.
@@ -5516,9 +5510,9 @@ inv MS; simpl in *; try (monadInv TRS).
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-  intuition.
+  intuition. }
 
-(* label *)
+{ (* label *)
   eexists; eexists; eexists; split. apply effstep_plus_one. econstructor.
   exists mu; split.
     split. econstructor; eauto.
@@ -5531,9 +5525,9 @@ inv MS; simpl in *; try (monadInv TRS).
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-  intuition.
+  intuition. }
 
-(* goto *)
+{ (* goto *)
   generalize TRF; intros TRF'. monadInv TRF'. 
   exploit (simpl_find_label mu (cenv_for f) m lo tlo lbl (fn_body f) (call_cont k) x (call_cont tk)).
     eauto. eapply match_cont_call_cont. eauto.  
@@ -5552,9 +5546,9 @@ inv MS; simpl in *; try (monadInv TRS).
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-  intuition.
+  intuition. }
 
-(* internal function *)
+{ (* internal function *)
   monadInv TRFD. inv H. 
   generalize EQ; intro EQ'; monadInv EQ'.
   assert (list_norepet (var_names (fn_params f ++ fn_vars f))).
@@ -5631,22 +5625,12 @@ inv MS; simpl in *; try (monadInv TRS).
              destruct (disjoint_extern_local _ WD' bb) as [DEL | DEL]; rewrite DEL in *; discriminate.
            apply H5.
          destruct (local_DomRng _ WD _ _ _ H4).
-           unfold visTgt; rewrite H6. intuition.
-(* external function - case disappears
-  monadInv TRFD. inv FUNTY. 
-  exploit external_call_mem_inject; eauto. apply match_globalenvs_preserves_globals. 
-  eapply match_cont_globalenv. eexact (MCONT VSet.empty). 
-  intros [j' [tvres [tm' [P [Q [R [S [T [U V]]]]]]]]].
-  econstructor; split.
-  apply plus_one. econstructor; eauto. eapply external_call_symbols_preserved; eauto. 
-  exact symbols_preserved. exact varinfo_preserved.
-  econstructor; eauto.
-  intros. apply match_cont_incr_bounds with (Mem.nextblock m) (Mem.nextblock tm).
-  eapply match_cont_extcall; eauto. xomega. xomega.
-  eapply external_call_nextblock; eauto.
-  eapply external_call_nextblock; eauto.*)
+           unfold visTgt; rewrite H6. intuition. }
 
-(* return *)
+(* no case for external functions as these are all handled
+  by the coresemantics interface.*)
+
+{ (* return *)
   specialize (MCONT (cenv_for f)). inv MCONT. 
   eexists; eexists; eexists; split.
     apply effstep_plus_one. econstructor. 
@@ -5662,7 +5646,7 @@ inv MS; simpl in *; try (monadInv TRS).
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
-  intuition.
+  intuition. }
 Qed.
 
 (** The simulation proof *)
@@ -5679,7 +5663,7 @@ Theorem transl_program_correct:
                 /\ Genv.find_funct_ptr tge b = Some f2)
          (init_mem: exists m0, Genv.init_mem prog = Some m0),
 SM_simulation.SM_simulation_inject 
-   CL_eff_sem1 CL_eff_sem2 ge tge entrypoints.
+   (CL_eff_sem1 hf) (CL_eff_sem2 hf) ge tge entrypoints.
 Proof.
 intros.
 assert (GDE: genvs_domain_eq ge tge).

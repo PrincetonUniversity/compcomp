@@ -790,7 +790,8 @@ Proof. intros.
   intuition. }
 
 { (* nonobservable external function *)
-  rewrite  vis_restrict_sm, restrict_sm_all, restrict_nest in *; trivial. 
+  rewrite  vis_restrict_sm, restrict_sm_all, restrict_nest in *; trivial.
+  specialize (EFhelpers _ _ OBS); intros.
   exploit (inlineable_extern_inject ge tge); try eassumption.
   intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]]. 
  
@@ -804,14 +805,13 @@ Proof. intros.
         apply restrict_sm_WD; trivial.
       rewrite restrict_sm_all, vis_restrict_sm, restrict_nest; trivial.
     intuition.
-      apply intern_incr_as_inj in INC; trivial.
-        apply sm_inject_separated_mem in SEP; trivial.
-        eapply meminj_preserves_incr_sep; eassumption. 
+    eapply (intern_incr_meminj_preserves_globals_as_inj _ mu); trivial.
+      split; assumption.
       red; intros ? ? Hb. destruct (GFP _ _ Hb).
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
-      assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (Glob _ H1). }
+    eapply (intern_incr_meminj_preserves_globals_as_inj _ mu); try eassumption. 
+      split; eassumption. }
 
 { (* return *)
   inv STACKS. inv H1.
@@ -1231,9 +1231,11 @@ Proof. intros.
   intuition. }
 
 { (* nonobservable external function *) 
-  rewrite  vis_restrict_sm, restrict_sm_all, restrict_nest in *; trivial. 
+  rewrite  vis_restrict_sm, restrict_sm_all, restrict_nest in *; trivial.
+  specialize (EFhelpers _ _ OBS); intros. 
   exploit (inlineable_extern_inject ge tge); try eassumption.
-  intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]]. 
+  intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED
+      [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]]. 
  
   eexists; eexists; eexists; exists mu'; split.
     eapply rtl_effstep_exec_function_external; eauto.
@@ -1247,14 +1249,13 @@ Proof. intros.
         apply restrict_sm_WD; trivial.
       rewrite restrict_sm_all, vis_restrict_sm, restrict_nest; trivial.
     intuition.
-      apply intern_incr_as_inj in INC; trivial.
-        apply sm_inject_separated_mem in SEP; trivial.
-        eapply meminj_preserves_incr_sep; eassumption. 
+    eapply (intern_incr_meminj_preserves_globals_as_inj _ mu); trivial.
+      split; assumption.
       red; intros ? ? Hb. destruct (GFP _ _ Hb).
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
-      assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (Glob _ H1).
+    eapply (intern_incr_meminj_preserves_globals_as_inj _ mu); try eassumption. 
+      split; eassumption.
   split. assumption.
   split. assumption.
   eapply BuiltinEffect_Propagate; try eassumption. }  

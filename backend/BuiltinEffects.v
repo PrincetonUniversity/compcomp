@@ -182,6 +182,62 @@ Definition observableEF (ef: external_function): bool :=
   | _ => true
   end.
 
+Definition EFisHelper ef :=
+match ef with 
+    EF_builtin name sg => I64Helpers.is_I64_helper hf name sg
+  | EF_external name sg => I64Helpers.is_I64_helper hf name sg
+  | _ => false
+end.
+
+Lemma EFhelpers ef: EFisHelper ef = true -> observableEF ef = false.
+Proof. unfold observableEF; intros.
+destruct ef; try inv H.
+rewrite H1; trivial.
+rewrite H1; trivial.
+Qed. 
+
+Lemma EFhelpersE name sg: 
+  observableEF (EF_external name sg) = false ->
+   is_I64_helper hf name sg = true.
+Proof. 
+unfold observableEF. intros.
+rewrite negb_false_iff in H. trivial.
+Qed.
+Lemma EFhelpersB name sg: 
+  observableEF (EF_builtin name sg) = false ->
+   is_I64_helper hf name sg = true.
+Proof. 
+unfold observableEF. intros.
+rewrite negb_false_iff in H. trivial.
+Qed.
+
+Lemma obs_ef name sg : is_I64_helperP hf name sg ->
+    observableEF (EF_builtin name sg) = false.
+Proof. intros. unfold observableEF. 
+  apply is64helper_char in H.
+  rewrite H; trivial. Qed.
+
+Definition helper_injects ef vargs vres : Prop :=
+  forall (TF TV:Type) (tge:Genv.t TF TV) (GDE: genvs_domain_eq ge tge) 
+       (SymbPres: forall s, Genv.find_symbol tge s = Genv.find_symbol ge s)
+        m t m1 mu tm vargs'
+       (WD: SM_wd mu) (SMV: sm_valid mu m tm) (RC: REACH_closed m (vis mu)),
+       meminj_preserves_globals ge (as_inj mu) ->
+       external_call ef ge vargs m t vres m1 ->
+       Mem.inject (as_inj mu) m tm ->
+       val_list_inject (restrict (as_inj mu) (vis mu)) vargs vargs' ->
+       exists mu' vres' tm1,
+         external_call ef tge vargs' tm t vres' tm1 /\
+         val_inject (restrict (as_inj mu') (vis mu')) vres vres' /\
+         Mem.inject (as_inj mu') m1 tm1 /\
+         Mem.unchanged_on (loc_unmapped (restrict (as_inj mu) (vis mu))) m m1 /\
+         Mem.unchanged_on (loc_out_of_reach (restrict (as_inj mu) (vis mu)) m) tm tm1 /\
+         intern_incr mu mu' /\
+         sm_inject_separated mu mu' m tm /\
+         sm_locally_allocated mu mu' m tm m1 tm1 /\
+         SM_wd mu' /\ sm_valid mu' m1 tm1 /\
+         (REACH_closed m (vis mu) -> REACH_closed m1 (vis mu')).
+
 Definition helper_implements 
      (id: ident) (sg: signature) (vargs: list val) (vres: val) : Prop :=
   exists b, exists ef,
@@ -190,7 +246,7 @@ Definition helper_implements
   /\ ef_sig ef = sg
   /\ (forall m, external_call ef ge vargs m E0 vres m)
   (*NEW*) /\  observableEF ef = false
-  (*NEW*) /\ helper_injects ge ef vargs vres.
+  (*NEW*) /\ helper_injects ef vargs vres.
 
 Definition i64_helpers_correct: Prop :=
     (forall x z, Val.longoffloat x = Some z -> helper_implements hf.(i64_dtos) sig_f_l (x::nil) z)
@@ -202,7 +258,7 @@ Definition i64_helpers_correct: Prop :=
   /\(forall x, builtin_implements hf.(i64_neg) sig_l_l (x::nil) (Val.negl x))
   /\(forall x y, builtin_implements hf.(i64_add) sig_ll_l (x::y::nil) (Val.addl x y))
   /\(forall x y, builtin_implements hf.(i64_sub) sig_ll_l (x::y::nil) (Val.subl x y))
-  /\(forall x y, builtin_implements hf.(i64_mul) sig_ii_l (x::y::nil) (Val.mull' x y))
+  /\(forall x y, builtin_implements hf.(i64_mul) sig_ll_l (x::y::nil) (Val.mull' x y)) (*LENB: Compcert had sig_ii here*)
   /\(forall x y z, Val.divls x y = Some z -> helper_implements hf.(i64_sdiv) sig_ll_l (x::y::nil) z)
   /\(forall x y z, Val.divlu x y = Some z -> helper_implements hf.(i64_udiv) sig_ll_l (x::y::nil) z)
   /\(forall x y z, Val.modls x y = Some z -> helper_implements hf.(i64_smod) sig_ll_l (x::y::nil) z)
@@ -466,7 +522,7 @@ Qed.
   Mem-Unchanged_on condition loc_out_of_reach, rather than
   local_out_of_reach as in external calls.*)
 Lemma inlineable_extern_inject: forall {F V TF TV:Type}
-       (ge:Genv.t (AST.fundef F) V) (tge:Genv.t TF TV) (GDE: genvs_domain_eq ge tge) 
+       (ge:Genv.t F V) (tge:Genv.t TF TV) (GDE: genvs_domain_eq ge tge) 
         hf ef vargs m t vres m1 mu tm vargs'
        (WD: SM_wd mu) (SMV: sm_valid mu m tm) (RC: REACH_closed m (vis mu))
        (OBS: observableEF hf ef = false),

@@ -19,6 +19,9 @@ Require Import BuiltinEffects.
 
 Require Import val_casted.
 
+Section CLIGHT_COOP.
+Variable hf : I64Helpers.helper_functions.
+
 Inductive CL_core: Type :=
   | CL_State
       (f: function)
@@ -41,7 +44,7 @@ Definition CL_at_external (c: CL_core) : option (external_function * signature *
       match fd with
         Internal f => None
       | External ef targs tres => 
-          if observableEF ef 
+          if observableEF hf ef 
           then Some (ef, ef_sig ef, args)
           else None
       end
@@ -130,7 +133,7 @@ Inductive clight_corestep: CL_core -> mem-> CL_core -> mem -> Prop :=
   | clight_corestep_builtin:   forall f optid ef tyargs al k e le m vargs t vres m',
       eval_exprlist ge e le m al tyargs vargs ->
       external_call ef ge vargs m t vres m' ->
-      observableEF ef = false ->
+      observableEF hf ef = false ->
       clight_corestep (CL_State f (Sbuiltin optid ef tyargs al) k e le) m
          (CL_State f Sskip k e (set_opttemp optid vres le)) m'
 
@@ -211,7 +214,8 @@ Inductive clight_corestep: CL_core -> mem-> CL_core -> mem -> Prop :=
       function_entry f vargs m e le m' ->
       clight_corestep (CL_Callstate (Internal f) vargs k) m
         (CL_State f f.(fn_body) k e le) m'
-(*no external step
+
+(*All external calls in this language at handled by atExternal
   | step_external_function: forall ef targs tres vargs k m vres t m',
       external_call ef ge vargs m t vres m' ->
       clight_corestep (CL_Callstate (External ef targs tres) vargs k) m
@@ -379,4 +383,5 @@ Definition CL_coop_sem2 : CoopCoreSem genv CL_core.
   apply function_entry2_forward. 
 Defined.
 
+End CLIGHT_COOP.
 

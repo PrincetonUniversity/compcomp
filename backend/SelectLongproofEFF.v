@@ -728,7 +728,7 @@ Proof.
   exploit eval_add. eexact E2. eexact E3. intros [v5 [E5 L5]].
   exploit eval_add. eexact E5. eexact E4. intros [v6 [E6 L6]].
   exists (Val.longofwords v6 (Val.loword p)); split.
-  EvalOp. eapply eval_builtin_2; eauto. UseHelper. 
+  EvalOp. eapply eval_builtin_2; eauto. UseHelper.
   intros. unfold le1, p in *; subst; simpl in *.
   inv L3. inv L4. inv L5. simpl in L6. inv L6. 
   simpl. f_equal. symmetry. apply Int64.decompose_mul. 

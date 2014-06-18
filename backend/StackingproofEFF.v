@@ -6355,29 +6355,80 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   destruct PRE as [RC [PG [Glob [SMV WD]]]].
   simpl in TRANSL. inversion TRANSL; subst tf.
   inv H0. 
-  exploit transl_external_arguments; eauto. intros [vl [ARGS VINJ]].
-  exploit (inlineable_extern_inject _ _ GDE_lemma); try eassumption.
-     eapply decode_longs_inject. eapply VINJ. 
+  exploit transl_external_arguments; try eassumption.
+  intros [vl [ARGS VINJ]].
+  assert (VL: vl = args1).
+    eapply transl_external_arguments_fun; try eassumption. trivial.
+  subst vl.
+  exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply H. 
+     Focus 7.  eapply decode_longs_inject. eapply VINJ. 
+     assumption. eassumption. assumption. 
+     eapply EFhelpers; eassumption. assumption. assumption. 
   intros [mu' [vres' [tm' [EC [RINJ' [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
   eexists; exists tm'.
-  split. simpl. should operational rule in Mach_coop for nonobservables
-  really start in Mach_callstateOut?
-         eapply corestep_plus_trans. 
-           apply corestep_plus_one. econstructor.
-         eapply Mach_exec_function_external. ; eauto.
-  eapply external_call_symbols_preserved'; eauto.
-  exact symbols_preserved. exact varinfo_preserved.
-  econstructor; eauto.
-  apply match_stacks_change_bounds with (Mem.nextblock m) (Mem.nextblock m'0).
-  inv H0; inv A. eapply match_stack_change_extcall; eauto. apply Ple_refl. apply Ple_refl. 
-  eapply external_call_nextblock'; eauto.
-  eapply external_call_nextblock'; eauto.
-  inv H0. apply wt_setlist_result. eapply external_call_well_typed; eauto. auto.
-  apply agree_regs_set_regs; auto. apply agree_regs_inject_incr with j; auto. 
-  apply agree_callee_save_set_result; auto. }
+  split. simpl.
+           apply corestep_plus_one. 
+              eapply Mach_exec_function_external; try assumption.
+              econstructor. eapply EC.
+              reflexivity. reflexivity. 
+          (*eapply external_call_symbols_preserved'; eauto.
+            exact symbols_preserved. exact varinfo_preserved.*)
+  exists mu'.  
+  assert (STACKS': match_stacks mu' m' tm' sp0 ls0 s cs' 
+           (Linear.funsig (External ef))
+           (Mem.nextblock m') (Mem.nextblock tm')).
+      apply match_stacks_change_bounds
+           with (Mem.nextblock m) (Mem.nextblock m2).
+        eapply match_stack_change_extcall_intern; try eapply STACKS.
+          eapply external_call_mem_forward; eassumption.
+          eapply external_call_mem_forward; eassumption.
+          assumption. assumption. assumption. assumption. assumption.
+          apply Ple_refl. apply Ple_refl. 
+       eapply external_call_nextblock'. econstructor; eauto.
+       eapply external_call_nextblock'. econstructor; eauto.
+  clear STACKS.
+  assert (WTL: wt_locset (Locmap.setlist R ## (loc_result (ef_sig ef))
+                  (encode_long (sig_res (ef_sig ef)) v) rs1)).
+     apply wt_setlist_result. 
+       eapply external_call_well_typed; eauto. auto.
+  assert (AGREGS': agree_regs (restrict (as_inj mu') (vis mu'))
+             (Locmap.setlist R ## (loc_result (ef_sig ef))
+                 (encode_long (sig_res (ef_sig ef)) v) rs1)
+             (set_regs (loc_result (ef_sig ef))
+                (encode_long (sig_res (ef_sig ef)) vres') rs)).
+    apply agree_regs_set_regs; auto. 
+    eapply agree_regs_inject_incr; try eassumption.
+    eapply intern_incr_restrict; eassumption. 
+    eapply encode_long_inject; eassumption.
+  assert (AGCalleeSave: agree_callee_save
+             (Locmap.setlist R ## (loc_result (ef_sig ef))
+               (encode_long (sig_res (ef_sig ef)) v) rs1)
+             (parent_locset0 ls0 s)).
+    apply agree_callee_save_set_result. assumption. 
+  split; trivial.
+  split; trivial.
+  split; trivial.
+  split. clear AGREGS.
+    econstructor; eauto.
+     eapply agree_args_intern_incr; try eassumption.
+      eapply agree_args_invariant; try eapply AGARGS. assumption.
+      eapply mem_unchanged_on_sub; try eassumption.
+       unfold loc_out_of_reach; intros; subst b.
+         destruct (restrictD_Some _ _ _ _ _ H1); clear H1.
+         intros N.
+         eapply agree_sp_fresh; eassumption.
+  split. assumption.
+  split. auto.
+  split. 
+    eapply (intern_incr_meminj_preserves_globals_as_inj _ mu); trivial.
+      split; assumption.
+  split.
+    eapply (intern_incr_meminj_preserves_globals_as_inj ge mu); trivial.
+      split; assumption.
+  split; assumption. }
 
-(* return *)
+{ (* return *)
   inv STACKS. simpl in AGLOCS.  
   eexists; eexists; split.
     apply corestep_plus_one. apply Mach_exec_return. 
@@ -6399,11 +6450,11 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     destruct agree_inj0 as [X Y]. solve[apply X].
     inv AGARGS. revert agree_args_frame_match0. simpl. destruct s; auto.
     intros [Y|Y]. left; inv Y; auto. right; auto.
-  solve[intuition]. 
+  solve[intuition]. }
 Qed.
 
 Lemma MATCH_eff_diagram: forall st1 m1 st1' m1' (U1 : block -> Z -> bool)
-        (CS: effstep Linear_eff_sem ge U1 st1 m1 st1' m1')
+        (CS: effstep (Linear_eff_sem hf) ge U1 st1 m1 st1' m1')
         st2 mu m2 (MTCH: MATCH st1 mu st1 m1 st2 m2)
         (HypU1: forall b ofs, U1 b ofs = true -> vis mu b = true),
      exists st2' m2' U2,
@@ -7254,7 +7305,7 @@ Theorem transl_program_correct:
                 /\ Genv.find_funct_ptr ge b = Some f1
                 /\ Genv.find_funct_ptr tge b = Some f2)
          (init_mem: exists m0, Genv.init_mem prog = Some m0),
-SM_simulation.SM_simulation_inject Linear_eff_sem
+SM_simulation.SM_simulation_inject (Linear_eff_sem hf)
    (Mach_eff_sem hf return_address_offset) ge tge entrypoints.
 Proof.
 intros.
@@ -7346,7 +7397,7 @@ assert (GDE:= GDE_lemma).
 (* after_external*)
   { eapply MATCH_afterExternal; eassumption. }
 (*Core_diagram*)
-  { intros. exploit MATCH_diagram; try eassumption.
+  { intros. exploit MATCH_corediagram; try eassumption.
     intros [st2' [m2' [CSTgt [mu' MU]]]].
     exists st2', m2', mu'. intuition. }
 (*Effcore_diagram*)

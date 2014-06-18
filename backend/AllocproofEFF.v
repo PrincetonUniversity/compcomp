@@ -3987,8 +3987,8 @@ Proof. intros.
 
 { (* external function : only nonobservables*)     
   exploit (inlineable_extern_inject ge tge); try eapply PRE. 
-    eapply GDE_lemma. 
-    eassumption. eassumption. eassumption.
+    eapply GDE_lemma. eapply EFhelpers; eauto. (* eassumption.*)
+     eassumption. eassumption.
   intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].
   simpl in FUN; inv FUN.
   eexists; exists m'', mu'; split.
@@ -5423,8 +5423,8 @@ induction CS;
 
 { (* external function : only nonobservables*)     
   exploit (inlineable_extern_inject ge tge); try eapply PRE. 
-    eapply GDE_lemma. 
-    eassumption. eassumption. eassumption.
+    eapply GDE_lemma. eapply EFhelpers; eauto. (* eassumption.*)
+     eassumption. eassumption.
   intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].
   simpl in FUN; inv FUN.
   eexists; exists m''; eexists; split.

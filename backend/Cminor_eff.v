@@ -16,6 +16,11 @@ Require Import Cminor_coop.
 
 Require Import BuiltinEffects.
 
+
+Section CMINOR_EFF.
+
+Variable hf : I64Helpers.helper_functions.
+
 Inductive cmin_effstep (g: Cminor.genv):  (block -> Z -> bool) ->
             CMin_core -> mem -> CMin_core -> mem -> Prop :=
 
@@ -65,7 +70,7 @@ Inductive cmin_effstep (g: Cminor.genv):  (block -> Z -> bool) ->
 | cmin_effstep_builtin: forall f optid ef bl k sp e m vargs t vres m',
       eval_exprlist g sp e m bl vargs ->
       external_call ef g vargs m t vres m' ->
-      observableEF ef = false -> 
+      observableEF hf ef = false -> 
       cmin_effstep g (BuiltinEffect g ef vargs m)
           (*(BuiltinEffect g (ef_sig ef) vargs m) *)
           (CMin_State f (Sbuiltin optid ef bl) k sp e) m
@@ -130,7 +135,7 @@ Inductive cmin_effstep (g: Cminor.genv):  (block -> Z -> bool) ->
       cmin_effstep g EmptyEffect (CMin_Callstate (Internal f) vargs k) m
          (CMin_State f f.(fn_body) k (Vptr sp Int.zero) e) m'
 
-(*no external functions in coresteps!
+(*All external calls in this language at handled by atExternal
   | cmin_effstep_external_function: forall ef vargs k m t vres m',
       external_call ef g vargs m t vres m' ->
       cmin_effstep g EmptyEffect (CMin_Callstate (External ef) vargs k) m
@@ -138,17 +143,11 @@ Inductive cmin_effstep (g: Cminor.genv):  (block -> Z -> bool) ->
 
   | cmin_effstep_return: forall v optid f sp e k m,
       cmin_effstep g EmptyEffect (CMin_Returnstate v (Kcall optid f sp e k)) m
-        (CMin_State f Sskip k sp (set_optvar optid v e)) m
-(*
-  | cmin_effstep_sub_val: forall E EE c m c' m',
-      (forall b ofs, Mem.valid_block m b ->
-                     E b ofs = true -> EE b ofs = true) ->
-      cmin_effstep g E c m c' m' ->
-      cmin_effstep g EE c m c' m'*).
+        (CMin_State f Sskip k sp (set_optvar optid v e)) m.
 
 Lemma cminstep_effax1: forall (M : block -> Z -> bool) g c m c' m',
       cmin_effstep g M c m c' m' ->
-      (corestep cmin_coop_sem g c m c' m' /\
+      (corestep (cmin_coop_sem hf) g c m c' m' /\
        Mem.unchanged_on (fun (b : block) (ofs : Z) => M b ofs = false) m m').
 Proof. 
 intros.
@@ -200,17 +199,10 @@ intros.
   (*no external call*) 
   split. unfold corestep, coopsem; simpl. econstructor; eassumption.
          apply Mem.unchanged_on_refl.
-  (*effstep_sub_val
-    destruct IHcmin_effstep.
-    split; trivial.
-    eapply unchanged_on_validblock; try eassumption.
-    intros; simpl. remember (E b ofs) as d.
-    destruct d; trivial. apply eq_sym in Heqd.
-    rewrite (H _ _ H3 Heqd) in H4. discriminate.*)
 Qed.
 
 Lemma cminstep_effax2: forall  g c m c' m',
-      corestep cmin_coop_sem g c m c' m' ->
+      corestep (cmin_coop_sem hf) g c m c' m' ->
       exists M, cmin_effstep g M c m c' m'.
 Proof.
 intros. inv H.
@@ -260,9 +252,10 @@ Qed.
  
 Program Definition cmin_eff_sem : 
   @EffectSem Cminor.genv CMin_core.
-eapply Build_EffectSem with (sem := cmin_coop_sem)(effstep:=cmin_effstep).
+eapply Build_EffectSem with (sem := cmin_coop_sem hf)(effstep:=cmin_effstep).
 apply cminstep_effax1.
 apply cminstep_effax2.
 apply cmin_effstep_valid; eassumption.
-(*eapply cmin_effstep_sub_val; eassumption.*)
 Defined.
+
+End CMINOR_EFF.

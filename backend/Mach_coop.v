@@ -409,7 +409,7 @@ Lemma store_args_rec_succeeds_aux sz m sp args tys z
   Mem.range_perm m sp (4*z) (4*z + 4*sz) Cur Writable -> 
   exists m', store_args_rec m sp z args tys = Some m'.
 Proof.
-Admitted. (*TODO*)
+Admitted. (*TODO Gordon*)
 
 Lemma store_args_rec_succeeds sz m sp args tys 
       (VALSDEF: val_casted.vals_defined args=true)
@@ -614,7 +614,7 @@ Inductive mach_step (ge:genv): Mach_core -> mem -> Mach_core -> mem -> Prop :=
       rs' = undef_regs destroyed_at_function_entry rs ->
       mach_step ge (Mach_Callstate s fb rs (mk_load_frame sp0 args0 tys0)) m
                 (Mach_State s fb sp f.(fn_code) rs' (mk_load_frame sp0 args0 tys0)) m3
-
+(*
   | Mach_exec_function_external:
       forall s fb rs m t rs' ef args res m' lf
       (OBS: observableEF hf ef = false),
@@ -624,6 +624,17 @@ Inductive mach_step (ge:genv): Mach_core -> mem -> Mach_core -> mem -> Prop :=
       rs' = set_regs (loc_result (ef_sig ef)) res rs ->
       mach_step ge (Mach_Callstate s fb rs lf) m
          (Mach_Returnstate s (sig_res (ef_sig ef)) rs' lf) m'
+*)
+  | Mach_exec_function_external:
+      forall cs f' rs m t rs' callee args res m' lf
+(*     (OBS: observableEF hf callee = false),*)
+      (OBS: EFisHelper hf callee = true),
+      Genv.find_funct_ptr ge f' = Some (External callee) ->
+      external_call' callee ge args m t res m' ->
+      rs' = set_regs (loc_result (ef_sig callee)) res rs ->
+      mach_step ge
+      (Mach_CallstateOut cs f' callee args rs lf) m
+      (Mach_Returnstate cs (sig_res (ef_sig callee)) rs' lf) m'
 
   | Mach_exec_return:
       forall s f sp ra c retty rs m lf,
@@ -733,7 +744,11 @@ Lemma Mach_after_at_external_excl : forall retv q q',
 
 Lemma Mach_corestep_not_at_external ge m q m' q':
       mach_step ge q m q' m' -> Mach_at_external q = None.
-Proof. intros. inv H; try reflexivity. Qed.
+Proof. intros. inv H; try reflexivity. 
+  simpl. unfold observableEF. unfold EFisHelper in OBS.  
+  destruct callee; try inv OBS. 
+  rewrite H2. trivial. rewrite H2. trivial.  
+Qed.  
 
 Lemma Mach_corestep_not_halted ge m q m' q': 
       mach_step ge q m q' m' -> Mach_halted q = None.
@@ -788,7 +803,7 @@ Lemma Mach_forward ge c m c' m': forall
        eapply store_forward; eassumption. 
        eapply store_forward; eassumption. 
     (*external unobservable function*)
-      inv H1. eapply external_call_mem_forward; eassumption.
+      inv H0. eapply external_call_mem_forward; eassumption.
 Qed.
 
 Program Definition Mach_coop_sem : 

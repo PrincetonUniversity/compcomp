@@ -17,6 +17,10 @@ Require Import core_semantics.
 Require Import val_casted.
 Require Import BuiltinEffects.
 
+Section CSHARPMINOR_COOP.
+
+Variable hf : I64Helpers.helper_functions.
+
 Inductive CSharpMin_core: Type :=
   | CSharpMin_State:                      (**r Execution within a function *)
       forall (f: function)              (**r currently executing function  *)
@@ -55,7 +59,7 @@ Definition CSharpMin_at_external (c: CSharpMin_core) : option (external_function
   | CSharpMin_Callstate fd args k =>
         match fd with
           Internal f => None
-         | External ef => if observableEF ef 
+         | External ef => if observableEF hf ef 
                           then Some (ef, ef_sig ef, args)
                           else None
         end
@@ -112,7 +116,7 @@ Inductive CSharpMin_corestep (ge : genv) : CSharpMin_core -> mem -> CSharpMin_co
   | csharpmin_corestep_builtin: forall f optid ef bl k e le m vargs t vres m',
       eval_exprlist ge e le m bl vargs ->
       external_call ef ge vargs m t vres m' ->
-      observableEF ef = false ->
+      observableEF hf ef = false ->
       CSharpMin_corestep ge (CSharpMin_State f (Sbuiltin optid ef bl) k e le) m
          (CSharpMin_State f Sskip k e (Cminor.set_optvar optid vres le)) m'
 
@@ -175,7 +179,8 @@ Inductive CSharpMin_corestep (ge : genv) : CSharpMin_core -> mem -> CSharpMin_co
       bind_parameters f.(fn_params) vargs (create_undef_temps f.(fn_temps)) = Some le ->
       CSharpMin_corestep ge (CSharpMin_Callstate (Internal f) vargs k) m
         (CSharpMin_State f f.(fn_body) k e le) m1
-(*
+
+(*All external calls in this language at handled by atExternal
   | csharpmin_corestep_external_function: forall ef vargs k m t vres m',
       external_call ef ge vargs m t vres m' ->
       step (Callstate (External ef) vargs k) m
@@ -340,3 +345,5 @@ apply Build_CoopCoreSem with (coopsem := csharpmin_core_sem).
   apply csharpmin_coop_forward.
 Defined.
 *)
+
+End CSHARPMINOR_COOP.
