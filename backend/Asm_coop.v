@@ -25,6 +25,9 @@ Notation SP := ESP (only parsing).
 Notation "a # b" := (a b) (at level 1, only parsing).
 Notation "a # b <- c" := (Pregmap.set b c a) (at level 1, b at next level).
 
+Section ASM_COOP.
+Variable hf : I64Helpers.helper_functions.
+
 Section RELSEM.
 Variable ge: genv.
 
@@ -46,7 +49,7 @@ Inductive asm_step: state -> mem -> state -> mem -> Prop :=
       Genv.find_funct_ptr ge b = Some (Internal f) ->
       find_instr (Int.unsigned ofs) (fn_code f) = Some (Pbuiltin ef args res) ->
       external_call' ef ge (map rs args) m t vl m' ->
-      observableEF ef = false ->
+      observableEF hf ef = false ->
       rs' = nextinstr_nf 
              (set_regs res vl
                (undef_regs (map preg_of (destroyed_by_builtin ef)) rs)) ->
@@ -60,21 +63,20 @@ Inductive asm_step: state -> mem -> state -> mem -> Prop :=
       annot_arguments rs m args vargs ->
       external_call' ef ge vargs m t v m' ->
       asm_step (State rs) m (State (nextinstr rs)) m'*)
-  | asm_exec_step_external:
+  | asm_exec_step_to_external:
       forall b ef args rs m sg,
       rs PC = Vptr b Int.zero ->
       Genv.find_funct_ptr ge b = Some (External ef) ->
       extcall_arguments rs m (ef_sig ef) args ->
       asm_step (State sg rs) m (ExtCallState sg ef args rs) m
-(*NO REEAL EXTERNAL STEPS
   | asm_exec_step_external:
-      forall b ef args res rs m t rs' m',
+      forall sg b callee args res rs m t rs' m'
+      (OBS: EFisHelper hf callee = true),
       rs PC = Vptr b Int.zero ->
-      Genv.find_funct_ptr ge b = Some (External ef) ->
-      extcall_arguments rs m (ef_sig ef) args ->
-      external_call' ef ge args m t res m' ->
-      rs' = (set_regs (loc_external_result (ef_sig ef)) res rs) #PC <- (rs RA) ->
-      asm_step (State rs) m (State rs') m'*).
+      Genv.find_funct_ptr ge b = Some (External callee) ->
+      external_call' callee ge args m t res m' ->
+      rs' = (set_regs (loc_external_result (ef_sig callee)) res rs) #PC <- (rs RA) ->
+      asm_step (ExtCallState sg callee args rs) m (State sg rs') m'.
 
 End RELSEM.
 
@@ -82,7 +84,7 @@ Definition Asm_at_external (c: state):
           option (external_function * signature * list val) :=
   match c with
     ExtCallState _ ef args rs =>
-      if observableEF ef
+      if observableEF hf ef
       then Some(ef, ef_sig ef, decode_longs (sig_args (ef_sig ef)) args)
       else None
   | _ => None
@@ -176,7 +178,8 @@ Lemma Asm_after_at_external_excl : forall retv q q',
 Lemma Asm_corestep_not_at_external:
        forall ge m q m' q', asm_step ge q m q' m' -> 
               Asm_at_external q = None.
-  Proof. intros. inv H; try reflexivity. Qed.
+  Proof. intros. inv H; try reflexivity. 
+  simpl. rewrite (EFhelpers _ _ OBS). trivial. Qed.
 
 Lemma Asm_corestep_not_halted : forall ge m q m' q', 
        asm_step ge q m q' m' -> 
@@ -185,6 +188,7 @@ Lemma Asm_corestep_not_halted : forall ge m q m' q',
     rewrite H0; simpl. trivial. 
     rewrite H0; simpl. trivial.
     rewrite H0; simpl. trivial.
+    trivial.
   Qed.
  
 Definition Asm_core_sem : CoreSemantics genv state mem.
@@ -297,6 +301,7 @@ Lemma Asm_forward : forall g c m c' m'
    inv CS; try apply mem_forward_refl. clear - H2.
    eapply exec_instr_forward; eassumption.
    inv H2. eapply external_call_mem_forward; eassumption.
+   inv H1. eapply external_call_mem_forward; eassumption.
 Qed.
    
 Program Definition Asm_coop_sem : 
@@ -307,3 +312,4 @@ Defined.
 
 End ASM_COOPSEM.
 
+End ASM_COOP.

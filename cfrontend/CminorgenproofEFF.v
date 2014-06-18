@@ -2351,23 +2351,7 @@ simpl.
 econstructor; try eassumption.
    eapply match_Kcall with (cenv' := cenv); eauto.
    simpl. trivial.
-Qed. (*
-Lemma Builtin_mem_inject:
-    forall vargs m1 t vres m2 f m1' vargs',
-    meminj_preserves_globals ge (restrict (as_inj mu) (vis mu)) ->
-    (csharpmin_eff_sem hf) vargs m1 t vres m2 ->
-    Mem.inject (restrict (as_inj mu) (vis mu)) m1 m1' ->
-    val_list_inject (restrict (as_inj mu) (vis mu)) vargs vargs' ->
-    exists mu', exists vres', exists m2',
-       (cmin_eff_sem hf) tge vargs' m1' t vres' m2'
-    /\ val_inject (restrict (as_inj mu') (vis mu')) vres vres'
-    /\ Mem.inject (restrict (as_inj mu') (vis mu')) m2 m2'
-    /\ Mem.unchanged_on (loc_unmapped (as_inj mu)) m1 m2
-    /\ Mem.unchanged_on (local_out_of_reach (as_inj mu) m1) m1' m2'
-    /\ intern_incr mu mu'
-    /\ sm_inject_separated mu mu' m1 m1'
-    /\ sm_locally_allocated mu mu' m1 m1' m2 m2' .
-*)
+Qed. 
 
 Lemma structured_match_callstack_set_temp:
   forall mu cenv e le te sp lo hi cs bound tbound m tm tf id v tv,
@@ -2407,7 +2391,8 @@ Proof. intros.
   exploit structured_match_callstack_match_globalenvs; try eassumption.
   intros [hi' [Hi1 [Hi2 MG]]].
   exploit (inlineable_extern_inject ge tge); try eapply PRE. eapply GDE_lemma. 
-         eassumption. eassumption. eassumption.
+        apply symbols_preserved. eassumption. eassumption. eassumption. 
+        eassumption.
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
   eexists; eexists; exists mu'; split.
@@ -2439,71 +2424,6 @@ exploit (intern_incr_meminj_preserves_globals_as_inj ge).
   eapply H3. intuition. eapply WD'. assumption.
 intuition.
 Qed.
-
-(*
-Lemma MS_step_case_Builtin:
-forall x t ef optid vres m' bl vargs
-(EvalArgs: Csharpminor.eval_exprlist ge e lenv m bl vargs)
-(ExtCall: Events.external_call ef ge vargs m t vres m')
-(MCS : structured_match_callstack mu m tm (Frame cenv tfn e lenv te sp lo hi :: cs)
-        (Mem.nextblock m) (Mem.nextblock tm))
-(EQ : transl_exprlist cenv bl = OK x),
-exists c2' : CMin_core,
-  exists m2' mu', 
-      corestep_plus (CMin_core_sem hf) tge
-           (CMin_State tfn (Sbuiltin optid ef x) tk (Vptr sp Int.zero) te) tm c2' m2' /\
-  intern_incr mu mu' /\
-  sm_inject_separated mu mu' m tm /\
-  sm_locally_allocated mu mu' m tm m' m2' /\
-  MATCH
-    (CSharpMin_State f Csharpminor.Sskip k e (set_optvar optid vres lenv)) mu'
-    (CSharpMin_State f Csharpminor.Sskip k e (set_optvar optid vres lenv)) m'
-    c2' m2' /\
-  SM_wd mu' /\
-  sm_valid mu' m' m2'.
-Proof. intros.
-  exploit transl_exprlist_correct; try eassumption; try eapply PRE. 
-  intros [tvargs [EVAL2 VINJ2]].
-  exploit structured_match_callstack_match_globalenvs; try eassumption.
-  intros [hi' MG].
-  exploit Events.external_call_mem_inject; try eassumption.
-     eapply restrict_preserves_globals. eapply PRE.
-            unfold vis; simpl; intros. 
-            apply orb_true_iff. right.
-            eapply PRE. apply H.
-     eapply inject_mapped. 
-       eapply PRE.
-       eapply restrict_mapped_closed.
-          eapply inject_REACH_closed. apply PRE. apply PRE.
-          apply restrict_incr.
-
-  intros [j' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH [INCR SEPARATED]]]]]]]]].
-  eexists; eexists; split.
-      apply corestep_plus_one. eapply CompCertStep_CMin_corestep'.
-           econstructor; try eassumption.
-             eapply Events.external_call_symbols_preserved; eauto.
-                 eapply symbols_preserved; assumption.
-                 eapply varinfo_preserved; assumption.
-           reflexivity.
-  assert (MCS': match_callstack prog j' m' tm'
-                 (Frame cenv tfn e lenv te sp lo hi :: cs)
-                 (Mem.nextblock m') (Mem.nextblock tm')).
-    apply match_callstack_incr_bound with (Mem.nextblock m) (Mem.nextblock tm).
-    eapply match_callstack_external_call; eauto.
-    intros. eapply Events.external_call_max_perm; eauto.
-    xomega. xomega. 
-    eapply external_call_nextblock; eauto.
-    eapply external_call_nextblock; eauto.
-exists j'. split. assumption.  split. assumption. 
-  simpl in *. (* exists  (CSharpMin_State f Csharpminor.Sskip k e (set_optvar optid vres lenv)).
-  left. *) econstructor; eauto.
-Opaque PTree.set.
-  unfold set_optvar. destruct optid; simpl. 
-  eapply match_callstack_set_temp; eauto. 
-  auto.
-solve [eapply meminj_preserves_incr_sep; eassumption].
-Qed.
-*)
 
 Lemma MS_step_case_Ite: forall 
 (MCS : structured_match_callstack mu m tm
@@ -2846,7 +2766,7 @@ Lemma MATCH_corediagram: forall st1 m1 st1' m1'
             corestep_star (cmin_eff_sem hf) tge st2 m2 st2' m2').
 Proof.
   intros. unfold core_data in *.
-   inv CS1. 
+  inv CS1. 
 { (*skip seq*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
@@ -4007,7 +3927,8 @@ Proof. intros. (*
   exploit structured_match_callstack_match_globalenvs; try eassumption.
   intros [hi' [Hi1 [Hi2 MG]]].
   exploit (inlineable_extern_inject ge tge); try eapply PRE.
-      apply GDE_lemma. eassumption. eassumption. eassumption.
+      apply GDE_lemma. apply symbols_preserved. 
+      eassumption. eassumption. eassumption. eassumption.
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
   eexists; eexists; eexists; split.
@@ -4026,13 +3947,14 @@ Proof. intros. (*
          destruct AI'; apply eq_sym in HeqAI'; trivial.
          destruct p. destruct SEPARATED as [SEP1 [SEP2 SEP3]].
            destruct (SEP1 _ _ _ HeqAI HeqAI').
-           elim (SEP2 _ H7). eapply as_inj_DomRng; eassumption. apply H6.
+           elim (SEP2 _ H6). eapply as_inj_DomRng; eassumption. assumption.
      intros. remember (as_inj mu b) as AI.
        destruct AI; apply eq_sym in HeqAI.
-         destruct p. apply intern_incr_as_inj in INCR. apply INCR in HeqAI. rewrite HeqAI in H6; trivial. trivial.
+         destruct p. apply intern_incr_as_inj in INCR. apply INCR in HeqAI. 
+          rewrite HeqAI in H4; trivial. trivial.
        destruct SEPARATED as [SEP1 [SEP2 SEP3]].
-           destruct (SEP1 _ _ _ HeqAI H6).
-           elim (SEP3 _ H9). eapply as_inj_DomRng; eassumption. apply H7. 
+           destruct (SEP1 _ _ _ HeqAI H4).
+           elim (SEP3 _ H8). eapply as_inj_DomRng; eassumption. assumption. 
   inv MCS. intros.
   split. 
   assert (MCS': structured_match_callstack mu' m' tm'

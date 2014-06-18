@@ -14,6 +14,7 @@ Require Import Op.
 Require Import mem_lemmas.
 Require Import StructuredInjections.
 Require Import reach.
+Require Import Axioms.
 
   (** * Axiomatization of the helper functions *)
 
@@ -162,4 +163,342 @@ unfold is_I64_helper in H.
   intuition; try solve [subst; constructor]. 
     destruct (ident_eq name (i64_dtos hf)); try inv H.
     destruct (signature_eq sg sig_f_l); try inv H1. constructor.
+Qed.
+
+Lemma helpers_inject: forall {F V TF TV: Type} 
+  (ge: Genv.t F V) (tge : Genv.t TF TV)
+  (SymbPres : forall s, Genv.find_symbol tge s = Genv.find_symbol ge s)
+  hf name sg vargs m t vres m1 mu tm vargs'
+  (WD : SM_wd mu)
+  (SMV : sm_valid mu m tm)
+  (RC : REACH_closed m (vis mu))
+  (Glob : forall b, isGlobalBlock ge b = true -> frgnBlocksSrc mu b = true)
+  (OBS : is_I64_helper hf name sg = true)
+  (PG : meminj_preserves_globals ge (as_inj mu))
+  (EC : extcall_io_sem name sg ge vargs m t vres m1)
+  (MINJ : Mem.inject (as_inj mu) m tm)
+  (ArgsInj : val_list_inject (restrict (as_inj mu) (vis mu)) vargs vargs'),
+   exists (mu' : SM_Injection) (vres' : val) (tm1 : mem),
+     external_call (EF_external name sg) tge vargs' tm t vres' tm1 /\
+     val_inject (restrict (as_inj mu') (vis mu')) vres vres' /\
+     Mem.inject (as_inj mu') m1 tm1 /\
+     Mem.unchanged_on (loc_unmapped (restrict (as_inj mu) (vis mu))) m m1 /\
+     Mem.unchanged_on (loc_out_of_reach (restrict (as_inj mu) (vis mu)) m) tm
+       tm1 /\
+     intern_incr mu mu' /\
+     sm_inject_separated mu mu' m tm /\
+     sm_locally_allocated mu mu' m tm m1 tm1 /\
+     SM_wd mu' /\
+     sm_valid mu' m1 tm1 /\
+     REACH_closed m1 (vis mu').
+Proof. intros. apply is64helper_char in OBS. 
+inv OBS.
+{ (*i64dtos*)
+    inv EC. exists mu; eexists; eexists; split.
+      econstructor.
+        eapply eventval_list_match_preserved.
+          apply SymbPres.
+          eapply eventval_list_match_inject; try eapply ArgsInj.
+            rewrite <- restrict_sm_all.
+            eapply restrict_sm_preserves_globals; try eassumption.
+            unfold vis. intuition.  
+          assumption.
+        eapply eventval_match_preserved.
+          apply SymbPres. apply H0.
+      intuition.
+      inv H0; econstructor.
+    apply intern_incr_refl.
+    apply sm_inject_separated_same_sminj.
+    apply sm_locally_allocatedChar.
+    repeat split; extensionality b;
+      try rewrite freshloc_irrefl; intuition. }
+{ (*i64dtou*)
+    inv EC. exists mu; eexists; eexists; split.
+      econstructor.
+        eapply eventval_list_match_preserved.
+          apply SymbPres.
+          eapply eventval_list_match_inject; try eapply ArgsInj.
+            rewrite <- restrict_sm_all.
+            eapply restrict_sm_preserves_globals; try eassumption.
+            unfold vis. intuition.  
+          assumption.
+        eapply eventval_match_preserved.
+          apply SymbPres. apply H0.
+      intuition.
+      inv H0; econstructor.
+    apply intern_incr_refl.
+    apply sm_inject_separated_same_sminj.
+    apply sm_locally_allocatedChar.
+    repeat split; extensionality b;
+      try rewrite freshloc_irrefl; intuition. }
+{ inv EC. exists mu; eexists; eexists; split.
+      econstructor.
+        eapply eventval_list_match_preserved.
+          apply SymbPres.
+          eapply eventval_list_match_inject; try eapply ArgsInj.
+            rewrite <- restrict_sm_all.
+            eapply restrict_sm_preserves_globals; try eassumption.
+            unfold vis. intuition.  
+          assumption.
+        eapply eventval_match_preserved.
+          apply SymbPres. apply H0.
+      intuition.
+      inv H0; econstructor.
+    apply intern_incr_refl.
+    apply sm_inject_separated_same_sminj.
+    apply sm_locally_allocatedChar.
+    repeat split; extensionality b;
+      try rewrite freshloc_irrefl; intuition. }
+{ inv EC. exists mu; eexists; eexists; split.
+      econstructor.
+        eapply eventval_list_match_preserved.
+          apply SymbPres.
+          eapply eventval_list_match_inject; try eapply ArgsInj.
+            rewrite <- restrict_sm_all.
+            eapply restrict_sm_preserves_globals; try eassumption.
+            unfold vis. intuition.  
+          assumption.
+        eapply eventval_match_preserved.
+          apply SymbPres. apply H0.
+      intuition.
+      inv H0; econstructor.
+    apply intern_incr_refl.
+    apply sm_inject_separated_same_sminj.
+    apply sm_locally_allocatedChar.
+    repeat split; extensionality b;
+      try rewrite freshloc_irrefl; intuition. }
+{ inv EC. exists mu; eexists; eexists; split.
+      econstructor.
+        eapply eventval_list_match_preserved.
+          apply SymbPres.
+          eapply eventval_list_match_inject; try eapply ArgsInj.
+            rewrite <- restrict_sm_all.
+            eapply restrict_sm_preserves_globals; try eassumption.
+            unfold vis. intuition.  
+          assumption.
+        eapply eventval_match_preserved.
+          apply SymbPres. apply H0.
+      intuition.
+      inv H0; econstructor.
+    apply intern_incr_refl.
+    apply sm_inject_separated_same_sminj.
+    apply sm_locally_allocatedChar.
+    repeat split; extensionality b;
+      try rewrite freshloc_irrefl; intuition. }
+{ inv EC. exists mu; eexists; eexists; split.
+      econstructor.
+        eapply eventval_list_match_preserved.
+          apply SymbPres.
+          eapply eventval_list_match_inject; try eapply ArgsInj.
+            rewrite <- restrict_sm_all.
+            eapply restrict_sm_preserves_globals; try eassumption.
+            unfold vis. intuition.  
+          assumption.
+        eapply eventval_match_preserved.
+          apply SymbPres. apply H0.
+      intuition.
+      inv H0; econstructor.
+    apply intern_incr_refl.
+    apply sm_inject_separated_same_sminj.
+    apply sm_locally_allocatedChar.
+    repeat split; extensionality b;
+      try rewrite freshloc_irrefl; intuition. }
+{ inv EC. exists mu; eexists; eexists; split.
+      econstructor.
+        eapply eventval_list_match_preserved.
+          apply SymbPres.
+          eapply eventval_list_match_inject; try eapply ArgsInj.
+            rewrite <- restrict_sm_all.
+            eapply restrict_sm_preserves_globals; try eassumption.
+            unfold vis. intuition.  
+          assumption.
+        eapply eventval_match_preserved.
+          apply SymbPres. apply H0.
+      intuition.
+      inv H0; econstructor.
+    apply intern_incr_refl.
+    apply sm_inject_separated_same_sminj.
+    apply sm_locally_allocatedChar.
+    repeat split; extensionality b;
+      try rewrite freshloc_irrefl; intuition. }
+{ inv EC. exists mu; eexists; eexists; split.
+      econstructor.
+        eapply eventval_list_match_preserved.
+          apply SymbPres.
+          eapply eventval_list_match_inject; try eapply ArgsInj.
+            rewrite <- restrict_sm_all.
+            eapply restrict_sm_preserves_globals; try eassumption.
+            unfold vis. intuition.  
+          assumption.
+        eapply eventval_match_preserved.
+          apply SymbPres. apply H0.
+      intuition.
+      inv H0; econstructor.
+    apply intern_incr_refl.
+    apply sm_inject_separated_same_sminj.
+    apply sm_locally_allocatedChar.
+    repeat split; extensionality b;
+      try rewrite freshloc_irrefl; intuition. }
+{ inv EC. exists mu; eexists; eexists; split.
+      econstructor.
+        eapply eventval_list_match_preserved.
+          apply SymbPres.
+          eapply eventval_list_match_inject; try eapply ArgsInj.
+            rewrite <- restrict_sm_all.
+            eapply restrict_sm_preserves_globals; try eassumption.
+            unfold vis. intuition.  
+          assumption.
+        eapply eventval_match_preserved.
+          apply SymbPres. apply H0.
+      intuition.
+      inv H0; econstructor.
+    apply intern_incr_refl.
+    apply sm_inject_separated_same_sminj.
+    apply sm_locally_allocatedChar.
+    repeat split; extensionality b;
+      try rewrite freshloc_irrefl; intuition. }
+{ inv EC. exists mu; eexists; eexists; split.
+      econstructor.
+        eapply eventval_list_match_preserved.
+          apply SymbPres.
+          eapply eventval_list_match_inject; try eapply ArgsInj.
+            rewrite <- restrict_sm_all.
+            eapply restrict_sm_preserves_globals; try eassumption.
+            unfold vis. intuition.  
+          assumption.
+        eapply eventval_match_preserved.
+          apply SymbPres. apply H0.
+      intuition.
+      inv H0; econstructor.
+    apply intern_incr_refl.
+    apply sm_inject_separated_same_sminj.
+    apply sm_locally_allocatedChar.
+    repeat split; extensionality b;
+      try rewrite freshloc_irrefl; intuition. }
+{ inv EC. exists mu; eexists; eexists; split.
+      econstructor.
+        eapply eventval_list_match_preserved.
+          apply SymbPres.
+          eapply eventval_list_match_inject; try eapply ArgsInj.
+            rewrite <- restrict_sm_all.
+            eapply restrict_sm_preserves_globals; try eassumption.
+            unfold vis. intuition.  
+          assumption.
+        eapply eventval_match_preserved.
+          apply SymbPres. apply H0.
+      intuition.
+      inv H0; econstructor.
+    apply intern_incr_refl.
+    apply sm_inject_separated_same_sminj.
+    apply sm_locally_allocatedChar.
+    repeat split; extensionality b;
+      try rewrite freshloc_irrefl; intuition. }
+{ inv EC. exists mu; eexists; eexists; split.
+      econstructor.
+        eapply eventval_list_match_preserved.
+          apply SymbPres.
+          eapply eventval_list_match_inject; try eapply ArgsInj.
+            rewrite <- restrict_sm_all.
+            eapply restrict_sm_preserves_globals; try eassumption.
+            unfold vis. intuition.  
+          assumption.
+        eapply eventval_match_preserved.
+          apply SymbPres. apply H0.
+      intuition.
+      inv H0; econstructor.
+    apply intern_incr_refl.
+    apply sm_inject_separated_same_sminj.
+    apply sm_locally_allocatedChar.
+    repeat split; extensionality b;
+      try rewrite freshloc_irrefl; intuition. }
+{ inv EC. exists mu; eexists; eexists; split.
+      econstructor.
+        eapply eventval_list_match_preserved.
+          apply SymbPres.
+          eapply eventval_list_match_inject; try eapply ArgsInj.
+            rewrite <- restrict_sm_all.
+            eapply restrict_sm_preserves_globals; try eassumption.
+            unfold vis. intuition.  
+          assumption.
+        eapply eventval_match_preserved.
+          apply SymbPres. apply H0.
+      intuition.
+      inv H0; econstructor.
+    apply intern_incr_refl.
+    apply sm_inject_separated_same_sminj.
+    apply sm_locally_allocatedChar.
+    repeat split; extensionality b;
+      try rewrite freshloc_irrefl; intuition. }
+{ inv EC. exists mu; eexists; eexists; split.
+      econstructor.
+        eapply eventval_list_match_preserved.
+          apply SymbPres.
+          eapply eventval_list_match_inject; try eapply ArgsInj.
+            rewrite <- restrict_sm_all.
+            eapply restrict_sm_preserves_globals; try eassumption.
+            unfold vis. intuition.  
+          assumption.
+        eapply eventval_match_preserved.
+          apply SymbPres. apply H0.
+      intuition.
+      inv H0; econstructor.
+    apply intern_incr_refl.
+    apply sm_inject_separated_same_sminj.
+    apply sm_locally_allocatedChar.
+    repeat split; extensionality b;
+      try rewrite freshloc_irrefl; intuition. }
+{ inv EC. exists mu; eexists; eexists; split.
+      econstructor.
+        eapply eventval_list_match_preserved.
+          apply SymbPres.
+          eapply eventval_list_match_inject; try eapply ArgsInj.
+            rewrite <- restrict_sm_all.
+            eapply restrict_sm_preserves_globals; try eassumption.
+            unfold vis. intuition.  
+          assumption.
+        eapply eventval_match_preserved.
+          apply SymbPres. apply H0.
+      intuition.
+      inv H0; econstructor.
+    apply intern_incr_refl.
+    apply sm_inject_separated_same_sminj.
+    apply sm_locally_allocatedChar.
+    repeat split; extensionality b;
+      try rewrite freshloc_irrefl; intuition. }
+{ inv EC. exists mu; eexists; eexists; split.
+      econstructor.
+        eapply eventval_list_match_preserved.
+          apply SymbPres.
+          eapply eventval_list_match_inject; try eapply ArgsInj.
+            rewrite <- restrict_sm_all.
+            eapply restrict_sm_preserves_globals; try eassumption.
+            unfold vis. intuition.  
+          assumption.
+        eapply eventval_match_preserved.
+          apply SymbPres. apply H0.
+      intuition.
+      inv H0; econstructor.
+    apply intern_incr_refl.
+    apply sm_inject_separated_same_sminj.
+    apply sm_locally_allocatedChar.
+    repeat split; extensionality b;
+      try rewrite freshloc_irrefl; intuition. }
+{ inv EC. exists mu; eexists; eexists; split.
+      econstructor.
+        eapply eventval_list_match_preserved.
+          apply SymbPres.
+          eapply eventval_list_match_inject; try eapply ArgsInj.
+            rewrite <- restrict_sm_all.
+            eapply restrict_sm_preserves_globals; try eassumption.
+            unfold vis. intuition.  
+          assumption.
+        eapply eventval_match_preserved.
+          apply SymbPres. apply H0.
+      intuition.
+      inv H0; econstructor.
+    apply intern_incr_refl.
+    apply sm_inject_separated_same_sminj.
+    apply sm_locally_allocatedChar.
+    repeat split; extensionality b;
+      try rewrite freshloc_irrefl; intuition. }
 Qed.

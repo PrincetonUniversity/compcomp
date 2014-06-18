@@ -4071,7 +4071,10 @@ exists st2' m2',
    sm_inject_separated mu mu' m1 m2 /\
    sm_locally_allocated mu mu' m1 m2 m1' m2'.
 Proof. intros.
-destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; simpl in *; try (monadInv TRS).
+assert (SymbPres := symbols_preserved).
+destruct CS; intros; 
+  destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];
+  inv MS; simpl in *; try (monadInv TRS).
 
 { (* assign *)
   assert (INJR: Mem.inject (as_inj (restrict_sm mu (vis mu))) m m2).
@@ -4314,13 +4317,13 @@ destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];inv MS; sim
       intros. eapply Mem.load_unchanged_on; try eassumption.
         intros. red. apply restrictI_None. left; trivial.
       intros. eapply intern_as_inj_preserved1; try eassumption. red; xomega.
-      intros. rewrite H3. apply eq_sym. 
+      intros ? ? ? AI ?. rewrite AI. apply eq_sym. 
               eapply intern_as_inj_preserved2; try eassumption. red; xomega.
       eapply match_cont_intern_invariant; try eassumption.
         intros. eapply Mem.load_unchanged_on; try eassumption.
                 intros. apply restrictI_None. left; trivial. 
         intros. eapply intern_as_inj_preserved1; try eassumption. red; xomega.
-        intros. rewrite H3. apply eq_sym. 
+        intros ? ? ? AI ?. rewrite AI. apply eq_sym. 
                 eapply intern_as_inj_preserved2; try eassumption. red; xomega.
 (*  inv MENV; xomega. inv MENV; xomega. *)
   eapply Ple_trans; eauto. eapply external_call_nextblock; eauto.
@@ -4823,8 +4826,10 @@ Lemma MATCH_effcore_diagram: forall st1 m1 st1' m1'
          U1 b1 (ofs - delta1) = true /\
          Mem.perm m1 b1 (ofs - delta1) Max Nonempty)).
 Proof. intros.
-destruct CS; intros; destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];
-inv MS; simpl in *; try (monadInv TRS).
+assert (SymbPres := symbols_preserved).
+destruct CS; intros; 
+  destruct MTCH as [MS [RC [PG [GLOB [SMV WD]]]]];
+  inv MS; simpl in *; try (monadInv TRS).
 
 { (* assign *)
   assert (INJR: Mem.inject (as_inj (restrict_sm mu (vis mu))) m m2).
@@ -5112,8 +5117,8 @@ inv MS; simpl in *; try (monadInv TRS).
   intros [CASTED [tvargs [C D]]].
   rewrite restrict_sm_all in D.
   (*exploit external_call_mem_inject; eauto.*)
-  exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply D.
-    eassumption. eassumption. eassumption. eassumption. eassumption. eassumption. assumption.
+  exploit (inlineable_extern_inject _ _ GDE_lemma); 
+    try eapply D; try eassumption. 
 (*  apply match_globalenvs_preserves_globals; eauto with compat.*)
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].

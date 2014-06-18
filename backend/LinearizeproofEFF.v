@@ -1639,15 +1639,8 @@ exists st2' m2',
   MATCH mu' st1' m1' st2' m2'.
 Proof. intros.
   destruct MTCH as [MS [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
-  assert (GDEQ: genvs_domain_eq ge tge).
-   clear -ge tge. unfold genvs_domain_eq, genv2blocks.
-    simpl; split; intros. 
-     split; intros; destruct H as [id Hid].
-       rewrite <- symbols_preserved in Hid.
-       exists id; trivial.
-     rewrite symbols_preserved in Hid.
-       exists id; trivial.
-    rewrite varinfo_preserved. intuition.
+  assert (SymbPres := symbols_preserved).
+  assert (GDE:= GDE_lemma).
   induction CS; intros; try (inv MS).
 
 { (* start of block, at an [add_branch] *)
@@ -1984,11 +1977,11 @@ Proof. intros.
       apply intern_incr_as_inj in INC; trivial.
         apply sm_inject_separated_mem in SEP; trivial.
         eapply meminj_preserves_incr_sep; eassumption. 
-    red; intros. destruct (GFP _ _ H2).
+    intros ? ? Hb. destruct (GFP _ _ Hb).
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
     assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (Glob _ H2). }
+          rewrite <- FRG. eapply Glob; eassumption. }
 
   (* Lannot 
   eexists; eexists; split. 
@@ -2206,7 +2199,7 @@ Proof. intros.
     red; intros. destruct (GFP _ _ H1). split; trivial.
          eapply intern_incr_as_inj; eassumption.
     assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply IntInc.
-      apply Glob in H1. rewrite <-FF; trivial. }
+      rewrite <-FF. apply Glob; eassumption. }
 
 { (* internal functions *)
   assert (REACH: (reachable f)!!(LTL.fn_entrypoint f) = true).
@@ -2262,7 +2255,7 @@ Proof. intros.
     red; intros. destruct (GFP _ _ H1). split; trivial.
          eapply intern_incr_as_inj; eassumption.
     assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply IntInc.
-      apply Glob in H1. rewrite <-FF; trivial. }
+      rewrite <- FF; apply Glob; assumption. }
 
 { contradiction. }
 {  (* unobservable external function *)
@@ -2277,9 +2270,9 @@ Proof. intros.
      red; intros. apply Conventions1.loc_arguments_rec_charact in H0. 
            destruct l; try contradiction.
            destruct sl; try contradiction. trivial.
+  assert (OBS' := EFhelpers _ _ OBS).
   exploit (inlineable_extern_inject _ _ GDE_lemma);
-       try eapply ArgsInj; try eapply H; try assumption.
-     eassumption. eapply EFhelpers; eassumption. assumption. 
+       try eapply ArgsInj; try eapply H; try eassumption.
   intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED 
          [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].  
   eexists; eexists m''.
@@ -2306,7 +2299,7 @@ Proof. intros.
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
     assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (Glob _ H1). }
+          rewrite <- FRG. apply Glob; assumption. }
 
 { (* return *) 
   inv H5. inv H1.
@@ -2346,15 +2339,8 @@ exists st2' m2' (U2 : block -> Z -> bool),
          Mem.perm m1 b1 (ofs - delta1) Max Nonempty)).
 Proof. intros.
   destruct MTCH as [MS [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
-  assert (GDEQ: genvs_domain_eq ge tge).
-   clear -ge tge. unfold genvs_domain_eq, genv2blocks.
-    simpl; split; intros. 
-     split; intros; destruct H as [id Hid].
-       rewrite <- symbols_preserved in Hid.
-       exists id; trivial.
-     rewrite symbols_preserved in Hid.
-       exists id; trivial.
-    rewrite varinfo_preserved. intuition.
+  assert (SymbPres := symbols_preserved).
+  assert (GDE:= GDE_lemma).
   induction CS; intros; try (inv MS).
 
 { (* start of block, at an [add_branch] *)
@@ -2711,11 +2697,11 @@ Proof. intros.
       apply intern_incr_as_inj in INC; trivial.
         apply sm_inject_separated_mem in SEP; trivial.
         eapply meminj_preserves_incr_sep; eassumption. 
-      red; intros. destruct (GFP _ _ H2).
+      red; intros ? ? X. destruct (GFP _ _ X).
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
       assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (Glob _ H2).
+          rewrite <- FRG. apply Glob; assumption.
   intros.
     eapply BuiltinEffect_Propagate; try eassumption. }
 
@@ -2947,7 +2933,7 @@ Proof. intros.
      red; intros. destruct (GFP _ _ H1). split; trivial.
           eapply intern_incr_as_inj; eassumption.
      assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply IntInc.
-       apply Glob in H1. rewrite <-FF; trivial.
+       rewrite <- FF. apply Glob. assumption. 
   intuition. }
 
 { (* internal functions *)
@@ -3004,7 +2990,7 @@ Proof. intros.
      red; intros. destruct (GFP _ _ H1). split; trivial.
           eapply intern_incr_as_inj; eassumption.
      assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply IntInc.
-       apply Glob in H1. rewrite <-FF; trivial.
+       rewrite <- FF. apply Glob; assumption.
   intuition. }
 
 { contradiction. }
@@ -3020,9 +3006,9 @@ Proof. intros.
      red; intros. apply Conventions1.loc_arguments_rec_charact in H0. 
            destruct l; try contradiction.
            destruct sl; try contradiction. trivial.
+  assert (OBS' := EFhelpers _ _ OBS).
   exploit (inlineable_extern_inject _ _ GDE_lemma);
-       try eapply ArgsInj; try eapply H; try assumption.
-     eassumption. eapply EFhelpers; eassumption. assumption. 
+       try eapply ArgsInj; try eapply H; try eassumption.
   intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED 
          [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].  
   eexists; eexists m''; eexists.
@@ -3054,7 +3040,7 @@ Proof. intros.
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
        assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (Glob _ H1). }
+          rewrite <- FRG. apply Glob; assumption. }
   intros. 
     exploit @BuiltinEffect_Propagate; try eapply H.
       eassumption. 

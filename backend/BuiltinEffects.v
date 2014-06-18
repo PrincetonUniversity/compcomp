@@ -217,26 +217,6 @@ Proof. intros. unfold observableEF.
   apply is64helper_char in H.
   rewrite H; trivial. Qed.
 
-Definition helper_injects ef vargs vres : Prop :=
-  forall (TF TV:Type) (tge:Genv.t TF TV) (GDE: genvs_domain_eq ge tge) 
-       (SymbPres: forall s, Genv.find_symbol tge s = Genv.find_symbol ge s)
-        m t m1 mu tm vargs'
-       (WD: SM_wd mu) (SMV: sm_valid mu m tm) (RC: REACH_closed m (vis mu)),
-       meminj_preserves_globals ge (as_inj mu) ->
-       external_call ef ge vargs m t vres m1 ->
-       Mem.inject (as_inj mu) m tm ->
-       val_list_inject (restrict (as_inj mu) (vis mu)) vargs vargs' ->
-       exists mu' vres' tm1,
-         external_call ef tge vargs' tm t vres' tm1 /\
-         val_inject (restrict (as_inj mu') (vis mu')) vres vres' /\
-         Mem.inject (as_inj mu') m1 tm1 /\
-         Mem.unchanged_on (loc_unmapped (restrict (as_inj mu) (vis mu))) m m1 /\
-         Mem.unchanged_on (loc_out_of_reach (restrict (as_inj mu) (vis mu)) m) tm tm1 /\
-         intern_incr mu mu' /\
-         sm_inject_separated mu mu' m tm /\
-         sm_locally_allocated mu mu' m tm m1 tm1 /\
-         SM_wd mu' /\ sm_valid mu' m1 tm1 /\
-         (REACH_closed m (vis mu) -> REACH_closed m1 (vis mu')).
 
 Definition helper_implements 
      (id: ident) (sg: signature) (vargs: list val) (vres: val) : Prop :=
@@ -245,8 +225,7 @@ Definition helper_implements
   /\ Genv.find_funct_ptr ge b = Some (External ef)
   /\ ef_sig ef = sg
   /\ (forall m, external_call ef ge vargs m E0 vres m)
-  (*NEW*) /\  observableEF ef = false
-  (*NEW*) /\ helper_injects ef vargs vres.
+  (*NEW*) /\  observableEF ef = false.
 
 Definition i64_helpers_correct: Prop :=
     (forall x z, Val.longoffloat x = Some z -> helper_implements hf.(i64_dtos) sig_f_l (x::nil) z)
@@ -289,43 +268,6 @@ Proof. intros.
   destruct ef.
     (*EF_external*)
        inv H. apply Mem.unchanged_on_refl.
-(*       simpl in *. rewrite negb_false_iff, orb_false_r in *.
-       unfold ident_eq in OBS.
-       destruct (peq name (i64_dtos hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_dtou hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_stod hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_utod hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_stof hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_utof hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_neg hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_add hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_sub hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_mul hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_sdiv hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_udiv hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_smod hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_umod hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_shl hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_shr hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_sar hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       discriminate.*)
     (*EF_builtin - same proof as previous case*)
        inv H. apply Mem.unchanged_on_refl.
     simpl in OBS; inv OBS.
@@ -333,43 +275,6 @@ Proof. intros.
     simpl in OBS; inv OBS.
     simpl in OBS; inv OBS.
     simpl in OBS; inv OBS.
-(*       simpl in *. rewrite negb_false_iff, orb_false_r in *.
-       unfold ident_eq in OBS.
-       destruct (peq name (i64_dtos hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_dtou hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_stod hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_utod hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_stof hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_utof hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_neg hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_add hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_sub hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_mul hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_sdiv hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_udiv hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_smod hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_umod hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_shl hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_shr hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       destruct (peq name (i64_sar hf)); simpl in *. 
-        subst name. inv H. apply Mem.unchanged_on_refl.
-       discriminate.*)
     (*case EF_malloc*)
        eapply  malloc_Effect_unchOn. eassumption.
     (*case EF_free*)
@@ -517,14 +422,17 @@ induction M; simpl in *; intros.
           eexists. eapply reach_cons; try eassumption.
 Qed.
 
-(*takes the role of external_call_mem_inject for builtins etc.
+(*takes the role of external_call_mem_inject
   Since inlinables write at most to vis, we use the
   Mem-Unchanged_on condition loc_out_of_reach, rather than
   local_out_of_reach as in external calls.*)
 Lemma inlineable_extern_inject: forall {F V TF TV:Type}
        (ge:Genv.t F V) (tge:Genv.t TF TV) (GDE: genvs_domain_eq ge tge) 
-        hf ef vargs m t vres m1 mu tm vargs'
+       (SymbPres: forall s, Genv.find_symbol tge s = Genv.find_symbol ge s)
+       hf ef vargs m t vres m1 mu tm vargs'
        (WD: SM_wd mu) (SMV: sm_valid mu m tm) (RC: REACH_closed m (vis mu))
+       (Glob: forall b, isGlobalBlock ge b = true -> 
+              frgnBlocksSrc mu b = true)
        (OBS: observableEF hf ef = false),
        meminj_preserves_globals ge (as_inj mu) ->
        external_call ef ge vargs m t vres m1 ->
@@ -540,12 +448,15 @@ Lemma inlineable_extern_inject: forall {F V TF TV:Type}
          sm_inject_separated mu mu' m tm /\
          sm_locally_allocated mu mu' m tm m1 tm1 /\
          SM_wd mu' /\ sm_valid mu' m1 tm1 /\
-         (REACH_closed m (vis mu) -> REACH_closed m1 (vis mu')).
+         REACH_closed m1 (vis mu').
 Proof. intros.
 destruct ef; simpl in H0. 
     (*EFexternal*)
-      unfold observableEF in OBS. rewrite negb_false_iff in OBS. admit. 
-    (*EF_builtin*) admit.
+      unfold observableEF in OBS. rewrite negb_false_iff in OBS. 
+      eapply helpers_inject; try eassumption. 
+    (*EF_builtin*)
+      unfold observableEF in OBS. rewrite negb_false_iff in OBS. 
+      eapply helpers_inject; try eassumption. 
     simpl in OBS; try solve [inv OBS].
     simpl in OBS; try solve [inv OBS].
     simpl in OBS; try solve [inv OBS].
@@ -635,7 +546,8 @@ destruct ef; simpl in H0.
             eapply Mem.valid_block_alloc; try eassumption.
             eapply SMV; eassumption.
       eapply (REACH_Store m'); try eassumption.
-      intros. rewrite getBlocks_char in H5. destruct H5 as [zz [ZZ | ZZ]]; inv ZZ.
+      intros ? getBl. rewrite getBlocks_char in getBl. 
+         destruct getBl as [zz [ZZ | ZZ]]; inv ZZ.
   (*case EF_free*)
     inv H0. inv H2. inv H9. inv H7.
     destruct (restrictD_Some _ _ _ _ _ H6) as [AIb VISb].
@@ -685,6 +597,7 @@ destruct ef; simpl in H0.
        eapply SMV; assumption. eapply SMV; assumption.
      eapply REACH_closed_free; eassumption.
   (*memcpy*)
+     clear OBS.
      inv H0. 
   exploit Mem.loadbytes_length; eauto. intros LEN.
   assert (RPSRC: Mem.range_perm m bsrc (Int.unsigned osrc) (Int.unsigned osrc + sz) Cur Nonempty).
@@ -739,15 +652,16 @@ destruct ef; simpl in H0.
   destruct (loadbytes_D _ _ _ _ _ H9); clear A C.
    clear RPSRC RPDST PSRC PDST H8 H11 H3 H5 H6 H7 EQ1 EQ2 B D.  
   intros. eapply REACH_Storebytes; try eassumption.
-          intros. eapply H3. subst bytes.
-          destruct (in_split _ _ H5) as [bts1 [bts2 Bytes]]; clear H5.
+          intros. eapply RC. subst bytes.
+          destruct (in_split _ _ H3) as [bts1 [bts2 Bytes]]; clear H3.
           specialize (getN_range _ _ _ _ _ _ Bytes). intros.
           apply getN_aux in Bytes. 
           eapply REACH_cons. instantiate(1:=bsrc).
-            eapply REACH_nil. apply H14.
+            eapply REACH_nil. assumption.
             Focus 2. apply eq_sym. eassumption. 
-            eapply H15. clear - H5 H4. split. specialize (Zle_0_nat (length bts1)). intros. omega.
-            apply inj_lt in H5. rewrite nat_of_Z_eq in H5; omega.
+            eapply H15. clear - H3 H4. 
+            split. specialize (Zle_0_nat (length bts1)). intros. omega.
+                   apply inj_lt in H3. rewrite nat_of_Z_eq in H3; omega.
     simpl in OBS; try solve [inv OBS].
     simpl in OBS; try solve [inv OBS].
     simpl in OBS; try solve [inv OBS].

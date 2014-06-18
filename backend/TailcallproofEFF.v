@@ -1147,7 +1147,7 @@ intros.
             simpl. exists id; eassumption.
  Qed. 
 
-Lemma MATCH_corestep: forall st1 m1 st1' m1'
+Lemma MATCH_corediagram: forall st1 m1 st1' m1'
       (CS: corestep (rtl_eff_sem hf) ge st1 m1 st1' m1')
       st2 mu m2 (MTCH: MATCH st1 mu st1 m1 st2 m2),
   (exists st2' m2',
@@ -1160,6 +1160,7 @@ Lemma MATCH_corestep: forall st1 m1 st1' m1'
        sm_locally_allocated mu mu m1 m2 m1' m2 /\
        MATCH st2 mu st1' m1' st2 m2)%nat.
 Proof.
+  assert (SymbPres := symbols_preserved).
   induction 1; intros; destruct MTCH as [MS PRE];
   inv MS; EliminatedInstr.
 
@@ -1407,9 +1408,8 @@ Proof.
         eapply restrict_sm_preserves_globals; try eassumption.
           unfold vis. intuition.
   assert (ArgsInj:= regset_get_list _ _ _ args RLD).
-  exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply H0.
-        eassumption. eassumption. eassumption. eassumption. 
-        eassumption. eassumption. eassumption.
+  exploit (inlineable_extern_inject _ _ GDE_lemma);
+    try eapply H0; try eassumption.
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
   left. exists (RTL_State s' (transf_function f) (Vptr sp' Int.zero) pc' (rs'#res <- vres')), tm'; split.
@@ -1431,7 +1431,7 @@ Proof.
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
       assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-          rewrite <- FRG. eapply (Glob _ H3). }
+          rewrite <- FRG. apply Glob; assumption. }
 
 { (* cond *)
   TransfInstr. 
@@ -1566,7 +1566,7 @@ Proof.
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
       assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply IntInc.
-          rewrite <- FRG. eapply (Glob _ H1). }
+          rewrite <- FRG. apply Glob; assumption. }
 
 { (* nonobservable external call *)
   destruct PRE as [RC [PG [GFP [Glob [SMV WD]]]]].
@@ -1647,9 +1647,9 @@ Lemma MATCH_effstep: forall st1 m1 st1' m1' (U1 : block -> Z -> bool)
        sm_locally_allocated mu mu m1 m2 m1' m2 /\
        MATCH st2 mu st1' m1' st2 m2)%nat.
 Proof.
+  assert (SymbPres := symbols_preserved).
   induction 1; intros; destruct MTCH as [MS PRE];
   inv MS; EliminatedInstr.
-
 { (* nop *)
   TransfInstr.
   left; eexists; eexists; eexists; split.
@@ -1927,9 +1927,8 @@ Proof.
         eapply restrict_sm_preserves_globals; try eassumption.
           unfold vis. intuition.
   assert (ArgsInj:= regset_get_list _ _ _ args RLD).
-  exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply H0.
-        eassumption. eassumption. eassumption. eassumption.
-        eassumption. eassumption. eassumption.
+  exploit (inlineable_extern_inject _ _ GDE_lemma); 
+    try eapply H0; try eassumption. 
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
   left. exists (RTL_State s' (transf_function f) (Vptr sp' Int.zero) pc' (rs'#res <- vres')), tm'; eexists; split.
@@ -1954,7 +1953,7 @@ Proof.
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
       assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-          rewrite <- FRG. eapply (Glob _ H3). 
+          rewrite <- FRG. apply Glob; assumption. 
   eapply BuiltinEffect_Propagate; eassumption. }
 
 { (* cond *)
@@ -2098,7 +2097,7 @@ Proof.
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
       assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply IntInc.
-          rewrite <- FRG. eapply (Glob _ H1). }
+          rewrite <- FRG. apply Glob; assumption. }
 
 { (* nonobservable external call *)
   destruct PRE as [RC [PG [GFP [Glob [SMV WD]]]]].
@@ -2252,7 +2251,7 @@ apply effect_simulations_lemmas.inj_simulation_plus with
 (* after_external*)
   { apply MATCH_afterExternal. }
 (* core_diagram*)
-  { intros. exploit MATCH_corestep; try eassumption.
+  { intros. exploit MATCH_corediagram; try eassumption.
     intros [[st2' [m2' [CS' [mu' X]]]] | [meas [locAlloc MTCH]]].
       exists st2', m2', mu'. intuition. 
       left. apply corestep_plus_one; assumption.

@@ -2910,6 +2910,7 @@ exists st2' m2' mu',
   /\ MATCH mu' st1' m1' st2' m2'
   /\ SM_wd mu' /\ sm_valid mu' m1' m2'.
 Proof. intros.
+   assert (SymbPres:= symbols_preserved).
    destruct CS; intros; destruct MTCH as [MSTATE PRE];
    inv MSTATE; try UseShape.
 
@@ -3725,8 +3726,8 @@ Proof. intros.
          (decode_longs (sig_args (ef_sig ef)) (map ls1 (map R args')))).
     eapply add_equations_args_inject; try eassumption.
       inv WTI. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto.     
-  exploit (inlineable_extern_inject ge tge); try eapply PRE. eapply GDE_lemma. 
-         eassumption. eassumption. eassumption.
+  exploit (inlineable_extern_inject ge tge GDE_lemma); 
+    try eapply PRE; try eassumption.
   intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].
   assert (E: map ls1 (map R args') = reglist ls1 args').
   { unfold reglist. rewrite list_map_compose. auto. }
@@ -3774,7 +3775,7 @@ Proof. intros.
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
     assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (H6 _ H13).
+          rewrite <- FRG. eapply H6; eassumption. 
   split; trivial. }
 
 { (* annot *)
@@ -3982,13 +3983,13 @@ Proof. intros.
         red; intros. destruct (GFP _ _ H10). split; trivial.
            eapply intern_incr_as_inj; eassumption.
         assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply IntInc'.
-          apply Glob in H10. rewrite <-FF; trivial.
+          rewrite <-FF; eapply Glob; eassumption.
   split; trivial. }
 
-{ (* external function : only nonobservables*)     
-  exploit (inlineable_extern_inject ge tge); try eapply PRE. 
-    eapply GDE_lemma. eapply EFhelpers; eauto. (* eassumption.*)
-     eassumption. eassumption.
+{ (* external function : only nonobservables*) 
+  specialize (EFhelpers _ _ OBS); intros OBS'.
+  exploit (inlineable_extern_inject ge tge GDE_lemma);
+    try eapply PRE; try eassumption.    
   intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].
   simpl in FUN; inv FUN.
   eexists; exists m'', mu'; split.
@@ -4034,7 +4035,7 @@ Proof. intros.
       red; intros ? ? Hb. destruct (GFP _ _ Hb). split; trivial.
            eapply intern_incr_as_inj; eassumption.
       assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          apply Glob in H1. rewrite <-FF; trivial.
+        rewrite <-FF. eapply Glob; eassumption.
   split; trivial. }
 
 { (* return *)
@@ -4081,6 +4082,7 @@ Lemma Match_effcore_diagram:
          U1 b1 (ofs - delta1) = true /\
          Mem.perm m1 b1 (ofs - delta1) Max Nonempty)).
 Proof. intros. 
+assert (SymbPres := symbols_preserved).
 induction CS; 
    destruct MTCH as [MSTATE PRE]; inv MSTATE; try UseShape.
 
@@ -5116,8 +5118,7 @@ induction CS;
          (decode_longs (sig_args (ef_sig ef)) (map ls1 (map R args')))).
     eapply add_equations_args_inject; try eassumption.
       inv WTI. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto.     
-  exploit (inlineable_extern_inject ge tge); try eapply PRE. eapply GDE_lemma. 
-         eassumption. eassumption. eassumption.
+  exploit (inlineable_extern_inject ge tge); try eapply PRE; try eassumption.
   intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].
   assert (E: map ls1 (map R args') = reglist ls1 args').
   { unfold reglist. rewrite list_map_compose. auto. }
@@ -5171,7 +5172,7 @@ induction CS;
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
     assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (H6 _ H13).
+          rewrite <- FRG. eauto. 
   split; trivial. 
   split; trivial. 
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
@@ -5421,10 +5422,9 @@ induction CS;
           apply Glob in H10. rewrite <-FF; trivial.
   intuition. }
 
-{ (* external function : only nonobservables*)     
-  exploit (inlineable_extern_inject ge tge); try eapply PRE. 
-    eapply GDE_lemma. eapply EFhelpers; eauto. (* eassumption.*)
-     eassumption. eassumption.
+{ (* external function : only nonobservables*)  
+  specialize (EFhelpers _ _ OBS); intros OBS'.   
+  exploit (inlineable_extern_inject ge tge); try eapply PRE; try eassumption. 
   intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].
   simpl in FUN; inv FUN.
   eexists; exists m''; eexists; split.
@@ -5471,7 +5471,7 @@ induction CS;
       red; intros ? ? Hb. destruct (GFP _ _ Hb). split; trivial.
            eapply intern_incr_as_inj; eassumption.
       assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          apply Glob in H1. rewrite <-FF; trivial.
+         rewrite <-FF. eapply Glob; eassumption.
   split. trivial. split. trivial.
   intros. eapply BuiltinEffect_Propagate; try eassumption. 
       instantiate (1:=tge).

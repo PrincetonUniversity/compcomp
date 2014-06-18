@@ -2701,7 +2701,7 @@ Proof. intros.
 Qed.
 
 
-Lemma MATCH_corestep: forall
+Lemma MATCH_corediagram: forall
   (st1 : CL_core) (m1 : mem) (st1' : CL_core) (m1' : mem)
 (*  (CS: corestep (clight_eff_sem FE FE_FWD FE_UNCH) ge st1 m1 st1' m1')*)
   (CS: corestep (CL_eff_sem2 hf) ge st1 m1 st1' m1')
@@ -2717,6 +2717,7 @@ exists (st2' : CSharpMin_core) (m2' : mem) (mu' : SM_Injection),
   SM_wd mu' /\ sm_valid mu' m1' m2'.
 Proof.
   intros. 
+  assert (SymbPres := symbols_preserved).
   inv CS; simpl in *.
 
 { (*corestep_assign*)
@@ -2879,8 +2880,8 @@ Proof.
       unfold vis. intuition. 
     exploit transl_arglist_correct; try eassumption.
     intros [tvargs [EVAL2 VINJ2]].
-    exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply H0.
-        eassumption. eassumption. eassumption. eassumption. eassumption. eassumption. eassumption.
+    exploit (inlineable_extern_inject _ _ GDE_lemma); 
+     try eapply H0; try  eassumption. 
     intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
     eexists; eexists; eexists mu'.
@@ -2903,7 +2904,7 @@ Proof.
            split; trivial.
            eapply intern_incr_as_inj; eassumption.
          assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-           rewrite <- FRG. eapply (Glob _ H3). }
+           rewrite <- FRG. apply Glob; assumption. }
 
 { (* seq *)
   destruct MC as [SMC PRE].
@@ -3422,6 +3423,7 @@ exists (st2' : CSharpMin_core) (m2' : mem) (mu' : SM_Injection),
   MATCH st1' mu' st1' m1' st2' m2'.
 Proof.
   intros. 
+  assert (SymbPres := symbols_preserved).
   induction EFFSTEP; simpl in *.
 
 { (*corestep_assign*)
@@ -3652,8 +3654,8 @@ Proof.
       unfold vis. intuition. 
     exploit transl_arglist_correctMu; try eassumption.
     intros [tvargs [EVAL2 VINJ2]].
-    exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply H0.
-        eassumption. eassumption. eassumption. eassumption. eassumption. eassumption. eassumption.
+    exploit (inlineable_extern_inject _ _ GDE_lemma); 
+       try eapply H0; try eassumption. 
     intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
     eexists; eexists; eexists mu'.
@@ -3678,7 +3680,7 @@ Proof.
            split; trivial.
            eapply intern_incr_as_inj; eassumption.
          assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-           rewrite <- FRG. eapply (Glob _ H3). }
+           rewrite <- FRG. apply Glob; assumption. }
 
 { (* seq *)
   destruct MC as [SMC PRE].
@@ -4384,7 +4386,7 @@ intros.
 (* after_external*)
   { apply MATCH_afterExternal. apply GDE_lemma. }
 (* core_diagram*)
-  { intros. exploit MATCH_corestep; try eassumption.
+  { intros. exploit MATCH_corediagram; try eassumption.
     intros [st2' [m2' [mu' [CS2 MU']]]].
     exists st2', m2', mu'. intuition. }
 (* effcore_diagram*)

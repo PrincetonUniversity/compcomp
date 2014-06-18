@@ -25,6 +25,9 @@ Notation SP := ESP (only parsing).
 Notation "a # b" := (a b) (at level 1, only parsing).
 Notation "a # b <- c" := (Pregmap.set b c a) (at level 1, b at next level).
 
+Section ASM_EFF.
+Variable hf : I64Helpers.helper_functions.
+
 Section EFFSEM.
 Definition effect_instr (ge:genv) (c: code) (i: instruction) (rs: regset) (m: mem) 
            : (block -> Z -> bool)  :=
@@ -157,7 +160,7 @@ Inductive asm_effstep: (block -> Z -> bool) ->
       Genv.find_funct_ptr ge b = Some (Internal f) ->
       find_instr (Int.unsigned ofs) (fn_code f) = Some (Pbuiltin ef args res) ->
       external_call' ef ge (map rs args) m t vl m' ->
-      observableEF ef = false ->
+      observableEF hf ef = false ->
       rs' = nextinstr_nf 
              (set_regs res vl
                (undef_regs (map preg_of (destroyed_by_builtin ef)) rs)) ->
@@ -171,21 +174,21 @@ Inductive asm_effstep: (block -> Z -> bool) ->
       annot_arguments rs m args vargs ->
       external_call' ef ge vargs m t v m' ->
       asm_effstep (State rs) m (State (nextinstr rs)) m'*)
-  | asm_effexec_step_external:
+  | asm_effexec_step_to_external:
       forall b ef args rs m sg,
       rs PC = Vptr b Int.zero ->
       Genv.find_funct_ptr ge b = Some (External ef) ->
       extcall_arguments rs m (ef_sig ef) args ->
       asm_effstep EmptyEffect (State sg rs) m (ExtCallState sg ef args rs) m
-(* EXTERNAL STEPS HALNDLE DBY CORESEMATICS INTERFACE
   | asm_effexec_step_external:
-      forall b ef args res rs m t rs' m',
+      forall sg b callee args res rs m t rs' m'
+      (OBS: EFisHelper hf callee = true),
       rs PC = Vptr b Int.zero ->
-      Genv.find_funct_ptr ge b = Some (External ef) ->
-      extcall_arguments rs m (ef_sig ef) args ->
-      external_call' ef ge args m t res m' ->
-      rs' = (set_regs (loc_external_result (ef_sig ef)) res rs) #PC <- (rs RA) ->
-      asm_effstep (State rs) m (State rs') m'*).
+      Genv.find_funct_ptr ge b = Some (External callee) ->
+      external_call' callee ge args m t res m' ->
+      rs' = (set_regs (loc_external_result (ef_sig callee)) res rs) #PC <- (rs RA) ->
+      asm_effstep  (BuiltinEffect ge callee args m)
+         (ExtCallState sg callee args rs) m (State sg rs') m'.
 End EFFSEM.
 
 Section ASM_EFFSEM.
@@ -297,7 +300,7 @@ Qed.
 
 Lemma asmstep_effax1: forall (M : block -> Z -> bool) g c m c' m',
       asm_effstep g M c m c' m' ->
-      (asm_step g c m c' m' /\
+      (asm_step hf g c m c' m' /\
        Mem.unchanged_on (fun (b : block) (ofs : Z) => M b ofs = false) m m').
 Proof. 
 intros.
@@ -311,10 +314,21 @@ split. eapply asm_exec_step_builtin; eassumption.
          eapply BuiltinEffect_unchOn; eassumption. 
 split. econstructor; eauto.
        apply Mem.unchanged_on_refl. 
+split. econstructor; eauto. 
+       inv H1.
+         destruct callee; try inv OBS.
+           eapply mem_unchanged_on_sub.
+             eapply BuiltinEffect_unchOn; try eapply H3. 
+              instantiate(1:=hf). unfold observableEF. rewrite H2. trivial.
+             unfold BuiltinEffect; simpl; intros. trivial.
+           eapply mem_unchanged_on_sub.
+             eapply BuiltinEffect_unchOn; try eapply H3. 
+              instantiate(1:=hf). unfold observableEF. rewrite H2. trivial.
+             unfold BuiltinEffect; simpl; intros. trivial.
 Qed.
 
 Lemma asmstep_effax2: forall  g c m c' m',
-      asm_step g c m c' m' ->
+      asm_step hf g c m c' m' ->
       exists M, asm_effstep g M c m c' m'.
 Proof.
 intros. (*unfold corestep, Asm_coop_sem in H; simpl in H.*)
@@ -323,6 +337,7 @@ intros. (*unfold corestep, Asm_coop_sem in H; simpl in H.*)
     try solve [eexists; econstructor; try eassumption].
   eexists. eapply asm_effexec_step_builtin; try eassumption. trivial.
   eexists. econstructor; eassumption.
+  eexists. econstructor; eauto.
 Qed.
 
 
@@ -373,11 +388,12 @@ intros.
   eapply exec_instr_valid_block; eassumption.
   inv H0.
   eapply BuiltinEffect_valid_block; eassumption.
+  eapply BuiltinEffect_valid_block; eassumption.
 Qed.
 
 Program Definition Asm_eff_sem : 
   @EffectSem genv state.
-eapply Build_EffectSem with (sem := Asm_coop_sem).
+eapply Build_EffectSem with (sem := Asm_coop_sem hf).
 apply asmstep_effax1.
 apply asmstep_effax2.
 apply asm_effstep_valid. 
@@ -385,3 +401,5 @@ Defined.
 
 End ASM_EFFSEM.
 
+
+End ASM_EFF.

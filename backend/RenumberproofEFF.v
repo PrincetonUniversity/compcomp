@@ -430,7 +430,7 @@ induction H; econstructor; eauto. clear IHlist_forall2.
 eapply replace_locals_frames; eassumption.
 Qed.
 
-Lemma MATCH_corestep: forall 
+Lemma MATCH_corediagram: forall 
        st1 m1 st1' m1' 
        (CS: corestep (rtl_eff_sem hf) ge st1 m1 st1' m1')
        st2 mu m2 (MTCH: MATCH mu st1 m1 st2 m2),
@@ -444,6 +444,7 @@ exists st2' m2' mu',
 Proof. intros.
   destruct MTCH as [MS [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
   assert (GDE:= GDE_lemma).
+  assert (SymbPres := symbols_preserved).
 
   induction CS; intros; try (inv MS); try TR_AT. 
 { (* nop *)
@@ -663,7 +664,7 @@ Proof. intros.
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
       assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (Glob _ H3). }
+          rewrite <- FRG. eapply Glob; eassumption. }
 
 { (* cond *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
@@ -786,7 +787,7 @@ Proof. intros.
      red; intros. destruct (GFP _ _ H1). split; trivial.
           eapply intern_incr_as_inj; eassumption.
      assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply IntInc.
-       apply Glob in H1. rewrite <-FF; trivial.
+        rewrite <-FF. eapply Glob; eassumption.
   intuition. }
 
 { (* nonobservable external function *)
@@ -851,6 +852,7 @@ exists st2' m2' U2 mu',
 Proof. intros.
   destruct MTCH as [MS [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
   assert (GDE:= GDE_lemma).
+  assert (SymbPres := symbols_preserved).
 
   induction CS; intros; try (inv MS); try TR_AT. 
 
@@ -1089,7 +1091,7 @@ Proof. intros.
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
       assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (Glob _ H3).
+          rewrite <- FRG. eapply Glob; eassumption.
   split; trivial.
   split; trivial.
   intros.
@@ -1227,7 +1229,7 @@ Proof. intros.
      red; intros. destruct (GFP _ _ H1). split; trivial.
           eapply intern_incr_as_inj; eassumption.
      assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply IntInc.
-       apply Glob in H1. rewrite <-FF; trivial.
+       rewrite <-FF. eapply Glob; eassumption.
   intuition. }
 
 { (* nonobservable external function *) 
@@ -1906,7 +1908,7 @@ assert (GDE:= GDE_lemma).
 (*afterExternal*)
   { apply MATCH_afterExternal. assumption. }
 (*corediagram*)
-{ intros. exploit MATCH_corestep; try eassumption.
+{ intros. exploit MATCH_corediagram; try eassumption.
   intros [st2' [m2' [mu' [CS' [INC [SEP [LocAlloc [MTCH' [WD' SMV']]]]]]]]].
   exists st2', m2', mu'.
   split; trivial.

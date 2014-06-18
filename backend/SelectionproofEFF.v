@@ -535,7 +535,7 @@ Proof. intros. unfold divl, binop_long.
         helper_implements ge hf (i64_sdiv hf) sig_ll_l (x :: y :: nil) z)
       by eapply HC. 
   destruct (IMPL _ _ _ divsdummy) 
-     as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
+     as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
   destruct (is_longconst e1); simpl in *.
     destruct (is_longconst e2); simpl in *. repeat split; trivial.
     split. repeat split; trivial. 
@@ -576,7 +576,7 @@ Proof. intros. unfold shllimm.
         helper_implements ge hf (i64_shl hf) sig_li_l 
           (x :: y :: nil) (Val.shll x y)) by eapply HC.
    destruct (IMPL Vundef Vundef)
-     as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
+     as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
    unfold fundef; rewrite FOUND, PTR. split. trivial.
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
@@ -633,7 +633,7 @@ Proof. intros. unfold shrlimm.
         helper_implements ge hf (i64_sar hf) sig_li_l 
           (x :: y :: nil) (Val.shrl x y)) by eapply HC.
     destruct (IMPL Vundef Vundef)
-      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
     unfold fundef; rewrite FOUND, PTR.  split. trivial.
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
@@ -661,7 +661,7 @@ Proof. intros; unfold shrluimm.
         helper_implements ge hf (i64_shr hf) sig_li_l 
           (x :: y :: nil) (Val.shrlu x y)) by eapply HC.
     destruct (IMPL Vundef Vundef)
-      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
     unfold fundef; rewrite FOUND, PTR.  split. trivial.
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
@@ -685,7 +685,7 @@ Proof. intros. unfold divlu.
         Val.divlu x y = Some z ->
         helper_implements ge hf (i64_udiv hf) sig_ll_l (x :: y :: nil) z) by eapply HC.
     destruct (IMPL _ _ _ divlu_dummy)
-      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
   destruct (is_longconst e1); simpl in *. 
     destruct (is_longconst e2); simpl in *.
     repeat split; trivial.
@@ -731,7 +731,7 @@ Proof. intros. unfold modl.
         helper_implements ge hf (i64_smod hf) sig_ll_l (x :: y :: nil) z)
         by eapply HC.
   destruct (IMPL _ _ _ modls_dummy)
-      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
   destruct (is_longconst e1); simpl in *; auto. 
     destruct (is_longconst e2); simpl in *; auto.
     split. repeat split; trivial.
@@ -787,7 +787,7 @@ Proof. intros. unfold modlu.
         helper_implements ge hf (i64_umod hf) sig_ll_l (x :: y :: nil) z)
     by eapply HC.
   destruct (IMPL _ _ _ modlu_dummy)
-      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
   destruct (is_longconst e1); simpl in *; auto. 
     destruct (is_longconst e2); simpl in *; auto. 
       split. repeat split; trivial.
@@ -865,7 +865,7 @@ Proof. intros. unfold shll.
         helper_implements ge hf (i64_shl hf) sig_li_l 
           (x :: y :: nil) (Val.shll x y)) by eapply HC.
     destruct (IMPL Vundef Vundef)
-      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
     unfold fundef; rewrite FOUND, PTR. split. trivial.
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
@@ -883,7 +883,7 @@ Proof. intros. unfold shrl.
         helper_implements ge hf (i64_sar hf) sig_li_l 
           (x :: y :: nil) (Val.shrl x y)) by eapply HC.
   destruct (IMPL Vundef Vundef)
-      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
   unfold fundef; rewrite FOUND, PTR.  split. trivial.
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
@@ -901,7 +901,7 @@ Proof. intros. unfold shrlu.
         helper_implements ge hf (i64_shr hf) sig_li_l 
           (x :: y :: nil) (Val.shrlu x y)) by eapply HC.
   destruct (IMPL Vundef Vundef)
-      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]]. 
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
   unfold fundef; rewrite FOUND, PTR.  split. trivial.
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
@@ -1174,7 +1174,7 @@ assert (IMPL:forall x z : val,
      by eapply HC.
 destruct longoffloat_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
-      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
 unfold fundef. rewrite FOUND, PTR. split. trivial.
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
@@ -1189,7 +1189,7 @@ assert (IMPL:forall x z : val,
      by eapply HC.
 destruct longuoffloat_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
-      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
 unfold fundef. rewrite FOUND, PTR. split. trivial.
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
@@ -1204,7 +1204,7 @@ assert (IMPL:forall x z : val,
      by eapply HC.
 destruct floatoflong_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
-      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
 unfold fundef. rewrite FOUND, PTR.  split. trivial.
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
@@ -1219,7 +1219,7 @@ assert (IMPL:forall x z : val,
      by eapply HC.
 destruct floatoflongu_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
-      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
 unfold fundef. rewrite FOUND, PTR. split. trivial.
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
@@ -1234,7 +1234,7 @@ assert (IMPL:forall x z : val,
      by eapply HC.
 destruct singleoflong_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
-      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
 unfold fundef. rewrite FOUND, PTR. split. trivial.
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
@@ -1249,7 +1249,7 @@ assert (IMPL:forall x z : val,
      by eapply HC.
 destruct singleoflongu_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
-      as [b [ef [FOUND [PTR [SIG [EXE [OBS _]]]]]]].
+      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
 unfold fundef. rewrite FOUND, PTR. split. trivial.
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
@@ -1433,7 +1433,7 @@ Lemma helper_implements_preserved:
   helper_implements ge hf id sg vargs vres ->
   helper_implements tge hf id sg vargs vres.
 Proof.
-  intros. destruct H as (b & ef & A & B & C & D & E & F).
+  intros. destruct H as (b & ef & A & B & C & D & E).
   exploit function_ptr_translated; eauto. simpl. intros. 
   exists b; exists ef. 
   split. rewrite symbols_preserved. auto.
@@ -1441,14 +1441,7 @@ Proof.
   split. auto.
   split. intros. eapply external_call_symbols_preserved; eauto. 
          exact symbols_preserved. exact varinfo_preserved.
-  split; trivial.
-  red. intros. eapply F; try assumption.
-    eapply genvs_domain_eq_trans. apply GDE_lemma. trivial.
-    intros. rewrite SymbPres. apply symbols_preserved. 
-   eapply meminj_preserves_genv2blocks. 
-     eapply genvs_domain_eq_preserves. apply GDE_lemma.
-     eapply meminj_preserves_genv2blocks. assumption.
-   admit. (*trace mismatch*)
+  trivial.
 Qed.
 
 (*
@@ -2858,8 +2851,8 @@ intuition.
   rewrite replace_locals_as_inj. assumption.
 Qed. 
 
-Lemma MATCH_diagram: forall (GDE : genvs_domain_eq ge tge)
-      st1 m1 st1' m1' (CS: corestep (cmin_eff_sem hf) ge st1 m1 st1' m1')
+Lemma MATCH_diagram: forall st1 m1 st1' m1'
+      (CS: corestep (cmin_eff_sem hf) ge st1 m1 st1' m1')
       st2 mu m2 (MC: MATCH st1 mu st1 m1 st2 m2)
       (R: list_norepet (map fst (prog_defs prog))),
   exists st2' m2',
@@ -2876,6 +2869,8 @@ Lemma MATCH_diagram: forall (GDE : genvs_domain_eq ge tge)
 Proof.
   intros.
   assert (THELPERS:= helpers_correct_preserved); clear HELPERS.
+  assert (SymbPres:= symbols_preserved).
+  assert (GDE:= GDE_lemma).
    inv CS; simpl in *.
 { (*skip seq*)
       destruct MC as [SMC PRE].
@@ -3180,8 +3175,8 @@ Proof.
         eapply restrict_sm_preserves_globals; try eassumption.
           unfold vis. intuition.
       exploit sel_exprlist_inject; eauto. intros [vargs' [P Q]].
-      exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply Q.
-        eassumption. eassumption. eassumption. eassumption. eassumption. eassumption. assumption.
+      exploit (inlineable_extern_inject _ _ GDE); 
+        try eapply Q; try eassumption.
       intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
       eexists; eexists. 
@@ -3212,7 +3207,7 @@ Proof.
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
         assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-          rewrite <- FRG. eapply (Glob _ H3). }
+          rewrite <- FRG. eapply Glob; eassumption. }
 { (* Seq *)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *.
@@ -3586,8 +3581,7 @@ Proof.
 Qed.
 
 Lemma MATCH_effcore_diagram: 
-  forall (GDE : genvs_domain_eq ge tge)
-      st1 m1 st1' m1' (U1 : block -> Z -> bool)
+  forall st1 m1 st1' m1' (U1 : block -> Z -> bool)
       (CS: effstep (cmin_eff_sem hf) ge U1 st1 m1 st1' m1')
       st2 mu m2 
       (EffSrc: forall b ofs, U1 b ofs = true -> vis mu b = true)
@@ -3615,6 +3609,8 @@ Lemma MATCH_effcore_diagram:
 Proof.
   intros. 
   assert (THELPERS:= helpers_correct_preserved); clear HELPERS.
+  assert (SymbPres:= symbols_preserved).
+  assert (GDE:= GDE_lemma).
   induction CS; simpl in *.
 { (*skip seq*)
       destruct MC as [SMC PRE].
@@ -3926,8 +3922,8 @@ Proof.
         eapply restrict_sm_preserves_globals; try eassumption.
           unfold vis. intuition.
       exploit sel_exprlist_inject; eauto. intros [vargs' [P Q]].
-      exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply Q.
-        eassumption. eassumption. eassumption. eassumption. eassumption. eassumption. assumption.
+      exploit (inlineable_extern_inject _ _ GDE_lemma);
+          try eapply Q; try eassumption.
       intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
       eexists; eexists; eexists. 
@@ -3959,7 +3955,7 @@ Proof.
            split; trivial.
            eapply intern_incr_as_inj; eassumption.
          assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-            rewrite <- FRG. eapply (Glob _ H3).
+            rewrite <- FRG. eapply Glob; eassumption.
        split; trivial. split; trivial.
        eapply BuiltinEffect_Propagate; eassumption. }
 { (* Seq *)

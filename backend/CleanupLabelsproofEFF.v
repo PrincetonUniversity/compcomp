@@ -1432,6 +1432,7 @@ exists st2' m2',
   MATCH mu' st1' m1' st2' m2'.
 Proof. intros.
   destruct MTCH as [MS [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
+  assert (SymbPres:= symbols_preserved).
   assert (GDE:= GDE_lemma).
 
   induction CS; intros; try (inv MS); try rewrite remove_unused_labels_cons. 
@@ -1698,7 +1699,7 @@ Proof. intros.
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
       assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (Glob _ H2). }
+          rewrite <- FRG. eapply Glob; eassumption. }
 
 (* Lannot not supported
   eexists; eexists; split.
@@ -1991,6 +1992,7 @@ exists st2' m2' U2,
          Mem.perm m1 b1 (ofs - delta1) Max Nonempty)).
 Proof. intros.
   destruct MTCH as [MS [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
+  assert (SymbPres:= symbols_preserved).
   assert (GDE:= GDE_lemma).
   induction CS; intros; try (inv MS); try rewrite remove_unused_labels_cons. 
 { (* Lgetstack *)
@@ -2275,7 +2277,7 @@ Proof. intros.
           split; trivial.
           eapply intern_incr_as_inj; eassumption.
       assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC.
-          rewrite <- FRG. eapply (Glob _ H2).
+          rewrite <- FRG. eapply Glob; eassumption.
   intros.
     eapply BuiltinEffect_Propagate; try eassumption. }
 
@@ -2499,10 +2501,10 @@ Proof. intros.
        apply intern_incr_as_inj; eassumption.
        apply sm_inject_separated_mem. assumption.
        assumption.
-     red; intros. destruct (GFP _ _ H1). split; trivial.
+     intros ? ? Hb. destruct (GFP _ _ Hb). split; trivial.
           eapply intern_incr_as_inj; eassumption.
      assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply IntInc.
-       apply Glob in H1. rewrite <-FF; trivial.
+       rewrite <-FF; eapply Glob; eassumption. 
   intuition. }
 
 { (* unobservable external function *)

@@ -1107,17 +1107,19 @@ Proof.
   intros [rs1 [tm1 [mu' [MU' [EX1 [ME1 [RR1 [RO1 EXT1]]]]]]]].
   (*WAS: exploit external_call_mem_extends; eauto. 
         intros [v' [tm2 [A [B [C [D E]]]]]].*)
+  destruct MU' as [INC [SEP [LOCALLOC' [WD' [SMV' RC']]]]].
   exploit (inlineable_extern_inject _ _ GDE_lemma);
-       try eapply RR1; try eapply H1.
-     eapply MU'. eapply MU'. eapply MU'. 
-     eapply OBS'. 
+       try eapply RR1; try eapply H1; try eassumption.
+     apply symbols_preserved.
+     assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC. 
+        rewrite <- FF; apply Glob.
      eapply intern_incr_meminj_preserves_globals_as_inj.
-         eassumption. split; assumption. 
-     eapply MU'. eapply MU'. eassumption. 
+         apply WD. split; assumption. 
+     assumption. assumption. 
  (* exploit external_call_mem_inject; eauto. 
         intros [j' [v' [tm2 [A [B [C [D [E [F G]]]]]]]]].*)
    intros [mu'' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
-           [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
+           [INCR [SEPARATED [LOCALLOC [WD'' [SMV'' RC'']]]]]]]]]]]]].
   exists (rs1#rd <- vres'); exists tm', mu''.
   split. intuition.
     eapply intern_incr_trans. eassumption. eassumption. 
@@ -1192,12 +1194,15 @@ Proof.
   assert (PG': meminj_preserves_globals ge (as_inj mu')).     
        eapply intern_incr_meminj_preserves_globals_as_inj.
          eassumption. split; assumption. 
-      apply MU'. apply MU'. 
-  exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply RR1.
-        eapply MU'. eapply MU'. eapply MU'. 
-        eassumption. eassumption. eassumption. eassumption. 
+      apply MU'. apply MU'.
+  destruct MU' as [INC [SEP [LOCALLOC' [WD' [SMV' RC']]]]].
+  exploit (inlineable_extern_inject _ _ GDE_lemma);
+       try eapply RR1; try eapply H1; try eassumption.
+     apply symbols_preserved.
+     assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC. 
+        rewrite <- FF; apply Glob.
   intros [mu'' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
-           [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
+           [INCR [SEPARATED [LOCALLOC [WD'' [SMV'' RC'']]]]]]]]]]]]].
   eexists; exists tm', mu''. 
   split. intuition.
      eapply intern_incr_trans; eassumption.
@@ -2015,17 +2020,19 @@ Proof.
   intros [rs1 [tm1 [mu' [MU' [EX1 [ME1 [RR1 [RO1 EXT1]]]]]]]].
   (*WAS: exploit external_call_mem_extends; eauto. 
         intros [v' [tm2 [A [B [C [D E]]]]]].*)
+  destruct MU' as [INC [SEP [LOCALLOC' [WD' [SMV' RC']]]]].
   exploit (inlineable_extern_inject _ _ GDE_lemma);
-       try eapply RR1; try eapply H1.
-     eapply MU'. eapply MU'. eapply MU'. 
-     eapply OBS'.
+       try eapply RR1; try eapply H1; try eassumption.
+     apply symbols_preserved.
+     assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC. 
+        rewrite <- FF; apply Glob.
      eapply intern_incr_meminj_preserves_globals_as_inj.
-         eassumption. split; assumption. 
-     eapply MU'. eapply MU'. eassumption. 
+         apply WD. split; assumption. 
+     assumption. assumption. 
  (* exploit external_call_mem_inject; eauto. 
         intros [j' [v' [tm2 [A [B [C [D [E [F G]]]]]]]]].*)
    intros [mu'' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
-           [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
+           [INCR [SEPARATED [LOCALLOC [WD'' [SMV'' RC'']]]]]]]]]]]]].
   exists (rs1#rd <- vres'); exists tm', mu''.
   split. intuition.
     eapply intern_incr_trans. eassumption. eassumption. 
@@ -2081,11 +2088,14 @@ Proof.
        eapply intern_incr_meminj_preserves_globals_as_inj.
          eassumption. split; assumption. 
       apply MU'. apply MU'. 
-  exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply RR1.
-        eapply MU'. eapply MU'. eapply MU'. 
-        eassumption. eassumption. eassumption. eassumption. 
+  destruct MU' as [INC [SEP [LOCALLOC' [WD' [SMV' RC']]]]].
+  exploit (inlineable_extern_inject _ _ GDE_lemma);
+       try eapply RR1; try eapply H1; try eassumption.
+     apply symbols_preserved.
+     assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC. 
+        rewrite <- FF; apply Glob.
   intros [mu'' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
-           [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
+           [INCR [SEPARATED [LOCALLOC [WD'' [SMV'' RC'']]]]]]]]]]]]].
   eexists; exists tm', mu''. 
   split. intuition.
      eapply intern_incr_trans; eassumption.
@@ -4240,9 +4250,11 @@ Proof. intros.
   clear PG.
   exploit sp_preserved_intern_incr; try eassumption.
   intros SP'; clear SP.
-  exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply C.
-        eassumption. eassumption. eassumption. eassumption. 
-        eassumption. eassumption. assumption.
+  exploit (inlineable_extern_inject _ _ GDE_lemma);
+       try eapply C; try eassumption.
+     apply symbols_preserved.
+     assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC'. 
+        rewrite <- FF; apply Glob.
   intros [mu'' [vres' [tm'' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INC'' [SEP'' [LOCALLOC'' [WD'' [SMV'' RC'']]]]]]]]]]]]].
   eexists; eexists; eexists mu''. 
@@ -4289,12 +4301,12 @@ Proof. intros.
              apply sm_inject_separated_mem; eassumption.
   red; intros ? ? Hb. destruct (GFP _ _ Hb).
           split; trivial.
-          eapply intern_incr_as_inj; try eapply H3. 
+          eapply intern_incr_as_inj; try eapply H2. 
           eapply intern_incr_trans; eassumption.
           assumption.
   assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC'.
    assert (FRG': frgnBlocksSrc mu' = frgnBlocksSrc mu'') by eapply INC''.
-          rewrite <- FRG', <- FRG. eapply (Glob _ H3).  }
+          rewrite <- FRG', <- FRG. eapply Glob; eassumption.  }
 
 { (* seq *)
   inv TS.
@@ -4680,7 +4692,7 @@ Proof. intros.
     red; intros. destruct (GFP _ _ H7). split; trivial.
          eapply intern_incr_as_inj; eassumption.
     assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC'.
-      apply Glob in H7. rewrite <-FF; trivial. }
+      rewrite <-FF. eapply Glob; eassumption. }
 
   (* no external call *)
 
@@ -4729,7 +4741,8 @@ exists st2' m2' mu', exists U2 : block -> Z -> bool,
          U1 b1 (ofs - delta1)%Z = true /\
          Mem.perm m1 b1 (ofs - delta1) Max Nonempty)).
 Proof. intros st1 m1 st1' m1' U1 CS.
-   induction CS; intros; destruct MTCH as [MSTATE PRE]; inv MSTATE. 
+  assert (SymbPres:= symbols_preserved).
+  induction CS; intros; destruct MTCH as [MSTATE PRE]; inv MSTATE. 
 { (* skip seq *)
   inv TS. inv TK.
   eexists; exists m2, mu; eexists; split.
@@ -5452,9 +5465,10 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   clear PG.
   exploit sp_preserved_intern_incr; try eassumption.
   intros SP'; clear SP.
-  exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply C.
-        eassumption. eassumption. eassumption. eassumption. 
-        eassumption. eassumption. assumption.
+  exploit (inlineable_extern_inject _ _ GDE_lemma);
+     try eapply C; try eassumption.   
+     assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC'. 
+       rewrite <- FF; eapply Glob; eassumption. 
   intros [mu'' [vres' [tm'' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INC'' [SEP'' [LOCALLOC'' [WD'' [SMV'' RC'']]]]]]]]]]]]].
   eexists; eexists; eexists mu''. eexists.
@@ -5504,12 +5518,12 @@ Proof. intros st1 m1 st1' m1' U1 CS.
              apply sm_inject_separated_mem; eassumption.
     red; intros ? ? Hb. destruct (GFP _ _ Hb).
           split; trivial.
-          eapply intern_incr_as_inj; try eapply H3. 
+          eapply intern_incr_as_inj; try eapply H2. 
           eapply intern_incr_trans; eassumption.
           assumption.
     assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC'.
      assert (FRG': frgnBlocksSrc mu' = frgnBlocksSrc mu'') by eapply INC''.
-          rewrite <- FRG', <- FRG. eapply (Glob _ H3). 
+          rewrite <- FRG', <- FRG. eapply Glob; eassumption. 
   (*effect propagation*)
   simpl. intros b z EFF. 
     apply andb_true_iff in EFF; destruct EFF as [EFF VB].
