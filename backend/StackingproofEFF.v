@@ -4916,9 +4916,9 @@ assert
     (decode_longs (sig_args (AST.ef_sig tf)) ls ## (loc_arguments (AST.ef_sig tf)))
     (decode_longs (sig_args (AST.ef_sig tf)) targs)).
 { apply decode_longs_inject; auto. }
-assert (OBS: observableEF hf tf=true).
-{ destruct (observableEF hf tf); try inv H1; auto. }
-rewrite OBS in *. inv H1. split. 
+destruct (observableEF_dec hf tf); try inv H1. 
+rename o into OBS.
+split. 
 solve[apply val_list_inject_forall_inject; auto].
 exploit replace_locals_wd_AtExternal; try eassumption.
   apply val_list_inject_forall_inject in H.
@@ -5031,7 +5031,7 @@ simpl.
  destruct f; inv H0. 
  inv AtExtTgt.
  inv TRANSL.
- destruct (observableEF hf tf); inv H0; inv H1.
+ destruct (observableEF_dec hf tf); inv H0; inv H1.
  eexists. eexists.
     split. reflexivity.
     split. reflexivity.
@@ -7573,7 +7573,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
      eassumption. eassumption. 
      instantiate (1:=tge).
      unfold BuiltinEffect. unfold BuiltinEffect in H0.
-     destruct ef; simpl in *; trivial; discriminate. }
+     destruct ef; simpl in *; trivial; contradiction. }
 
 { (* return *)
   inv STACKS. simpl in AGLOCS.  

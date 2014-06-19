@@ -1215,13 +1215,13 @@ Proof. intros A n.
 Qed.
 
 Lemma REACH_Store: forall m chunk b i v m'
-     (ST: Mem.store chunk m b (Int.unsigned i) v = Some m')
+     (ST: Mem.store chunk m b i v = Some m')
      Roots (VISb: Roots b = true)
      (VISv : forall b', getBlocks (v :: nil) b' = true -> 
              Roots b' = true)
      (R: REACH_closed m Roots),
      REACH_closed m' Roots.
-Proof. intros.
+Proof. intros. 
 intros bb Hbb.
 apply R. clear R.
 rewrite REACHAX.
@@ -1252,12 +1252,12 @@ destruct (eq_block r b); subst.
      rewrite (Mem.store_mem_contents _ _ _ _ _ _ ST) in H4, H0. 
           apply Mem.store_valid_access_3 in ST. destruct ST as [RP ALGN].
           rewrite PMap.gss in H4.
-          destruct (zlt zz (Int.unsigned i)).
+          destruct (zlt zz i).
             rewrite Mem.setN_outside in H4.
             eexists. eapply reach_cons; try eassumption.
                      apply reach_nil. assumption.
             left; trivial. 
-          destruct (zlt zz ((Int.unsigned i) + Z.of_nat (length (encode_val chunk v)))).
+          destruct (zlt zz (i + Z.of_nat (length (encode_val chunk v)))).
           Focus 2.
             rewrite Mem.setN_outside in H4.
             eexists. eapply reach_cons; try eassumption.
@@ -1265,11 +1265,11 @@ destruct (eq_block r b); subst.
             right; trivial.
           rewrite encode_val_length in *. rewrite <- size_chunk_conv in *.
             rewrite PMap.gss in H0.
-            remember ((Mem.setN (encode_val chunk v) (Int.unsigned i)
+            remember ((Mem.setN (encode_val chunk v) i
           (Mem.mem_contents m) !! b)) as c. apply eq_sym in H0.
-          specialize (getN_aux (nat_of_Z ((size_chunk chunk))) (Int.unsigned i) c).
-          assert (exists z, zz = Int.unsigned i + z /\ z>=0 /\ z < size_chunk chunk).
-            exists (zz - Int.unsigned i). omega.
+          specialize (getN_aux (nat_of_Z ((size_chunk chunk))) i c).
+          assert (exists z, zz = i + z /\ z>=0 /\ z < size_chunk chunk).
+            exists (zz - i). omega.
           destruct H1 as [z [Z1 [Z2 Z3]]]. clear g l. subst zz.
           rewrite <- (nat_of_Z_eq _ Z2) in H4.
           assert (SPLIT: exists vl1 u vl2,
@@ -1342,7 +1342,7 @@ Qed.
 
 (*similar proof as Lemma REACH_Store. *)
 Lemma REACH_Storebytes: forall m b i bytes m'
-     (ST: Mem.storebytes m b (Int.unsigned i) bytes = Some m')
+     (ST: Mem.storebytes m b i bytes = Some m')
      Roots (VISb: Roots b = true)
      (VISv : forall b' z n, In (Pointer b' z n) bytes -> 
              Roots b' = true)
@@ -1379,23 +1379,23 @@ destruct (eq_block r b); subst.
      rewrite (Mem.storebytes_mem_contents _ _ _ _ _ ST) in H4, H0. 
           apply Mem.storebytes_range_perm in ST. (*destruct ST as [RP ALGN].*)
           rewrite PMap.gss in H4.
-          destruct (zlt zz (Int.unsigned i)).
+          destruct (zlt zz i).
             rewrite Mem.setN_outside in H4.
             eexists. eapply reach_cons; try eassumption.
                      apply reach_nil. assumption.
             left; trivial. 
-          destruct (zlt zz ((Int.unsigned i) + Z.of_nat (length bytes))).
+          destruct (zlt zz (i + Z.of_nat (length bytes))).
           Focus 2.
             rewrite Mem.setN_outside in H4.
             eexists. eapply reach_cons; try eassumption.
                      apply reach_nil. assumption.
             right; trivial.
           rewrite nat_of_Z_of_nat in H0. rewrite PMap.gss in H0.
-            remember ((Mem.setN bytes (Int.unsigned i)
-          (Mem.mem_contents m) !! b)) as c. apply eq_sym in H0.
-          specialize (getN_aux (length bytes) (Int.unsigned i) c).
-          assert (exists z, zz = Int.unsigned i + z /\ z>=0 /\ z < Z.of_nat(length bytes)).
-            exists (zz - Int.unsigned i). omega.
+            remember ((Mem.setN bytes i (Mem.mem_contents m) !! b)) as c.
+             apply eq_sym in H0.
+          specialize (getN_aux (length bytes) i c).
+          assert (exists z, zz = i + z /\ z>=0 /\ z < Z.of_nat(length bytes)).
+            exists (zz - i). omega.
           destruct H1 as [z [Z1 [Z2 Z3]]]. clear g l. subst zz.
           rewrite <- (nat_of_Z_eq _ Z2) in H4.
           assert (SPLIT: exists vl1 u vl2,

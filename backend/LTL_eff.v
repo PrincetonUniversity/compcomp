@@ -69,7 +69,7 @@ Inductive ltl_effstep (g:genv):  (block -> Z -> bool) ->
         (LTL_Callstate s fd rs') m'
   | ltl_effstep_Lbuiltin: forall s f sp ef args res bb rs m t vl rs' m',
       external_call' ef g (reglist rs args) m t vl m' ->
-      observableEF hf ef =false ->
+      ~observableEF hf ef ->
       rs' = Locmap.setlist (map R res) vl (undef_regs (destroyed_by_builtin ef) rs) ->
       ltl_effstep g (BuiltinEffect g ef (decode_longs (sig_args (ef_sig ef)) (reglist rs args)) m)
          (LTL_Block s f sp (Lbuiltin ef args res :: bb) rs) m
@@ -110,8 +110,7 @@ Inductive ltl_effstep (g:genv):  (block -> Z -> bool) ->
         (LTL_State s f (Vptr sp Int.zero) f.(fn_entrypoint) rs') m'
 
   | ltl_effstep_function_external: forall s ef t args res rs m rs' m'
-      (*(OBS: observableEF hf ef = false),*)
-      (OBS: EFisHelper hf ef = true),
+      (OBS: EFisHelper hf ef),
       args = map rs (loc_arguments (ef_sig ef)) ->
       external_call' ef g args m t res m' ->
       rs' = Locmap.setlist (map R (loc_result (ef_sig ef))) res rs ->
@@ -150,10 +149,6 @@ intros.
   split. unfold corestep, coopsem; simpl. econstructor; eassumption.
          inv H.
          eapply BuiltinEffect_unchOn; eassumption.
-(*  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
-         inv H. eapply ec_builtinEffectPolymorphic; eassumption.
-  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
-         inv H. eapply ec_builtinEffectPolymorphic; eassumption.*)
   split. unfold corestep, coopsem; simpl. econstructor; eassumption.
          apply Mem.unchanged_on_refl.
   split. unfold corestep, coopsem; simpl. econstructor; eassumption.
@@ -167,15 +162,11 @@ intros.
   split. unfold corestep, coopsem; simpl. 
          eapply ltl_exec_function_external; eassumption.
          inv H0.
-         destruct ef; try inv OBS.
-           eapply mem_unchanged_on_sub.
-             eapply BuiltinEffect_unchOn; try eapply H2. 
-              instantiate(1:=hf). unfold observableEF. rewrite H0. trivial.
-             unfold BuiltinEffect; simpl; intros. trivial.
-           eapply mem_unchanged_on_sub.
-             eapply BuiltinEffect_unchOn; try eapply H2. 
-              instantiate(1:=hf). unfold observableEF. rewrite H0. trivial.
-             unfold BuiltinEffect; simpl; intros. trivial.
+       exploit @BuiltinEffect_unchOn. 
+         eapply EFhelpers; eassumption.
+         eapply H2. 
+       unfold BuiltinEffect; simpl.
+         destruct ef; simpl; trivial; contradiction.
   split. unfold corestep, coopsem; simpl. econstructor; eassumption.
          apply Mem.unchanged_on_refl.
 Qed.

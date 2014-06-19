@@ -155,12 +155,12 @@ Qed.
 Section BUILTINS.
 
 Context {F V: Type} (ge: Genv.t (AST.fundef F) V).
-Variable hf : I64Helpers.helper_functions.
+Variable hf : helper_functions.
 
 Definition builtin_implements (id: ident) (sg: signature)
       (vargs: list val) (vres: val) : Prop :=
   forall m, external_call (EF_builtin id sg) ge vargs m E0 vres m.
-(*
+
 Definition observableEF (ef: external_function): Prop :=
   match ef with
     EF_malloc => False (*somewhat arbitrary*)
@@ -169,54 +169,65 @@ Definition observableEF (ef: external_function): Prop :=
   | EF_builtin x sg => ~ is_I64_helper hf x sg
   | EF_external x sg => ~ is_I64_helper hf x sg
   | _ => True
-  end.*)
-(*Computational variant is preferable, since observability is used
-  in the definition of classify_call, in SelectionNEW.v*)
-Definition observableEF (ef: external_function): bool :=
-  match ef with
-    EF_malloc => false (*somewhat arbitrary*)
-  | EF_free => false (*somewhat arbitrary*)
-  | EF_memcpy _ _ => false
-  | EF_builtin x sg => negb (is_I64_helper hf x sg)
-  | EF_external x sg => negb (is_I64_helper hf x sg)
-  | _ => true
   end.
+
+Lemma observableEF_dec ef: {observableEF ef} + {~observableEF ef}.
+Proof.
+destruct ef; simpl; try solve[left; trivial].
+  destruct (is_I64_helper_dec hf name sg).
+    right. intros N. apply (N i). 
+    left; trivial. 
+  destruct (is_I64_helper_dec hf name sg).
+    right. intros N. apply (N i). 
+    left; trivial. 
+  right; intros N. trivial.
+  right; intros N. trivial.
+  right; intros N. trivial.
+Qed.
 
 Definition EFisHelper ef :=
 match ef with 
-    EF_builtin name sg => I64Helpers.is_I64_helper hf name sg
-  | EF_external name sg => I64Helpers.is_I64_helper hf name sg
-  | _ => false
+    EF_builtin name sg => is_I64_helper hf name sg
+  | EF_external name sg => is_I64_helper hf name sg
+  | _ => False
 end.
 
-Lemma EFhelpers ef: EFisHelper ef = true -> observableEF ef = false.
-Proof. unfold observableEF; intros.
-destruct ef; try inv H.
-rewrite H1; trivial.
-rewrite H1; trivial.
+Lemma EFhelpers ef: EFisHelper ef -> ~ observableEF ef.
+Proof. unfold observableEF; intros. intros N.
+destruct ef; simpl in H; trivial. apply (N H). apply (N H).
 Qed. 
 
 Lemma EFhelpersE name sg: 
-  observableEF (EF_external name sg) = false ->
-   is_I64_helper hf name sg = true.
+  ~ observableEF (EF_external name sg) ->
+  is_I64_helper hf name sg.
 Proof. 
 unfold observableEF. intros.
-rewrite negb_false_iff in H. trivial.
-Qed.
+destruct (is_I64_helper_dec hf name sg). 
+  trivial.
+  elim (H n). 
+Qed. 
+
 Lemma EFhelpersB name sg: 
-  observableEF (EF_builtin name sg) = false ->
-   is_I64_helper hf name sg = true.
+  ~observableEF (EF_builtin name sg) ->
+  is_I64_helper hf name sg.
 Proof. 
 unfold observableEF. intros.
-rewrite negb_false_iff in H. trivial.
+destruct (is_I64_helper_dec hf name sg). 
+  trivial.
+  elim (H n). 
+Qed. 
+
+Lemma obs_efB name sg : is_I64_helper hf name sg ->
+     ~ observableEF (EF_builtin name sg).
+Proof. intros. unfold observableEF. 
+  intros N. apply (N H).
 Qed.
 
-Lemma obs_ef name sg : is_I64_helperP hf name sg ->
-    observableEF (EF_builtin name sg) = false.
+Lemma obs_efE name sg : is_I64_helper hf name sg ->
+     ~ observableEF (EF_external name sg).
 Proof. intros. unfold observableEF. 
-  apply is64helper_char in H.
-  rewrite H; trivial. Qed.
-
+  intros N. apply (N H).
+Qed.
 
 Definition helper_implements 
      (id: ident) (sg: signature) (vargs: list val) (vres: val) : Prop :=
@@ -225,7 +236,7 @@ Definition helper_implements
   /\ Genv.find_funct_ptr ge b = Some (External ef)
   /\ ef_sig ef = sg
   /\ (forall m, external_call ef ge vargs m E0 vres m)
-  (*NEW*) /\  observableEF ef = false.
+  (*NEW*) /\ ~ observableEF ef.
 
 Definition i64_helpers_correct: Prop :=
     (forall x z, Val.longoffloat x = Some z -> helper_implements hf.(i64_dtos) sig_f_l (x::nil) z)
@@ -260,7 +271,7 @@ Axiom get_helpers_correct:
 
 Lemma BuiltinEffect_unchOn:
     forall {F V:Type} hf ef (g : Genv.t F V) vargs m t vres m'
-    (OBS: observableEF hf ef = false),
+    (OBS: ~ observableEF hf ef),
     external_call ef g vargs m t vres m' -> 
     Mem.unchanged_on
       (fun b z=> BuiltinEffect g ef vargs m b z = false) m m'.
@@ -270,11 +281,10 @@ Proof. intros.
        inv H. apply Mem.unchanged_on_refl.
     (*EF_builtin - same proof as previous case*)
        inv H. apply Mem.unchanged_on_refl.
-    simpl in OBS; inv OBS.
-    simpl in OBS; inv OBS.
-    simpl in OBS; inv OBS.
-    simpl in OBS; inv OBS.
-    simpl in OBS; inv OBS.
+    simpl in OBS. intuition.
+    simpl in OBS. intuition. 
+    simpl in OBS. intuition. 
+    simpl in OBS. intuition. 
     (*case EF_malloc*)
        eapply  malloc_Effect_unchOn. eassumption.
     (*case EF_free*)
@@ -282,9 +292,9 @@ Proof. intros.
     (*case EE_memcpy*)
        inv H. clear - H1 H6 H7.
        eapply memcpy_Effect_unchOn; try eassumption. omega.
-    simpl in OBS; inv OBS.
-    simpl in OBS; inv OBS.
-    simpl in OBS; inv OBS.
+    simpl in OBS. intuition.
+    simpl in OBS. intuition. 
+    simpl in OBS. intuition.
 Qed.
 
 Lemma BuiltinEffect_valid_block:
@@ -294,132 +304,6 @@ Proof. intros. unfold BuiltinEffect in H.
   destruct ef; try discriminate.
     eapply freeEffect_valid_block; eassumption.
     eapply memcpy_Effect_validblock; eassumption.
-Qed.
-
-Lemma REACH_Store: forall m chunk b i v m'
-     (ST: Mem.store chunk m b i v = Some m')
-     Roots (VISb: Roots b = true)
-     (VISv : forall b', getBlocks (v :: nil) b' = true -> 
-             Roots b' = true)
-     (R: REACH_closed m Roots),
-     REACH_closed m' Roots.
-Proof. intros.
-intros bb Hbb.
-apply R. clear R.
-rewrite REACHAX.
-remember (Roots bb) as Rb. destruct Rb; apply eq_sym in HeqRb.
-  eexists. eapply reach_nil; trivial. 
-rewrite REACHAX in Hbb.
-destruct Hbb as [L HL].
-destruct (reachD'' _ _ _ _ HL) as [r [M [Rr [RCH HM]]]]; clear HL L.
-destruct (eq_block r b); subst. 
-(*we stored into the root of the access path to bb*)
-  clear VISb.
-  generalize dependent bb.
-  induction M; simpl in *; intros.
-  inv RCH. congruence. 
-  inv RCH.    
-  apply (Mem.perm_store_2 _ _ _ _ _ _ ST) in H2.
-  remember (rev M) as rm.
-  destruct rm; simpl in *. destruct HM as [zz [Hzz1 [Hzz2 Hzz3]]].
-        inv Hzz1.
-        intuition. 
-        assert (M= nil). destruct M; trivial. 
-             assert (@length (block * Z) nil = length (rev (p :: M))). rewrite Heqrm; trivial.
-             rewrite rev_length in H3. simpl in H3. inv H3.
-        subst. simpl in *. clear H Heqrm H0 H1.
-          specialize (Mem.loadbytes_store_same _ _ _ _ _ _ ST). intros LD.
-          apply loadbytes_D in LD. destruct LD.
-
-     rewrite (Mem.store_mem_contents _ _ _ _ _ _ ST) in H4, H0. 
-          apply Mem.store_valid_access_3 in ST. destruct ST as [RP ALGN].
-          rewrite PMap.gss in H4.
-          destruct (zlt zz i).
-            rewrite Mem.setN_outside in H4.
-            eexists. eapply reach_cons; try eassumption.
-                     apply reach_nil. assumption.
-            left; trivial. 
-          destruct (zlt zz (i + Z.of_nat (length (encode_val chunk v)))).
-          Focus 2.
-            rewrite Mem.setN_outside in H4.
-            eexists. eapply reach_cons; try eassumption.
-                     apply reach_nil. assumption.
-            right; trivial.
-          rewrite encode_val_length in *. rewrite <- size_chunk_conv in *.
-            rewrite PMap.gss in H0.
-            remember ((Mem.setN (encode_val chunk v) i
-          (Mem.mem_contents m) !! b)) as c. apply eq_sym in H0.
-          specialize (getN_aux (nat_of_Z ((size_chunk chunk))) i c).
-          assert (exists z, zz = i + z /\ z>=0 /\ z < size_chunk chunk).
-            exists (zz - i). omega.
-          destruct H1 as [z [Z1 [Z2 Z3]]]. clear g l. subst zz.
-          rewrite <- (nat_of_Z_eq _ Z2) in H4.
-          assert (SPLIT: exists vl1 u vl2,
-                     encode_val chunk v = vl1 ++ u :: vl2 /\
-                     length vl1 = nat_of_Z z).
-            eapply list_split. rewrite encode_val_length.
-                 rewrite size_chunk_conv in Z3.
-            remember (size_chunk_nat chunk) as k. clear Heqk H2 H4 Hzz3.
-            specialize (Z2Nat.inj_lt z (Z.of_nat k)); intros.
-            rewrite Nat2Z.id in H1. apply H1. omega. omega.  assumption.
-            
-          destruct SPLIT as [B1 [u [B2 [EE LL]]]].
-          rewrite EE in *. rewrite <- LL in H4.
-          intros. apply H1 in H0. clear H1.
-          rewrite <- H0 in H4. clear H0. subst u.
-          destruct (encode_val_pointer_inv' _ _ _ _ _ _ _ EE).
-          subst.
-          rewrite VISv in HeqRb. discriminate.
-             rewrite getBlocks_char. exists off; left. trivial.
-  destruct HM as [zz [Hzz1 [Hzz2 Hzz3]]].
-    subst.
-    remember (Roots b') as q.
-    destruct q; apply eq_sym in Heqq.
-      assert (b' = b). apply (Hzz3 _ z Heqq). left; trivial.
-      subst. elim (Hzz2 z). apply in_or_app. right. left. trivial.
-    destruct (eq_block b' b); try congruence.
-        rewrite (Mem.store_mem_contents _ _ _ _ _ _ ST) in H4.
-        rewrite PMap.gso in H4; trivial.
-        assert (Hb': exists L : list (block * Z),
-            reach m (fun bb0 : block => Roots bb0 = true) L b').
-          apply IHM; trivial. clear IHM.
-          exists zz. intuition.
-          eapply (Hzz2 zz0). apply in_or_app. left; trivial.
-          eapply (Hzz3 _ zx H). right; trivial.
-        destruct Hb' as [L HL].
-          eexists. eapply reach_cons; try eassumption.  
-(*we stored elsewhere*)
-generalize dependent bb.
-induction M; simpl in *; intros.
-  inv RCH. congruence. 
-  inv RCH.    
-  apply (Mem.perm_store_2 _ _ _ _ _ _ ST) in H2.
-  rewrite (Mem.store_mem_contents _ _ _ _ _ _ ST) in H4.
-  remember (rev M) as rm.
-  destruct rm; simpl in *. destruct HM as [zz [Hzz1 [Hzz2 Hzz3]]].
-        inv Hzz1.
-        rewrite PMap.gso in H4; trivial.
-        eexists. eapply reach_cons; try eassumption.
-           apply reach_nil. assumption.
-  destruct HM as [zz [Hzz1 [Hzz2 Hzz3]]].
-    subst.
-    remember (Roots b') as q.
-    destruct q; apply eq_sym in Heqq.
-      assert (b' = r). apply (Hzz3 _ z Heqq). left; trivial.
-      subst. 
-        rewrite PMap.gso in H4; trivial.
-          eexists. eapply reach_cons; try eassumption.
-           apply reach_nil. assumption.
-    destruct (eq_block b' b); try congruence.
-        rewrite PMap.gso in H4; trivial.
-        assert (Hb': exists L : list (block * Z),
-            reach m (fun bb0 : block => Roots bb0 = true) L b').
-          apply IHM; trivial. clear IHM.
-          exists zz. intuition.
-          eapply (Hzz2 zz0). apply in_or_app. left; trivial.
-          eapply (Hzz3 _ zx H). right; trivial.
-        destruct Hb' as [L HL].
-          eexists. eapply reach_cons; try eassumption.
 Qed.
 
 (*takes the role of external_call_mem_inject
@@ -433,7 +317,7 @@ Lemma inlineable_extern_inject: forall {F V TF TV:Type}
        (WD: SM_wd mu) (SMV: sm_valid mu m tm) (RC: REACH_closed m (vis mu))
        (Glob: forall b, isGlobalBlock ge b = true -> 
               frgnBlocksSrc mu b = true)
-       (OBS: observableEF hf ef = false),
+       (OBS: ~ observableEF hf ef),
        meminj_preserves_globals ge (as_inj mu) ->
        external_call ef ge vargs m t vres m1 ->
        Mem.inject (as_inj mu) m tm ->
@@ -452,17 +336,17 @@ Lemma inlineable_extern_inject: forall {F V TF TV:Type}
 Proof. intros.
 destruct ef; simpl in H0. 
     (*EFexternal*)
-      unfold observableEF in OBS. rewrite negb_false_iff in OBS. 
-      eapply helpers_inject; try eassumption. 
+      eapply helpers_inject; try eassumption.
+      apply EFhelpersE; eassumption. 
     (*EF_builtin*)
-      unfold observableEF in OBS. rewrite negb_false_iff in OBS. 
-      eapply helpers_inject; try eassumption. 
-    simpl in OBS; try solve [inv OBS].
-    simpl in OBS; try solve [inv OBS].
-    simpl in OBS; try solve [inv OBS].
-    simpl in OBS; try solve [inv OBS].
+      eapply helpers_inject; try eassumption.
+      apply EFhelpersE; eassumption. 
+    simpl in OBS; intuition.
+    simpl in OBS; intuition.
+    simpl in OBS; intuition.
+    simpl in OBS; intuition. 
     (*case EF_malloc*)
-    inv H0. inv H2. inv H8. inv H6. 
+    inv H0. inv H2. inv H8. inv H6. clear OBS.
     exploit alloc_parallel_intern; eauto. apply Zle_refl. apply Zle_refl. 
     intros [mu' [tm' [tb [TALLOC [INJ' [INC [AI1 [AI2 [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]].
     exploit Mem.store_mapped_inject. eexact INJ'. eauto. eauto. 
@@ -662,9 +546,9 @@ destruct ef; simpl in H0.
             eapply H15. clear - H3 H4. 
             split. specialize (Zle_0_nat (length bts1)). intros. omega.
                    apply inj_lt in H3. rewrite nat_of_Z_eq in H3; omega.
-    simpl in OBS; try solve [inv OBS].
-    simpl in OBS; try solve [inv OBS].
-    simpl in OBS; try solve [inv OBS].
+    simpl in OBS; intuition.
+    simpl in OBS; intuition.
+    simpl in OBS; intuition. 
 Qed.
 
 Lemma BuiltinEffect_Propagate: forall {F V TF TV:Type}
@@ -759,6 +643,14 @@ Proof.
           rewrite H13 in H1. discriminate.
   inv H8.
   inv H8.
+Qed.
+
+Lemma helpers_EmptyEffect: forall {F V:Type} (ge: Genv.t F V) 
+   hf ef args m,
+   EFisHelper hf ef -> (BuiltinEffect ge ef args m = EmptyEffect).
+Proof. intros.
+destruct ef; simpl in *; try reflexivity.
+contradiction. contradiction.
 Qed.
 
 Require Import Conventions.

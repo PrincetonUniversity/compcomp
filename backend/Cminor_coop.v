@@ -106,7 +106,7 @@ Definition CMin_at_external (c: CMin_core) : option (external_function * signatu
   | CMin_State f s k sp e => None
   | CMin_Callstate fd args k => match fd with
                                   Internal f => None
-                                | External ef => if observableEF hf ef 
+                                | External ef => if observableEF_dec hf ef 
                                                  then Some (ef, ef_sig ef, args)
                                                  else None
                               end
@@ -171,7 +171,7 @@ Inductive CMin_corestep (ge : genv) : CMin_core -> mem -> CMin_core -> mem -> Pr
   | cmin_corestep_builtin: forall f optid ef bl k sp e m vargs t vres m',
       eval_exprlist ge sp e m bl vargs ->
       external_call ef ge vargs m t vres m' ->
-      observableEF hf ef = false ->
+      ~observableEF hf ef ->
       CMin_corestep ge (CMin_State f (Sbuiltin optid ef bl) k sp e) m
          (CMin_State f Sskip k sp (set_optvar optid vres e)) m'
 

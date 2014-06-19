@@ -1055,7 +1055,7 @@ inv MC; simpl in AtExtSrc; inv AtExtSrc.
 destruct f; try inv H1. inv H3.
 destruct f; simpl in *; inv H2.
 split; trivial. monadInv H0.
-destruct (observableEF hf e0); inv H3.
+destruct (observableEF_dec hf e0); inv H3.
 assert (ValsInj: Forall2 (val_inject (restrict (as_inj mu) (vis mu)))
   (decode_longs (sig_args (ef_sig e)) (ls1 ## (Conventions1.loc_arguments (ef_sig e))))
   (decode_longs (sig_args (ef_sig e)) (ls2 ## (Conventions1.loc_arguments (ef_sig e))))).
@@ -1270,7 +1270,7 @@ simpl.
  destruct f; inv H2. 
  destruct tf; inv AtExtTgt.
  inv H0.
- destruct (observableEF hf e1); inv H2; inv H3.
+ destruct (observableEF_dec hf e1); inv H2; inv H3.
  eexists. eexists.
     split. reflexivity.
     split. reflexivity.

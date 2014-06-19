@@ -185,8 +185,8 @@ Proof.
   
     destruct (le_gt_dec p n); simpl; trivial. 
 
-    destruct H as [? [? ?]]. 
-    repeat split; auto. 
+    destruct H as [? ?]. 
+    split; auto. 
 
     destruct H. split. auto.
     destruct (Genv.find_symbol ge i); simpl in *; trivial.
@@ -216,7 +216,7 @@ Proof. intros.
     destruct H as [? [? _]].
     destruct H0 as [? [? _]]. 
     repeat split; eauto. 
-     simpl. eapply is64helper_char. constructor.
+     simpl. constructor.
      (*apply obs_ef. econstructor. *)
      apply silent_add; simpl. 
                 apply silent_add; simpl; auto.
@@ -228,7 +228,7 @@ Proof. intros.
                 apply silent_lift; trivial. 
     destruct H as [? [? _]].
       repeat split; eauto.
-     simpl. eapply is64helper_char. constructor.
+     simpl. constructor.
      (*apply obs_ef. econstructor. *)
       apply silent_lift; trivial. 
       apply silent_add; simpl. 
@@ -244,7 +244,7 @@ Proof. intros.
         split; trivial.
     destruct H0 as [? [? _]].
       repeat split; eauto.
-     simpl. eapply is64helper_char. constructor.
+     simpl. constructor.
      (*apply obs_ef. econstructor. *)
       apply silent_lift; trivial. 
       apply silent_add; simpl. 
@@ -258,7 +258,7 @@ Proof. intros.
                 apply silent_lift; trivial. 
     repeat split; eauto. 
       apply silent_lift; trivial. 
-     simpl. eapply is64helper_char. constructor.
+     simpl. constructor.
      (*apply obs_ef. econstructor. *)   
 Qed. 
 
@@ -465,31 +465,27 @@ Proof. intros. unfold addl.
   destruct (is_longconst e1); simpl in *. 
     destruct (is_longconst e2); simpl in *. repeat split; trivial.
     destruct (Int64.eq i Int64.zero); trivial.
-    split. simpl.  eapply is64helper_char. constructor.
+    split. simpl. constructor.
        (*apply obs_ef. econstructor. *)
-    split. simpl. repeat split; trivial. 
-    intros. simpl. reflexivity. 
-  destruct (is_longconst e2).
+    repeat split; trivial. 
+   destruct (is_longconst e2).
     destruct (Int64.eq i Int64.zero); trivial.
-    split.  eapply is64helper_char. constructor.
+    split. constructor.
        (*apply obs_ef. econstructor. *)
       (*destruct ef; try inv H. *)
-    split. simpl. repeat split; trivial. 
-    intros. simpl. reflexivity.
-  split. eapply is64helper_char. constructor.
+    repeat split; trivial.
+  split. constructor.
        (*apply obs_ef. econstructor. *)
-    split. simpl. repeat split; trivial. 
-    intros. simpl. reflexivity. 
+    repeat split; trivial.
 Qed.
 
 Lemma silent_negl ge: forall e, silent hf ge e ->
       silent hf ge (negl hf e).
 Proof. intros. unfold negl.
   destruct (is_longconst e). repeat split; trivial.
-    split. eapply is64helper_char. constructor.
+    split. constructor.
        (*apply obs_ef. econstructor. *)
-    split. simpl. repeat split; trivial. 
-    intros. simpl. reflexivity.
+    repeat split; trivial. 
 Qed.
 
 Lemma silent_subl ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
@@ -499,20 +495,17 @@ Proof. intros. unfold subl.
     destruct (is_longconst e2); repeat split; trivial.
     destruct (Int64.eq i Int64.zero); trivial.
     apply silent_negl; auto. 
-    split. eapply is64helper_char. constructor.
+    split. constructor.
        (*apply obs_ef. econstructor. *)
-    split. simpl. repeat split; trivial. 
-    intros. simpl. reflexivity.
+    repeat split; trivial. 
   destruct (is_longconst e2).
     destruct (Int64.eq i Int64.zero). repeat split; trivial.
-    split. eapply is64helper_char. constructor.
+    split. constructor.
        (*apply obs_ef. econstructor. *) 
-    split. simpl. repeat split; trivial. 
-    intros. simpl. reflexivity.
-  split. eapply is64helper_char. constructor.
+    repeat split; trivial. 
+  split. constructor.
        (*apply obs_ef. econstructor. *)
-    split. simpl. repeat split; trivial. 
-    intros. simpl. reflexivity.
+    repeat split; trivial. 
 Qed.
 
 Lemma divsdummy: Val.divls (Vlong Int64.one) (Vlong Int64.one) 
@@ -539,17 +532,15 @@ Proof. intros. unfold divl, binop_long.
   destruct (is_longconst e1); simpl in *.
     destruct (is_longconst e2); simpl in *. repeat split; trivial.
     split. repeat split; trivial. 
-    unfold fundef. rewrite FOUND, PTR. split. trivial. 
+    unfold fundef. rewrite FOUND, PTR.
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
     split. repeat split; trivial.
-    unfold fundef. rewrite FOUND, PTR. split. trivial.
+    unfold fundef. rewrite FOUND, PTR. 
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 Qed.
 
 Lemma silent_lowlong ge: forall e, silent hf ge e ->
@@ -577,11 +568,10 @@ Proof. intros. unfold shllimm.
           (x :: y :: nil) (Val.shll x y)) by eapply HC.
    destruct (IMPL Vundef Vundef)
      as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
-   unfold fundef; rewrite FOUND, PTR. split. trivial.
+   unfold fundef; rewrite FOUND, PTR. 
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 Qed.
 
 Lemma silent_mullimm ge (HC: i64_helpers_correct ge hf) n e:
@@ -634,11 +624,10 @@ Proof. intros. unfold shrlimm.
           (x :: y :: nil) (Val.shrl x y)) by eapply HC.
     destruct (IMPL Vundef Vundef)
       as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
-    unfold fundef; rewrite FOUND, PTR.  split. trivial.
+    unfold fundef; rewrite FOUND, PTR. 
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 Qed.
 
 Lemma silent_shrluimm ge (HC: i64_helpers_correct ge hf) n e:
@@ -662,11 +651,10 @@ Proof. intros; unfold shrluimm.
           (x :: y :: nil) (Val.shrlu x y)) by eapply HC.
     destruct (IMPL Vundef Vundef)
       as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
-    unfold fundef; rewrite FOUND, PTR.  split. trivial.
+    unfold fundef; rewrite FOUND, PTR.  
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 Qed.
 
 Lemma divlu_dummy:
@@ -690,26 +678,23 @@ Proof. intros. unfold divlu.
     destruct (is_longconst e2); simpl in *.
     repeat split; trivial.
     split. repeat split; trivial.
-    unfold fundef; rewrite FOUND, PTR.  split. trivial.
+    unfold fundef; rewrite FOUND, PTR. 
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
   destruct (is_longconst e2); simpl in *. 
     destruct (Int64.is_power2 i); simpl. 
       apply silent_shrluimm; trivial.
     split. repeat split; trivial.
-    unfold fundef; rewrite FOUND, PTR.  split. trivial.
+    unfold fundef; rewrite FOUND, PTR. 
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
   split. repeat split; trivial.
-    unfold fundef; rewrite FOUND, PTR.  split. trivial.
+    unfold fundef; rewrite FOUND, PTR.  
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 Qed.
 
 Lemma modls_dummy:
@@ -735,17 +720,15 @@ Proof. intros. unfold modl.
   destruct (is_longconst e1); simpl in *; auto. 
     destruct (is_longconst e2); simpl in *; auto.
     split. repeat split; trivial.
-    unfold fundef. rewrite FOUND, PTR. split. trivial.
+    unfold fundef. rewrite FOUND, PTR. 
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
   split. repeat split; trivial.
-    unfold fundef. rewrite FOUND, PTR. split. trivial.
+    unfold fundef. rewrite FOUND, PTR. 
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 Qed.
 
 Lemma silent_andl ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
@@ -791,26 +774,23 @@ Proof. intros. unfold modlu.
   destruct (is_longconst e1); simpl in *; auto. 
     destruct (is_longconst e2); simpl in *; auto. 
       split. repeat split; trivial.
-      unfold fundef. rewrite FOUND, PTR. split. trivial.
+      unfold fundef. rewrite FOUND, PTR. 
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
     destruct (is_longconst e2); simpl in *; auto.   
       destruct (Int64.is_power2 i); simpl in *; auto.
         apply silent_andl; simpl; auto.
         split. repeat split; trivial.
-      unfold fundef. rewrite FOUND, PTR. split. trivial.
+      unfold fundef. rewrite FOUND, PTR. 
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
   split. repeat split; trivial.
-    unfold fundef. rewrite FOUND, PTR. split. trivial.
+    unfold fundef. rewrite FOUND, PTR.
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 Qed.
 
 Lemma silent_orl ge: forall e1 e2, silent hf ge e1 -> silent hf ge e2 ->
@@ -866,11 +846,10 @@ Proof. intros. unfold shll.
           (x :: y :: nil) (Val.shll x y)) by eapply HC.
     destruct (IMPL Vundef Vundef)
       as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
-    unfold fundef; rewrite FOUND, PTR. split. trivial.
+    unfold fundef; rewrite FOUND, PTR. 
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 Qed. 
 
 Lemma silent_shrl ge (HC:i64_helpers_correct ge hf) e1 e2:
@@ -884,11 +863,10 @@ Proof. intros. unfold shrl.
           (x :: y :: nil) (Val.shrl x y)) by eapply HC.
   destruct (IMPL Vundef Vundef)
       as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
-  unfold fundef; rewrite FOUND, PTR.  split. trivial.
+  unfold fundef; rewrite FOUND, PTR.  
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 Qed. 
 
 Lemma silent_shrlu ge (HC:i64_helpers_correct ge hf) e1 e2:
@@ -902,11 +880,10 @@ Proof. intros. unfold shrlu.
           (x :: y :: nil) (Val.shrlu x y)) by eapply HC.
   destruct (IMPL Vundef Vundef)
       as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]]. 
-  unfold fundef; rewrite FOUND, PTR.  split. trivial.
+  unfold fundef; rewrite FOUND, PTR.  
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
 Qed.
 
 Lemma silent_compXimm  ge C cc c n e: silent hf ge e ->
@@ -1175,13 +1152,11 @@ assert (IMPL:forall x z : val,
 destruct longoffloat_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
       as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
-unfold fundef. rewrite FOUND, PTR. split. trivial.
+unfold fundef. rewrite FOUND, PTR. 
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      simpl in *. inv OBS.
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
-
+      simpl in *. auto. 
 split. split; trivial.
 assert (IMPL:forall x z : val,
         Val.longuoffloat x = Some z ->
@@ -1190,13 +1165,11 @@ assert (IMPL:forall x z : val,
 destruct longuoffloat_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
       as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
-unfold fundef. rewrite FOUND, PTR. split. trivial.
+unfold fundef. rewrite FOUND, PTR. 
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      simpl in *.  inv OBS.
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
-
+      simpl in *. auto. 
 split. split; trivial.
 assert (IMPL:forall x z : val,
         Val.floatoflong x = Some z ->
@@ -1205,13 +1178,11 @@ assert (IMPL:forall x z : val,
 destruct floatoflong_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
       as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
-unfold fundef. rewrite FOUND, PTR.  split. trivial.
+unfold fundef. rewrite FOUND, PTR. 
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      simpl in *.  inv OBS.
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
-
+      simpl in *. auto. 
 split. split; trivial.
 assert (IMPL:forall x z : val,
         Val.floatoflongu x = Some z ->
@@ -1220,13 +1191,11 @@ assert (IMPL:forall x z : val,
 destruct floatoflongu_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
       as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
-unfold fundef. rewrite FOUND, PTR. split. trivial.
+unfold fundef. rewrite FOUND, PTR. 
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      simpl in *.  inv OBS.
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
-
+      simpl in *. auto.  
 split. split; trivial.
 assert (IMPL:forall x z : val,
         Val.singleoflong x = Some z ->
@@ -1235,13 +1204,11 @@ assert (IMPL:forall x z : val,
 destruct singleoflong_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
       as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
-unfold fundef. rewrite FOUND, PTR. split. trivial.
+unfold fundef. rewrite FOUND, PTR. 
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      simpl in *.  inv OBS.
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
-
+      simpl in *. auto.
 split. split; trivial.
 assert (IMPL:forall x z : val,
         Val.singleoflongu x = Some z ->
@@ -1250,12 +1217,11 @@ assert (IMPL:forall x z : val,
 destruct singleoflongu_dummy as [x [z XZ]].
 destruct (IMPL _ _ XZ)
       as [b [ef [FOUND [PTR [SIG [EXE OBS]]]]]].
-unfold fundef. rewrite FOUND, PTR. split. trivial.
+unfold fundef. rewrite FOUND, PTR. 
       destruct ef; simpl; try reflexivity; try solve[inv SIG].
       eapply EFhelpersE; eassumption. 
       eapply EFhelpersB; eassumption. 
-      simpl in *.  inv OBS.
-      destruct ef; simpl; try reflexivity; try solve[inv SIG].
+      simpl in *. auto. 
 Qed.
 
 Lemma silent_addressing ge ch e a el: silent hf ge e ->
@@ -1658,7 +1624,7 @@ Lemma classify_call_correct:
   match classify_call hf ge a with
   | Call_default => True
   | Call_imm id => exists b, Genv.find_symbol ge id = Some b /\ v = Vptr b Int.zero
-  | Call_builtin ef => fd = External ef /\ (*NEW*) observableEF hf ef = false
+  | Call_builtin ef => fd = External ef /\ (*NEW*) ~ observableEF hf ef
   end.
 Proof.
   unfold classify_call; intros. 
@@ -1669,7 +1635,7 @@ Proof.
   rewrite Genv.find_funct_find_funct_ptr in H0. 
   rewrite H0. 
   destruct fd. exists b; auto. 
-  remember (observableEF hf e0) as d. 
+  remember (observableEF_dec hf e0) as d. 
   destruct d; simpl in *. 
     rewrite andb_false_r. exists b; auto.
   rewrite andb_true_r.
@@ -2131,7 +2097,7 @@ Inductive match_states (j:meminj) : CMin_core -> mem -> CMinSel_core -> mem -> P
       val_list_inject j args args' -> env_inject j e e' -> Mem.inject j m m' -> 
       sp_preserved j sp sp' ->
       CminorSel.eval_exprlist tge sp' e' m' nil al args' ->
-      (*NEW*) observableEF hf ef = false ->
+      (*NEW*) ~ observableEF hf ef ->
       match_states j
         (CMin_Callstate (External ef) args (Cminor.Kcall optid f sp e k)) m
         (CMinSel_State (sel_function hf ge f) (Sbuiltin optid ef al) k' sp' e') m'
@@ -2286,13 +2252,11 @@ Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
 Proof. intros.
   destruct MTCH as [MC [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
   destruct c1; inv AtExtSrc. destruct f; inv H0.
-  remember (observableEF hf e0) as obs.
-  destruct obs; inv H1.
-  split; trivial. 
-  inv MC; simpl.
+  split; trivial.
+  inv MC; simpl in *.
+  destruct (observableEF_dec hf e0); inv H1.
   exists args'.
-    rewrite <- Heqobs.
-    specialize (val_list_inject_forall_inject _ _ _ H6); intros.
+    specialize (val_list_inject_forall_inject _ _ _ H7); intros.
     specialize (forall_vals_inject_restrictD _ _ _ _ H); intros.
     exploit replace_locals_wd_AtExternal; try eassumption.
     intros WDnu.
@@ -2305,23 +2269,8 @@ Proof. intros.
         subst; trivial.
     eapply inject_shared_replace_locals; try eassumption.
       subst; trivial.
-  rewrite H11 in Heqobs. discriminate.
-(*  subst. exists args'.
-    specialize (val_list_inject_forall_inject _ _ _ H3); intros.
-    specialize (forall_vals_inject_restrictD _ _ _ _ H); intros. 
-  split; trivial. 
-  split; trivial. 
-  exploit replace_locals_wd_AtExternal; try eassumption.
-    intros WDnu.
-    intuition.   
-    assert (SMVnu: sm_valid nu m1 m2).
-      red. subst nu. rewrite replace_locals_DOM, replace_locals_RNG. apply SMV.
-    subst nu; split; repeat rewrite replace_locals_as_inj, replace_locals_vis. 
-        econstructor; eauto.
-        rewrite replace_locals_frgnBlocksSrc. intuition.
-        subst; trivial.
-    eapply inject_shared_replace_locals; try eassumption.
-      subst; trivial.*)
+
+  destruct (observableEF_dec hf e0); inv H1. contradiction.
 Qed.
 
 (*FreshS/T: fresh blocks in src/tgt language*)
@@ -2627,7 +2576,8 @@ Proof. intros.
  simpl in *.
  destruct f; inv AtExtSrc.
  simpl in *.
- remember (observableEF hf e0) as obs. destruct obs; inv H3.
+ remember (observableEF_dec hf e0) as obs. 
+ destruct obs; inv H3.
   apply eq_sym in AtExtTgt. inv AtExtTgt.
   exists (CMin_Returnstate ret1 k). eexists.
     split. reflexivity.

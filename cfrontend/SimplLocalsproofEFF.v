@@ -3616,8 +3616,7 @@ destruct MTCH as [MC [RC [PG [Glob [SMV WD]]]]].
     inv MC; simpl in AtExtSrc; inv AtExtSrc.
     destruct fd; simpl in *; inv H0.
     split; trivial. monadInv TRFD.
-    remember (observableEF hf e0) as obs.
-    destruct obs; inv H1.
+    destruct (observableEF_dec hf e0); inv H1.
     exists tvargs; split; trivial. 
     eapply val_list_inject_forall_inject; try eassumption.
     split; trivial.
@@ -3699,9 +3698,9 @@ Proof. intros.
   destruct fd; inv H0.
   destruct tfd; inv AtExtTgt. 
   simpl in TRFD. inv TRFD. 
-    remember (observableEF hf e1) as obs.
-    destruct obs; inv H1; inv H0. 
-    eexists; eexists.
+  destruct (observableEF_dec hf e1); inv H1; inv H0. 
+  rename o into OBS.  
+  eexists; eexists.
     split. reflexivity.
     split. reflexivity.
   simpl in *.

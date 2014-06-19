@@ -97,72 +97,58 @@ Definition get_helpers : res helper_functions :=
      i64_neg i64_add i64_sub i64_mul i64_sdiv i64_udiv i64_smod i64_umod
      i64_shl i64_shr i64_sar).
 
-Definition is_I64_helper hf (x:ident) (sg:signature) : bool:=
-  (ident_eq x hf.(i64_dtos) && signature_eq sg sig_f_l) ||
-  (ident_eq x hf.(i64_dtou) && signature_eq sg sig_f_l) ||
-  (ident_eq x hf.(i64_stod) && signature_eq sg sig_l_f) ||
-  (ident_eq x hf.(i64_utod) && signature_eq sg sig_l_f) ||
-  (ident_eq x hf.(i64_stof) && signature_eq sg sig_l_s) ||
-  (ident_eq x hf.(i64_utof) && signature_eq sg  sig_l_s) ||
-  (ident_eq x hf.(i64_neg) && signature_eq sg sig_l_l) ||
-  (ident_eq x hf.(i64_add) && signature_eq sg sig_ll_l) ||
-  (ident_eq x hf.(i64_sub) && signature_eq sg sig_ll_l) ||
-  (ident_eq x hf.(i64_mul) && signature_eq sg sig_ll_l) ||
-  (ident_eq x hf.(i64_sdiv) && signature_eq sg sig_ll_l) ||
-  (ident_eq x hf.(i64_udiv) && signature_eq sg sig_ll_l) ||
-  (ident_eq x hf.(i64_smod) && signature_eq sg sig_ll_l) ||
-  (ident_eq x hf.(i64_umod) && signature_eq sg sig_ll_l) ||
-  (ident_eq x hf.(i64_shl) && signature_eq sg sig_li_l) ||
-  (ident_eq x hf.(i64_shr) && signature_eq sg sig_li_l) ||
-  (ident_eq x hf.(i64_sar) && signature_eq sg sig_li_l).
+Inductive is_I64_helper hf : ident -> signature -> Prop :=
+  ef_dtos: is_I64_helper hf hf.(i64_dtos) sig_f_l
+| ef_dtou: is_I64_helper hf hf.(i64_dtou) sig_f_l
+| ef_stod: is_I64_helper hf hf.(i64_stod) sig_l_f
+| ef_utod: is_I64_helper hf hf.(i64_utod) sig_l_f
+| ef_stof: is_I64_helper hf hf.(i64_stof) sig_l_s
+| ef_utof: is_I64_helper hf hf.(i64_utof)  sig_l_s
+| ef_neg: is_I64_helper hf hf.(i64_neg) sig_l_l
+| ef_add: is_I64_helper hf hf.(i64_add) sig_ll_l
+| ef_sub: is_I64_helper hf hf.(i64_sub) sig_ll_l
+| ef_mul: is_I64_helper hf hf.(i64_mul) sig_ll_l
+| ef_sdiv: is_I64_helper hf hf.(i64_sdiv) sig_ll_l
+| ef_udiv: is_I64_helper hf hf.(i64_udiv) sig_ll_l
+| ef_smod: is_I64_helper hf hf.(i64_smod) sig_ll_l
+| ef_umod: is_I64_helper hf hf.(i64_umod) sig_ll_l
+| ef_shl: is_I64_helper hf hf.(i64_shl) sig_li_l
+| ef_shr: is_I64_helper hf hf.(i64_shr) sig_li_l
+| ef_sarf: is_I64_helper hf hf.(i64_sar) sig_li_l.
 
-Inductive is_I64_helperP hf : ident -> signature -> Prop :=
-  ef_dtos: is_I64_helperP hf hf.(i64_dtos) sig_f_l
-| ef_dtou: is_I64_helperP hf hf.(i64_dtou) sig_f_l
-| ef_stod: is_I64_helperP hf hf.(i64_stod) sig_l_f
-| ef_utod: is_I64_helperP hf hf.(i64_utod) sig_l_f
-| ef_stof: is_I64_helperP hf hf.(i64_stof) sig_l_s
-| ef_utof: is_I64_helperP hf hf.(i64_utof)  sig_l_s
-| ef_neg: is_I64_helperP hf hf.(i64_neg) sig_l_l
-| ef_add: is_I64_helperP hf hf.(i64_add) sig_ll_l
-| ef_sub: is_I64_helperP hf hf.(i64_sub) sig_ll_l
-| ef_mul: is_I64_helperP hf hf.(i64_mul) sig_ll_l
-| ef_sdiv: is_I64_helperP hf hf.(i64_sdiv) sig_ll_l
-| ef_udiv: is_I64_helperP hf hf.(i64_udiv) sig_ll_l
-| ef_smod: is_I64_helperP hf hf.(i64_smod) sig_ll_l
-| ef_umod: is_I64_helperP hf hf.(i64_umod) sig_ll_l
-| ef_shl: is_I64_helperP hf hf.(i64_shl) sig_li_l
-| ef_shr: is_I64_helperP hf hf.(i64_shr) sig_li_l
-| ef_sarf: is_I64_helperP hf hf.(i64_sar) sig_li_l.
-
-Lemma identeq_and x b: ((ident_eq x x) && b) = b.
-Proof. destruct (ident_eq x x); intuition. Qed. 
-Lemma sigeq_or x b: ((signature_eq x x) || b) = true.
-Proof. destruct (signature_eq x x); intuition. Qed. 
-Lemma sigeq_or' x b: (b || (signature_eq x x)) = true.
-Proof. destruct (signature_eq x x); intuition. Qed. 
-
-Lemma ident_sig_eq_elim b name name' sg sg': 
-  ((b || (ident_eq name name' && signature_eq sg sg')) = true)
-<->
-  (b=true \/ (name=name' /\ sg=sg')).
+Lemma is_I64_helper_dec hf name sg:
+ {is_I64_helper hf name sg} + {~is_I64_helper hf name sg} .
 Proof.
-destruct b; simpl. intuition. 
-destruct (ident_eq name name'); simpl.
-destruct (signature_eq sg sg'); simpl. intuition. intuition. intuition. 
-Qed.
-
-Lemma is64helper_char hf (name:ident) (sg:signature) :
-   is_I64_helperP hf name sg <-> (is_I64_helper hf name sg = true).
-Proof.
-split; intros.
-unfold is_I64_helper.
-inv H; rewrite identeq_and; try rewrite sigeq_or'; trivial. 
-unfold is_I64_helper in H. 
-  repeat rewrite ident_sig_eq_elim in H.
-  intuition; try solve [subst; constructor]. 
-    destruct (ident_eq name (i64_dtos hf)); try inv H.
-    destruct (signature_eq sg sig_f_l); try inv H1. constructor.
+destruct (signature_eq sg sig_f_l); subst.
+  destruct (ident_eq name hf.(i64_dtos)); subst; try solve[left; constructor].
+  destruct (ident_eq name hf.(i64_dtou)); subst; try solve[left; constructor].
+  right; intros N. inv N; intuition.
+destruct (signature_eq sg sig_l_f); subst.
+  destruct (ident_eq name hf.(i64_stod)); subst; try solve[left; constructor].
+  destruct (ident_eq name hf.(i64_utod)); subst; try solve[left; constructor].
+  right; intros N. inv N; intuition. 
+destruct (signature_eq sg sig_l_s); subst.
+  destruct (ident_eq name hf.(i64_stof)); subst; try solve[left; constructor].
+  destruct (ident_eq name hf.(i64_utof)); subst; try solve[left; constructor].
+  right; intros N. inv N; intuition. 
+destruct (signature_eq sg sig_l_l); subst.
+  destruct (ident_eq name hf.(i64_neg)); subst; try solve[left; constructor].
+  right; intros N. inv N; intuition.  
+destruct (signature_eq sg sig_ll_l); subst.
+  destruct (ident_eq name hf.(i64_add)); subst; try solve[left; constructor].
+  destruct (ident_eq name hf.(i64_sub)); subst; try solve[left; constructor].
+  destruct (ident_eq name hf.(i64_mul)); subst; try solve[left; constructor].
+  destruct (ident_eq name hf.(i64_sdiv)); subst; try solve[left; constructor].
+  destruct (ident_eq name hf.(i64_udiv)); subst; try solve[left; constructor].
+  destruct (ident_eq name hf.(i64_smod)); subst; try solve[left; constructor].
+  destruct (ident_eq name hf.(i64_umod)); subst; try solve[left; constructor].
+  right; intros N. inv N; intuition. 
+destruct (signature_eq sg sig_li_l); subst.
+  destruct (ident_eq name hf.(i64_shl)); subst; try solve[left; constructor].
+  destruct (ident_eq name hf.(i64_shr)); subst; try solve[left; constructor].
+  destruct (ident_eq name hf.(i64_sar)); subst; try solve[left; constructor].
+  right; intros N. inv N; intuition. 
+right; intros N. inv N; intuition. 
 Qed.
 
 Lemma helpers_inject: forall {F V TF TV: Type} 
@@ -173,7 +159,7 @@ Lemma helpers_inject: forall {F V TF TV: Type}
   (SMV : sm_valid mu m tm)
   (RC : REACH_closed m (vis mu))
   (Glob : forall b, isGlobalBlock ge b = true -> frgnBlocksSrc mu b = true)
-  (OBS : is_I64_helper hf name sg = true)
+  (OBS : is_I64_helper hf name sg)
   (PG : meminj_preserves_globals ge (as_inj mu))
   (EC : extcall_io_sem name sg ge vargs m t vres m1)
   (MINJ : Mem.inject (as_inj mu) m tm)
@@ -191,7 +177,7 @@ Lemma helpers_inject: forall {F V TF TV: Type}
      SM_wd mu' /\
      sm_valid mu' m1 tm1 /\
      REACH_closed m1 (vis mu').
-Proof. intros. apply is64helper_char in OBS. 
+Proof. intros. 
 inv OBS.
 { (*i64dtos*)
     inv EC. exists mu; eexists; eexists; split.

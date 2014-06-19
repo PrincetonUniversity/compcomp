@@ -55,7 +55,7 @@ Definition LTL_at_external (c: LTL_core) : option (external_function * signature
       match f with
         | Internal f => None
         | External ef => 
-           if observableEF hf ef 
+           if observableEF_dec hf ef 
            then Some (ef, ef_sig ef, decode_longs (sig_args (ef_sig ef)) 
                                      (map rs (loc_arguments (ef_sig ef))))
            else None
@@ -125,7 +125,7 @@ Inductive ltl_corestep (ge:genv): LTL_core -> mem -> LTL_core -> mem -> Prop :=
         (LTL_Callstate s fd rs') m'
   | ltl_exec_Lbuiltin: forall s f sp ef args res bb rs m t vl rs' m',
       external_call' ef ge (reglist rs args) m t vl m' ->
-      observableEF hf ef = false ->
+      ~ observableEF hf ef ->
       rs' = Locmap.setlist (map R res) vl (undef_regs (destroyed_by_builtin ef) rs) ->
       ltl_corestep ge (LTL_Block s f sp (Lbuiltin ef args res :: bb) rs) m
          (LTL_Block s f sp bb rs') m'
@@ -160,8 +160,7 @@ Inductive ltl_corestep (ge:genv): LTL_core -> mem -> LTL_core -> mem -> Prop :=
         (LTL_State s f (Vptr sp Int.zero) f.(fn_entrypoint) rs') m'
 
   | ltl_exec_function_external: forall s ef t args res rs m rs' m'
-      (*(OBS: observableEF hf ef = false),*)
-      (OBS: EFisHelper hf ef = true),
+      (OBS: EFisHelper hf ef),
       args = map rs (loc_arguments (ef_sig ef)) ->
       external_call' ef ge args m t res m' ->
       rs' = Locmap.setlist (map R (loc_result (ef_sig ef))) res rs ->
@@ -175,9 +174,8 @@ Inductive ltl_corestep (ge:genv): LTL_core -> mem -> LTL_core -> mem -> Prop :=
 Lemma LTL_corestep_not_at_external ge m q m' q':
       ltl_corestep ge q m q' m' -> LTL_at_external q = None.
   Proof. intros. inv H; try reflexivity. simpl in *. 
-  simpl. unfold observableEF. unfold EFisHelper in OBS.  
-  destruct ef; try inv OBS. 
-  rewrite H0. trivial. rewrite H0. trivial.  
+  simpl. destruct (observableEF_dec hf ef); simpl; trivial. 
+  exfalso. eapply EFhelpers; eassumption.  
 Qed.
 
 Definition LTL_halted (q : LTL_core): option val :=

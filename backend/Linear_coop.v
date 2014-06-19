@@ -126,7 +126,7 @@ Inductive Linear_step (ge:genv): Linear_core -> mem -> Linear_core -> mem -> Pro
   | lin_exec_Lbuiltin:
       forall s f sp rs m ef args res b t vl rs' m' lf,
       external_call' ef ge (reglist rs args) m t vl m' ->
-      observableEF hf ef = false ->
+      ~ observableEF hf ef ->
       rs' = Locmap.setlist (map R res) vl (undef_regs (destroyed_by_builtin ef) rs) ->
       Linear_step ge (Linear_State s f sp (Lbuiltin ef args res :: b) rs lf) m
          (Linear_State s f sp b rs' lf) m'
@@ -186,8 +186,7 @@ Inductive Linear_step (ge:genv): Linear_core -> mem -> Linear_core -> mem -> Pro
 
   | lin_exec_function_external:
       forall s ef args res rs1 rs2 m t m' lf
-(*     (OBS: observableEF hf ef = false),*)
-      (OBS: EFisHelper hf ef = true),
+      (OBS: EFisHelper hf ef),
       args = map rs1 (loc_arguments (ef_sig ef)) ->
       external_call' ef ge args m t res m' ->
       rs2 = Locmap.setlist (map R (loc_result (ef_sig ef))) res rs1 ->
@@ -279,7 +278,7 @@ Definition Linear_at_external (c: Linear_core) : option (external_function * sig
       match f with
         | Internal f => None
         | External ef => 
-            if observableEF hf ef
+            if observableEF_dec hf ef
             then Some (ef, ef_sig ef, decode_longs (sig_args (ef_sig ef)) 
                                    (map rs (loc_arguments (ef_sig ef))))
             else None
@@ -309,9 +308,8 @@ Definition Linear_after_external (vret: option val) (c: Linear_core) : option Li
 Lemma Linear_corestep_not_at_external ge m q m' q':
       Linear_step ge q m q' m' -> Linear_at_external q = None.
   Proof. intros. inv H; try reflexivity. 
-  simpl. unfold observableEF. unfold EFisHelper in OBS.  
-  destruct ef; try inv OBS. 
-  rewrite H0. trivial. rewrite H0. trivial.  
+  simpl. destruct (observableEF_dec hf ef); simpl; trivial. 
+  exfalso. eapply EFhelpers; eassumption. 
 Qed.
 
 Lemma Linear_corestep_not_halted ge m q m' q' :

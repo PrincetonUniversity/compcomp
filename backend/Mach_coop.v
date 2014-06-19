@@ -547,7 +547,7 @@ Inductive mach_step (ge:genv): Mach_core -> mem -> Mach_core -> mem -> Prop :=
   | Mach_exec_Mbuiltin:
       forall s f sp rs m ef args res b t vl rs' m' lf,
       external_call' ef ge rs##args m t vl m' ->
-      observableEF hf ef = false ->
+      ~ observableEF hf ef ->
       rs' = set_regs res vl (undef_regs (destroyed_by_builtin ef) rs) ->
       mach_step ge (Mach_State s f sp (Mbuiltin ef args res :: b) rs lf) m
                 (Mach_State s f sp b rs' lf) m'
@@ -627,8 +627,7 @@ Inductive mach_step (ge:genv): Mach_core -> mem -> Mach_core -> mem -> Prop :=
 *)
   | Mach_exec_function_external:
       forall cs f' rs m t rs' callee args res m' lf
-(*     (OBS: observableEF hf callee = false),*)
-      (OBS: EFisHelper hf callee = true),
+      (OBS: EFisHelper hf callee),
       Genv.find_funct_ptr ge f' = Some (External callee) ->
       external_call' callee ge args m t res m' ->
       rs' = set_regs (loc_result (ef_sig callee)) res rs ->
@@ -706,7 +705,7 @@ Definition Mach_at_external (c: Mach_core):
   | Mach_State _ _ _ _ _ _ => None
   | Mach_Callstate _ _ _ _ => None
   | Mach_CallstateOut s fb ef args rs lf => 
-        if observableEF hf ef
+        if observableEF_dec hf ef
         then Some (ef, ef_sig ef, decode_longs (sig_args (ef_sig ef)) args)
         else None
   | Mach_CallstateIn _ _ _ => None
@@ -745,9 +744,8 @@ Lemma Mach_after_at_external_excl : forall retv q q',
 Lemma Mach_corestep_not_at_external ge m q m' q':
       mach_step ge q m q' m' -> Mach_at_external q = None.
 Proof. intros. inv H; try reflexivity. 
-  simpl. unfold observableEF. unfold EFisHelper in OBS.  
-  destruct callee; try inv OBS. 
-  rewrite H2. trivial. rewrite H2. trivial.  
+  simpl. destruct (observableEF_dec hf callee); simpl; trivial. 
+  exfalso. eapply EFhelpers; eassumption. 
 Qed.  
 
 Lemma Mach_corestep_not_halted ge m q m' q': 

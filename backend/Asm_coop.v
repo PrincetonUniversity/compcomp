@@ -49,7 +49,7 @@ Inductive asm_step: state -> mem -> state -> mem -> Prop :=
       Genv.find_funct_ptr ge b = Some (Internal f) ->
       find_instr (Int.unsigned ofs) (fn_code f) = Some (Pbuiltin ef args res) ->
       external_call' ef ge (map rs args) m t vl m' ->
-      observableEF hf ef = false ->
+      ~ observableEF hf ef ->
       rs' = nextinstr_nf 
              (set_regs res vl
                (undef_regs (map preg_of (destroyed_by_builtin ef)) rs)) ->
@@ -71,7 +71,7 @@ Inductive asm_step: state -> mem -> state -> mem -> Prop :=
       asm_step (State sg rs) m (ExtCallState sg ef args rs) m
   | asm_exec_step_external:
       forall sg b callee args res rs m t rs' m'
-      (OBS: EFisHelper hf callee = true),
+      (OBS: EFisHelper hf callee),
       rs PC = Vptr b Int.zero ->
       Genv.find_funct_ptr ge b = Some (External callee) ->
       external_call' callee ge args m t res m' ->
@@ -84,7 +84,7 @@ Definition Asm_at_external (c: state):
           option (external_function * signature * list val) :=
   match c with
     ExtCallState _ ef args rs =>
-      if observableEF hf ef
+      if observableEF_dec hf ef
       then Some(ef, ef_sig ef, decode_longs (sig_args (ef_sig ef)) args)
       else None
   | _ => None
@@ -179,7 +179,9 @@ Lemma Asm_corestep_not_at_external:
        forall ge m q m' q', asm_step ge q m q' m' -> 
               Asm_at_external q = None.
   Proof. intros. inv H; try reflexivity. 
-  simpl. rewrite (EFhelpers _ _ OBS). trivial. Qed.
+  simpl. destruct (observableEF_dec hf callee); simpl; trivial. 
+  exfalso. eapply EFhelpers; eassumption. 
+Qed.
 
 Lemma Asm_corestep_not_halted : forall ge m q m' q', 
        asm_step ge q m q' m' -> 

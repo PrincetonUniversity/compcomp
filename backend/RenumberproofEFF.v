@@ -1293,7 +1293,7 @@ Proof. intros.
 destruct MTCH as [MC [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
 inv MC; simpl in AtExtSrc; inv AtExtSrc.
 destruct f; simpl in *; inv H0.
-destruct (observableEF hf e0); inv H1.
+destruct (observableEF_dec hf e0); inv H1.
 split; trivial.
 rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in ARGS; trivial.
 exploit val_list_inject_forall_inject; try eassumption. intros ARGS'.
@@ -1494,7 +1494,7 @@ simpl.
  simpl in *. inv MC; simpl in *; inv AtExtSrc.
  destruct f; inv H0. simpl.
  simpl in AtExtTgt. inv AtExtTgt.
- destruct (observableEF hf e0); inv H0; inv H1.
+ destruct (observableEF_dec hf e0); inv H0; inv H1.
  eexists. eexists.
     split. reflexivity.
     split. reflexivity.

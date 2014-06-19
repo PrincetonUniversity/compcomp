@@ -24,17 +24,14 @@ Fixpoint silent hf (ge:genv) (a:expr) :=
   | Econdition con a1 a2 => silentCondExpr hf ge con 
        /\ silent hf ge a1 /\ silent hf ge a2
   | Elet a1 a2 => silent hf ge a1 /\ silent hf ge a2
-  | Ebuiltin ef al => (*observableEF hf ef = false *) EFisHelper hf ef = true
+  | Ebuiltin ef al => EFisHelper hf ef
        /\ silentExprList hf ge al
-       /\ (forall args m, BuiltinEffect ge ef args m = EmptyEffect)
   | Eexternal x sg al => silentExprList hf ge al /\
       match Genv.find_symbol ge x with
           None => True
         | Some b =>
             match Genv.find_funct_ptr ge b with
-              Some (External ef) => (*observableEF hf ef = false*)
-                           EFisHelper hf ef = true
-                /\ (forall args m, BuiltinEffect ge ef args m = EmptyEffect)
+              Some (External ef) =>  EFisHelper hf ef
             | _ => True
             end
       end
@@ -105,7 +102,7 @@ Definition CMinSel_at_external (c: CMinSel_core) : option (external_function * s
   | CMinSel_Callstate fd args k => 
       match fd with
         Internal f => None
-      | External ef => if observableEF hf ef 
+      | External ef => if observableEF_dec hf ef 
                        then Some (ef, ef_sig ef, args)
                        else None
       end
@@ -117,7 +114,7 @@ Definition CMinSel_after_external (vret: option val) (c: CMinSel_core) : option 
     CMinSel_Callstate fd args k => 
          match fd with
             Internal f => None
-          | External ef => if observableEF hf ef 
+          | External ef => if observableEF_dec hf ef 
                            then match vret with
                                 None => Some (CMinSel_Returnstate Vundef k)
                               | Some v => Some (CMinSel_Returnstate v k)
@@ -180,7 +177,7 @@ Inductive CMinSel_corestep (ge : genv) : CMinSel_core -> mem ->
       (SILS: silentExprList hf ge al),
       eval_exprlist ge sp e m nil al vl ->
       external_call ef ge vl m t v m' ->
-      observableEF hf ef = false ->
+      ~ observableEF hf ef ->
       CMinSel_corestep ge (CMinSel_State f (Sbuiltin optid ef al) k sp e) m
          (CMinSel_State f Sskip k sp (Cminor.set_optvar optid v e)) m'
 
@@ -278,7 +275,7 @@ Lemma CMinSel_after_at_external_excl : forall retv q q',
   Proof. intros.
        destruct q; simpl in *; try inv H.
        destruct f; try inv H1; simpl; trivial.
-       remember (observableEF hf e) as d. 
+       remember (observableEF_dec hf e) as d. 
        destruct d; try inv H0.
        destruct retv; inv H1; simpl; trivial.
 Qed.
