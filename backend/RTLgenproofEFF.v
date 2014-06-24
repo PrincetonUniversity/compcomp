@@ -2682,14 +2682,6 @@ Proof. intros.
 Qed. 
 *)
 
-Lemma restrict_sm_replace_externs mu X FS FT:
-    replace_externs (restrict_sm mu X) FS FT =
-    restrict_sm (replace_externs mu FS FT) X.
-Proof. intros.
-destruct mu; simpl.
-f_equal.
-Qed.
-
 Lemma tr_cont_match_stacks_replace_externs: 
       forall mu FS FT 
       (HFS: forall b, vis mu b = true -> 

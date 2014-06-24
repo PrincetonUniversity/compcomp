@@ -2325,3 +2325,11 @@ Proof. intros. remember (as_inj mu1 b) as AI.
            destruct (SEP1 _ _ _ HeqAI H).
            elim (SEP3 _ H2). eapply as_inj_DomRng; eassumption. apply H0.
 Qed. 
+
+Lemma restrict_sm_replace_externs mu X FS FT:
+    replace_externs (restrict_sm mu X) FS FT =
+    restrict_sm (replace_externs mu FS FT) X.
+Proof. intros.
+destruct mu; simpl.
+f_equal.
+Qed.
