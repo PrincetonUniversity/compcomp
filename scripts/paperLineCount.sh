@@ -3,7 +3,7 @@
 #count_files
 # $1: file names
 function count_files {
-  cat $1 | wc -l | awk '{printf "%d & ", $1;}'
+  cat $1 | wc -l | awk '{printf "%d ", $1;}'
 }
 
 #count
@@ -13,7 +13,7 @@ function count_files {
 # $4: proof files
 function count {
   echo -n "$1 & "
-  count_files "$2"
+  count_files "$2"; echo -n "& "
   count_files "$3"
   echo "\\\\"
 }
