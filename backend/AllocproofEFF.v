@@ -2662,7 +2662,7 @@ simpl.
  destruct f; inv AtExtSrc. 
  destruct tf; inv AtExtTgt.
  inv FUN.
- destruct (observableEF hf e1); inv H0; inv H1.
+ destruct (observableEF_dec hf e1); inv H0; inv H1.
  eexists. eexists.
     split. reflexivity.
     split. reflexivity.
@@ -2854,7 +2854,7 @@ split.
                apply REACH_nil. unfold exportedSrc. 
                  apply frgnSrc_shared in H11; trivial. rewrite H11; intuition.
 
-       remember (sig_res (ef_sig e')) as o. 
+       remember (sig_res (ef_sig e')) as sr. 
         { rewrite map_locmap_setlist_eq.
           apply encode_long_inject.
           inv RValInjNu'; try econstructor. 
@@ -2867,10 +2867,10 @@ split.
           unfold getBlocks. simpl. solve[destruct (eq_block b1 b1); auto]. 
           solve[auto].
           solve[apply loc_result_locs_diff].
-          unfold encode_long,loc_result. subst o.          
+          unfold encode_long,loc_result. subst sr.          
           destruct (sig_res (ef_sig e')). destruct t; auto.
           simpl; auto. simpl; auto. simpl; auto. simpl; auto. solve[simpl; auto].
-          unfold encode_long,loc_result. subst o.
+          unfold encode_long,loc_result. subst sr.
           destruct (sig_res (ef_sig e')). destruct t; auto.
           solve[simpl; auto]. }
 
@@ -5611,7 +5611,7 @@ assert (GDE:= GDE_lemma).
     specialize (forall_vals_inject_restrictD _ _ _ _ ValsInj); intros.
     exploit replace_locals_wd_AtExternal; try eassumption. 
     intros H2. inv FUN. simpl. 
-    destruct (observableEF hf e0); inv H0.
+    destruct (observableEF_dec hf e0); inv H0.
     eexists; split; eauto. split; auto. simpl. intros. subst.
     (*MATCH*)
     split; auto. split; auto.

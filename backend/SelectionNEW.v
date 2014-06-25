@@ -184,7 +184,7 @@ Definition classify_call (ge: Cminor.genv) (e: Cminor.expr) : call_kind :=
       | None => Call_imm id
       | Some b =>
           match Genv.find_funct_ptr ge b with
-          | Some(External ef) => if ef_inline ef && (*NEW*) negb (observableEF hf ef)
+          | Some(External ef) => if ef_inline ef && (*NEW*) negb (observableEF_dec hf ef)
                                  then Call_builtin ef else Call_imm id
           | _ => Call_imm id
           end

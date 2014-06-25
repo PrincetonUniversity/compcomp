@@ -1088,7 +1088,6 @@ Lemma transl_expr_Ebuiltin_correct:
   eval_exprlist ge sp e m le al vl ->
   transl_exprlist_prop le al vl ->
   external_call ef ge vl m E0 v m ->
-  (*NEW observableEF ef = false -> *)
   transl_expr_prop le (Ebuiltin ef al) v.
 Proof.
   intros; red; intros. 
@@ -1099,11 +1098,8 @@ Proof.
   inv TE.
   simpl in OBS.
   exploit H0; eauto. eapply OBS.
-  assert (OBS' : observableEF hf ef = false).
-    (*eapply OBS*)
-    destruct OBS as [OBS [SEL BEFF]]. destruct ef; try inv OBS.  
-         unfold observableEF. rewrite H3. trivial. 
-         unfold observableEF. rewrite H3. trivial. 
+  destruct OBS as [isHLP SEL]. 
+  assert (OBS :~ observableEF hf ef) by solve [eapply EFhelpers; trivial]. 
   intros [rs1 [tm1 [mu' [MU' [EX1 [ME1 [RR1 [RO1 EXT1]]]]]]]].
   (*WAS: exploit external_call_mem_extends; eauto. 
         intros [v' [tm2 [A [B [C [D E]]]]]].*)
@@ -1150,9 +1146,7 @@ Lemma silentD_Eexternal name ef al b:  forall
   (SIL: silent hf ge (Eexternal name (ef_sig ef) al))
   (FS: Genv.find_symbol ge name = Some b)
   (FFP: Genv.find_funct_ptr ge b = Some (External ef)),
-  silentExprList hf ge al /\ EFisHelper hf ef = true
-   /\ forall (args : list val) (m : mem),
-             BuiltinEffect ge ef args m = EmptyEffect.
+  silentExprList hf ge al /\ EFisHelper hf ef.
 Proof. intros.  
 unfold silent in SIL.
 rewrite FS, FFP in SIL.
@@ -1184,11 +1178,8 @@ Lemma transl_expr_Eexternal_correct:
 Proof.
   intros; red; intros. inv TE.
   destruct (silentD_Eexternal _ _ _ _ OBS H H0)
-    as [SilentArgs [ObsEF EffectEF]]; clear OBS.
-  assert (OBS' : observableEF hf ef = false).
-    destruct ef; try inv ObsEF.  
-         unfold observableEF. rewrite H5. trivial. 
-         unfold observableEF. rewrite H5. trivial. 
+    as [SilentArgs isHLP]; clear OBS.
+  assert (OBS := EFhelpers _ _ isHLP). 
   exploit H3; eauto. 
   intros [rs1 [tm1 [mu' [MU' [EX1 [ME1 [RR1 [RO1 EXT1]]]]]]]].
   assert (PG': meminj_preserves_globals ge (as_inj mu')).     
@@ -2011,12 +2002,9 @@ Proof.
      eapply restrict_sm_preserves_globals; try eassumption.
      unfold vis. intuition. 
   inv TE.
-  simpl in OBS.
-  exploit H0; eauto. eapply OBS.
-  assert (OBS' : observableEF hf ef = false).
-    destruct OBS as [ObsEF _]. destruct ef; try inv ObsEF.  
-         unfold observableEF. rewrite H3. trivial. 
-         unfold observableEF. rewrite H3. trivial. 
+  destruct OBS as [isHLP silExpr].
+  exploit H0; eauto. 
+  assert (OBS' := EFhelpers _ _ isHLP). 
   intros [rs1 [tm1 [mu' [MU' [EX1 [ME1 [RR1 [RO1 EXT1]]]]]]]].
   (*WAS: exploit external_call_mem_extends; eauto. 
         intros [v' [tm2 [A [B [C [D E]]]]]].*)
@@ -2043,14 +2031,10 @@ Proof.
              apply mem_forward_refl.
              eapply effstep_star_fwd. eassumption.
              eapply external_call_mem_forward; eassumption.
- destruct OBS as [ObsEF [SilentArgs EffectEF]].
 (* Exec *)
   split. eapply effstep_star_trans'. eexact EX1.
          apply effstep_star_one. eapply rtl_effstep_exec_Ibuiltin; try eassumption. 
-         clear - EffectEF EC.
-         destruct ef; simpl in *; trivial.
-         rewrite (EffectEF (rs1 ## rl) tm1). simpl. reflexivity.
-         rewrite (EffectEF (rs1 ## rl) tm1). simpl. reflexivity.
+         rewrite (helpers_EmptyEffect _ _ _ _ _ isHLP). intuition. 
     (*  eapply external_call_symbols_preserved; eauto. 
         exact symbols_preserved. exact varinfo_preserved.*)
 (* Match-env *)
@@ -2077,12 +2061,9 @@ Lemma Efftransl_expr_Eexternal_correct:
 Proof.
   intros; red; intros. inv TE.
   destruct (silentD_Eexternal _ _ _ _ OBS H H0)
-    as [SilentArgs [ObsEF EffectEF]]; clear OBS.
+    as [SilentArgs isHLP]; clear OBS.
   exploit H3; eauto.  
-  assert (OBS' : observableEF hf ef = false).
-    destruct ef; try inv ObsEF.  
-         unfold observableEF. rewrite H5. trivial. 
-         unfold observableEF. rewrite H5. trivial. 
+  assert (OBS' := EFhelpers _ _ isHLP). 
   intros [rs1 [tm1 [mu' [MU' [EX1 [ME1 [RR1 [RO1 EXT1]]]]]]]].
   assert (PG': meminj_preserves_globals ge (as_inj mu')).     
        eapply intern_incr_meminj_preserves_globals_as_inj.
@@ -2119,10 +2100,7 @@ Proof.
      (*  eapply external_call_symbols_preserved; eauto. exact symbols_preserved. exact varinfo_preserved.*)
      apply effstep_star_one. apply rtl_effstep_exec_return. 
      reflexivity. reflexivity.
-     simpl in *. clear - EffectEF EC.
-         destruct ef; simpl in *; trivial.
-         rewrite (EffectEF (rs1 ## rl) tm1). simpl. reflexivity.
-         rewrite (EffectEF (rs1 ## rl) tm1). simpl. reflexivity.
+     simpl in *. rewrite (helpers_EmptyEffect _ _ _ _ _ isHLP). intuition. 
 (* Match-env *)
   split. eapply match_env_update_dest; try eassumption.
      eapply match_env_inject_incr; try eassumption.
@@ -2704,14 +2682,6 @@ Proof. intros.
 Qed. 
 *)
 
-Lemma restrict_sm_replace_externs mu X FS FT:
-    replace_externs (restrict_sm mu X) FS FT =
-    restrict_sm (replace_externs mu FS FT) X.
-Proof. intros.
-destruct mu; simpl.
-f_equal.
-Qed.
-
 Lemma tr_cont_match_stacks_replace_externs: 
       forall mu FS FT 
       (HFS: forall b, vis mu b = true -> 
@@ -3037,7 +3007,7 @@ destruct MTCH as [MC [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
 inv MC; simpl in AtExtSrc; inv AtExtSrc.
 destruct f; simpl in *; inv H0.
 inv TF.
-destruct (observableEF hf e0); inv H1.
+destruct (observableEF_dec hf e0); inv H1.
 split; trivial.
 rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AINJ; trivial.
 exploit val_list_inject_forall_inject; try eassumption. intros ARGS'.
@@ -3344,7 +3314,7 @@ simpl.
  destruct f; inv H0. 
  destruct tf; inv AtExtTgt.
  inv TF.
- destruct (observableEF hf e1); inv H0; inv H1.
+ destruct (observableEF_dec hf e1); inv H0; inv H1.
  eexists. eexists.
     split. reflexivity.
     split. reflexivity.

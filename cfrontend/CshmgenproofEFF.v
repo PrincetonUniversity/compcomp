@@ -693,7 +693,7 @@ Proof.
   apply alignof_blockcopy_1248.
   apply sizeof_pos. 
   eapply Zdivide_trans. apply alignof_blockcopy_divides. apply sizeof_alignof_compat.
-  simpl. reflexivity.
+  simpl. auto.
 Qed.
 
 Lemma make_memcpy_correct_BuiltinEffect:
@@ -718,7 +718,7 @@ Proof.
   apply alignof_blockcopy_1248.
   apply sizeof_pos. 
   eapply Zdivide_trans. apply alignof_blockcopy_divides. apply sizeof_alignof_compat.
-  simpl. reflexivity.
+  simpl. auto. 
 Qed.
 (*
 Lemma make_memcpy_correct_BuiltinEffect:
@@ -2409,14 +2409,12 @@ simpl.
  simpl in *. inv MC; simpl in *; inv AtExtSrc.
  destruct fd; inv H0. simpl in TY. inv TY.
  destruct tfd; inv AtExtTgt.
- remember (observableEF hf e0) as d.
- destruct d; inv H1.
- remember (observableEF hf e1) as d1.
- destruct d1; inv H0.
+ destruct (observableEF_dec hf e0); inv H1.
+ destruct (observableEF_dec hf e1); inv H0.
  simpl in *.
  remember (list_typ_eq (sig_args (ef_sig e)) (typlist_of_typelist targs) &&
            opt_typ_eq (sig_res (ef_sig e)) (opttyp_of_type tres)) as dd.
- destruct dd; inv TR. clear Heqd1; apply eq_sym in Heqdd.
+ destruct dd; inv TR. clear o0; rename o into OBS.
  eexists. eexists.
     split. reflexivity.
     split. reflexivity.
@@ -4273,8 +4271,9 @@ Proof. intros. destruct H as [MC [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
     specialize (forall_vals_inject_restrictD _ _ _ _ ValsInj); intros.
     exploit replace_locals_wd_AtExternal; try eassumption. 
     intros WDr.
-    remember (observableEF hf e0) as obs.
-    destruct obs; inv H0.
+    remember (observableEF_dec hf e0) as d. 
+    destruct d; inv H0.
+    rename o into OBS.
     exists args2; intuition.
       destruct tfd; simpl in *.
         remember ( list_typ_eq (sig_args (ef_sig e)) (typlist_of_typelist targs) &&
@@ -4283,7 +4282,7 @@ Proof. intros. destruct H as [MC [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
       remember ( list_typ_eq (sig_args (ef_sig e)) (typlist_of_typelist targs) &&
            opt_typ_eq (sig_res (ef_sig e)) (opttyp_of_type tres)) as q.
         destruct q; inv TR.
-        rewrite <- Heqobs. trivial.
+        rewrite <- Heqd. trivial.
      (*MATCH*)
        split; subst; rewrite replace_locals_as_inj, replace_locals_vis. 
          econstructor; repeat rewrite restrict_sm_all, vis_restrict_sm, 

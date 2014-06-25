@@ -399,7 +399,7 @@ Proof.
   inv H1; simpl in *; inv H0.
   destruct fd; inv H1.
   inv TR.
-  destruct (observableEF hf e0); inv H0.
+  destruct (observableEF_dec hf e0); inv H0.
   split; trivial.
   split. destruct (match_callstack_match_globalenvs _ _ _ _ _ _ _ MCS) as [hi Hhi].
               eapply inj_preserves_globals. eassumption.
@@ -435,7 +435,7 @@ Proof. intros.
   inv MC; simpl in *; inv H0.
   destruct fd; inv H10.
   inv TR.
-  destruct (observableEF hf e0); inv AtExt2. inv H0.
+  destruct (observableEF_dec hf e0); inv AtExt2. inv H0.
   exists (CSharpMin_Returnstate ret1 k). eexists. eexists.
     split. reflexivity.
     split. reflexivity.
@@ -508,7 +508,7 @@ Proof.
      inv ZZ2.
      inv TR.
      inv TR.
-     destruct (observableEF hf e0). split; intros; inv H. intuition.
+     destruct (observableEF_dec hf e0). split; intros; inv H. intuition.
     intuition. 
 Qed.
 

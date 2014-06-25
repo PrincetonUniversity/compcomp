@@ -70,7 +70,7 @@ Inductive RTL_effstep (ge:genv):  (block -> Z -> bool) ->
       forall s f sp pc rs m ef args res pc' t v m',
       (fn_code f)!pc = Some(Ibuiltin ef args res pc') ->
       external_call ef ge rs##args m t v m' ->
-      observableEF hf ef = false -> 
+      ~ observableEF hf ef -> 
       RTL_effstep ge (BuiltinEffect ge ef (rs##args) m)
          (RTL_State s f sp pc rs) m
          (RTL_State s f sp pc' (rs#res <- v)) m'
@@ -111,8 +111,7 @@ Inductive RTL_effstep (ge:genv):  (block -> Z -> bool) ->
         m'
   | rtl_effstep_exec_function_external:
       forall s ef args res t m m'
-(*      (OBS: observableEF hf ef = false),*)
-      (OBS: EFisHelper hf ef = true),
+      (OBS: EFisHelper hf ef),
       external_call ef ge args m t res m' ->
       RTL_effstep ge (BuiltinEffect ge ef args m)
           (RTL_Callstate s (External ef) args) m
@@ -191,11 +190,8 @@ intros.
          eapply Mem.alloc_unchanged_on; eassumption. 
   split. unfold corestep, coopsem; simpl. 
          eapply rtl_corestep_exec_function_external; eassumption.
-         destruct ef; try inv OBS.
-           eapply BuiltinEffect_unchOn; try eapply H. 
-            instantiate(1:=hf). unfold observableEF. rewrite H1. trivial.
-           eapply BuiltinEffect_unchOn; try eapply H. 
-            instantiate(1:=hf). unfold observableEF. rewrite H1. trivial. 
+         eapply BuiltinEffect_unchOn; try eassumption. 
+         eapply EFhelpers; eassumption.
   split. unfold corestep, coopsem; simpl.
          eapply rtl_corestep_exec_return; eassumption.
          apply Mem.unchanged_on_refl.

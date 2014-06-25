@@ -974,8 +974,7 @@ Proof. intros.
   destruct fd; inv H0.
   destruct tfd; inv AtExtTgt.
   inv TR.
-  remember (observableEF hf e1) as obs.
-  destruct obs; inv H0; inv H1.
+  destruct (observableEF_dec hf e1); inv H0; inv H1.
   exists (CSharpMin_Returnstate ret1 k). eexists.
     split. reflexivity.
     split. reflexivity.
@@ -1187,7 +1186,7 @@ Proof.
   inv MC; simpl in *; inv AtExt.
   destruct fd; inv H0.
   inv TR.
-  destruct (observableEF hf e0); inv H1.
+  destruct (observableEF_dec hf e0); inv H1.
   exists targs.
   split; trivial. apply val_list_inject_forall_inject; eassumption. 
 Qed.
@@ -2371,7 +2370,7 @@ forall x t ef optid vres m' bl vargs
         (Mem.nextblock m) (Mem.nextblock tm))
 (EQ : transl_exprlist cenv bl = OK x)
 (MK : match_cont k tk cenv xenv cs)
-(OBS: observableEF hf ef = false),
+(OBS: ~ observableEF hf ef),
 exists c2' : CMin_core,
   exists m2' mu', 
       corestep_plus (CMin_core_sem hf) tge
@@ -3907,7 +3906,7 @@ forall x t ef optid vres m' bl vargs tvargs
 (MK : match_cont k tk cenv xenv cs)
 (Vinj: val_list_inject (restrict (as_inj mu) (vis mu)) vargs tvargs)
 (EVAL2: eval_exprlist tge (Vptr sp Int.zero) te tm x tvargs)
-(OBS: observableEF hf ef = false),
+(OBS: ~ observableEF hf ef),
 exists c2' : CMin_core,
   exists m2' mu', 
       effstep_plus (cmin_eff_sem hf) tge (BuiltinEffect tge ef tvargs tm)

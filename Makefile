@@ -81,7 +81,7 @@ BACKEND=\
   CminorSel.v CminorSel_coop.v CminorSel_eff.v \
   SelectOp.v SelectDiv.v SelectLong.v Selection.v \
   I64Helpers.v BuiltinEffects.v SelectionNEW.v SelectLongNEW.v \
-  SelectOpproof.v SelectDivproof.v SelectLongproof.v \
+  SelectOpproof.v SelectDivproof.v SelectLongproof.v SelectLongproofEFF.v \
   Selectionproof.v SelectionproofEFF.v \
   Registers.v RTL.v RTL_coop.v RTL_eff.v \
   RTLgen.v RTLgenspec.v RTLgenproof.v RTLgenproofEFF.v \
@@ -103,7 +103,8 @@ BACKEND=\
   Mach.v Mach_coop.v Mach_eff.v \
   Bounds.v Stacklayout.v Stacking.v Stackingproof.v StackingproofEFF.v \
   Asm.v Asmgen.v Asmgenproof0.v Asmgenproof1.v Asmgenproof.v \
-  AsmEFF.v AsmgenEFF.v Asmgenproof0EFF.v Asmgenproof1EFF.v AsmgenproofEFF.v
+  AsmEFF.v AsmgenEFF.v Asm_coop.v Asm_eff.v \
+  Asmgenproof0EFF.v Asmgenproof1EFF.v AsmgenproofEFF.v
 
 # C front-end modules (in cfrontend/)
 

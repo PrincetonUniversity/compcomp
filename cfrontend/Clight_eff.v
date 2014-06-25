@@ -148,7 +148,7 @@ Inductive clight_effstep (ge:genv): (block -> Z -> bool) ->
   | clight_effstep_builtin:   forall f optid ef tyargs al k e le m vargs t vres m',
       eval_exprlist ge e le m al tyargs vargs ->
       external_call ef ge vargs m t vres m' ->
-      observableEF hf ef = false ->
+      ~ observableEF hf ef ->
       clight_effstep ge (BuiltinEffect ge ef vargs m)
          (CL_State f (Sbuiltin optid ef tyargs al) k e le) m
          (CL_State f Sskip k e (set_opttemp optid vres le)) m'
@@ -248,6 +248,7 @@ Inductive clight_effstep (ge:genv): (block -> Z -> bool) ->
       clight_effstep ge EmptyEffect
         (CL_Callstate (Internal f) vargs k) m
         (CL_State f f.(fn_body) k e le) m'
+
 (*All external calls in this language at handled by atExternal
   | step_external_function: forall ef targs tres vargs k m vres t m',
       external_call ef ge vargs m t vres m' ->
@@ -279,8 +280,6 @@ intros.
          apply Mem.unchanged_on_refl.
   split. unfold corestep, coopsem; simpl. econstructor; eassumption.
          eapply BuiltinEffect_unchOn; eassumption.
-(*  split. econstructor; try eassumption.
-         eapply ec_builtinEffectPolymorphic; eassumption.*)
   split. econstructor; try eassumption.
          apply Mem.unchanged_on_refl.
   split. econstructor; try eassumption.

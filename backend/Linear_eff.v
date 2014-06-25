@@ -79,7 +79,7 @@ Inductive linear_effstep (ge:genv): (block -> Z -> bool) -> Linear_core -> mem -
   | lin_effexec_Lbuiltin:
       forall s f sp rs m ef args res b t vl rs' m' lf,
       external_call' ef ge (reglist rs args) m t vl m' ->
-      observableEF hf ef = false ->
+      ~ observableEF hf ef ->
       rs' = Locmap.setlist (map R res) vl (undef_regs (destroyed_by_builtin ef) rs) ->
       linear_effstep ge (BuiltinEffect ge ef (decode_longs (sig_args (ef_sig ef)) (reglist rs args)) m)
          (Linear_State s f sp (Lbuiltin ef args res :: b) rs lf) m
@@ -147,8 +147,7 @@ Inductive linear_effstep (ge:genv): (block -> Z -> bool) -> Linear_core -> mem -
 
   | lin_effexec_function_external:
       forall s ef args res rs1 rs2 m t m' lf
-(*      (OBS: observableEF hf ef = false),*)
-      (OBS: EFisHelper hf ef = true),
+      (OBS: EFisHelper hf ef),
       args = map rs1 (loc_arguments (ef_sig ef)) ->
       external_call' ef ge args m t res m' ->
       rs2 = Locmap.setlist (map R (loc_result (ef_sig ef))) res rs1 ->
@@ -211,15 +210,11 @@ intros.
   split. unfold corestep, coopsem; simpl. 
          eapply lin_exec_function_external; eassumption.
          inv H0.
-         destruct ef; try inv OBS.
-           eapply mem_unchanged_on_sub.
-             eapply BuiltinEffect_unchOn; try eapply H2. 
-              instantiate(1:=hf). unfold observableEF. rewrite H0. trivial.
-             unfold BuiltinEffect; simpl; intros. trivial.
-           eapply mem_unchanged_on_sub.
-             eapply BuiltinEffect_unchOn; try eapply H2. 
-              instantiate(1:=hf). unfold observableEF. rewrite H0. trivial.
-             unfold BuiltinEffect; simpl; intros. trivial. 
+       exploit @BuiltinEffect_unchOn. 
+         eapply EFhelpers; eassumption.
+         eapply H2. 
+       unfold BuiltinEffect; simpl.
+         destruct ef; simpl; trivial; contradiction.
   split. unfold corestep, coopsem; simpl. econstructor; eassumption.
          apply Mem.unchanged_on_refl.
 Qed.

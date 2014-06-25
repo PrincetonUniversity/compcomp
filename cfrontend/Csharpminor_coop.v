@@ -59,7 +59,7 @@ Definition CSharpMin_at_external (c: CSharpMin_core) : option (external_function
   | CSharpMin_Callstate fd args k =>
         match fd with
           Internal f => None
-         | External ef => if observableEF hf ef 
+         | External ef => if observableEF_dec hf ef 
                           then Some (ef, ef_sig ef, args)
                           else None
         end
@@ -116,7 +116,7 @@ Inductive CSharpMin_corestep (ge : genv) : CSharpMin_core -> mem -> CSharpMin_co
   | csharpmin_corestep_builtin: forall f optid ef bl k e le m vargs t vres m',
       eval_exprlist ge e le m bl vargs ->
       external_call ef ge vargs m t vres m' ->
-      observableEF hf ef = false ->
+      ~ observableEF hf ef ->
       CSharpMin_corestep ge (CSharpMin_State f (Sbuiltin optid ef bl) k e le) m
          (CSharpMin_State f Sskip k e (Cminor.set_optvar optid vres le)) m'
 

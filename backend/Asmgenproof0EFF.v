@@ -865,6 +865,7 @@ Ltac TailNoLabel :=
 (** * Execution of straight-line code *)
 
 Section STRAIGHTLINE.
+Variable hf : I64Helpers.helper_functions.
 
 Variable ge: genv.
 Variable fn: function.
@@ -938,7 +939,7 @@ Lemma exec_straight_steps_1:
   rs#PC = Vptr b ofs ->
   Genv.find_funct_ptr ge b = Some (Internal fn) ->
   code_tail (Int.unsigned ofs) (fn_code fn) c ->
-  corestep_plus Asm_eff_sem ge (State sg rs) m (State sg rs') m'.
+  corestep_plus (Asm_eff_sem hf) ge (State sg rs) m (State sg rs') m'.
 Proof.
   induction 1; intros.
   apply corestep_plus_one.
@@ -989,6 +990,7 @@ End STRAIGHTLINE.
 
 (*Lenb: the same for effectfull executions*)
 Section EFFSTRAIGHTLINE.
+Variable hf: I64Helpers.helper_functions.
 
 Variable ge: genv.
 Variable fn: function.
@@ -1174,7 +1176,7 @@ Lemma eff_exec_straight_steps_1:
   rs#PC = Vptr b ofs ->
   Genv.find_funct_ptr ge b = Some (Internal fn) ->
   code_tail (Int.unsigned ofs) (fn_code fn) c ->
-  effstep_plus Asm_eff_sem ge U (State sg rs) m (State sg rs') m'.
+  effstep_plus (Asm_eff_sem hf) ge U (State sg rs) m (State sg rs') m'.
 Proof.
   induction 1; intros.
   apply effstep_plus_one.

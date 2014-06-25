@@ -723,7 +723,7 @@ Proof. intros.
 destruct MTCH as [MC [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
 inv MC; simpl in AtExtSrc; inv AtExtSrc.
 destruct f; simpl in *; inv H1.
-destruct (observableEF hf e0); inv H2.
+destruct (observableEF_dec hf e0); inv H2.
 split; trivial. 
 assert (ValsInj: Forall2 (val_inject (restrict (as_inj mu) (vis mu)))
   (decode_longs (sig_args (ef_sig e)) (map ls (Conventions1.loc_arguments (ef_sig e))))
@@ -936,7 +936,7 @@ simpl.
  simpl in *. inv MC; simpl in *; inv AtExtSrc.
  destruct f; inv H1. 
  simpl in AtExtTgt. inv AtExtTgt.
- destruct (observableEF hf e0); inv H1; inv H2.
+ destruct (observableEF_dec hf e0); inv H1; inv H2.
  eexists. eexists.
     split. reflexivity.
     split. reflexivity.

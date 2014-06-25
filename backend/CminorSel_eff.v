@@ -79,7 +79,7 @@ Inductive cminsel_effstep (ge:genv):  (block -> Z -> bool) ->
       (SILS: silentExprList hf ge al),
       CminorSel.eval_exprlist ge sp e m nil al vl ->
       external_call ef ge vl m t v m' ->
-      observableEF hf ef = false ->
+      ~ observableEF hf ef ->
       cminsel_effstep ge (BuiltinEffect ge ef vl m)
           (CMinSel_State f (Sbuiltin optid ef al) k sp e) m
           (CMinSel_State f Sskip k sp (Cminor.set_optvar optid v e)) m'

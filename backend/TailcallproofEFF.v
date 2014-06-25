@@ -664,7 +664,7 @@ Proof. intros.
  rename args' into vals2. rename H2 into MINJ.
  split; trivial.
  simpl.
- destruct (observableEF hf e0); inv H3.
+ destruct (observableEF_dec hf e0); inv H3.
  eexists.
     split. eapply val_list_inject_forall_inject. eassumption.
     simpl. split. reflexivity.
@@ -835,7 +835,7 @@ Proof. intros. simpl.
  destruct MTCH as [MC [RC [PG [GFP [Glob [VAL WDmu]]]]]].
  simpl in *. inv MC; simpl in *; inv AtExtSrc.
  destruct f; inv H3. simpl in *. inv AtExtTgt.
- destruct (observableEF hf e0); inv H3; inv H4.
+ destruct (observableEF_dec hf e0); inv H3; inv H4.
  eexists. eexists.
     split. reflexivity.
     split. reflexivity.

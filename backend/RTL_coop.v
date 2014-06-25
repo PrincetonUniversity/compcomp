@@ -98,7 +98,7 @@ Inductive RTL_corestep (ge:genv): RTL_core -> mem -> RTL_core -> mem -> Prop :=
       forall s f sp pc rs m ef args res pc' t v m',
       (fn_code f)!pc = Some(Ibuiltin ef args res pc') ->
       external_call ef ge rs##args m t v m' ->
-      observableEF hf ef = false ->      
+      ~ observableEF hf ef ->      
       RTL_corestep ge (RTL_State s f sp pc rs) m
          (RTL_State s f sp pc' (rs#res <- v)) m'
 
@@ -135,8 +135,7 @@ Inductive RTL_corestep (ge:genv): RTL_core -> mem -> RTL_core -> mem -> Prop :=
 
   | rtl_corestep_exec_function_external:
       forall s ef args res t m m'
-(*      (OBS: observableEF hf ef = false),*)
-      (OBS: EFisHelper hf ef = true),
+      (OBS: EFisHelper hf ef),
       external_call ef ge args m t res m' ->
       RTL_corestep ge (RTL_Callstate s (External ef) args) m
           (RTL_Returnstate s res) m'
@@ -185,7 +184,7 @@ Definition RTL_at_external (c: RTL_core): option (external_function * signature 
     | RTL_Callstate stack f args => 
         match f with
           Internal _ => None
-        | External ef =>  if observableEF hf ef 
+        | External ef =>  if observableEF_dec hf ef 
                           then Some(ef, ef_sig ef, args)
                           else None
         end
@@ -209,9 +208,8 @@ Definition RTL_after_external (vret: option val)(c: RTL_core): option RTL_core :
 Lemma corestep_not_external: forall (ge : genv) (m : mem) (q : RTL_core) (m' : mem) (q' : RTL_core),
                                RTL_corestep ge q m q' m' -> RTL_at_external q = None.
   intros. inv H; try reflexivity. 
-  simpl. unfold observableEF. unfold EFisHelper in OBS.  
-  destruct ef; try inv OBS. 
-  rewrite H1. trivial. rewrite H1. trivial.  
+  simpl. destruct (observableEF_dec hf ef); simpl; trivial. 
+  exfalso. eapply EFhelpers; eassumption. 
 Qed.
 
 Lemma corestep_not_halted: forall (ge : genv) (m : mem) (q : RTL_core) (m' : mem) (q' : RTL_core),

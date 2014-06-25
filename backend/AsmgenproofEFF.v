@@ -56,6 +56,7 @@ Variable prog: Mach.program.
 Variable tprog: AsmEFF.program.
 Hypothesis TRANSF: transf_program prog = Errors.OK tprog.
 
+Variable hf : I64Helpers.helper_functions.
 Let ge := Genv.globalenv prog.
 Let tge := Genv.globalenv tprog.
 
@@ -123,7 +124,7 @@ Lemma exec_straight_exec:
   forall fb f c ep tf tc c' rs m rs' m' sg,
   transl_code_at_pc ge (rs PC) fb f c ep tf tc ->
   exec_straight tge tf tc rs m c' rs' m' ->
-  corestep_plus Asm_eff_sem  tge (State sg rs) m (State sg rs') m'.
+  corestep_plus (Asm_eff_sem hf) tge (State sg rs) m (State sg rs') m'.
 Proof.
   intros. inv H.
   eapply exec_straight_steps_1; eauto.
@@ -135,7 +136,7 @@ Lemma eff_exec_straight_exec:
   forall fb f c ep tf tc c' rs m rs' m' sg U,
   transl_code_at_pc ge (rs PC) fb f c ep tf tc ->
   eff_exec_straight tge tf U tc rs m c' rs' m' ->
-  effstep_plus Asm_eff_sem tge U (State sg rs) m (State sg rs') m'.
+  effstep_plus (Asm_eff_sem hf) tge U (State sg rs) m (State sg rs') m'.
 Proof.
   intros. inv H.
   eapply eff_exec_straight_steps_1; eauto.
@@ -442,7 +443,7 @@ Fixpoint core_sig (s: list stackframe) : option signature :=
   match s with nil => None
    | (Stackframe fb sp ra c :: s') =>  core_sig s'
   end.
-
+TODO: add loadframe
 Inductive match_states mu: Mach_core -> mem -> Asm_coop.state -> mem -> Prop :=
   | match_states_intro:
       forall s fb sp c ep ms m m' rs f tf tc sg 
@@ -514,7 +515,7 @@ Lemma exec_straight_steps:
   (*NEW*) forall (SPlocal: sp_spec mu sp)
   (*NEW*) (CoreSig: core_sig s = Some sg),
   exists st',
-  corestep_plus Asm_eff_sem tge (State sg rs1) m1' st' m2' /\
+  corestep_plus (Asm_eff_sem hf) tge (State sg rs1) m1' st' m2' /\
   match_states mu (Mach_State s fb sp c ms2) m2 st' m2'.
 Proof.
   intros. inversion H2. subst. monadInv H7. 
@@ -540,7 +541,7 @@ Lemma eff_exec_straight_steps:
   (*NEW*) forall (SPlocal: sp_spec mu sp)
   (*NEW*) (CoreSig: core_sig s = Some sg),
   exists st',
-  effstep_plus Asm_eff_sem tge U (State sg rs1) m1' st' m2' /\
+  effstep_plus (Asm_eff_sem hf) tge U (State sg rs1) m1' st' m2' /\
   match_states mu (Mach_State s fb sp c ms2) m2 st' m2'.
 Proof.
   intros. inversion H2. subst. monadInv H7. 
@@ -566,7 +567,7 @@ Lemma exec_straight_steps_goto:
   (*NEW*) forall (SPlocal: sp_spec mu sp)
   (*NEW*) (CoreSig: core_sig s = Some sg),
   exists st',
-  corestep_plus Asm_eff_sem  tge (State sg rs1) m1' st' m2' /\
+  corestep_plus (Asm_eff_sem hf) tge (State sg rs1) m1' st' m2' /\
   match_states mu (Mach_State s fb sp c' ms2) m2 st' m2'.
 Proof.
   intros. inversion H3. subst. monadInv H9.
@@ -607,7 +608,7 @@ Lemma eff_exec_straight_steps_goto:
   (*NEW*) forall (SPlocal: sp_spec mu sp)
   (*NEW*) (CoreSig: core_sig s = Some sg),
   exists st',
-  effstep_plus Asm_eff_sem tge EmptyEffect (State sg rs1) m1' st' m2' /\
+  effstep_plus (Asm_eff_sem hf)tge EmptyEffect (State sg rs1) m1' st' m2' /\
   match_states mu (Mach_State s fb sp c' ms2) m2 st' m2'.
 Proof.
   intros. inversion H3. subst. monadInv H9.
@@ -876,12 +877,12 @@ Qed.
 
 Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
       (MTCH: MATCH c1 mu c1 m1 c2 m2)
-      (AtExtSrc: at_external (Mach_eff_sem return_address_offset) c1 = 
+      (AtExtSrc: at_external (Mach_eff_sem hf return_address_offset) c1 = 
                  Some (e, ef_sig, vals1)),
       Mem.inject (as_inj mu) m1 m2  /\
 (exists vals2 : list val,
    Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\
-   at_external Asm_eff_sem c2 = Some (e, ef_sig, vals2) /\
+   at_external (Asm_eff_sem hf)c2 = Some (e, ef_sig, vals2) /\
    (forall pubSrc' pubTgt' : block -> bool,
     pubSrc' =
     (fun b : block => locBlocksSrc mu b && REACH m1 (exportedSrc mu vals1) b) ->
@@ -957,8 +958,8 @@ Lemma MATCH_afterExternal: forall
       mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
       (MemInjMu : Mem.inject (as_inj mu) m1 m2)
       (MatchMu: MATCH st1 mu st1 m1 st2 m2)
-      (AtExtSrc : at_external (Mach_eff_sem return_address_offset) st1 = Some (e, ef_sig, vals1))
-      (AtExtTgt : at_external Asm_eff_sem st2 = Some (e', ef_sig', vals2))
+      (AtExtSrc : at_external (Mach_eff_sem hf return_address_offset) st1 = Some (e, ef_sig, vals1))
+      (AtExtTgt : at_external (Asm_eff_sem hf)st2 = Some (e', ef_sig', vals2))
       (ValInjMu : Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2)
       (pubSrc' : block -> bool)
       (pubSrcHyp : pubSrc' =
@@ -991,8 +992,8 @@ Lemma MATCH_afterExternal: forall
                (fun b z => locBlocksSrc nu b = true /\ pubBlocksSrc nu b = false) m1 m1')
        (UnchLOOR: Mem.unchanged_on (local_out_of_reach nu m1) m2 m2'),
   exists st1' st2',
-  after_external (Mach_eff_sem return_address_offset) (Some ret1) st1 =Some st1' /\
-  after_external Asm_eff_sem (Some ret2) st2 = Some st2' /\
+  after_external (Mach_eff_sem hf return_address_offset) (Some ret1) st1 =Some st1' /\
+  after_external (Asm_eff_sem hf)(Some ret2) st2 = Some st2' /\
   MATCH st1' mu' st1' m1' st2' m2'.
 Proof. intros.
 destruct MatchMu as [MS PRE].
@@ -1282,14 +1283,14 @@ intuition.
 Qed.
 
 Lemma effcore_diagram: forall st1 m1 st1' m1' (U1 : block -> Z -> bool)
-      (CS: effstep (Mach_eff_sem return_address_offset) ge U1 st1 m1 st1' m1')
+      (CS: effstep (Mach_eff_sem hf return_address_offset) ge U1 st1 m1 st1' m1')
       st2 mu m2
       (U1Vis: forall b ofs, U1 b ofs = true -> vis mu b = true)
       (MTCH: MATCH st1 mu st1 m1 st2 m2),
 exists st2' m2' (U2 : block -> Z -> bool),
-     (effstep_plus Asm_eff_sem tge U2 st2 m2 st2' m2' \/
+     (effstep_plus (Asm_eff_sem hf)tge U2 st2 m2 st2' m2' \/
       (measure st1' < measure st1)%nat /\
-      effstep_star Asm_eff_sem tge U2 st2 m2 st2' m2')
+      effstep_star (Asm_eff_sem hf)tge U2 st2 m2 st2' m2')
  /\ exists mu',
     intern_incr mu mu' /\
     sm_inject_separated mu mu' m1 m2 /\
@@ -2824,13 +2825,13 @@ Transparent destroyed_at_function_entry.
 Qed.
 
 Lemma MATCH_core_diagram: forall st1 m1 st1' m1' 
-        (CS: corestep (Mach_eff_sem return_address_offset) ge st1 m1 st1' m1')
+        (CS: corestep (Mach_eff_sem hf return_address_offset) ge st1 m1 st1' m1')
         st2 mu m2 (MTCH: MATCH st1 mu st1 m1 st2 m2)
         (LNR: list_norepet (prog_defs_names prog)),
      exists st2' m2', 
-       (corestep_plus Asm_eff_sem tge st2 m2 st2' m2' \/
+       (corestep_plus (Asm_eff_sem hf)tge st2 m2 st2' m2' \/
          (measure st1' < measure st1)%nat /\
-          corestep_star Asm_eff_sem tge st2 m2 st2' m2') /\
+          corestep_star (Asm_eff_sem hf)tge st2 m2 st2' m2') /\
      exists mu',
        intern_incr mu mu' /\
        sm_inject_separated mu mu' m1 m2 /\
@@ -4288,7 +4289,7 @@ Lemma MATCH_initial: forall (v1 v2 : val) (sig : signature) entrypoints
                     Genv.find_funct_ptr tge b = Some f2)
   (vals1 : list val) c1 (m1 : mem) (j : meminj)
   (vals2 : list val) (m2 : mem) (DomS DomT : Values.block -> bool)
-  (Ini :initial_core (Mach_eff_sem return_address_offset) ge v1 vals1 = Some c1)
+  (Ini :initial_core (Mach_eff_sem hf return_address_offset) ge v1 vals1 = Some c1)
   (Inj: Mem.inject j m1 m2)
   (VInj: Forall2 (val_inject j) vals1 vals2)
   (PG: meminj_preserves_globals ge j)
@@ -4305,7 +4306,7 @@ Lemma MATCH_initial: forall (v1 v2 : val) (sig : signature) entrypoints
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
-  initial_core Asm_eff_sem tge v2 vals2 = Some c2 /\
+  initial_core (Asm_eff_sem hf)tge v2 vals2 = Some c2 /\
   MATCH c1
     (initial_SM DomS DomT
        (REACH m1
@@ -4409,7 +4410,7 @@ Theorem transl_program_correct:
                 /\ Genv.find_funct_ptr tge b = Some f2)
          (init_mem: exists m0, Genv.init_mem prog = Some m0),
 SM_simulation.SM_simulation_inject 
-   (Mach_eff_sem return_address_offset) Asm_eff_sem ge tge entrypoints.
+   (Mach_eff_sem hf return_address_offset) (Asm_eff_sem hf)ge tge entrypoints.
 Proof.
 intros.
 assert (GDE:= GDE_lemma). 

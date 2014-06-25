@@ -44,7 +44,7 @@ Definition CL_at_external (c: CL_core) : option (external_function * signature *
       match fd with
         Internal f => None
       | External ef targs tres => 
-          if observableEF hf ef 
+          if observableEF_dec hf ef 
           then Some (ef, ef_sig ef, args)
           else None
       end
@@ -133,7 +133,7 @@ Inductive clight_corestep: CL_core -> mem-> CL_core -> mem -> Prop :=
   | clight_corestep_builtin:   forall f optid ef tyargs al k e le m vargs t vres m',
       eval_exprlist ge e le m al tyargs vargs ->
       external_call ef ge vargs m t vres m' ->
-      observableEF hf ef = false ->
+      ~ observableEF hf ef ->
       clight_corestep (CL_State f (Sbuiltin optid ef tyargs al) k e le) m
          (CL_State f Sskip k e (set_opttemp optid vres le)) m'
 

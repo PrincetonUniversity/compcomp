@@ -4313,7 +4313,7 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
                     (mk_load_frame sp0 args0 tys0)) m'
 
   | match_states_init:
-      forall f tf fb ls args tys m m'
+      forall f tf fb ls args tys m m' m0
         (TRANSL: transf_function f = OK tf)
         (FIND: Genv.find_funct_ptr tge fb = Some (Internal tf))
         (WTLS: wt_locset ls)
@@ -4325,7 +4325,10 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
         (ARGS0: exists args0, val_list_inject (restrict (as_inj mu) (vis mu)) args0 args
                            /\ ls = init_locset tys args0)
         (VALSDEF: vals_defined args=true)
-        (HASTY: Val.has_type_list args tys),
+        (HASTY: Val.has_type_list args tys)
+        (INITMEM: Genv.init_mem prog = Some m0)
+        (Fwd: Ple (Mem.nextblock m0) (Mem.nextblock m))
+        (Fwd': Ple (Mem.nextblock m0) (Mem.nextblock m')),
       match_states mu (Linear_CallstateIn nil (Internal f) ls (Linear_coop.mk_load_frame ls f)) m 
                       (Mach_CallstateIn fb args tys) m'
 
@@ -4916,9 +4919,9 @@ assert
     (decode_longs (sig_args (AST.ef_sig tf)) ls ## (loc_arguments (AST.ef_sig tf)))
     (decode_longs (sig_args (AST.ef_sig tf)) targs)).
 { apply decode_longs_inject; auto. }
-assert (OBS: observableEF hf tf=true).
-{ destruct (observableEF hf tf); try inv H1; auto. }
-rewrite OBS in *. inv H1. split. 
+destruct (observableEF_dec hf tf); try inv H1. 
+rename o into OBS.
+split. 
 solve[apply val_list_inject_forall_inject; auto].
 exploit replace_locals_wd_AtExternal; try eassumption.
   apply val_list_inject_forall_inject in H.
@@ -5031,7 +5034,7 @@ simpl.
  destruct f; inv H0. 
  inv AtExtTgt.
  inv TRANSL.
- destruct (observableEF hf tf); inv H0; inv H1.
+ destruct (observableEF_dec hf tf); inv H0; inv H1.
  eexists. eexists.
     split. reflexivity.
     split. reflexivity.
@@ -5423,7 +5426,67 @@ Proof.
   clear - OVER. rewrite Zlength_cons in OVER. unfold Z.succ in OVER. omega.
 Qed.
 
-Lemma MATCH_corediagram: forall st1 m1 st1' m1'
+Lemma sm_locally_allocated_alloc_right_sm_store_args 
+        mu m m1 lo hi m2 sp args tys m3: forall
+        (ALLOC: Mem.alloc m1 lo hi = (m2, sp))
+        (STARGS: store_args m2 sp args tys = Some m3),
+      sm_locally_allocated mu (alloc_right_sm mu sp) m m1 m m3.
+Proof. intros.
+rewrite sm_locally_allocatedChar.
+  assert (locBlocksSrc (alloc_right_sm mu sp) = locBlocksSrc mu) as -> by auto.
+  assert (locBlocksTgt (alloc_right_sm mu sp) 
+        = (fun b => eq_block b sp || locBlocksTgt mu b)) as -> by auto.
+  assert (extBlocksSrc (alloc_right_sm mu sp) = extBlocksSrc mu) as -> by auto.
+  assert (extBlocksTgt (alloc_right_sm mu sp) = extBlocksTgt mu) as -> by auto.
+  assert (DomSrc (alloc_right_sm mu sp) = DomSrc mu) as -> by auto.
+  cut (freshloc m1 m3 = fun b => eq_block b sp). intros ->.
+  split; auto. extensionality b. 
+    solve[rewrite freshloc_irrefl, orb_comm; simpl; auto].
+  split; auto. extensionality b. simpl. unfold DomTgt. destruct mu; simpl.
+    solve[rewrite <-orb_assoc, orb_comm; auto].
+  split; auto. extensionality b. 
+    solve[rewrite freshloc_irrefl, orb_comm; simpl; auto].
+  split; auto. extensionality b. solve[rewrite orb_comm; auto].
+  assert (F: freshloc m2 m3 = fun b => false). 
+  {  apply store_args_rec_only_stores in STARGS. clear - STARGS. 
+     induction STARGS. extensionality b. rewrite freshloc_irrefl; auto.
+     apply extensionality. intros b'. 
+     generalize e as e'; intro. apply store_freshloc in e. 
+     rewrite <-freshloc_trans with (m'':=m''), e, IHSTARGS; simpl; auto.
+     apply store_forward in e'; auto. apply only_stores_fwd in STARGS; auto. }
+  assert (freshloc m1 m3 = freshloc m1 m2) as ->.
+  { extensionality b; rewrite <-freshloc_trans with (m'' := m2), F, orb_comm; auto.
+    apply alloc_forward in ALLOC; auto.    
+    apply store_args_fwd in STARGS; auto. }
+  apply freshloc_alloc in ALLOC; rewrite ALLOC; auto.
+Qed.
+
+Lemma vis_alloc_right_sm mu b: vis (alloc_right_sm mu b) = vis mu.
+Proof. intros.
+unfold alloc_right_sm, vis; simpl. trivial.
+Qed.
+
+Lemma match_globalenvs_initmem
+      (LNR : list_norepet fst ## (prog_defs prog)) :
+     forall mu m1 (WD : SM_wd mu)
+      (INITMEM : Genv.init_mem prog = Some m1)
+      (PGR : meminj_preserves_globals ge 
+               (restrict (as_inj mu) (vis mu))),
+  match_globalenvs (restrict (as_inj mu) (vis mu)) (Mem.nextblock m1).
+Proof. intros.
+    destruct PGR as [PGa [PGb PGc]].
+    econstructor.
+      intros. exploit @valid_init_is_global. 
+                apply LNR. apply INITMEM. apply H.
+              intros [symb FindSymb]. apply (PGa _ _ FindSymb).
+      intros. symmetry. apply (PGc _ _ _ _ GV H).
+      intros. eapply (Genv.find_symbol_not_fresh _ _ INITMEM H).
+      intros. eapply Genv.find_funct_ptr_not_fresh; eauto.
+      intros. eapply Genv.find_var_info_not_fresh; eauto.
+Qed.
+
+Lemma MATCH_corediagram (LNR: list_norepet (map fst (prog_defs prog))):
+  forall st1 m1 st1' m1'
       (CS: corestep (Linear_eff_sem hf) ge st1 m1 st1' m1')
       st2 mu m2 (MTCH: MATCH st1 mu st1 m1 st2 m2),
   exists st2' m2',
@@ -6211,37 +6274,23 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   unfold eq_block in Y. cut (b2 = sp0). intros. subst b2. clear Y.
   eapply Mem.fresh_block_alloc; eauto.
   solve[destruct (peq b2 sp0); try simpl in Y; congruence].
-  (*TODO: sm_locally_allocated_alloc_right_sm*)
-  { rewrite sm_locally_allocatedChar.
-  assert (locBlocksSrc (alloc_right_sm mu sp0) = locBlocksSrc mu) as -> by auto.
-  assert (locBlocksTgt (alloc_right_sm mu sp0) 
-        = (fun b => eq_block b sp0 || locBlocksTgt mu b)) as -> by auto.
-  assert (extBlocksSrc (alloc_right_sm mu sp0) = extBlocksSrc mu) as -> by auto.
-  assert (extBlocksTgt (alloc_right_sm mu sp0) = extBlocksTgt mu) as -> by auto.
-  assert (DomSrc (alloc_right_sm mu sp0) = DomSrc mu) as -> by auto.
-  cut (freshloc m2 m4 = fun b => eq_block b sp0). intros ->.
-  split; auto. extensionality b. 
-    solve[rewrite freshloc_irrefl, orb_comm; simpl; auto].
-  split; auto. extensionality b. simpl. unfold DomTgt. destruct mu; simpl.
-    solve[rewrite <-orb_assoc, orb_comm; auto].
-  split; auto. extensionality b. 
-    solve[rewrite freshloc_irrefl, orb_comm; simpl; auto].
-  split; auto. extensionality b. solve[rewrite orb_comm; auto].
-  assert (F: freshloc m3 m4 = fun b => false). 
-  {  apply store_args_rec_only_stores in STORE. clear - STORE. 
-     induction STORE. extensionality b. rewrite freshloc_irrefl; auto.
-     apply extensionality. intros b'. 
-     generalize e as e'; intro. apply store_freshloc in e. 
-     rewrite <-freshloc_trans with (m'':=m''), e, IHSTORE; simpl; auto.
-     apply store_forward in e'; auto. apply only_stores_fwd in STORE; auto. }
-  assert (freshloc m2 m4 = freshloc m2 m3) as ->.
-  { extensionality b; rewrite <-freshloc_trans with (m'' := m3), F, orb_comm; auto.
-    apply alloc_forward in ALLOC; auto.    
-    apply store_args_fwd in STORE; auto. }
-  apply freshloc_alloc in ALLOC; rewrite ALLOC; auto. }
+  { clear - ALLOC STORE. 
+   eapply sm_locally_allocated_alloc_right_sm_store_args; 
+       eassumption. }
   split.
   apply match_states_call_intern with (tf := tfn); auto.
-  admit. (*TODO: match_globalenvs*)
+  { (*match_stacks*)
+    econstructor.
+    instantiate (1:=Mem.nextblock m1); assumption.
+    clear - ALLOC STORE Fwd'. 
+      apply store_args_fwd in STORE. apply forward_nextblock in STORE.
+      apply alloc_forward in ALLOC. apply forward_nextblock in ALLOC.
+      xomega.
+    rewrite alloc_right_sm_as_inj, vis_alloc_right_sm.
+    assert (PGR:= restrict_preserves_globals _ _ (vis mu) PG).
+    clear - LNR Glob INITMEM PGR WD.  
+    eapply match_globalenvs_initmem; eauto. 
+      apply PGR. unfold vis. intuition. }
   simpl. unfold bind. solve[rewrite TRANSL; auto].
   intros r. simpl. solve[rewrite Regmap.gi, NOREGS; auto].
   simpl. unfold agree_callee_save. 
@@ -6455,7 +6504,9 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   solve[intuition]. }
 Qed.
 
-Lemma MATCH_eff_diagram: forall st1 m1 st1' m1' (U1 : block -> Z -> bool)
+Lemma MATCH_eff_diagram 
+      (LNR: list_norepet (map fst (prog_defs prog))):
+      forall st1 m1 st1' m1' (U1 : block -> Z -> bool)
         (CS: effstep (Linear_eff_sem hf) ge U1 st1 m1 st1' m1')
         st2 mu m2 (MTCH: MATCH st1 mu st1 m1 st2 m2)
         (HypU1: forall b ofs, U1 b ofs = true -> vis mu b = true),
@@ -7359,7 +7410,18 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   apply freshloc_alloc in ALLOC; rewrite ALLOC; auto. }
   split.
   apply match_states_call_intern with (tf := tfn); auto.
-  admit. (*TODO: match_globalenvs*)
+  { (*match_stacks*)
+    econstructor.
+    instantiate (1:=Mem.nextblock m1); assumption.
+    clear - ALLOC STORE Fwd'. 
+      apply store_args_fwd in STORE. apply forward_nextblock in STORE.
+      apply alloc_forward in ALLOC. apply forward_nextblock in ALLOC.
+      xomega.
+    rewrite alloc_right_sm_as_inj, vis_alloc_right_sm.
+    assert (PGR:= restrict_preserves_globals _ _ (vis mu) PG).
+    clear - LNR Glob INITMEM PGR WD.  
+    eapply match_globalenvs_initmem; eauto. 
+      apply PGR. unfold vis. intuition. }
   simpl. unfold bind. solve[rewrite TRANSL; auto].
   intros r. simpl. solve[rewrite Regmap.gi, NOREGS; auto].
   simpl. unfold agree_callee_save. 
@@ -7573,7 +7635,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
      eassumption. eassumption. 
      instantiate (1:=tge).
      unfold BuiltinEffect. unfold BuiltinEffect in H0.
-     destruct ef; simpl in *; trivial; discriminate. }
+     destruct ef; simpl in *; trivial; contradiction. }
 
 { (* return *)
   inv STACKS. simpl in AGLOCS.  

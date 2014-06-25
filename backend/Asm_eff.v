@@ -160,7 +160,7 @@ Inductive asm_effstep: (block -> Z -> bool) ->
       Genv.find_funct_ptr ge b = Some (Internal f) ->
       find_instr (Int.unsigned ofs) (fn_code f) = Some (Pbuiltin ef args res) ->
       external_call' ef ge (map rs args) m t vl m' ->
-      observableEF hf ef = false ->
+      ~ observableEF hf ef ->
       rs' = nextinstr_nf 
              (set_regs res vl
                (undef_regs (map preg_of (destroyed_by_builtin ef)) rs)) ->
@@ -182,7 +182,7 @@ Inductive asm_effstep: (block -> Z -> bool) ->
       asm_effstep EmptyEffect (State sg rs) m (ExtCallState sg ef args rs) m
   | asm_effexec_step_external:
       forall sg b callee args res rs m t rs' m'
-      (OBS: EFisHelper hf callee = true),
+      (OBS: EFisHelper hf callee),
       rs PC = Vptr b Int.zero ->
       Genv.find_funct_ptr ge b = Some (External callee) ->
       external_call' callee ge args m t res m' ->
@@ -316,16 +316,12 @@ split. econstructor; eauto.
        apply Mem.unchanged_on_refl. 
 split. econstructor; eauto. 
        inv H1.
-         destruct callee; try inv OBS.
-           eapply mem_unchanged_on_sub.
-             eapply BuiltinEffect_unchOn; try eapply H3. 
-              instantiate(1:=hf). unfold observableEF. rewrite H2. trivial.
-             unfold BuiltinEffect; simpl; intros. trivial.
-           eapply mem_unchanged_on_sub.
-             eapply BuiltinEffect_unchOn; try eapply H3. 
-              instantiate(1:=hf). unfold observableEF. rewrite H2. trivial.
-             unfold BuiltinEffect; simpl; intros. trivial.
-Qed.
+       exploit @BuiltinEffect_unchOn. 
+         eapply EFhelpers; eassumption.
+         eapply H3. 
+       unfold BuiltinEffect; simpl.
+         destruct callee; simpl; trivial; contradiction.
+Qed.       
 
 Lemma asmstep_effax2: forall  g c m c' m',
       asm_step hf g c m c' m' ->
