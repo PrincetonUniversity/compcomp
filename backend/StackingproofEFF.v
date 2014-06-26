@@ -5336,7 +5336,72 @@ Proof.
   assert (A: 0 <= 4*(z+sz) <= Int.max_unsigned) by omega. solve[apply A].
   revert H. generalize (Zlength_cons_pos _ v0 args). generalize (Zlength (v0::args)). intros.
   assert (A: 0 <= 4*z <= Int.max_unsigned) by omega. solve[apply A].
-Admitted. (*other cases are similar*)
+  - revert H2. unfold store_args_rec. 
+  case_eq (store_stack m (Vptr sp Int.zero) Tfloat
+            (Int.repr (fe_ofs_arg + 4 * (z + sz))) v0); try solve[inversion 2].
+  fold store_args_rec. intros m0 STORE REST. 
+  apply IHtys with (m := m0) (sz := sz + typesize Tfloat) (args := args); eauto. 
+  simpl; omega. simpl typesize. omega. 
+  simpl typesize. revert H. rewrite Zlength_cons. unfold Z.succ. intros; omega.
+  assert (z+(sz+typesize Tfloat) = z+sz+typesize Tfloat) as -> by omega; eauto.
+  unfold store_stack, Mem.storev in STORE; simpl in STORE. 
+  erewrite Mem.load_store_other; eauto.  
+  right. left. simpl. rewrite !Int.add_zero_l. rewrite !Int.unsigned_repr. 
+  assert (A: 4*z+size_chunk ch <= 4*(z+sz)) by omega. solve[apply A].
+  revert H. generalize (Zlength_cons_pos _ v0 args). generalize (Zlength (v0::args)). intros.
+  assert (A: 0 <= 4*(z+sz) <= Int.max_unsigned) by omega. solve[apply A].
+  revert H. generalize (Zlength_cons_pos _ v0 args). generalize (Zlength (v0::args)). intros.
+  assert (A: 0 <= 4*z <= Int.max_unsigned) by omega. solve[apply A].
+  - revert H2. unfold store_args_rec. 
+  destruct v0; try solve[intros; congruence].
+  case_eq (store_stack m (Vptr sp Int.zero) Tint
+            (Int.repr (fe_ofs_arg + 4 * (z + sz + 1))) (Vint (Int64.hiword i))); 
+    try solve[inversion 2].
+  fold store_args_rec. intros m0 STORE.
+  case_eq (store_stack m0 (Vptr sp Int.zero) Tint
+            (Int.repr (fe_ofs_arg + 4 * (z + sz))) (Vint (Int64.loword i)));
+    try solve[inversion 2].
+  fold store_args_rec. intros m1 STORE' REST.
+  apply IHtys with (m := m1) (sz := sz + 2) (args := args); eauto. 
+  simpl; omega. simpl typesize. omega. 
+  revert H. rewrite Zlength_cons. unfold Z.succ. intros; omega.
+  assert (z+(sz+2) = z+sz+2) as -> by omega; eauto.
+  unfold store_stack, Mem.storev in STORE, STORE'; simpl in STORE, STORE'. 
+  erewrite Mem.load_store_other with (m1:=m0); eauto.  
+  erewrite Mem.load_store_other with (m1:=m); eauto.  
+  right. left. simpl. rewrite !Int.add_zero_l. rewrite !Int.unsigned_repr.
+  assert (A: 4*z+size_chunk ch <= 4*(z+sz+1)) by omega. solve[apply A].   
+  revert H. generalize (Zlength_cons_pos _ (Vlong i) args). 
+    generalize (Zlength (Vlong i::args)). intros.
+  assert (A: 0 <= 4*(z+sz+1) <= Int.max_unsigned) by omega. solve[apply A].
+  revert H. generalize (Zlength_cons_pos _ (Vlong i) args). 
+    generalize (Zlength (Vlong i::args)). intros.
+  assert (A: 0 <= 4*z <= Int.max_unsigned) by omega. solve[apply A].
+  right. left. simpl. rewrite !Int.add_zero_l. rewrite !Int.unsigned_repr.
+  assert (A: 4*z+size_chunk ch <= 4*(z+sz)) by omega. solve[apply A].   
+  revert H. generalize (Zlength_cons_pos _ (Vlong i) args). 
+    generalize (Zlength (Vlong i::args)). intros.
+  assert (A: 0 <= 4*(z+sz) <= Int.max_unsigned) by omega. solve[apply A].
+  revert H. generalize (Zlength_cons_pos _ (Vlong i) args). 
+    generalize (Zlength (Vlong i::args)). intros.
+  assert (A: 0 <= 4*z <= Int.max_unsigned) by omega. solve[apply A].
+  - revert H2. unfold store_args_rec. 
+  case_eq (store_stack m (Vptr sp Int.zero) Tsingle
+            (Int.repr (fe_ofs_arg + 4 * (z + sz))) v0); try solve[inversion 2].
+  fold store_args_rec. intros m0 STORE REST. 
+  apply IHtys with (m := m0) (sz := sz + typesize Tint) (args := args); eauto. 
+  simpl; omega. simpl typesize. omega. 
+  simpl typesize. revert H. rewrite Zlength_cons. unfold Z.succ. intros; omega.
+  assert (z+(sz+typesize Tint) = z+sz+typesize Tint) as -> by omega; eauto.
+  unfold store_stack, Mem.storev in STORE; simpl in STORE. 
+  erewrite Mem.load_store_other; eauto.  
+  right. left. simpl. rewrite !Int.add_zero_l. rewrite !Int.unsigned_repr. 
+  assert (A: 4*z+size_chunk ch <= 4*(z+sz)) by omega. solve[apply A].
+  revert H. generalize (Zlength_cons_pos _ v0 args). generalize (Zlength (v0::args)). intros.
+  assert (A: 0 <= 4*(z+sz) <= Int.max_unsigned) by omega. solve[apply A].
+  revert H. generalize (Zlength_cons_pos _ v0 args). generalize (Zlength (v0::args)). intros.
+  assert (A: 0 <= 4*z <= Int.max_unsigned) by omega. solve[apply A].
+Qed.
 
 Lemma store_args_contains m sp args tys m' z 
       (POS: z >= 0) 
