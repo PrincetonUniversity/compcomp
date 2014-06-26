@@ -3,16 +3,16 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-Require Import msl.Axioms.
+Require Import Axioms.
 
-Require Import compcert.common.Memory.
+Require Import Memory.
 Require Import ZArith.
 
-Require Import linking.sepcomp. Import SepComp.
+Require Import sepcomp. Import SepComp.
 
-Require Import linking.pred_lemmas.
-Require Import linking.inj_lemmas.
-Require Import linking.join_sm.
+Require Import pred_lemmas.
+Require Import inj_lemmas.
+Require Import join_sm.
 
 (* [disjinv] enforces disjointness conditions on the local, public and     *)
 (* foreign block sets declared by [mu0] and [mu].  The definition is used  *)

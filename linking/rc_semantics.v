@@ -2,14 +2,14 @@ Require Import Bool.
 Require Import ZArith.
 Require Import BinPos.
 
-Require Import msl.Axioms.
+Require Import Axioms.
 
 Require Import compcert. Import CompcertCommon.
 
-Require Import linking.sepcomp. Import SepComp.
-Require Import sepcomp.arguments.
+Require Import sepcomp. Import SepComp.
+Require Import arguments.
 
-Require Import linking.core_semantics_lemmas.
+Require Import core_semantics_tcs.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
