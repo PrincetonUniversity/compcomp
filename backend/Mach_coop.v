@@ -408,14 +408,22 @@ Qed.
 Lemma args_len_recD: forall v args tp tys sz,
      args_len_rec (v :: args) (tp :: tys) = Some sz ->
      exists z1 z2, sz = z1+z2 /\ args_len_rec args tys = Some z2 /\
+(*<<<<<<< HEAD
+        match tp with Tlong => z1=2 | _ => z1=1 end.
+=======*)
         match tp with Tlong => z1=2 | Tfloat => z1=2 | _ => z1=1 end.
+(*>>>>>>> ffae95af412269a765d789c6b8fcddbc26e3ad2d*)
 Proof.
 simpl. intros. 
 destruct tp; simpl in *. 
 destruct (args_len_rec args tys); inv H. 
   exists 1, z; repeat split; trivial.
 destruct (args_len_rec args tys); inv H. 
+(*<<<<<<< HEAD
+  exists 1, z; repeat split; trivial.
+=======*)
   exists 2, z; repeat split; trivial.
+(*>>>>>>> ffae95af412269a765d789c6b8fcddbc26e3ad2d*)
 destruct v; inv H.
   destruct (args_len_rec args tys); inv H1. 
   exists 2, z; repeat split; trivial.
@@ -601,6 +609,11 @@ Lemma store_args_rec_succeeds_aux sp:
       (RP: Mem.range_perm m sp (4*z) (4*z + 4*sz) Cur Writable),
   exists m', store_args_rec m sp z args tys = Some m'.
 Proof. 
+(*<<<<<<< HEAD*)
+(*generalize dependent m. generalize dependent z.
+generalize dependent sz. generalize dependent args.*)
+(*=======
+>>>>>>> ffae95af412269a765d789c6b8fcddbc26e3ad2d*)
 intros tys. induction tys.
   intros.
   destruct args; simpl in *; inv ALR. rewrite Zplus_0_r in *.
@@ -650,6 +663,7 @@ intros tys. induction tys.
    destruct (Mem.valid_access_store m (chunk_of_type a) sp (4*z) v) as [mm ST]. 
     split. red; intros. eapply RP; clear RP.
         split. omega.
+(*>>>>>>> ffae95af412269a765d789c6b8fcddbc26e3ad2d*)
         assert (size_chunk (chunk_of_type a) <= 4 * (typesize a + sz')).  
          { clear - AL. apply args_len_rec_nonneg in AL.
             unfold typesize. destruct a; simpl in *. 
@@ -681,7 +695,7 @@ intros tys. induction tys.
          assert (0 < typesize Tfloat + sz').
            simpl. destruct sz'. omega. xomega. xomega. 
          remember (typesize Tfloat + sz') as q. clear  AL Heqq sz'. 
-           unfold Int.max_unsigned. xomega. 
+           unfold Int.max_unsigned. xomega.
     - congruence.
     - unfold store_stack. simpl.
        rewrite Int.add_zero_l, Int.unsigned_repr, ST. 
@@ -706,7 +720,10 @@ intros tys. induction tys.
  red; intros. eapply store_arg_perm1; eauto. 
  clear STARG. eapply RP; clear RP. 
  specialize (typesize_pos a); intros. omega.
+(*<<<<<<< HEAD
+=======*)
 (*FIXME: *) Grab Existential Variables. refine (0).
+(*>>>>>>> ffae95af412269a765d789c6b8fcddbc26e3ad2d*)
 Qed.
 
 Lemma store_args_rec_succeeds sz m sp args tys 
