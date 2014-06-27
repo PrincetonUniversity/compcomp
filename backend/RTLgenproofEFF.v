@@ -6246,6 +6246,8 @@ assert (GDE: genvs_domain_eq ge tge).
     simpl. inv MS. trivial. }
 (* at_external*)
   { apply MATCH_atExternal. }
+(* order_wf *)
+  { apply lt_state_wf. }
 (* after_external*)
   { intros. 
     specialize (MATCH_afterExternal GDE _ _ _ _ _ _ _ _ _ _ _ 
@@ -6254,8 +6256,6 @@ assert (GDE: genvs_domain_eq ge tge).
        MemInjNu' RValInjNu' FwdSrc FwdTgt _ frgnSrcHyp _ frgnTgtHyp
        _ Mu'Hyp UnchPrivSrc UnchLOOR).
     intros. eapply H. }
-(* order_wf *)
-  { apply lt_state_wf. }
 (* core_diagram*)
   { intros. exploit MATCH_corestep; try eassumption.
      intros [st2' [m2' [mu' [CS' X]]]]. 

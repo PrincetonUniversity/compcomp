@@ -5030,6 +5030,8 @@ Lemma MATCH_afterExternal: forall
                  locBlocksTgt mu b && REACH m2 (exportedTgt mu vals2) b))
        nu (NuHyp: nu = replace_locals mu pubSrc' pubTgt')
        nu' ret1 m1' ret2 m2' 
+       (HasTy1: Val.has_type ret1 (proj_sig_res (AST.ef_sig e)))
+       (HasTy2: Val.has_type ret2 (proj_sig_res (AST.ef_sig e')))
        (INC: extern_incr nu nu')
        (SEP: sm_inject_separated nu nu' m1 m2)
        (WDnu': SM_wd nu')
@@ -5258,8 +5260,7 @@ split.
     }
 
   (*wtlocset*)
-    eapply wt_setlist_result. 2: assumption. 
-    admit. (*MATCH_afterExternal: eapply external_call_well_typed; eauto. *)
+   { eapply wt_setlist_result; auto. }
 
   (*agree*)
    { rewrite replace_externs_as_inj, replace_externs_vis. 
@@ -5425,9 +5426,11 @@ Proof.
   erewrite Mem.load_store_other; eauto.  
   right. left. simpl. rewrite !Int.add_zero_l. rewrite !Int.unsigned_repr. 
   assert (A: 4*z+size_chunk ch <= 4*(z+sz)) by omega. solve[apply A].
-  revert H. generalize (Zlength_cons_pos _ v0 args). generalize (Zlength (v0::args)). intros.
+  revert H. generalize (Zlength_cons_pos _ v0 args). 
+    generalize (Zlength (v0::args)). intros.
   assert (A: 0 <= 4*(z+sz) <= Int.max_unsigned) by omega. solve[apply A].
-  revert H. generalize (Zlength_cons_pos _ v0 args). generalize (Zlength (v0::args)). intros.
+  revert H. generalize (Zlength_cons_pos _ v0 args). 
+    generalize (Zlength (v0::args)). intros.
   assert (A: 0 <= 4*z <= Int.max_unsigned) by omega. solve[apply A].
 Qed.
 
@@ -7790,7 +7793,7 @@ SM_simulation.SM_simulation_inject (Linear_eff_sem hf)
 Proof.
 intros.
 assert (GDE:= GDE_lemma). 
- eapply effect_simulations_lemmas.inj_simulation_plus with
+ eapply effect_simulations_lemmas.inj_simulation_plus_typed with
   (match_states:=MATCH) (measure:=fun x => O).
 (*genvs_dom_eq*)
   assumption.

@@ -2654,28 +2654,30 @@ Lemma MATCH_afterExternal: forall
       (pubTgtHyp: pubTgt' =
                  (fun b : block => 
                  locBlocksTgt mu b && REACH m2 (exportedTgt mu vals2) b))
-       nu (NuHyp: nu = replace_locals mu pubSrc' pubTgt')
-       nu' ret1 m1' ret2 m2' 
-       (INC: extern_incr nu nu')
-       (SEP: sm_inject_separated nu nu' m1 m2)
-       (WDnu': SM_wd nu')
-       (SMvalNu': sm_valid nu' m1' m2')
-       (MemInjNu': Mem.inject (as_inj nu') m1' m2')
-       (RValInjNu': val_inject (as_inj nu') ret1 ret2)
-       (FwdSrc: mem_forward m1 m1')
-       (FwdTgt: mem_forward m2 m2')
-       (frgnSrc' : block -> bool)
-       (frgnSrcHyp: frgnSrc' =
-             (fun b : block => DomSrc nu' b &&
-            (negb (locBlocksSrc nu' b) && REACH m1' (exportedSrc nu' (ret1 :: nil)) b)))
-       (frgnTgt' : block -> bool)
-       (frgnTgtHyp: frgnTgt' =
-            (fun b : block => DomTgt nu' b &&
-             (negb (locBlocksTgt nu' b) && REACH m2' (exportedTgt nu' (ret2 :: nil)) b)))
-       mu' (Mu'Hyp: mu' = replace_externs nu' frgnSrc' frgnTgt')
-       (UnchPrivSrc: Mem.unchanged_on
-               (fun b z => locBlocksSrc nu b = true /\ pubBlocksSrc nu b = false) m1 m1')
-       (UnchLOOR: Mem.unchanged_on (local_out_of_reach nu m1) m2 m2'),
+      nu (NuHyp: nu = replace_locals mu pubSrc' pubTgt')
+      nu' ret1 m1' ret2 m2' 
+      (HasTy1 : Val.has_type ret1 (proj_sig_res (AST.ef_sig e)))
+      (HasTy2 : Val.has_type ret2 (proj_sig_res (AST.ef_sig e')))
+      (INC: extern_incr nu nu')
+      (SEP: sm_inject_separated nu nu' m1 m2)
+      (WDnu': SM_wd nu')
+      (SMvalNu': sm_valid nu' m1' m2')
+      (MemInjNu': Mem.inject (as_inj nu') m1' m2')
+      (RValInjNu': val_inject (as_inj nu') ret1 ret2)
+      (FwdSrc: mem_forward m1 m1')
+      (FwdTgt: mem_forward m2 m2')
+      (frgnSrc' : block -> bool)
+      (frgnSrcHyp: frgnSrc' =
+            (fun b : block => DomSrc nu' b &&
+           (negb (locBlocksSrc nu' b) && REACH m1' (exportedSrc nu' (ret1 :: nil)) b)))
+      (frgnTgt' : block -> bool)
+      (frgnTgtHyp: frgnTgt' =
+           (fun b : block => DomTgt nu' b &&
+            (negb (locBlocksTgt nu' b) && REACH m2' (exportedTgt nu' (ret2 :: nil)) b)))
+      mu' (Mu'Hyp: mu' = replace_externs nu' frgnSrc' frgnTgt')
+      (UnchPrivSrc: Mem.unchanged_on
+              (fun b z => locBlocksSrc nu b = true /\ pubBlocksSrc nu b = false) m1 m1')
+      (UnchLOOR: Mem.unchanged_on (local_out_of_reach nu m1) m2 m2'),
   exists st1' st2',
   after_external (rtl_eff_sem hf) (Some ret1) st1 =Some st1' /\
   after_external (LTL_eff_sem hf) (Some ret2) st2 = Some st2' /\
@@ -2848,7 +2850,7 @@ assert (GFnu': forall b, isGlobalBlock (Genv.globalenv prog) b = true ->
           rewrite (frgnSrc_shared _ WDnu' _ Glob). intuition.
  
 assert (retty1: Val.has_type ret1 (proj_sig_res (ef_sig e'))).
-{ admit. (*ret typing condition*)}
+{ auto. }
 
 split. 
   unfold vis in *. 
@@ -5497,7 +5499,7 @@ SM_simulation.SM_simulation_inject (rtl_eff_sem hf)
 Proof.
 intros.
 assert (GDE:= GDE_lemma).
- eapply effect_simulations_lemmas.inj_simulation_plus with
+ eapply effect_simulations_lemmas.inj_simulation_plus_typed with
   (match_states:=fun x mu st m st' m' => MATCH mu st m st' m')
   (measure:=fun x => O).
 (*genvs_dom_eq*)
@@ -5608,7 +5610,7 @@ assert (GDE:= GDE_lemma).
     extensionality b; eauto.
     extensionality b; eauto. }
 (* after_external*)
-  { apply MATCH_afterExternal. eassumption. }
+  { intros. eapply MATCH_afterExternal with (mu := mu); try eassumption. }
 (* core_diagram*)
   { intros x; intros. exploit MATCH_corestep; eauto.
     intros [st2' [m2' [mu' [CS2 MU']]]].
