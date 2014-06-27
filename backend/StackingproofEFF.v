@@ -4328,7 +4328,8 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
         (HASTY: Val.has_type_list args tys)
         (INITMEM: Genv.init_mem prog = Some m0)
         (Fwd: Ple (Mem.nextblock m0) (Mem.nextblock m))
-        (Fwd': Ple (Mem.nextblock m0) (Mem.nextblock m')),
+        (Fwd': Ple (Mem.nextblock m0) (Mem.nextblock m'))
+        (REP: 4*(2*Zlength args) < Int.max_unsigned),
       match_states mu (Linear_CallstateIn nil (Internal f) ls (Linear_coop.mk_load_frame ls f)) m 
                       (Mach_CallstateIn fb args tys) m'
 
@@ -4908,6 +4909,11 @@ Proof. intros.
     intros b0 GET. apply REACH_nil. 
     solve[rewrite orb_true_iff; right; auto].
   solve[rewrite val_has_type_list_func_charact; auto].
+
+  assert (Zlength vals2 = Zlength vals1) as ->. 
+  { apply forall_inject_val_list_inject in VInj. clear - VInj. 
+    induction VInj; auto. rewrite !Zlength_cons, IHVInj; auto. }
+  solve[auto].
 Qed.
 
 Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
@@ -5570,6 +5576,16 @@ Proof. intros.
       intros. eapply (Genv.find_symbol_not_fresh _ _ INITMEM H).
       intros. eapply Genv.find_funct_ptr_not_fresh; eauto.
       intros. eapply Genv.find_var_info_not_fresh; eauto.
+Qed.
+
+(*TODO: move*)
+Lemma args_len_rec_bound args tys z : 
+  args_len_rec args tys = Some z -> z <= 2*Zlength args.
+Proof. 
+  revert args z. induction tys. destruct args. simpl. inversion 1; omega.
+  simpl. inversion 1. destruct args. inversion 1. intros z H.
+  apply args_len_recD in H. destruct H as [z1 [z2 [Zeq [? H2]]]]. subst z.
+  specialize (IHtys _ _ H). destruct a; subst z1; rewrite Zlength_cons; omega.
 Qed.
 
 Lemma MATCH_corediagram (LNR: list_norepet (map fst (prog_defs prog))):
@@ -6347,8 +6363,11 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   destruct H as [z ARGSLEN]. 
   case_eq (Mem.alloc m2 0 (4*z)). intros m3 sp0 ALLOC.
   assert (STORE: exists m4, store_args m3 sp0 args tys = Some m4).
-  { unfold store_args; eapply store_args_rec_succeeds; eauto.
-    admit. (*TODO: initial_core should fail if arguments don't fit in address space*) }
+  { unfold store_args; eapply store_args_rec_succeeds; eauto. 
+    apply args_len_rec_bound in ARGSLEN.
+    assert (4*z <= 4*(2*Zlength args)) by omega.
+    apply Zle_lt_trans with (m := 4*(2*Zlength args)); auto.
+    unfold Int.max_unsigned in REP. omega. }
   destruct STORE as [m4 STORE].
   eexists; eexists; split.
     eapply corestep_plus_one. simpl. econstructor; eauto.
@@ -6389,7 +6408,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   simpl; auto. destruct ARGS0 as [args0 [ARGS0 _]].
   solve[eexists; eapply val_list_inject_forall_inject; eauto].
   eapply store_args_contains; eauto. omega. 
-  assert (OVER: 4*(2*Zlength args) <= Int.max_unsigned). admit. (*TODO: no overflow check*)
+  assert (OVER: 4*(2*Zlength args) <= Int.max_unsigned) by omega.
   solve[apply OVER].
   solve[apply val_has_type_list_func_charact; apply HASTY].
   rewrite alloc_right_sm_as_inj. intros b0 z0 ASINJ. destruct SMV as [H H0]. 
@@ -7453,8 +7472,11 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   destruct H as [z ARGSLEN]. 
   case_eq (Mem.alloc m2 0 (4*z)). intros m3 sp0 ALLOC.
   assert (STORE: exists m4, store_args m3 sp0 args tys = Some m4).
-  { unfold store_args; eapply store_args_rec_succeeds; eauto.
-    admit. (*TODO: initial_core should fail if arguments don't fit in address space*) }
+  { unfold store_args; eapply store_args_rec_succeeds; eauto. 
+    apply args_len_rec_bound in ARGSLEN.
+    assert (4*z <= 4*(2*Zlength args)) by omega.
+    apply Zle_lt_trans with (m := 4*(2*Zlength args)); auto.
+    unfold Int.max_unsigned in REP. omega. }
   destruct STORE as [m4 STORE].
   eexists; eexists; eexists; split.
     eapply effstep_plus_one. simpl. econstructor; eauto.
@@ -7520,7 +7542,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   simpl; auto. destruct ARGS0 as [args0 [ARGS0 _]].
   solve[eexists; eapply val_list_inject_forall_inject; eauto].
   eapply store_args_contains; eauto. omega. 
-  assert (OVER: 4*(2*Zlength args) <= Int.max_unsigned). admit. (*TODO: no overflow check*)
+  assert (OVER: 4*(2*Zlength args) <= Int.max_unsigned) by omega.
   solve[apply OVER].
   solve[apply val_has_type_list_func_charact; apply HASTY].
   rewrite alloc_right_sm_as_inj. intros b0 z0 ASINJ. destruct SMV as [H H0]. 
