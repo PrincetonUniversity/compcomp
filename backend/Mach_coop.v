@@ -19,12 +19,20 @@ Require Import mem_lemmas. (*for mem_forward*)
 Require Import core_semantics.
 Require Import val_casted.
 Require Import BuiltinEffects.
+
 Require Import load_frame.
 
 Definition genv := Genv.t fundef unit.
 
 Notation "a ## b" := (List.map a b) (at level 1).
 Notation "a # b <- c" := (Regmap.set b c a) (at level 1, b at next level).
+
+Inductive load_frame: Type :=
+| mk_load_frame:
+    forall (sp: block)       (**r pointer to argument frame *)
+           (args: list val)  (**r initial program arguments *)
+           (tys: list typ),  (**r initial argument types *)
+    load_frame.
 
 Section MACH_COOPSEM.
 Variable hf : I64Helpers.helper_functions.

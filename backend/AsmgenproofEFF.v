@@ -109,7 +109,6 @@ Proof.
       exists id; assumption.
 Qed.
 
-
 (** * Properties of control flow *)
 
 Lemma transf_function_no_overflow:
@@ -121,10 +120,10 @@ Proof.
 Qed.
 
 Lemma exec_straight_exec:
-  forall fb f c ep tf tc c' rs m rs' m' sg,
+  forall fb f c ep tf tc c' rs m rs' m' lf,
   transl_code_at_pc ge (rs PC) fb f c ep tf tc ->
   exec_straight tge tf tc rs m c' rs' m' ->
-  corestep_plus (Asm_eff_sem hf) tge (State sg rs) m (State sg rs') m'.
+  corestep_plus (Asm_eff_sem hf) tge (State rs lf) m (State rs' lf) m'.
 Proof.
   intros. inv H.
   eapply exec_straight_steps_1; eauto.
@@ -133,10 +132,10 @@ Proof.
 Qed.
 
 Lemma eff_exec_straight_exec:
-  forall fb f c ep tf tc c' rs m rs' m' sg U,
+  forall fb f c ep tf tc c' rs m rs' m' lf U,
   transl_code_at_pc ge (rs PC) fb f c ep tf tc ->
   eff_exec_straight tge tf U tc rs m c' rs' m' ->
-  effstep_plus (Asm_eff_sem hf) tge U (State sg rs) m (State sg rs') m'.
+  effstep_plus (Asm_eff_sem hf) tge U (State rs lf) m (State rs' lf) m'.
 Proof.
   intros. inv H.
   eapply eff_exec_straight_steps_1; eauto.

@@ -17,13 +17,6 @@ Require Import core_semantics.
 Require Import val_casted.
 Require Import BuiltinEffects.
 
-Inductive load_frame: Type :=
-| mk_load_frame:
-    forall (sp: block)       (**r pointer to argument frame *)
-           (args: list val)  (**r initial program arguments *)
-           (tys: list typ),  (**r initial argument types *)
-    load_frame.
-
 Definition load_stack (m: mem) (sp: val) (ty: typ) (ofs: int) :=
   Mem.loadv (chunk_of_type ty) m (Val.add sp (Vint ofs)).
 
