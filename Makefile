@@ -15,10 +15,10 @@
 
 include Makefile.config
 
-DIRS=lib common $(ARCH)/$(VARIANT) $(ARCH) backend cfrontend core driver \
+DIRS=lib common $(ARCH)/$(VARIANT) $(ARCH) backend cfrontend core linking driver \
   flocq/Core flocq/Prop flocq/Calc flocq/Appli exportclight
 
-RECDIRS=lib common backend cfrontend core driver flocq exportclight
+RECDIRS=lib common backend cfrontend core linking driver flocq exportclight
 
 COQINCLUDES=$(foreach d, $(RECDIRS), -R $(d) -as compcert.$(d)) \
   -I $(ARCH)/$(VARIANT) -as compcert.$(ARCH).$(VARIANT) \
@@ -136,13 +136,21 @@ CORE=Extensionality.v base.v eq_dec.v Address.v \
   wholeprog_simulations.v wholeprog_lemmas.v barebones_simulations.v \
   val_casted.v 
 
+# Linking files
+
+LINKING=cast.v pos.v stack.v seq_lemmas.v pred_lemmas.v core_semantics_tcs.v \
+  sepcomp.v gallina_coresem.v inj_lemmas.v join_sm.v reestablish.v wf_lemmas.v stacking.v \
+  linking_spec.v linking.v compcert_linking.v linking_lemmas.v compcert_linking_lemmas.v \
+  disjointness.v reach_lemmas.v rc_semantics.v rc_semantics_lemmas.v \
+  linking_inv.v ret_lemmas.v call_lemmas.v linking_proof.v context_equiv.v
+
 # Putting everything together (in driver/)
 
 DRIVER=Compiler.v Complements.v
 
 # All source files
 
-FILES=$(LIB) $(COMMON) $(BACKEND) $(CFRONTEND) $(CORE) $(DRIVER) $(FLOCQ)
+FILES=$(LIB) $(COMMON) $(BACKEND) $(CFRONTEND) $(CORE) $(LINKING) $(DRIVER) $(FLOCQ)
 
 # Symbolic links vs. copy
 

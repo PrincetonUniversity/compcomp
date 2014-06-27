@@ -4,38 +4,38 @@ Require Import JMeq.
 
 (* msl imports *)
 
-Require Import msl.Axioms. (*for proof_irr*)
+Require Import Axioms. (*for proof_irr*)
 
 (* sepcomp imports *)
 
-Require Import linking.sepcomp. Import SepComp. 
-Require Import sepcomp.arguments.
+Require Import sepcomp. Import SepComp. 
+Require Import arguments.
 
-Require Import linking.pos.
-Require Import linking.stack.
-Require Import linking.cast.
-Require Import linking.pred_lemmas.
-Require Import linking.seq_lemmas.
-Require Import linking.wf_lemmas.
-Require Import linking.reestablish.
-Require Import linking.core_semantics_lemmas.
-Require Import linking.inj_lemmas.
-Require Import linking.join_sm.
-Require Import linking.reach_lemmas.
-Require Import linking.compcert_linking.
-Require Import linking.compcert_linking_lemmas.
-Require Import linking.disjointness.
-Require Import linking.rc_semantics.
-Require Import linking.rc_semantics_lemmas.
-Require Import linking.linking_inv.
-Require Import linking.call_lemmas.
-Require Import linking.ret_lemmas.
+Require Import pos.
+Require Import stack.
+Require Import cast.
+Require Import pred_lemmas.
+Require Import seq_lemmas.
+Require Import wf_lemmas.
+Require Import reestablish.
+Require Import core_semantics_tcs.
+Require Import inj_lemmas.
+Require Import join_sm.
+Require Import reach_lemmas.
+Require Import compcert_linking.
+Require Import compcert_linking_lemmas.
+Require Import disjointness.
+Require Import rc_semantics.
+Require Import rc_semantics_lemmas.
+Require Import linking_inv.
+Require Import call_lemmas.
+Require Import ret_lemmas.
 
 (* compcert imports *)
 
-Require Import compcert.common.AST.    (*for ident*)
-Require Import compcert.common.Globalenvs.   
-Require Import compcert.common.Memory.   
+Require Import AST.    (*for ident*)
+Require Import Globalenvs.   
+Require Import Memory.   
 
 (* ssreflect *)
 
@@ -44,8 +44,8 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-Require Import compcert.common.Values.   
-Require Import sepcomp.nucular_semantics.
+Require Import Values.   
+Require Import nucular_semantics.
 
 (* This file proves the main linking simulation result (see               *)
 (* linking/linking_spec.v for the specification of the theorem that's     *)
@@ -118,7 +118,7 @@ Qed.
 
 End halted_lems.
 
-Require Import sepcomp.mem_wd.
+Require Import mem_wd.
 
 (*TODO: move elsewhere*)
 Lemma valid_genvs_domain_eq F1 F2 V1 V2 
@@ -633,7 +633,7 @@ End linkingSimulation.
 
 Print Assumptions link.
 
-Require Import linking.linking_spec.
+Require Import linking_spec.
 
 Module LinkingSimulation : LINKING_SIMULATION.
 

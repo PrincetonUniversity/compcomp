@@ -312,6 +312,11 @@ Fixpoint args_len_rec args tys : option Z :=
             | Some z => Some (2+z)
           end
         | Tlong, _ => None
+        | Tfloat,_ => 
+          match args_len_rec args' tys' with
+            | None => None
+            | Some z => Some (2+z)
+          end
         | _,_ => 
           match args_len_rec args' tys' with
             | None => None
@@ -403,14 +408,22 @@ Qed.
 Lemma args_len_recD: forall v args tp tys sz,
      args_len_rec (v :: args) (tp :: tys) = Some sz ->
      exists z1 z2, sz = z1+z2 /\ args_len_rec args tys = Some z2 /\
+(*<<<<<<< HEAD
         match tp with Tlong => z1=2 | _ => z1=1 end.
+=======*)
+        match tp with Tlong => z1=2 | Tfloat => z1=2 | _ => z1=1 end.
+(*>>>>>>> ffae95af412269a765d789c6b8fcddbc26e3ad2d*)
 Proof.
 simpl. intros. 
 destruct tp; simpl in *. 
 destruct (args_len_rec args tys); inv H. 
   exists 1, z; repeat split; trivial.
 destruct (args_len_rec args tys); inv H. 
+(*<<<<<<< HEAD
   exists 1, z; repeat split; trivial.
+=======*)
+  exists 2, z; repeat split; trivial.
+(*>>>>>>> ffae95af412269a765d789c6b8fcddbc26e3ad2d*)
 destruct v; inv H.
   destruct (args_len_rec args tys); inv H1. 
   exists 2, z; repeat split; trivial.
@@ -596,8 +609,11 @@ Lemma store_args_rec_succeeds_aux sp:
       (RP: Mem.range_perm m sp (4*z) (4*z + 4*sz) Cur Writable),
   exists m', store_args_rec m sp z args tys = Some m'.
 Proof. 
+(*<<<<<<< HEAD*)
 (*generalize dependent m. generalize dependent z.
 generalize dependent sz. generalize dependent args.*)
+(*=======
+>>>>>>> ffae95af412269a765d789c6b8fcddbc26e3ad2d*)
 intros tys. induction tys.
   intros.
   destruct args; simpl in *; inv ALR. rewrite Zplus_0_r in *.
@@ -609,15 +625,45 @@ intros tys. induction tys.
  apply args_len_recD in ALR. 
  destruct ALR as [sizeA [sz' [SZ [AL SzA]]]].
  assert (sizeA = typesize a).
-  clear - SzA. destruct a; try solve[trivial]. simpl. admit. (*TODO*)
+ { clear - SzA H. destruct a; try solve[trivial]. }
  clear SzA.
  subst sz sizeA.
  assert (STARG: exists mm zz, store_arg m sp z a v = Some(mm,zz)).
- { clear IHtys H0.
-   destruct (Mem.valid_access_store m (chunk_of_type a) sp (4*z) v)
-   as [mm ST]. 
+ { clear IHtys H0. 
+   destruct (typ_eq a Tlong). subst a.
+   { simpl. destruct v; try solve[simpl in VALSDEF; congruence | inv H].
+     assert (H1: sz' >= 0) by (apply args_len_rec_nonneg in AL; omega).
+     destruct (Mem.valid_access_store m (chunk_of_type Tint) sp (4*(z+1)) (Vint (Int64.hiword i))) 
+       as [mm ST]. 
       split. red; intros. eapply RP; clear RP.
         split. omega.
+        assert (1 + size_chunk (chunk_of_type Tint) <= 4 * (typesize Tlong + sz')).  
+         { clear - AL. apply args_len_rec_nonneg in AL.
+           unfold typesize. simpl size_chunk. omega. } 
+        destruct H0. simpl size_chunk in H3. simpl typesize. clear - H1 H3. omega.
+        clear - POS. rewrite Zmult_comm. solve[simpl align_chunk; eapply Zdivide_intro; eauto]. 
+     destruct (Mem.valid_access_store mm (chunk_of_type Tint) sp (4*z) (Vint (Int64.loword i))) 
+       as [mm' ST']. 
+      split. red; intros. 
+        eapply Mem.perm_store_1; eauto.
+        eapply RP; eauto. clear RP. split. omega.
+        assert (size_chunk (chunk_of_type Tint) <= 4 * (typesize Tlong + sz')).  
+         { clear - AL. apply args_len_rec_nonneg in AL.
+           unfold typesize. simpl size_chunk. omega. } 
+        destruct H0. simpl size_chunk in H3. simpl typesize. clear - H1 H3. omega.         
+        clear - POS. rewrite Zmult_comm. solve[simpl align_chunk; eapply Zdivide_intro; eauto]. 
+     unfold store_stack. simpl. simpl in ST, ST'.
+     assert (A: 0 <= 4*(z+1) <= Int.max_unsigned). 
+     { split. omega. simpl typesize in REP.
+       assert (1 + sz' >= 0) by (apply args_len_rec_nonneg in AL; omega).
+       unfold Int.max_unsigned. omega. }
+     assert (B: 0 <= 4*z <= Int.max_unsigned) by omega.
+     rewrite !Int.add_zero_l, !Int.unsigned_repr, ST, ST'. 
+       exists mm', (z+2); trivial. solve[apply B]. solve[apply A]. }
+   destruct (Mem.valid_access_store m (chunk_of_type a) sp (4*z) v) as [mm ST]. 
+    split. red; intros. eapply RP; clear RP.
+        split. omega.
+(*>>>>>>> ffae95af412269a765d789c6b8fcddbc26e3ad2d*)
         assert (size_chunk (chunk_of_type a) <= 4 * (typesize a + sz')).  
          { clear - AL. apply args_len_rec_nonneg in AL.
             unfold typesize. destruct a; simpl in *. 
@@ -627,19 +673,19 @@ intros tys. induction tys.
                destruct sz'; try xomega. } 
          remember (size_chunk (chunk_of_type a)) as p1. 
          remember (typesize a + sz') as p2. clear - H0 H1. omega. 
-      clear - POS. assert (0 < z). admit. clear POS. 
-         destruct a; simpl. 
-           destruct z. omega. exists (Z.pos p). xomega. xomega.
-           destruct z. omega. exists (Z.pos p). xomega. xomega.
-           destruct z. omega. admit. xomega. 
-           destruct z. omega. exists (Z.pos p). xomega. xomega. 
+      clear - POS n. rewrite Zmult_comm. 
+      destruct a; simpl align_chunk; eapply Zdivide_intro; eauto. congruence.
    clear RP.
    destruct a; simpl in ST; simpl.
-    unfold store_stack. simpl.
+    - unfold store_stack. simpl.
        rewrite Int.add_zero_l, Int.unsigned_repr, ST. 
-       exists mm, (z+1); trivial.
-       admit.
-    unfold store_stack. simpl.
+       exists mm, (z+1); trivial. 
+       assert (A: 0 <= 4*z <= Int.max_unsigned). 
+       { split. omega. simpl typesize in REP.
+         assert (1 + sz' >= 0) by (apply args_len_rec_nonneg in AL; omega).
+         unfold Int.max_unsigned. omega. }
+       solve[apply A].
+    - unfold store_stack. simpl.
        rewrite Int.add_zero_l, Int.unsigned_repr, ST. 
        exists mm, (z+2); trivial. 
        clear - POS REP AL. 
@@ -649,31 +695,9 @@ intros tys. induction tys.
          assert (0 < typesize Tfloat + sz').
            simpl. destruct sz'. omega. xomega. xomega. 
          remember (typesize Tfloat + sz') as q. clear  AL Heqq sz'. 
-           unfold Int.max_unsigned. xomega. 
-    destruct v; inv H; inv VALSDEF.
-       unfold store_stack. simpl.
-       rewrite Int.add_zero_l, Int.unsigned_repr.
-       rewrite Int.add_zero_l, Int.unsigned_repr. 
-       apply Mem.store_int64_split in ST. 
-       destruct ST as [m1 [ST1 ST2]]. admit.
-
-       clear - POS REP AL.
-       apply args_len_rec_nonneg in AL.
-       destruct z; try xomega. 
-         unfold Int.max_unsigned; simpl; omega.
-         assert (0 < typesize Tlong + sz').
-           simpl. destruct sz'. omega. xomega. xomega. 
-         remember (typesize Tlong + sz') as q. clear  AL Heqq sz'. 
-           unfold Int.max_unsigned. xomega. 
-       clear - POS REP AL.
-       apply args_len_rec_nonneg in AL.
-       destruct z; simpl; try xomega. 
-         unfold Int.max_unsigned; simpl; omega.
-         assert (0 < typesize Tlong + sz').
-           simpl. destruct sz'. omega. xomega. xomega. 
-         remember (typesize Tlong + sz') as q. clear  AL Heqq sz'. 
-           unfold Int.max_unsigned. xomega. 
-    unfold store_stack. simpl.
+           unfold Int.max_unsigned. xomega.
+    - congruence.
+    - unfold store_stack. simpl.
        rewrite Int.add_zero_l, Int.unsigned_repr, ST. 
        exists mm, (z+1); trivial. 
        clear - POS REP AL. 
@@ -696,6 +720,10 @@ intros tys. induction tys.
  red; intros. eapply store_arg_perm1; eauto. 
  clear STARG. eapply RP; clear RP. 
  specialize (typesize_pos a); intros. omega.
+(*<<<<<<< HEAD
+=======*)
+(*FIXME: *) Grab Existential Variables. refine (0).
+(*>>>>>>> ffae95af412269a765d789c6b8fcddbc26e3ad2d*)
 Qed.
 
 Lemma store_args_rec_succeeds sz m sp args tys 

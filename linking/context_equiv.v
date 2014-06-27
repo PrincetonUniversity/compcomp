@@ -1,14 +1,14 @@
 (* sepcomp imports *)
 
-Require Import linking.sepcomp. Import SepComp. 
-Require Import sepcomp.arguments.
+Require Import sepcomp. Import SepComp. 
+Require Import arguments.
 
-Require Import linking.pos.
-Require Import linking.core_semantics_lemmas.
-Require Import linking.compcert_linking.
-Require Import linking.rc_semantics.
-Require Import linking.rc_semantics_lemmas.
-Require Import linking.linking_spec.
+Require Import pos.
+Require Import core_semantics_tcs.
+Require Import compcert_linking.
+Require Import rc_semantics.
+Require Import rc_semantics_lemmas.
+Require Import linking_spec.
 
 (* ssreflect *)
 
@@ -17,11 +17,11 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-Require Import sepcomp.nucular_semantics.
-Require Import compcert.common.Values.   
-Require Import sepcomp.wholeprog_lemmas.
-Require Import sepcomp.closed_safety.
-Require Import sepcomp.core_semantics_lemmas.
+Require Import nucular_semantics.
+Require Import Values.   
+Require Import wholeprog_lemmas.
+Require Import closed_safety.
+Require Import core_semantics_lemmas.
 
 Import Wholeprog_simulation.
 Import SM_simulation.

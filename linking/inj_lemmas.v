@@ -9,12 +9,12 @@ Require Import BinPos.
 
 Require Import compcert. Import CompcertCommon.
 
-Require Import msl.Axioms.
+Require Import Axioms.
 
-Require Import linking.sepcomp. Import SepComp.
+Require Import sepcomp. Import SepComp.
 
-Require Import linking.pred_lemmas.
-Require Import linking.seq_lemmas.
+Require Import pred_lemmas.
+Require Import seq_lemmas.
 
 (* This file collects lemmas on structured injections.                    *)
 (* [Inj.t] is the type of well-defined structured injections. It is       *)

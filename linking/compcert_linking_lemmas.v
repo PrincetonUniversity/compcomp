@@ -1,17 +1,17 @@
-Require Import msl.Axioms.
+Require Import Axioms.
 
-Require Import sepcomp.effect_semantics.
+Require Import effect_semantics.
 
-Require Import linking.pos.
-Require Import linking.compcert_linking.
-Require Import linking.core_semantics_lemmas.
+Require Import pos.
+Require Import compcert_linking.
+Require Import core_semantics_tcs.
 
 Require Import ssreflect ssrbool ssrnat ssrfun seq fintype.
 Set Implicit Arguments.
 
-Require Import compcert.common.AST. (*for ident*)
-Require Import compcert.common.Values. 
-Require Import compcert.common.Globalenvs. 
+Require Import AST. (*for ident*)
+Require Import Values. 
+Require Import Globalenvs. 
 
 Section linkingLemmas.
 

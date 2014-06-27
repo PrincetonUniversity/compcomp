@@ -1,12 +1,12 @@
 (* sepcomp imports *)
 
-Require Import linking.sepcomp. Import SepComp. 
-Require Import sepcomp.arguments.
+Require Import sepcomp. Import SepComp. 
+Require Import arguments.
 
-Require Import linking.pos.
-Require Import linking.core_semantics_lemmas.
-Require Import linking.compcert_linking.
-Require Import linking.rc_semantics.
+Require Import pos.
+Require Import core_semantics_tcs.
+Require Import compcert_linking.
+Require Import rc_semantics.
 
 (* ssreflect *)
 
@@ -15,8 +15,8 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-Require Import sepcomp.nucular_semantics.
-Require Import compcert.common.Values.   
+Require Import nucular_semantics.
+Require Import Values.   
 
 (* This file states the main linking simulation result.                   *)
 (* Informally,                                                            *)

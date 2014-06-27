@@ -1,18 +1,18 @@
-Require Import linking.sepcomp. Import SepComp.
+Require Import sepcomp. Import SepComp.
 
-Require Import linking.pos.
-Require Import linking.stack. 
-Require Import linking.core_semantics_lemmas.
+Require Import pos.
+Require Import stack. 
+Require Import core_semantics_tcs.
 
 Require Import ssreflect ssrbool ssrnat ssrfun eqtype seq fintype finfun.
 Set Implicit Arguments.
 
 (*NOTE: because of redefinition of [val], these imports must appear 
   after Ssreflect eqtype.*)
-Require Import compcert.common.AST.    (*for typ*)
-Require Import compcert.common.Values. (*for val*)
-Require Import compcert.common.Globalenvs. 
-Require Import compcert.lib.Integers.
+Require Import AST.    (*for typ*)
+Require Import Values. (*for val*)
+Require Import Globalenvs. 
+Require Import Integers.
 
 Require Import ZArith.
 
