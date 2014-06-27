@@ -312,6 +312,11 @@ Fixpoint args_len_rec args tys : option Z :=
             | Some z => Some (2+z)
           end
         | Tlong, _ => None
+        | Tfloat,_ => 
+          match args_len_rec args' tys' with
+            | None => None
+            | Some z => Some (2+z)
+          end
         | _,_ => 
           match args_len_rec args' tys' with
             | None => None
@@ -400,16 +405,309 @@ unfold store_stack, Mem.storev. simpl. intros m0 STORE H.
 solve[eapply only_stores_cons; eauto].
 Qed.
 
-Lemma store_args_rec_succeeds_aux sz m sp args tys z 
-      (VALSDEF: val_casted.vals_defined args=true)
-      (HASTY: Val.has_type_list args tys) 
-      (POS: 0 <= z) 
-      (REP: 4*(z+sz) < Int.modulus) :
-  args_len_rec args tys = Some sz -> 
-  Mem.range_perm m sp (4*z) (4*z + 4*sz) Cur Writable -> 
-  exists m', store_args_rec m sp z args tys = Some m'.
+Lemma args_len_recD: forall v args tp tys sz,
+     args_len_rec (v :: args) (tp :: tys) = Some sz ->
+     exists z1 z2, sz = z1+z2 /\ args_len_rec args tys = Some z2 /\
+        match tp with Tlong => z1=2 | Tfloat => z1=2 | _ => z1=1 end.
 Proof.
-Admitted. (*TODO Gordon*)
+simpl. intros. 
+destruct tp; simpl in *. 
+destruct (args_len_rec args tys); inv H. 
+  exists 1, z; repeat split; trivial.
+destruct (args_len_rec args tys); inv H. 
+  exists 2, z; repeat split; trivial.
+destruct v; inv H.
+  destruct (args_len_rec args tys); inv H1. 
+  exists 2, z; repeat split; trivial.
+destruct (args_len_rec args tys); inv H. 
+  exists 1, z; repeat split; trivial.
+Qed. 
+
+Lemma args_len_rec_nonneg: forall tys args sz,
+     args_len_rec args tys = Some sz -> 0 <= sz.
+Proof.
+intros tys; induction tys; intros. 
+  destruct args; inv H. omega. 
+destruct args; inv H. 
+  destruct a; specialize (IHtys args).
+  destruct (args_len_rec args tys); inv H1. 
+    specialize (IHtys _ (eq_refl _)). 
+    destruct z. omega. destruct p; xomega. 
+    xomega. 
+  destruct (args_len_rec args tys); inv H1. 
+    specialize (IHtys _ (eq_refl _)). 
+    destruct z. omega. destruct p; xomega. 
+    xomega. 
+  destruct v; inv H1. 
+    destruct (args_len_rec args tys); inv H0. 
+    specialize (IHtys _ (eq_refl _)). 
+    destruct z. omega. destruct p; xomega. 
+    xomega. 
+  destruct (args_len_rec args tys); inv H1. 
+    specialize (IHtys _ (eq_refl _)). 
+    destruct z. omega. destruct p; xomega. 
+    xomega. 
+Qed.
+
+Lemma args_len_rec_pos: forall v args tp tys sz,
+     args_len_rec (v :: args) (tp :: tys) = Some sz -> 0 < sz.
+Proof. intros.
+apply args_len_recD in H. destruct H as [? [? [? [? ?]]]]; subst.
+apply args_len_rec_nonneg in H0.
+destruct tp; omega.
+Qed. 
+
+Definition store_arg m sp ofs ty' a' :=
+      match ty', a' with 
+        | Tlong, Vlong n => 
+          match store_stack m (Vptr sp Int.zero) Tint 
+                  (Int.repr (Stacklayout.fe_ofs_arg + 4*(ofs+1))) 
+                            (Vint (Int64.hiword n)) with
+            | None => None
+            | Some m' => 
+                match  store_stack m' (Vptr sp Int.zero) Tint
+                      (Int.repr (Stacklayout.fe_ofs_arg + 4*ofs)) 
+                                (Vint (Int64.loword n)) with
+                | None => None
+                | Some m'' => Some (m'',ofs+2) 
+                end
+          end
+        | Tlong, _ => None
+        | _,_ => 
+          match store_stack m (Vptr sp Int.zero) ty' 
+                 (Int.repr (Stacklayout.fe_ofs_arg + 4*ofs)) a' with
+            | None => None
+            | Some m' => Some (m', ofs+typesize ty')
+          end
+      end.
+
+Lemma store_argSZ m sp z ty v m' ofs:
+      store_arg m sp z ty v = Some(m',ofs) -> ofs = z + typesize ty.
+Proof. destruct ty; simpl; intros.
+  remember (store_stack m (Vptr sp Int.zero) Tint
+          (Int.repr (Stacklayout.fe_ofs_arg + 4 * z)) v) as s. 
+    unfold Stacklayout.fe_ofs_arg in Heqs. simpl in Heqs.
+    rewrite <- Heqs in H. clear Heqs.
+    destruct s; inv H. trivial. 
+  remember (store_stack m (Vptr sp Int.zero) Tfloat
+          (Int.repr (Stacklayout.fe_ofs_arg + 4 * z)) v) as s. 
+    unfold Stacklayout.fe_ofs_arg in Heqs. simpl in Heqs.
+    rewrite <- Heqs in H. clear Heqs.
+    destruct s; inv H. trivial.
+  destruct v; inv H.
+  remember (store_stack m (Vptr sp Int.zero) Tint 
+                  (Int.repr (Stacklayout.fe_ofs_arg + 4*(z+1))) 
+                            (Vint (Int64.hiword i))) as s1. 
+    unfold Stacklayout.fe_ofs_arg in Heqs1. simpl in Heqs1.
+    rewrite <- Heqs1 in *. clear Heqs1.
+    destruct s1; inv H1.
+    remember (store_stack m0 (Vptr sp Int.zero) Tint 
+                  (Int.repr (Stacklayout.fe_ofs_arg + 4*z)) 
+                            (Vint (Int64.loword i))) as s2. 
+    unfold Stacklayout.fe_ofs_arg in Heqs2. simpl in Heqs2.
+    rewrite <- Heqs2 in *. clear Heqs2.
+    destruct s2; inv H0. trivial. 
+  remember (store_stack m (Vptr sp Int.zero) Tsingle
+          (Int.repr (Stacklayout.fe_ofs_arg + 4 * z)) v) as s. 
+    unfold Stacklayout.fe_ofs_arg in Heqs. simpl in Heqs.
+    rewrite <- Heqs in *. clear Heqs.
+    destruct s; inv H. trivial. 
+Qed.
+  
+Lemma store_args_cons m sp z v args ty tys m1 z1: 
+  store_arg m sp z ty v = Some(m1, z1) ->
+  (exists m', store_args_rec m1 sp z1 args tys = Some m') ->
+  exists m', store_args_rec m sp z (v :: args) (ty :: tys) = Some m'. 
+Proof. intros.
+simpl. unfold store_arg in H.
+destruct ty.
+  remember (store_stack m (Vptr sp Int.zero) Tint
+          (Int.repr (Stacklayout.fe_ofs_arg + 4 * z)) v) as s. 
+    unfold Stacklayout.fe_ofs_arg in Heqs. simpl in Heqs.
+    rewrite <- Heqs. clear Heqs.
+    destruct s; inv H. simpl. assumption.
+  remember (store_stack m (Vptr sp Int.zero) Tfloat
+          (Int.repr (Stacklayout.fe_ofs_arg + 4 * z)) v) as s. 
+    unfold Stacklayout.fe_ofs_arg in Heqs. simpl in Heqs.
+    rewrite <- Heqs. clear Heqs.
+    destruct s; inv H. simpl. assumption.
+  destruct v; inv H.
+  remember (store_stack m (Vptr sp Int.zero) Tint 
+                  (Int.repr (Stacklayout.fe_ofs_arg + 4*(z+1))) 
+                            (Vint (Int64.hiword i))) as s1. 
+    unfold Stacklayout.fe_ofs_arg in Heqs1. simpl in Heqs1.
+    rewrite <- Heqs1 in *. clear Heqs1.
+    destruct s1; inv H2.
+    remember (store_stack m0 (Vptr sp Int.zero) Tint 
+                  (Int.repr (Stacklayout.fe_ofs_arg + 4*z)) 
+                            (Vint (Int64.loword i))) as s2. 
+    unfold Stacklayout.fe_ofs_arg in Heqs2. simpl in Heqs2.
+    rewrite <- Heqs2 in *. clear Heqs2.
+    destruct s2; inv H1. assumption.
+  remember (store_stack m (Vptr sp Int.zero) Tsingle
+          (Int.repr (Stacklayout.fe_ofs_arg + 4 * z)) v) as s. 
+    unfold Stacklayout.fe_ofs_arg in Heqs. simpl in Heqs.
+    rewrite <- Heqs. clear Heqs.
+    destruct s; inv H. simpl. assumption.
+Qed.  
+
+Lemma store_arg_perm1: forall m sp z ty v mm zz
+      (STA: store_arg m sp z ty v = Some (mm, zz)),
+       forall (b' : block) (ofs' : Z) (k : perm_kind) (p : permission),
+       Mem.perm m b' ofs' k p -> Mem.perm mm b' ofs' k p.
+Proof. intros.
+simpl. unfold store_arg in STA.
+destruct ty.
+  remember (store_stack m (Vptr sp Int.zero) Tint
+          (Int.repr (Stacklayout.fe_ofs_arg + 4 * z)) v) as s.
+    destruct s; inv STA. apply eq_sym in Heqs. 
+    unfold store_stack in Heqs; simpl in Heqs.
+    eapply Mem.perm_store_1; eassumption.
+  remember (store_stack m (Vptr sp Int.zero) Tfloat
+          (Int.repr (Stacklayout.fe_ofs_arg + 4 * z)) v) as s. 
+    destruct s; inv STA. apply eq_sym in Heqs. 
+    unfold store_stack in Heqs; simpl in Heqs.
+    eapply Mem.perm_store_1; eassumption.
+  destruct v; inv STA.
+  remember (store_stack m (Vptr sp Int.zero) Tint 
+                  (Int.repr (Stacklayout.fe_ofs_arg + 4*(z+1))) 
+                            (Vint (Int64.hiword i))) as s1. 
+    unfold Stacklayout.fe_ofs_arg in Heqs1. simpl in Heqs1.
+    rewrite <- Heqs1 in *. apply eq_sym in Heqs1.
+    destruct s1; inv H1.
+    remember (store_stack m0 (Vptr sp Int.zero) Tint 
+                  (Int.repr (Stacklayout.fe_ofs_arg + 4*z)) 
+                            (Vint (Int64.loword i))) as s2. 
+    unfold Stacklayout.fe_ofs_arg in Heqs2. simpl in Heqs2.
+    rewrite <- Heqs2 in *. apply eq_sym in Heqs2.
+    destruct s2; inv H2.
+    unfold store_stack in *; simpl in *.
+    eapply Mem.perm_store_1; try eassumption. 
+    eapply Mem.perm_store_1; eassumption. 
+  remember (store_stack m (Vptr sp Int.zero) Tsingle
+          (Int.repr (Stacklayout.fe_ofs_arg + 4 * z)) v) as s.
+    destruct s; inv STA. apply eq_sym in Heqs. 
+    unfold store_stack in Heqs; simpl in Heqs.
+    eapply Mem.perm_store_1; eassumption.
+Qed.     
+
+Lemma store_args_rec_succeeds_aux sp: 
+  forall tys args 
+      (VALSDEF: val_casted.vals_defined args=true)
+      (HASTY: Val.has_type_list args tys) sz
+      (ALR: args_len_rec args tys = Some sz)
+      z (POS: 0 <= z)
+      (REP: 4*(z+sz) < Int.modulus) m
+      (RP: Mem.range_perm m sp (4*z) (4*z + 4*sz) Cur Writable),
+  exists m', store_args_rec m sp z args tys = Some m'.
+Proof. 
+intros tys. induction tys.
+  intros.
+  destruct args; simpl in *; inv ALR. rewrite Zplus_0_r in *.
+     eexists; reflexivity.
+  destruct args. intros. inv ALR. 
+  intros. destruct HASTY. 
+  assert (ArgsDef: vals_defined args = true). 
+    destruct v; try inv VALSDEF; trivial.
+ apply args_len_recD in ALR. 
+ destruct ALR as [sizeA [sz' [SZ [AL SzA]]]].
+ assert (sizeA = typesize a).
+ { clear - SzA H. destruct a; try solve[trivial]. }
+ clear SzA.
+ subst sz sizeA.
+ assert (STARG: exists mm zz, store_arg m sp z a v = Some(mm,zz)).
+ { clear IHtys H0. 
+   destruct (typ_eq a Tlong). subst a.
+   { simpl. destruct v; try solve[simpl in VALSDEF; congruence | inv H].
+     assert (H1: sz' >= 0) by (apply args_len_rec_nonneg in AL; omega).
+     destruct (Mem.valid_access_store m (chunk_of_type Tint) sp (4*(z+1)) (Vint (Int64.hiword i))) 
+       as [mm ST]. 
+      split. red; intros. eapply RP; clear RP.
+        split. omega.
+        assert (1 + size_chunk (chunk_of_type Tint) <= 4 * (typesize Tlong + sz')).  
+         { clear - AL. apply args_len_rec_nonneg in AL.
+           unfold typesize. simpl size_chunk. omega. } 
+        destruct H0. simpl size_chunk in H3. simpl typesize. clear - H1 H3. omega.
+        clear - POS. rewrite Zmult_comm. solve[simpl align_chunk; eapply Zdivide_intro; eauto]. 
+     destruct (Mem.valid_access_store mm (chunk_of_type Tint) sp (4*z) (Vint (Int64.loword i))) 
+       as [mm' ST']. 
+      split. red; intros. 
+        eapply Mem.perm_store_1; eauto.
+        eapply RP; eauto. clear RP. split. omega.
+        assert (size_chunk (chunk_of_type Tint) <= 4 * (typesize Tlong + sz')).  
+         { clear - AL. apply args_len_rec_nonneg in AL.
+           unfold typesize. simpl size_chunk. omega. } 
+        destruct H0. simpl size_chunk in H3. simpl typesize. clear - H1 H3. omega.         
+        clear - POS. rewrite Zmult_comm. solve[simpl align_chunk; eapply Zdivide_intro; eauto]. 
+     unfold store_stack. simpl. simpl in ST, ST'.
+     assert (A: 0 <= 4*(z+1) <= Int.max_unsigned). 
+     { split. omega. simpl typesize in REP.
+       assert (1 + sz' >= 0) by (apply args_len_rec_nonneg in AL; omega).
+       unfold Int.max_unsigned. omega. }
+     assert (B: 0 <= 4*z <= Int.max_unsigned) by omega.
+     rewrite !Int.add_zero_l, !Int.unsigned_repr, ST, ST'. 
+       exists mm', (z+2); trivial. solve[apply B]. solve[apply A]. }
+   destruct (Mem.valid_access_store m (chunk_of_type a) sp (4*z) v) as [mm ST]. 
+    split. red; intros. eapply RP; clear RP.
+        split. omega.
+        assert (size_chunk (chunk_of_type a) <= 4 * (typesize a + sz')).  
+         { clear - AL. apply args_len_rec_nonneg in AL.
+            unfold typesize. destruct a; simpl in *. 
+               destruct sz'; xomega. destruct sz'. xomega. 
+               destruct p; xomega. xomega. 
+               destruct sz'; try xomega. destruct p; xomega. 
+               destruct sz'; try xomega. } 
+         remember (size_chunk (chunk_of_type a)) as p1. 
+         remember (typesize a + sz') as p2. clear - H0 H1. omega. 
+      clear - POS n. rewrite Zmult_comm. 
+      destruct a; simpl align_chunk; eapply Zdivide_intro; eauto. congruence.
+   clear RP.
+   destruct a; simpl in ST; simpl.
+    - unfold store_stack. simpl.
+       rewrite Int.add_zero_l, Int.unsigned_repr, ST. 
+       exists mm, (z+1); trivial. 
+       assert (A: 0 <= 4*z <= Int.max_unsigned). 
+       { split. omega. simpl typesize in REP.
+         assert (1 + sz' >= 0) by (apply args_len_rec_nonneg in AL; omega).
+         unfold Int.max_unsigned. omega. }
+       solve[apply A].
+    - unfold store_stack. simpl.
+       rewrite Int.add_zero_l, Int.unsigned_repr, ST. 
+       exists mm, (z+2); trivial. 
+       clear - POS REP AL. 
+       apply args_len_rec_nonneg in AL.
+       destruct z; try xomega. 
+         unfold Int.max_unsigned; simpl; omega.
+         assert (0 < typesize Tfloat + sz').
+           simpl. destruct sz'. omega. xomega. xomega. 
+         remember (typesize Tfloat + sz') as q. clear  AL Heqq sz'. 
+           unfold Int.max_unsigned. xomega. 
+    - congruence.
+    - unfold store_stack. simpl.
+       rewrite Int.add_zero_l, Int.unsigned_repr, ST. 
+       exists mm, (z+1); trivial. 
+       clear - POS REP AL. 
+       apply args_len_rec_nonneg in AL.
+       destruct z; try xomega. 
+         unfold Int.max_unsigned; simpl; omega.
+         assert (0 < typesize Tsingle + sz').
+           simpl. destruct sz'. omega. xomega. xomega. 
+         remember (typesize Tsingle + sz') as q. clear  AL Heqq sz'. 
+           unfold Int.max_unsigned. xomega.
+ }
+ specialize (IHtys _ ArgsDef H0 _ AL).
+ rewrite Zplus_assoc in REP.
+ assert (POS' : 0 <= z+typesize a). destruct a; simpl; omega.
+ specialize (IHtys _ POS' REP).
+ destruct STARG as [mm [zz STARG]].
+ specialize (store_argSZ _ _ _ _ _ _ _ STARG). intros ZZ; subst zz.
+ eapply store_args_cons. eassumption.
+ apply IHtys; clear IHtys.
+ red; intros. eapply store_arg_perm1; eauto. 
+ clear STARG. eapply RP; clear RP. 
+ specialize (typesize_pos a); intros. omega.
+(*FIXME: *) Grab Existential Variables. refine (0).
+Qed.
 
 Lemma store_args_rec_succeeds sz m sp args tys 
       (VALSDEF: val_casted.vals_defined args=true)
