@@ -2481,6 +2481,17 @@ Proof. intros.
   remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz; inv H0. 
     apply eq_sym in Heqzz.
   destruct f; try discriminate.
+
+  simpl; revert H1; case_eq 
+    (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0%Z => 0%Z
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
+  intros l _.
+  2: simpl; solve[rewrite andb_comm; inversion 2].
+
   exploit function_ptr_translated; eauto. intros [tf [FP TF]].
   simpl. exists (LTL_Callstate nil tf 
                   (Locmap.setlist (loc_arguments (funsig tf)) 
@@ -2494,25 +2505,39 @@ Proof. intros.
     case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
     rewrite D.
 
+  assert (Zlength vals2 = Zlength vals1) as ->. 
+  { apply forall_inject_val_list_inject in VInj. clear - VInj. 
+    induction VInj; auto. rewrite !Zlength_cons, IHVInj; auto. }
+
   assert (val_casted.val_has_type_list_func vals2
            (sig_args (funsig tf))=true) as ->.
   { eapply val_casted.val_list_inject_hastype; eauto.
     eapply forall_inject_val_list_inject; eauto.
     destruct (val_casted.vals_defined vals1); auto.
-    rewrite andb_comm in H1; simpl in H1. solve[inv H1].
+    rewrite andb_comm in H1; simpl in H1. 
+    rewrite andb_comm in H1; solve[inv H1].
     assert (sig_args (funsig tf)
           = sig_args (RTL.funsig (Internal f))) as ->.
     { erewrite sig_function_translated; eauto. }
-    destruct (val_casted.val_has_type_list_func vals1
-      (sig_args (RTL.funsig (Internal f)))); auto. inv H1. }
+    simpl in H0. rewrite <-H0 in H1. simpl. rewrite <-H0.
+    destruct (val_casted.val_has_type_list_func 
+                vals1 (sig_args (funsig tf))); auto. 
+    simpl in H1; inv H1. }   
   assert (val_casted.vals_defined vals2=true) as ->.
   { eapply val_casted.val_list_inject_defined.
     eapply forall_inject_val_list_inject; eauto.
     destruct (val_casted.vals_defined vals1); auto.
-    rewrite andb_comm in H1; inv H1. }
+    rewrite <-andb_assoc, andb_comm in H1. inv H1. }
   monadInv TF. rename x into tf.
+  simpl; revert H1; case_eq 
+    (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0%Z => 0%Z
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
   solve[simpl; auto].
-
+  intros CONTRA. solve[elimtype False; auto].
   intros CONTRA. solve[elimtype False; auto].
 
   destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
@@ -2521,7 +2546,7 @@ Proof. intros.
   split.
     revert H1.
     case_eq (val_casted.val_has_type_list_func vals1
-               (sig_args (RTL.funsig (Internal f))) && val_casted.vals_defined vals1).
+               (sig_args (RTL.fn_sig f)) && val_casted.vals_defined vals1).
     intros H2. inversion 1; subst. clear H1.
     eapply match_states_call.
       constructor.
@@ -2542,12 +2567,12 @@ Proof. intros.
           { rewrite val_casted.val_has_type_list_func_charact; auto.
             eapply val_casted.val_list_inject_hastype. 
             eapply forall_inject_val_list_inject; eauto. auto.
-            rewrite A, H; auto. }
+            simpl in A. rewrite A, H; auto. }
 
           assert (len: 
             length (val_casted.encode_longs (sig_args (funsig tf)) vals2) =
             length (loc_arguments (funsig tf))).
-          { rewrite <-A in H. clear A. clear H H0 vals1 VInj.
+          { simpl in A. rewrite <-A in H. clear A. clear H H0 vals1 VInj.
             destruct (funsig tf). simpl. unfold loc_arguments. simpl. 
             revert vals2 B; generalize 0; induction sig_args; auto.
             destruct a; simpl. 
@@ -2572,9 +2597,9 @@ Proof. intros.
           apply has_type_list_locs_val_types; auto.
           solve[apply len].
 
-        intros. apply REACH_nil. rewrite H; intuition.
+        intros. apply REACH_nil. solve[rewrite H; intuition].
         simpl. red; intros. red in H. 
-          destruct l.
+          destruct l0.
             rewrite Locmap.gsetlisto; trivial. 
             apply Loc.notin_iff. intros. apply loc_arguments_rec_charact in H0.
             destruct l'; try contradiction. constructor.

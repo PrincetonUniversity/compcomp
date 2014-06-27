@@ -1553,6 +1553,17 @@ Proof. intros.
            val_casted.vals_defined vals1). 
   2: solve[intros Heq; rewrite Heq in H1; inv H1].
   intros Heq; rewrite Heq in H1; inv H1.
+
+  simpl; revert H0; case_eq 
+    (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0%Z => 0%Z
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
+  intros l _.
+  2: simpl; solve[inversion 2].
+
   exploit function_ptr_translated; eauto. intros [tf [FP TF]].
   assert (exists fi, tf = Internal fi).
   { monadInv TF. eauto. }
@@ -1569,6 +1580,11 @@ Proof. intros.
     unfold Linear_eff_sem, Linear_coop_sem. simpl.
     case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
     rewrite D.
+
+  assert (Zlength vals2 = Zlength vals1) as ->. 
+  { apply forall_inject_val_list_inject in VInj. clear - VInj. 
+    induction VInj; auto. rewrite !Zlength_cons, IHVInj; auto. }
+
     set (tf := Internal fi).
     assert (val_casted.val_has_type_list_func vals2 (sig_args (funsig tf))=true) as ->.
     { eapply val_casted.val_list_inject_hastype; eauto.
@@ -1585,13 +1601,24 @@ Proof. intros.
       eapply forall_inject_val_list_inject; eauto.
       destruct (val_casted.vals_defined vals1); auto.
       rewrite andb_comm in Heq; inv Heq. }
-    solve[auto].
 
-    intros CONTRA. solve[elimtype False; auto].
+  simpl; revert H0; case_eq 
+    (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0%Z => 0%Z
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
+  solve[simpl; auto].
+  intros CONTRA. solve[elimtype False; auto].
+  intros CONTRA. solve[elimtype False; auto].
+  simpl in H0. inv H0.
+
   destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
      VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
     as [AA [BB [CC [DD [EE [FF GG]]]]]].
   split.
+
     eapply match_states_call0; try eassumption.
       constructor. auto.
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest.
@@ -1610,7 +1637,7 @@ Proof. intros.
           apply (val_casted.getBlocks_encode_longs 
                    (sig_args (LTL.funsig (Internal f)))); auto.
       red; intros. apply Conventions1.loc_arguments_rec_charact in H. 
-           destruct l; try contradiction.
+           destruct l0; try contradiction.
            destruct sl; try contradiction. trivial. 
     trivial.
   rewrite initial_SM_as_inj.

@@ -46,23 +46,6 @@ Require Import I64Helpers.
 Open Local Scope cminorsel_scope.
 
 (** * Correctness of the instruction selection functions for expressions *)
-(*
-Theorem eval_addrsymbolInject: forall (ge : genv) (sp : val) (e : env) (m : mem) (le : letenv)
-         (id : ident) (ofs : int) j,
-       exists v : val,
-         eval_expr ge sp e m le (addrsymbol id ofs) v /\
-         val_inject j (symbol_address ge id ofs) v.
-Proof.
-  intros. unfold addrsymbol. exists (symbol_address ge id ofs); split; auto.
-  destruct (symbol_is_external id).
-  predSpec Int.eq Int.eq_spec ofs Int.zero.
-  subst. EvalOp.
-  EvalOp. econstructor. EvalOp. simpl; eauto. econstructor. simpl. 
-  unfold symbol_address. destruct (Genv.find_symbol ge id); auto. 
-  simpl. rewrite Int.add_commut. rewrite Int.add_zero. auto. 
-  EvalOp.
-Qed.
-*)
 
 Section SILENT.
 
@@ -2456,21 +2439,38 @@ Proof. intros.
   remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz; inv H0. 
     apply eq_sym in Heqzz.
   destruct f; try discriminate.
+  simpl; revert H1; case_eq 
+    (zlt (match match Zlength vals1 with 0 => 0
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0 => 0
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
+  intros l _.
+  2: solve[simpl; rewrite andb_comm; inversion 2].
+
   exploit function_ptr_translated; eauto. intros FIND.
   exists (CMinSel_Callstate (sel_fundef hf ge (Internal f)) vals2 Kstop).
   split.
   simpl. 
   destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
-  subst. inv A. rewrite C in Heqzz. inv Heqzz. unfold tge in FIND. rewrite D in FIND. inv FIND.
+  subst. inv A. rewrite C in Heqzz. inv Heqzz. unfold tge in FIND. 
+    rewrite D in FIND. inv FIND.
   unfold CMinSel_initial_core. 
   case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
   rewrite D.  
+
+  assert (Zlength vals2 = Zlength vals1) as ->. 
+  { apply forall_inject_val_list_inject in VInj. clear - VInj. 
+    induction VInj; auto. rewrite !Zlength_cons, IHVInj; auto. }
+
   assert (val_casted.val_has_type_list_func vals2
            (sig_args (funsig (Internal (sel_function hf ge f))))=true) as ->.
   { eapply val_casted.val_list_inject_hastype; eauto.
     eapply forall_inject_val_list_inject; eauto.
     destruct (val_casted.vals_defined vals1); auto.
-    rewrite andb_comm in H1; simpl in H1. solve[inv H1].
+    rewrite andb_comm in H1; simpl in H1. 
+    solve[rewrite andb_comm in H1; inv H1].
     assert (sig_args (funsig (Internal (sel_function hf ge f))) 
           = sig_args (Cminor.funsig (Internal f))) as ->.
     { simpl. auto. }
@@ -2480,10 +2480,21 @@ Proof. intros.
   { eapply val_casted.val_list_inject_defined.
     eapply forall_inject_val_list_inject; eauto.
     destruct (val_casted.vals_defined vals1); auto.
-    rewrite andb_comm in H1; inv H1. }
+    simpl in H1; rewrite <-andb_assoc, andb_comm in H1; inv H1. }
+
+  simpl; revert H1; case_eq 
+    (zlt (match match Zlength vals1 with 0 => 0
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0 => 0
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
+  
   solve[simpl; auto].
   intros CONTRA. solve[elimtype False; auto].
+  intros CONTRA. solve[elimtype False; auto].
   destruct InitMem as [m0 [INIT_MEM [A B]]].
+
 destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
     VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
    as [AA [BB [CC [DD [EE [FF GG]]]]]].
@@ -2493,7 +2504,7 @@ destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
     destruct (val_casted.val_has_type_list_func vals1
              (sig_args (Cminor.funsig (Internal f))) && val_casted.vals_defined vals1); 
       try solve[inversion 1]. 
-    inversion 1; subst. clear H1.
+    simpl. inversion 1; subst. clear H1.
     eapply match_callstate.
       constructor. rewrite initial_SM_as_inj.
       unfold vis, initial_SM; simpl.
@@ -2501,7 +2512,7 @@ destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
       eapply restrict_forall_vals_inject; try eassumption.
         intros. apply REACH_nil. rewrite H; intuition.
       rewrite initial_SM_as_inj. unfold vis, initial_SM; simpl.
-        eapply inject_mapped; try eassumption.
+        eapply inject_mapped; try eassumption. 
     rewrite initial_SM_as_inj in GG.
       unfold vis, initial_SM in FF; simpl in FF.
       eapply restrict_mapped_closed; eassumption.

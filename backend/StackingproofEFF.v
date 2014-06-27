@@ -4807,6 +4807,16 @@ Proof. intros.
   2: solve[intros H2; rewrite H2 in H1; inv H1].
   intros H2; rewrite H2 in H1. inv H1. 
 
+  simpl; revert H0; case_eq 
+    (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0%Z => 0%Z
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
+  intros l _.
+  2: simpl; solve[inversion 2].
+
   exploit function_ptr_translated; eauto. intros [tf [FP TF]].
   clear Ini.
 
@@ -4836,8 +4846,20 @@ Proof. intros.
   exists (Mach_CallstateIn b vals2 (sig_args (funsig tf))).
   split. simpl. rewrite e, D. 
 
+  assert (Zlength vals2 = Zlength vals1) as ->. 
+  { apply forall_inject_val_list_inject in VInj. clear - VInj. 
+    induction VInj; auto. rewrite !Zlength_cons, IHVInj; auto. }
+
   rewrite VALS2, DEF2. monadInv TF. rename x into tf. simpl. 
+  simpl; revert H0; case_eq 
+    (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0%Z => 0%Z
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
   solve[simpl; auto].
+  intros CONTRA. solve[elimtype False; auto].
 
   destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
      VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
@@ -4856,29 +4878,29 @@ Proof. intros.
   assert (Linear.fn_sig f=fn_sig x) as ->.
   { apply unfold_transf_function in TF; rewrite TF; auto. }
 
-  eapply match_states_init; eauto. simpl.
+  inv H0. eapply match_states_init; eauto. simpl.
 
   solve[apply wt_setlist_loc_arguments].
   solve[intros r; apply loc_arguments_gso_reg].
 
   intros ? ? ? [X|X]; subst; unfold init_locset. 
   { rewrite Locmap.gsetlisto; auto. rewrite Loc.notin_iff.
-  intros l X. apply loc_arguments_rec_charact in X. 
-  destruct l; try destruct sl; try solve[contradiction].
+  intros l0 X. apply loc_arguments_rec_charact in X. 
+  destruct l0; try destruct sl; try solve[contradiction].
   left; intros CONTRA; congruence. }
   { rewrite Locmap.gsetlisto; auto. rewrite Loc.notin_iff.
-  intros l X. apply loc_arguments_rec_charact in X. 
-  destruct l; try destruct sl; try solve[contradiction].
+  intros l0 X. apply loc_arguments_rec_charact in X. 
+  destruct l0; try destruct sl; try solve[contradiction].
   left; intros CONTRA; congruence. }
 
   simpl. unfold loc_arguments. rewrite initial_SM_as_inj.
-  rewrite andb_true_iff in H2. destruct H2 as [H2 H3]. revert H2.
+  rewrite andb_true_iff in H2. destruct H2 as [H2 H4]. revert H2.
   generalize (sig_args (fn_sig x)) as tys.
   apply forall_inject_val_list_inject in VInj. intros tys.
   generalize (encode_longs_inject _ tys vals1 vals2 VInj).
-  solve[intros H2 H4; apply agree_args_match_init; auto].
+  solve[intros H2 H5; apply agree_args_match_init; auto].
 
-  solve[rewrite H1; auto].
+  solve[rewrite H3; auto].
   exists vals1. rewrite initial_SM_as_inj. 
     unfold initial_SM, vis. simpl. split; auto.
     apply forall_inject_val_list_inject.

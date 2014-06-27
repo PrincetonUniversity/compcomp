@@ -859,6 +859,17 @@ Proof. intros.
   intros cast. case_eq (val_casted.vals_defined vals1).
   2: solve[intros def; rewrite cast, def in H1; inv H1].
   intros def; rewrite cast,def in H1.
+
+  simpl; revert H1; case_eq 
+    (zlt (match match Zlength vals1 with 0 => 0
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0 => 0
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
+  intros l _.
+  2: solve[inversion 2].
+
   exploit function_ptr_translated; eauto. intros [tf [FIND TR]].
   exists (CMin_Callstate tf vals2 Cminor.Kstop).
   split.
@@ -869,6 +880,10 @@ Proof. intros.
   case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
   rewrite D.
 
+  assert (Zlength vals2 = Zlength vals1) as ->. 
+  { apply forall_inject_val_list_inject in VInj. clear - VInj. 
+    induction VInj; auto. rewrite !Zlength_cons, IHVInj; auto. }
+
   assert (val_casted.val_has_type_list_func vals2
            (sig_args (funsig tf))=true) as ->.
   { eapply val_casted.val_list_inject_hastype; eauto.
@@ -878,12 +893,21 @@ Proof. intros.
     { erewrite sig_preserved; eauto. }
     destruct (val_casted.val_has_type_list_func vals1
       (sig_args (Csharpminor.funsig (Internal f)))); auto. }
+
   assert (val_casted.vals_defined vals2=true) as ->.
   { eapply val_casted.val_list_inject_defined.
     eapply forall_inject_val_list_inject; eauto.
     destruct (val_casted.vals_defined vals1); auto. }
+
   monadInv TR. rename x into tf.
-  solve[simpl; auto].
+  simpl; revert H1; case_eq 
+    (zlt (match match Zlength vals1 with 0 => 0
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0 => 0
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned); simpl; auto. 
+  intros l'. clear - l l'. elimtype False. omega.
 
   intros CONTRA.
   solve[elimtype False; auto].

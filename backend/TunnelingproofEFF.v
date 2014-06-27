@@ -1237,6 +1237,17 @@ Proof. intros.
   case_eq (val_casted.val_has_type_list_func vals1 (sig_args (LTL.funsig (Internal f))) &&
            val_casted.vals_defined vals1). 
   2: solve[intros Heq; rewrite Heq in H1; inv H1].
+  simpl; revert H1; case_eq 
+    (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0%Z => 0%Z
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
+  intros l _. 
+  2: simpl; solve[rewrite andb_comm; inversion 2].
+  simpl. inversion 1.
+
   intros Heq; rewrite Heq in H1; inv H1.
   exploit function_ptr_translated; eauto. intros FP.
   exists (LTL_Callstate nil (Internal (tunnel_function f))
@@ -1250,7 +1261,12 @@ Proof. intros.
     simpl.
     case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
     rewrite D.
-    assert (val_casted.val_has_type_list_func vals2 (sig_args (funsig (Internal (tunnel_function f))))=true) as ->.
+    assert (Hlen: Zlength vals2 = Zlength vals1).
+    { apply forall_inject_val_list_inject in VInj. clear - VInj. 
+      induction VInj; auto. rewrite !Zlength_cons, IHVInj; auto. }
+    rewrite Hlen.
+    assert (val_casted.val_has_type_list_func vals2 
+             (sig_args (funsig (Internal (tunnel_function f))))=true) as ->.
     { eapply val_casted.val_list_inject_hastype; eauto.
       eapply forall_inject_val_list_inject; eauto.
       destruct (val_casted.vals_defined vals1); auto.
@@ -1261,9 +1277,17 @@ Proof. intros.
       eapply forall_inject_val_list_inject; eauto.
       destruct (val_casted.vals_defined vals1); auto.
       rewrite andb_comm in Heq; inv Heq. }
+    simpl; revert H0; case_eq 
+      (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                        | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                       end
+                 with 0%Z => 0%Z
+                   | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+                 end) Int.max_unsigned).
     solve[auto].
-
     intros CONTRA. solve[elimtype False; auto].
+    intros CONTRA. solve[elimtype False; auto].
+
   destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
      VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
     as [AA [BB [CC [DD [EE [FF GG]]]]]].
@@ -1284,15 +1308,15 @@ Proof. intros.
           rewrite orb_true_iff. right. 
           apply (val_casted.getBlocks_encode_longs (sig_args (fn_sig f))); auto.
         red; intros. apply loc_arguments_rec_charact in H. 
-           destruct l; try contradiction.
+           destruct l0; try contradiction.
            destruct sl; try contradiction. trivial. }
     constructor.
   rewrite initial_SM_as_inj.
   intuition.
       red; intros. specialize (Genv.find_funct_ptr_not_fresh prog). intros.
          destruct InitMem as [m0 [INIT_MEM [? ?]]].
-         specialize (H0 _ _ _ INIT_MEM H). 
-         destruct (valid_init_is_global _ R _ INIT_MEM _ H0) as [id Hid]. 
+         specialize (H1 _ _ _ INIT_MEM H). 
+         destruct (valid_init_is_global _ R _ INIT_MEM _ H1) as [id Hid]. 
            destruct PG as [PGa [PGb PGc]]. split. eapply PGa; eassumption.
          unfold isGlobalBlock. 
           apply orb_true_iff. left. apply genv2blocksBool_char1.

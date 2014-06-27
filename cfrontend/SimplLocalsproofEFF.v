@@ -3991,7 +3991,6 @@ Lemma MATCH_init_core: forall (v1 v2 : val) (sig : signature) entrypoints
   (InitMem : exists m0 : mem, Genv.init_mem prog = Some m0 
       /\ Ple (Mem.nextblock m0) (Mem.nextblock m1) 
       /\ Ple (Mem.nextblock m0) (Mem.nextblock m2))
-(*  (GDE: genvs_domain_eq ge tge)*)
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
@@ -4017,6 +4016,18 @@ Proof. intros.
   case_eq (tys_nonvoid targs); try solve[simpl; intros; congruence].
   case_eq (vals_defined vals1); try solve[simpl; intros; congruence].
   intros DEF TNV VALCAST; inversion 1; subst.
+
+  simpl; revert H1; case_eq 
+    (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0%Z => 0%Z
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
+  intros l _. 
+  2: simpl; solve[inversion 2].
+  simpl. inversion 1.
+
   exploit function_ptr_translated; eauto. intros [tf [FIND TR]].
   exists (CL_Callstate tf vals2 Kstop).
   split. simpl.
@@ -4025,6 +4036,10 @@ Proof. intros.
     rewrite D in FIND. inv FIND. simpl.
   case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
   rewrite D, <-(type_of_transf_fundef _ _ TR), tyof.
+  assert (Hlen: Zlength vals2 = Zlength vals1).
+  { apply forall_inject_val_list_inject in VInj. clear - VInj. 
+    induction VInj; auto. rewrite !Zlength_cons, IHVInj; auto. }
+  rewrite Hlen.
   assert (H: val_casted_list vals2 targs). 
   { cut (val_casted_list vals1 targs).
     cut (val_list_inject j vals1 vals2).
@@ -4035,9 +4050,16 @@ Proof. intros.
   { eapply vals_inject_defined; eauto. 
     eapply forall_inject_val_list_inject; eauto. }
   monadInv TR. rename x into tf. 
+  simpl; revert H0; case_eq 
+    (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0%Z => 0%Z
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
   solve[rewrite <-val_casted_list_funcP in H; rewrite H, TNV; auto].
-  intros CONTRA.
-  solve[elimtype False; auto].
+  intros CONTRA. solve[elimtype False; auto].
+  intros CONTRA. solve[elimtype False; auto].
   destruct InitMem as [m0 [INIT_MEM [A B]]].
   split. econstructor; try rewrite initial_SM_as_inj; try eassumption.
           intros. econstructor. 

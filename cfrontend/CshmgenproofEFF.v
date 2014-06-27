@@ -2137,101 +2137,6 @@ Proof.
   rewrite <- match_genv_meminj_preserves_extern_iff_all; trivial.
     apply MC. apply MC.
 Qed.
-(*
-Lemma MATCH_initial: forall v1 v2 sig entrypoints
-      (EP: In (v1, v2, sig) entrypoints)
-      (entry_points_ok : forall (v1 v2 : val) (sig : signature),
-                  In (v1, v2, sig) entrypoints ->
-                  exists b f1 f2,
-                    v1 = Vptr b Int.zero /\
-                    v2 = Vptr b Int.zero /\
-                    Genv.find_funct_ptr ge b = Some f1 /\
-                    Genv.find_funct_ptr tge b = Some f2)
-      vals1 c1 m1 j vals2 m2 (DomS DomT : block -> bool)
-      (FE : Clight.function -> list val -> mem -> Clight.env -> Clight.temp_env -> mem -> Prop)
-      (FE_FWD : forall f vargs m e lenv m', FE f vargs m e lenv m' ->
-                mem_forward m m')
-      (FE_UNCH : forall f vargs m e lenv m', FE f vargs m e lenv m' ->
-          Mem.unchanged_on
-            (fun (b : block) (z : Z) => EmptyEffect b z = false) m m')
-      (Ini: initial_core (clight_eff_sem FE FE_FWD FE_UNCH) ge v1 vals1 = Some c1)
-      (Inj: Mem.inject j m1 m2)
-      (VInj: Forall2 (val_inject j) vals1 vals2)
-      (PG:meminj_preserves_globals ge j)
-      (R : list_norepet (map fst (prog_defs prog)))
-      (J: forall b1 b2 delta, j b1 = Some (b2, delta) -> 
-            (DomS b1 = true /\ DomT b2 = true))
-      (RCH1: forall b, REACH m1 
-        (fun b' : Values.block => isGlobalBlock ge b' || getBlocks vals1 b') b =
-         true -> DomS b = true)
-      (RCH2: forall b, REACH m2 
-        (fun b' : Values.block => isGlobalBlock tge b' || getBlocks vals2 b') b =
-         true -> DomT b = true)
-      (RCL: REACH_closed m1 DomS) 
-      (MS: forall b1, DomS b1=true -> exists b2 d, j b1 = Some(b2,d) /\ DomT b2=true)
-      (InitMem : exists m0 : mem, Genv.init_mem prog = Some m0 
-               /\ Ple (Mem.nextblock m0) (Mem.nextblock m1) 
-               /\ Ple (Mem.nextblock m0) (Mem.nextblock m2))   
-      (GDE: genvs_domain_eq ge tge)
-      (HDomS: forall b : block, DomS b = true -> Mem.valid_block m1 b)
-      (HDomT: forall b : block, DomT b = true -> Mem.valid_block m2 b),
-exists c2,
-  initial_core (csharpmin_eff_sem hf) tge v2 vals2 = Some c2 /\
-  MATCH c1 (initial_SM DomS DomT DomS DomT j) c1 m1 c2 m2.
-Proof. intros.
-  inversion Ini.
-  unfold  CL_initial_core in H0. unfold ge in *. unfold tge in *.
-  destruct v1; inv H0.
-  remember (Int.eq_dec i Int.zero) as z; destruct z; inv H1. clear Heqz.
-  remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz; inv H0. 
-    apply eq_sym in Heqzz.
-  exploit function_ptr_translated; eauto. intros [tf [FP TF]].
-  exists (CSharpMin_Callstate tf vals2 Kstop).
-  split. 
-    destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
-    subst. inv A. rewrite C in Heqzz. inv Heqzz.
-    unfold tge in FP. rewrite D in FP. inv FP.
-    unfold csharpmin_eff_sem, csharpmin_coop_sem. simpl.
-    case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
-    solve[rewrite D; auto].
-
-    intros CONTRA.
-    solve[elimtype False; auto].
-  assert (exists targs tres, type_of_fundef f = Tfunction targs tres).
-         destruct f; simpl. eexists; eexists. reflexivity.
-         eexists; eexists. reflexivity.
-  destruct H as [targs [tres Tfun]].
-Locate core_initial_wd.
-  destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
-     VInj J (*RCH1*) RCH2 PG GDE (*MS*) HDomS HDomT (* RCL*) _ (eq_refl _))
-    as [AA [BB [CC [DD [EE [FF GG]]]]]].
-  intuition.
-  split.
-    eapply match_callstate; try eassumption.
-      constructor.
-      constructor.
-    rewrite initial_SM_as_inj.
-      unfold vis, initial_SM; simpl.
-      apply forall_inject_val_list_inject.
-      eapply restrict_forall_vals_inject; try eassumption.
-        intros. apply AA. apply REACH_nil. rewrite H; intuition.
-  intuition.
-    rewrite match_genv_meminj_preserves_extern_iff_all.
-      assumption.
-      apply BB.
-      apply EE.
-    rewrite initial_SM_as_inj.
-      red; intros. specialize (Genv.find_funct_ptr_not_fresh prog). intros.
-         destruct InitMem as [m0 [InitMem [? ?]]].
-         specialize (H0 _ _ _ InitMem H). 
-         destruct (valid_init_is_global _ R _ InitMem _ H0) as [id Hid]. 
-           destruct PG as [PGa [PGb PGc]]. split. eapply PGa; eassumption.
-         unfold isGlobalBlock. 
-          apply orb_true_iff. left. apply genv2blocksBool_char1.
-            simpl. exists id; eassumption.
-    rewrite initial_SM_as_inj; assumption.
-Qed.
-*)
 
 Lemma MATCH_initial: forall v1 v2 sig entrypoints
       (EP: In (v1, v2, sig) entrypoints)
@@ -2286,16 +2191,24 @@ intros.
   case_eq (val_casted.val_casted_list_func vals1 t).
   2: solve[intros cast; rewrite cast in H1; inv H1].
   intros cast. case_eq (val_casted.vals_defined vals1).
-  2: solve[intros def; rewrite cast, def, andb_comm in H1; inv H1].
+  2: solve[intros def; rewrite cast, def in H1; simpl in H1;
+           rewrite <-andb_assoc, andb_comm in H1; inv H1].
   intros def; rewrite cast,def in H1. simpl in H1. 
   rewrite andb_comm in H1; simpl in H1.
   case_eq (val_casted.tys_nonvoid t). 
-  2: solve[intros nvoid; rewrite nvoid in H1; inv H1].
+  2: solve[intros nvoid; rewrite nvoid, andb_comm in H1; inv H1].
   intros nvoid; rewrite nvoid in H1. inv H1.
+  revert H0; case_eq 
+         (zlt (match match Zlength vals1 with 0 => 0
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0 => 0
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned); simpl.
+  2: solve[inversion 2]. intros l _. inversion 1; subst.
   exploit function_ptr_translated; eauto. intros [tf' [FIND TR]].
   exists (CSharpMin_Callstate tf' vals2 Kstop).
-  split.
-  simpl. 
+  split. simpl. 
   destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
   subst. inv A. rewrite C in Heqzz. inv Heqzz. 
   unfold tge in FIND. rewrite D in FIND. inv FIND.
@@ -2343,8 +2256,8 @@ intros.
     rewrite initial_SM_as_inj.
       red; intros. specialize (Genv.find_funct_ptr_not_fresh prog). intros.
          destruct InitMem as [m0 [InitMem [? ?]]].
-         specialize (H0 _ _ _ InitMem H). 
-         destruct (valid_init_is_global _ R _ InitMem _ H0) as [id Hid]. 
+         specialize (H1 _ _ _ InitMem H). 
+         destruct (valid_init_is_global _ R _ InitMem _ H1) as [id Hid]. 
            destruct PG as [PGa [PGb PGc]]. split. eapply PGa; eassumption.
          unfold isGlobalBlock. 
           apply orb_true_iff. left. apply genv2blocksBool_char1.

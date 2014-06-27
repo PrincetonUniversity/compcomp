@@ -212,6 +212,7 @@ Definition Linear_initial_core (ge:genv) (v: val) (args:list val):
                      let tyl := sig_args (funsig f) in
                      if val_has_type_list_func args (sig_args (funsig f))
                         && vals_defined args
+                        && zlt (4*(2*(Zlength args))) Int.max_unsigned
                      then let ls0 := init_locset (sig_args (funsig f)) args 
                           in Some (Linear_CallstateIn nil f ls0 (mk_load_frame ls0 fi))
                      else None

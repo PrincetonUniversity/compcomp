@@ -114,6 +114,7 @@ Definition Asm_initial_core (ge:genv) (v: val) (args:list val):
                      let tyl := sig_args (funsig f) in
                      if val_has_type_list_func args (sig_args (funsig f))
                         && vals_defined args
+                        && zlt (4*(2*(Zlength args))) Int.max_unsigned
                      then Some (State (funsig f)
                                ((Pregmap.init Vundef)
                                     # PC <- (Vptr b Int.zero) (*lenb: is this use of f correct here?*)
