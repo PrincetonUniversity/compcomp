@@ -3803,29 +3803,7 @@ Proof. intros.
           rewrite <- FRG. eapply H6; eassumption. 
   split; trivial. }
 
-{ (* annot *)
-  admit. (* We don't treat annotations yet.
-   exploit (exec_moves mv); eauto. intros [ls1 [A1 B1]]. 
-   exploit external_call_mem_extends; eauto. eapply add_equations_args_lessdef; eauto.
-  inv WTI. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto. 
-  intros [v' [m'' [F [G [J K]]]]].
-  assert (v = Vundef). red in H0; inv H0. auto.
-  econstructor; split.
-  eapply plus_left. econstructor; eauto. 
-  eapply star_trans. eexact A1. 
-  eapply star_two. econstructor.
-  eapply external_call_symbols_preserved' with (ge1 := ge).
-  econstructor; eauto. 
-  exact symbols_preserved. exact varinfo_preserved.
-  eauto. constructor. eauto. eauto. traceEq.
-  exploit satisf_successors. eauto. eauto. simpl; eauto. eauto. 
-  eapply satisf_undef_reg with (r := res).
-  eapply add_equations_args_satisf; eauto. 
-  intros [enext [U V]]. 
-  econstructor; eauto.
-  change (destroyed_by_builtin (EF_annot txt typ)) with (@nil mreg). 
-  simpl. subst v. assumption.
-  apply wt_regset_assign; auto. subst v. constructor. *) }
+{ (* annot *) simpl in *. elimtype False. apply H1; auto. }
 
 { (* cond *)
   exploit (exec_moves mv); eauto. intros [ls1 [A1 B1]].
@@ -5206,29 +5184,7 @@ induction CS;
     destruct H3 as [[EFF VB] _].
     eapply BuiltinEffect_Propagate; eassumption. }
 
-{ (* annot *)
-   admit. (*We don't treat ennotations yet
-   exploit (Eff_exec_moves mv); eauto. intros [ls1 [A1 B1]]. 
-   exploit external_call_mem_extends; eauto. eapply add_equations_args_lessdef; eauto.
-  inv WTI. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto. 
-  intros [v' [m'' [F [G [J K]]]]].
-  assert (v = Vundef). red in H0; inv H0. auto.
-  econstructor; split.
-  eapply plus_left. econstructor; eauto. 
-  eapply star_trans. eexact A1. 
-  eapply star_two. econstructor.
-  eapply external_call_symbols_preserved' with (ge1 := ge).
-  econstructor; eauto. 
-  exact symbols_preserved. exact varinfo_preserved.
-  eauto. constructor. eauto. eauto. traceEq.
-  exploit satisf_successors. eauto. eauto. simpl; eauto. eauto. 
-  eapply satisf_undef_reg with (r := res).
-  eapply add_equations_args_satisf; eauto. 
-  intros [enext [U V]]. 
-  econstructor; eauto.
-  change (destroyed_by_builtin (EF_annot txt typ)) with (@nil mreg). 
-  simpl. subst v. assumption.
-  apply wt_regset_assign; auto. subst v. constructor. *) }
+{ (* annot *) simpl in *. elimtype False; apply H1; auto. }
 
 { (* cond *)
   exploit (Eff_exec_moves mv); eauto. intros [ls1 [A1 B1]].
