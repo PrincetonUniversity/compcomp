@@ -20,6 +20,7 @@ Require Import mem_lemmas. (*for mem_forward*)
 Require Import core_semantics.
 Require Import effect_semantics.
 Require Import BuiltinEffects.
+Require Import load_frame.
 
 Notation "a ## b" := (List.map a b) (at level 1).
 Notation "a # b <- c" := (Regmap.set b c a) (at level 1, b at next level).

@@ -51,6 +51,7 @@ Require Import Mach_coop.
 Require Import BuiltinEffects.
 Require Import Mach_eff.
 Require Import val_casted.
+Require Import load_frame.
 
 (** * Properties of frame offsets *)
 
@@ -277,113 +278,6 @@ simpl. destruct v; auto. intros [H [H2 H3]]. solve[split; auto].
 simpl. intros [H2 H3]. split; auto.
   revert H2. solve[apply val_inject_extern_incr; auto].
 Qed.
-
-Fixpoint agree_args_contains_aux m' sp' ofs args tys : Prop :=
-  let vsp := Vptr sp' Int.zero in
-  match tys with
-    | nil => args=nil
-    | ty'::tys' => 
-      match args with 
-        | nil => False
-        | a'::args' => 
-          match ty' with
-            | Tlong => 
-              match a' with
-                | Vlong n => 
-                  load_stack m' vsp Tint (Int.repr (fe_ofs_arg + 4*(ofs+1)))
-                  = Some (Vint (Int64.hiword n))
-                  /\ load_stack m' vsp Tint (Int.repr (fe_ofs_arg + 4*ofs))
-                     = Some (Vint (Int64.loword n))
-                  /\ agree_args_contains_aux m' sp' (ofs+2) args' tys'
-                | _ => False
-              end
-            | _ =>  
-              load_stack m' vsp ty' (Int.repr (fe_ofs_arg + 4*ofs)) = Some a' 
-              /\ agree_args_contains_aux m' sp' (ofs+typesize ty') args' tys'
-          end
-      end
-  end.
-
-Lemma agree_args_contains_aux_invariant:
-  forall tys m sp ofs args m',
-  agree_args_contains_aux m sp ofs args tys -> 
-  Mem.unchanged_on (fun b ofs => b=sp) m m' ->
-  agree_args_contains_aux m' sp ofs args tys.
-Proof.
-induction tys. destruct args; simpl; auto.
-intros m'; destruct args; simpl; auto. destruct a.
-generalize
-     (Int.repr
-        match ofs with
-        | 0 => 0
-        | Z.pos y' => Z.pos y'~0~0
-        | Z.neg y' => Z.neg y'~0~0
-        end) as z. 
-intros z [H H2] [H3 H4]. split; eauto. 
-unfold load_stack, Mem.loadv in H3|-*. 
-revert H3; case_eq (Val.add (Vptr sp Int.zero) (Vint z)); 
-  try solve[inversion 1].
-simpl; intros ? ?; inversion 1; subst.
-eapply Mem.load_unchanged_on. eapply H0. intros. solve[simpl; auto].
-generalize
-     (Int.repr
-        match ofs with
-        | 0 => 0
-        | Z.pos y' => Z.pos y'~0~0
-        | Z.neg y' => Z.neg y'~0~0
-        end) as z. 
-intros z [H H2] [H3 H4]. split; eauto. 
-unfold load_stack, Mem.loadv in H3|-*. 
-revert H3; case_eq (Val.add (Vptr sp Int.zero) (Vint z)); 
-  try solve[inversion 1].
-simpl; intros ? ?; inversion 1; subst.
-eapply Mem.load_unchanged_on. eapply H0. intros. solve[simpl; auto].
-generalize
-     (Int.repr
-        match ofs with
-        | 0 => 0
-        | Z.pos y' => Z.pos y'~0~0
-        | Z.neg y' => Z.neg y'~0~0
-        end) as z. 
-generalize
-     (Int.repr
-        match ofs + 1 with
-        | 0 => 0
-        | Z.pos y' => Z.pos y'~0~0
-        | Z.neg y' => Z.neg y'~0~0
-        end) as z1. 
-destruct v; try inversion 3.
-intros z1 z [H H2] [H3 [H4 H5]]. split; eauto. 
-unfold load_stack, Mem.loadv in H3|-*. 
-revert H3; case_eq (Val.add (Vptr sp Int.zero) (Vint z)); 
-  try solve[inversion 1].
-simpl; intros ? ?; inversion 1; subst.
-eapply Mem.load_unchanged_on. eapply H0. intros. solve[simpl; auto].
-split. eapply Mem.load_unchanged_on; eauto. intros. solve[simpl; auto].
-solve[eapply IHtys; eauto]. 
-generalize
-     (Int.repr
-        match ofs with
-        | 0 => 0
-        | Z.pos y' => Z.pos y'~0~0
-        | Z.neg y' => Z.neg y'~0~0
-        end) as z. 
-intros z [H H2] [H3 H4]. split; eauto. 
-unfold load_stack, Mem.loadv in H3|-*. 
-revert H3; case_eq (Val.add (Vptr sp Int.zero) (Vint z)); 
-  try solve[inversion 1].
-simpl; intros ? ?; inversion 1; subst.
-eapply Mem.load_unchanged_on. eapply H0. intros. solve[simpl; auto].
-Qed.
-
-(*Fixpoint agree_args_contains_aux m' sp' ofs args tys : Prop :=
-  match args,tys with
-    | nil,nil => True
-    | a::args',ty::tys' => 
-        Mem.load (chunk_of_type ty) m' sp' (fe_ofs_arg + 4*ofs) = Some a
-        /\ agree_args_contains_aux m' sp' (ofs+1) args' tys'
-    | _,_ => False
-  end.*)
 
 Fixpoint last_frame (stack: list Linear.stackframe) :=
   match stack with
@@ -1461,50 +1355,6 @@ solve[rewrite replace_locals_as_inj, replace_locals_vis; auto].
 solve[rewrite replace_locals_as_inj; auto].
 solve[rewrite replace_locals_locBlocksTgt; auto].
 Qed.
-
-(*TODO: put in core/StructuredInjections or somewhere similar*)
-Lemma forall_vals_inject_restrictD' j vals1 vals2 X 
-      (Inj : Forall2 (val_inject (restrict j X)) vals1 vals2) :
-  Forall2 (val_inject j) vals1 vals2 
-  /\ (forall b : block, getBlocks vals1 b = true -> X b = true).
-Proof. 
-intros. induction Inj. constructor.
-constructor; trivial. unfold getBlocks. simpl. intros; congruence.
-destruct IHInj as [H0 H1]. split. constructor; auto.
-  eapply val_inject_restrictD in H. eassumption.
-intros b0 GET. rewrite getBlocksD in GET. 
-assert (H2: (exists ofs, x=Vptr b0 ofs) \/ getBlocks l b0=true).
-{ revert GET; case_eq x; auto. intros b1 i ? H2; subst x. 
-  rewrite orb_true_iff in H2. destruct H2; auto. 
-  destruct (eq_block b1 b0); try (simpl in H2; congruence). subst.
-  left. exists i. auto. }
-destruct H2 as [[ofs H2]|H2]. subst x. 
-inv H. apply restrictD_Some in H4. destruct H4; auto.
-apply H1; auto.
-Qed.
-
-Lemma forall_vals_inject_intern_incr mu mu' vals1 vals2 
-      (Inj : Forall2 (val_inject (as_inj mu)) vals1 vals2) 
-      (Incr : intern_incr mu mu') 
-      (WD : SM_wd mu') : 
-  Forall2 (val_inject (as_inj mu')) vals1 vals2. 
-Proof. 
-intros. induction Inj. constructor.
-constructor; trivial. apply val_inject_incr with (f1 := as_inj mu); auto.
-apply intern_incr_as_inj; auto.
-Qed.
-
-Lemma forall_vals_inject_extern_incr mu mu' vals1 vals2 
-      (Inj : Forall2 (val_inject (as_inj mu)) vals1 vals2) 
-      (Incr : extern_incr mu mu') 
-      (WD : SM_wd mu') : 
-  Forall2 (val_inject (as_inj mu')) vals1 vals2. 
-Proof. 
-intros. induction Inj. constructor.
-constructor; trivial. apply val_inject_incr with (f1 := as_inj mu); auto.
-apply extern_incr_as_inj; auto.
-Qed.
-(*END TODO*)
 
 Lemma agree_args_replace_externs f0 mu args tys stack ls m' sp' FS FT 
     (HFS: forall b, vis mu b = true -> locBlocksSrc mu b || FS b = true) :
