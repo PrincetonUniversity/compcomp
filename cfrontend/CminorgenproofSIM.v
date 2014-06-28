@@ -313,7 +313,8 @@ exists c2 : CMin_core,
   initial_core (CMin_core_sem hf) tge v2 vals2 = Some c2 /\
   match_cores c1 j c1 m1 c2 m2. 
 Proof. intros.
-  inversion CSM_Ini. unfold  CSharpMin_initial_core in H0. unfold ge in *. unfold tge in *.
+  inversion CSM_Ini. unfold  CSharpMin_initial_core in H0. 
+    unfold ge in *. unfold tge in *.
   destruct v1; inv H0.
   remember (Int.eq_dec i Int.zero) as z; destruct z; inv H1. clear Heqz.
   remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz; inv H0. 
@@ -327,9 +328,21 @@ Proof. intros.
   subst. inv A. rewrite C in Heqzz. inv Heqzz. rewrite D in FIND. inv FIND.
   unfold CMin_initial_core. revert CSM_Ini; simpl.
   case_eq (Int.eq_dec Int.zero Int.zero). intros ? e. rewrite C, D.
-  case_eq (val_casted.val_has_type_list_func vals1 (sig_args (Csharpminor.funsig (Internal f)))).
+  case_eq (val_casted.val_has_type_list_func vals1 
+            (sig_args (Csharpminor.funsig (Internal f)))).
   case_eq (val_casted.vals_defined vals1).
-  intros H H2.
+  intros H H2. 
+  assert (Zlength vals2 = Zlength vals1) as ->. 
+  { apply forall_inject_val_list_inject in VI. clear - VI. induction VI; auto.
+    rewrite !Zlength_cons, IHVI; auto. }
+  case_eq 
+    (zlt (match match Zlength vals1 with 0 => 0
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0 => 0
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned); simpl.
+  2: solve[inversion 2]. intros l _. inversion 1; subst.
 
   assert (val_casted.val_has_type_list_func vals2
            (sig_args (funsig tf))=true) as ->.
@@ -352,9 +365,19 @@ Proof. intros.
   simpl; intros; congruence.
   intros. solve[elim n; auto].
   revert H1.
-  case_eq (val_casted.val_has_type_list_func vals1 (sig_args (Csharpminor.funsig (Internal f)))).
+  case_eq (val_casted.val_has_type_list_func vals1 
+            (sig_args (Csharpminor.funsig (Internal f)))).
   intros ?; inversion 1; subst. 
-  case_eq (val_casted.vals_defined vals1). intros H3. rewrite H3 in H2. inv H2.
+  case_eq (val_casted.vals_defined vals1). 
+    intros H3. rewrite H3 in H2. 
+  revert H2. case_eq 
+    (zlt (match match Zlength vals1 with 0 => 0
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0 => 0
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned); simpl.
+  intros l ? H2; inv H2.
   eapply MC_callstate with (cenv:=PTree.empty _)(cs := @nil frame); try eassumption.
   destruct INIT_MEM as [m0 [INIT_MEM [A B]]].
   assert (Genv.init_mem tprog = Some m0).
@@ -365,8 +388,8 @@ Proof. intros.
   apply A. apply B.
   econstructor. simpl. trivial.
   simpl. apply forall_inject_val_list_inject; auto.
-  intros H3; rewrite H3 in H2. inv H2.
-  solve[intros ?; inversion 1].
+  solve[intros ?; inversion 2].
+  intros H3; rewrite H3 in H2. inv H2. simpl. inversion 2.
 Qed.
 
 Lemma MC_safely_halted: forall (cd : core_data) (j : meminj) (c1 : CSharpMin_core) (m1 : mem)

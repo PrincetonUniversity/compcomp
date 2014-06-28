@@ -100,7 +100,7 @@ BACKEND=\
   Linear.v Linear_coop.v Linear_eff.v Lineartyping.v \
   Linearize.v Linearizeproof.v LinearizeproofEFF.v \
   CleanupLabels.v CleanupLabelsproof.v CleanupLabelsproofEFF.v \
-  Mach.v Mach_coop.v Mach_eff.v \
+  load_frame.v Mach.v Mach_coop.v Mach_eff.v \
   Bounds.v Stacklayout.v Stacking.v Stackingproof.v StackingproofEFF.v \
   Asm.v Asmgen.v Asmgenproof0.v Asmgenproof1.v Asmgenproof.v \
   AsmEFF.v AsmgenEFF.v Asm_coop.v Asm_eff.v \
@@ -134,7 +134,7 @@ CORE=Extensionality.v base.v eq_dec.v Address.v \
   closed_safety.v trace_semantics.v open_semantics_preservation.v \
   nucular_semantics.v \
   wholeprog_simulations.v wholeprog_lemmas.v barebones_simulations.v \
-  val_casted.v 
+  val_casted.v
 
 # Linking files
 

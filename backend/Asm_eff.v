@@ -148,14 +148,14 @@ Variable ge: genv.
 Inductive asm_effstep: (block -> Z -> bool) -> 
                        state -> mem -> state -> mem -> Prop :=
   | asm_effexec_step_internal:
-      forall b ofs f i rs m rs' m' sg,
+      forall b ofs f i rs m rs' m' lf,
       rs PC = Vptr b ofs ->
       Genv.find_funct_ptr ge b = Some (Internal f) ->
       find_instr (Int.unsigned ofs) (fn_code f) = Some i ->
       exec_instr ge (fn_code f) i rs m = Next rs' m' ->
-      asm_effstep (effect_instr ge (fn_code f) i rs m) (State sg rs) m (State sg rs') m'
+      asm_effstep (effect_instr ge (fn_code f) i rs m) (State rs lf) m (State rs' lf) m'
   | asm_effexec_step_builtin:
-      forall b ofs f ef args res rs m t vl rs' m' sg,
+      forall b ofs f ef args res rs m t vl rs' m' lf,
       rs PC = Vptr b ofs ->
       Genv.find_funct_ptr ge b = Some (Internal f) ->
       find_instr (Int.unsigned ofs) (fn_code f) = Some (Pbuiltin ef args res) ->
@@ -164,31 +164,22 @@ Inductive asm_effstep: (block -> Z -> bool) ->
       rs' = nextinstr_nf 
              (set_regs res vl
                (undef_regs (map preg_of (destroyed_by_builtin ef)) rs)) ->
-      asm_effstep (effect_instr ge (fn_code f) (Pbuiltin ef args res) rs m) (State sg rs) m (State sg rs') m'
-(*WE DON'T SUPPORT ANNOTS YET
-  | asm_effexec_step_annot:
-      forall b ofs c ef args rs m vargs t v m',
-      rs PC = Vptr b ofs ->
-      Genv.find_funct_ptr ge b = Some (Internal c) ->
-      find_instr (Int.unsigned ofs) c = Some (Pannot ef args) ->
-      annot_arguments rs m args vargs ->
-      external_call' ef ge vargs m t v m' ->
-      asm_effstep (State rs) m (State (nextinstr rs)) m'*)
+      asm_effstep (effect_instr ge (fn_code f) (Pbuiltin ef args res) rs m) (State rs lf) m (State rs' lf) m'
   | asm_effexec_step_to_external:
-      forall b ef args rs m sg,
+      forall b ef args rs m lf,
       rs PC = Vptr b Int.zero ->
       Genv.find_funct_ptr ge b = Some (External ef) ->
       extcall_arguments rs m (ef_sig ef) args ->
-      asm_effstep EmptyEffect (State sg rs) m (ExtCallState sg ef args rs) m
+      asm_effstep EmptyEffect (State rs lf) m (Asm_CallstateOut ef args rs lf) m
   | asm_effexec_step_external:
-      forall sg b callee args res rs m t rs' m'
+      forall b callee args res rs m t rs' m' lf
       (OBS: EFisHelper hf callee),
       rs PC = Vptr b Int.zero ->
       Genv.find_funct_ptr ge b = Some (External callee) ->
       external_call' callee ge args m t res m' ->
       rs' = (set_regs (loc_external_result (ef_sig callee)) res rs) #PC <- (rs RA) ->
       asm_effstep  (BuiltinEffect ge callee args m)
-         (ExtCallState sg callee args rs) m (State sg rs') m'.
+         (Asm_CallstateOut callee args rs lf) m (State rs' lf) m'.
 End EFFSEM.
 
 Section ASM_EFFSEM.
@@ -396,6 +387,5 @@ apply asm_effstep_valid.
 Defined.
 
 End ASM_EFFSEM.
-
 
 End ASM_EFF.

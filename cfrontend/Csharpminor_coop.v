@@ -227,6 +227,7 @@ Definition CSharpMin_initial_core (ge:genv) (v: val) (args:list val): option CSh
                     match f with Internal fi =>
                       if val_has_type_list_func args (sig_args (funsig f))
                          && vals_defined args
+                         && zlt (4*(2*(Zlength args))) Int.max_unsigned
                       then Some (CSharpMin_Callstate f args Kstop)
                       else None
                     | External _ => None

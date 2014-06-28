@@ -19,11 +19,20 @@ Require Import mem_lemmas. (*for mem_forward*)
 Require Import core_semantics.
 Require Import val_casted.
 Require Import BuiltinEffects.
+Require Import load_frame.
 
 Notation SP := ESP (only parsing).
 
 Notation "a # b" := (a b) (at level 1, only parsing).
 Notation "a # b <- c" := (Pregmap.set b c a) (at level 1, b at next level).
+
+Inductive load_frame: Type :=
+| mk_load_frame:
+    forall (sp: block)          (**r pointer to argument frame *)
+           (args: list val)     (**r initial program arguments *)
+           (tys: list typ)      (**r initial argument types *)
+           (retty: option typ), (**r optional return type *)
+    load_frame.
 
 Section ASM_COOP.
 Variable hf : I64Helpers.helper_functions.
@@ -32,19 +41,36 @@ Section RELSEM.
 Variable ge: genv.
 
 Inductive state: Type :=
-  | State: signature -> regset -> state
-  | ExtCallState: signature -> external_function -> list val -> regset -> state.
+  | State: 
+      forall (rs: regset)
+             (loader: load_frame),     (**r program loader frame *)
+        state
+
+  (*Auxiliary state: for marshalling arguments INTO memory*)
+  | Asm_CallstateIn: 
+      forall (f: block)                (**r pointer to function to call *)
+             (args: list val)          (**r arguments passed to initial_core *)
+             (tys: list typ),          (**r argument types *)
+        state
+
+  (*Auxiliary state: for marshalling arguments OUT OF memory*)
+  | Asm_CallstateOut: 
+      forall (f: external_function)    (**r external function to be called *)
+             (vals: list val)          (**r at_external arguments *)
+             (rs: regset)              (**r register state *)
+             (loader: load_frame),     (**r program loader frame *)
+        state.
 
 Inductive asm_step: state -> mem -> state -> mem -> Prop :=
   | asm_exec_step_internal:
-      forall b ofs f i rs m rs' m' sg,
+      forall b ofs (f:function) i rs m rs' m' lf,
       rs PC = Vptr b ofs ->
       Genv.find_funct_ptr ge b = Some (Internal f) ->
       find_instr (Int.unsigned ofs) (fn_code f) = Some i ->
       exec_instr ge (fn_code f) i rs m = Next rs' m' ->
-      asm_step (State sg rs) m (State sg rs') m'
+      asm_step (State rs lf) m (State rs' lf) m'
   | asm_exec_step_builtin:
-      forall b ofs f ef args res rs m t vl rs' m' sg,
+      forall b ofs f ef args res rs m t vl rs' m' lf,
       rs PC = Vptr b ofs ->
       Genv.find_funct_ptr ge b = Some (Internal f) ->
       find_instr (Int.unsigned ofs) (fn_code f) = Some (Pbuiltin ef args res) ->
@@ -53,37 +79,28 @@ Inductive asm_step: state -> mem -> state -> mem -> Prop :=
       rs' = nextinstr_nf 
              (set_regs res vl
                (undef_regs (map preg_of (destroyed_by_builtin ef)) rs)) ->
-      asm_step (State sg rs) m (State sg rs') m'
-(*WE DON'T SUPPORT  ANNOTS YET
-  | asm_exec_step_annot:
-      forall b ofs c ef args rs m vargs t v m',
-      rs PC = Vptr b ofs ->
-      Genv.find_funct_ptr ge b = Some (Internal c) ->
-      find_instr (Int.unsigned ofs) c = Some (Pannot ef args) ->
-      annot_arguments rs m args vargs ->
-      external_call' ef ge vargs m t v m' ->
-      asm_step (State rs) m (State (nextinstr rs)) m'*)
+      asm_step (State rs lf) m (State rs' lf) m'
   | asm_exec_step_to_external:
-      forall b ef args rs m sg,
+      forall b ef args rs m lf,
       rs PC = Vptr b Int.zero ->
       Genv.find_funct_ptr ge b = Some (External ef) ->
       extcall_arguments rs m (ef_sig ef) args ->
-      asm_step (State sg rs) m (ExtCallState sg ef args rs) m
+      asm_step (State rs lf) m (Asm_CallstateOut ef args rs lf) m
   | asm_exec_step_external:
-      forall sg b callee args res rs m t rs' m'
+      forall b callee args res rs m t rs' m' lf
       (OBS: EFisHelper hf callee),
       rs PC = Vptr b Int.zero ->
       Genv.find_funct_ptr ge b = Some (External callee) ->
       external_call' callee ge args m t res m' ->
       rs' = (set_regs (loc_external_result (ef_sig callee)) res rs) #PC <- (rs RA) ->
-      asm_step (ExtCallState sg callee args rs) m (State sg rs') m'.
+      asm_step (Asm_CallstateOut callee args rs lf) m (State rs' lf) m'.
 
 End RELSEM.
 
 Definition Asm_at_external (c: state):
           option (external_function * signature * list val) :=
   match c with
-    ExtCallState _ ef args rs =>
+    Asm_CallstateOut ef args rs lf =>
       if observableEF_dec hf ef
       then Some(ef, ef_sig ef, decode_longs (sig_args (ef_sig ef)) args)
       else None
@@ -92,12 +109,14 @@ Definition Asm_at_external (c: state):
 
 Definition Asm_after_external (vret: option val)(c: state) : option state :=
   match c with 
-    ExtCallState sg ef args rs => 
+    Asm_CallstateOut ef args rs lf => 
       match vret with
-         None => Some (State sg ((set_regs (loc_external_result (ef_sig ef)) 
-                               (encode_long (sig_res (ef_sig ef)) Vundef) rs) #PC <- (rs RA)))
-       | Some res => Some (State sg ((set_regs (loc_external_result (ef_sig ef)) 
-                               (encode_long (sig_res (ef_sig ef)) res) rs) #PC <- (rs RA))) 
+         None => Some (State ((set_regs (loc_external_result (ef_sig ef)) 
+                               (encode_long (sig_res (ef_sig ef)) Vundef) rs) #PC <- (rs RA))
+                      lf)
+       | Some res => Some (State ((set_regs (loc_external_result (ef_sig ef)) 
+                               (encode_long (sig_res (ef_sig ef)) res) rs) #PC <- (rs RA))
+                          lf) 
       end
   | _ => None
   end.
@@ -114,11 +133,8 @@ Definition Asm_initial_core (ge:genv) (v: val) (args:list val):
                      let tyl := sig_args (funsig f) in
                      if val_has_type_list_func args (sig_args (funsig f))
                         && vals_defined args
-                     then Some (State (funsig f)
-                               ((Pregmap.init Vundef)
-                                    # PC <- (Vptr b Int.zero) (*lenb: is this use of f correct here?*)
-                                    # RA <- Vzero
-                                    # ESP <- Vzero))
+                        && zlt (4*(2*(Zlength args))) Int.max_unsigned
+                     then Some (Asm_CallstateIn b args tyl)
                      else None
                    | External _ => None
                    end
@@ -126,29 +142,12 @@ Definition Asm_initial_core (ge:genv) (v: val) (args:list val):
           else None
      | _ => None
     end.
-(*COMPCERT:
-Inductive initial_state (p: program): state -> Prop :=
-  | initial_state_intro: forall m0,
-      Genv.init_mem p = Some m0 ->
-      let ge := Genv.globalenv p in
-      let rs0 :=
-        (Pregmap.init Vundef)
-        # PC <- (symbol_offset ge p.(prog_main) Int.zero)
-        # RA <- Vzero
-        # ESP <- Vzero in
-      initial_state p (State rs0 m0).
-
-Inductive final_state: state -> int -> Prop :=
-  | final_state_intro: forall rs m r,
-      rs#PC = Vzero ->
-      rs#EAX = Vint r ->
-      final_state (State rs m) r.
-*)
 
 Definition Asm_halted (q : state): option val :=
     match q with
-      State sg rs => if Val.cmp_bool Ceq (rs#PC) Vzero 
-                  then match sig_res sg
+      State rs (mk_load_frame b args tys retty) => 
+        if Val.cmp_bool Ceq (rs#PC) Vzero 
+                  then match retty 
                        with Some Tlong =>
                           match decode_longs (Tlong::nil) ((rs#EDX)::(rs#EAX)::nil) with
                                 | v :: nil => Some v
@@ -187,9 +186,9 @@ Lemma Asm_corestep_not_halted : forall ge m q m' q',
        asm_step ge q m q' m' -> 
        Asm_halted q = None.
   Proof. intros. inv H; simpl in *.
-    rewrite H0; simpl. trivial. 
-    rewrite H0; simpl. trivial.
-    rewrite H0; simpl. trivial.
+    rewrite H0; simpl. trivial. destruct lf; auto.
+    rewrite H0; simpl. trivial. destruct lf; auto.
+    rewrite H0; simpl. trivial. destruct lf; auto.
     trivial.
   Qed.
  

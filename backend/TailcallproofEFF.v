@@ -1089,7 +1089,19 @@ intros.
             (sig_args (funsig (Internal f))) 
            && val_casted.vals_defined vals1).
   2: solve[intros H2; rewrite H2 in H1; inv H1].
-  intros H2; rewrite H2 in H1. inv H1. 
+  intros H2; rewrite H2 in H1. 
+
+  simpl; revert H1; case_eq 
+    (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0%Z => 0%Z
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
+  intros l _.
+  2: solve[inversion 2].
+
+  simpl. inversion 1. 
   exploit funct_ptr_translated; eauto. intros FP.
     destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
     subst. inv A. rewrite C in Heqzz. inv Heqzz.
@@ -1097,6 +1109,11 @@ intros.
     unfold rtl_eff_sem, rtl_coop_sem. simpl.
     case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
     rewrite D.
+
+  assert (Zlength vals2 = Zlength vals1) as ->. 
+  { apply forall_inject_val_list_inject in VInj. clear - VInj. 
+    induction VInj; auto. rewrite !Zlength_cons, IHVInj; auto. }
+
   assert (val_casted.val_has_type_list_func vals2
            (sig_args (funsig (Internal (transf_function f))))=true) as ->.
   { eapply val_casted.val_list_inject_hastype; eauto.
@@ -1105,19 +1122,29 @@ intros.
     rewrite andb_comm in H2; simpl in H2. solve[inv H2].
     assert (sig_args (funsig (Internal (transf_function f)))
           = sig_args (funsig (Internal f))) as ->.
-    { specialize (sig_preserved (Internal f)). simpl. intros. rewrite H. reflexivity. }
+    { specialize (sig_preserved (Internal f)). simpl. intros. 
+      rewrite H0. reflexivity. }
     destruct (val_casted.val_has_type_list_func vals1
       (sig_args (funsig (Internal f)))); auto. }
+
   assert (val_casted.vals_defined vals2=true) as ->.
   { eapply val_casted.val_list_inject_defined.
     eapply forall_inject_val_list_inject; eauto.
     destruct (val_casted.vals_defined vals1); auto.
     rewrite andb_comm in H2; inv H2. }
-  simpl. 
-  eexists; split. reflexivity.
-  Focus 2.
-    intros CONTRA.
-    solve[elimtype False; auto].
+
+  simpl. eexists; split. 
+  simpl; revert H1; case_eq 
+    (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0%Z => 0%Z
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
+  solve[simpl; auto].
+  intros CONTRA. solve[elimtype False; auto].
+  2: intros CONTRA; solve[elimtype False; auto].
+
   clear e e0.
   destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
      VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
@@ -1132,15 +1159,15 @@ intros.
         unfold vis, initial_SM; simpl.
         apply forall_inject_val_list_inject.
         eapply restrict_forall_vals_inject; try eassumption.
-          intros. apply REACH_nil. rewrite H1; intuition.
+          intros. apply REACH_nil. rewrite H2; intuition.
       rewrite initial_SM_as_inj; trivial.
   rewrite initial_SM_as_inj.
   intuition.
     (*as in selectionproofEFF*)
       red; intros. specialize (Genv.find_funct_ptr_not_fresh prog). intros.
          destruct InitMem as [m0 [INIT_MEM [? ?]]].
-         specialize (H2 _ _ _ INIT_MEM H1). 
-         destruct (valid_init_is_global _ R _ INIT_MEM _ H2) as [id Hid]. 
+         specialize (H4 _ _ _ INIT_MEM H2). 
+         destruct (valid_init_is_global _ R _ INIT_MEM _ H4) as [id Hid]. 
            destruct PG as [PGa [PGb PGc]]. split. eapply PGa; eassumption.
          unfold isGlobalBlock. 
           apply orb_true_iff. left. apply genv2blocksBool_char1.

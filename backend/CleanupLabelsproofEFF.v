@@ -1348,6 +1348,16 @@ Proof. intros.
   case_eq (val_casted.val_has_type_list_func vals1
            (sig_args (funsig (Internal f))) && val_casted.vals_defined vals1). 
   2: solve[intros Heq; rewrite Heq in H1; inv H1].
+  simpl; revert H1; case_eq 
+    (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0%Z => 0%Z
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
+  intros l _. 
+  2: simpl; solve[rewrite andb_comm; inversion 2]. 
+  simpl. rewrite andb_comm. simpl. intros H1.
   intros Heq; rewrite Heq in H1; inv H1.
   exploit function_ptr_translated; eauto. intros FP.
   set (tf := transf_function f).
@@ -1361,6 +1371,11 @@ Proof. intros.
     simpl.
     case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
     rewrite D.
+
+    assert (Zlength vals2 = Zlength vals1) as ->. 
+    { apply forall_inject_val_list_inject in VInj. clear - VInj. 
+      induction VInj; auto. rewrite !Zlength_cons, IHVInj; auto. }
+
     assert (val_casted.val_has_type_list_func vals2 
              (sig_args (funsig (Internal (transf_function f))))=true) as ->.
     { eapply val_casted.val_list_inject_hastype; eauto.
@@ -1373,9 +1388,17 @@ Proof. intros.
       eapply forall_inject_val_list_inject; eauto.
       destruct (val_casted.vals_defined vals1); auto.
       rewrite andb_comm in Heq; inv Heq. }
-    solve[auto].
+  simpl; revert H0; case_eq 
+    (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0%Z => 0%Z
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
+  solve[simpl; auto].
+  intros CONTRA. solve[elimtype False; auto].
+  intros CONTRA. solve[elimtype False; auto].
 
-    intros CONTRA. solve[elimtype False; auto].
   destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
      VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
     as [AA [BB [CC [DD [EE [FF GG]]]]]]. 
@@ -1396,7 +1419,7 @@ Proof. intros.
           rewrite orb_true_iff. right. 
           apply (val_casted.getBlocks_encode_longs (sig_args (fn_sig f))); auto.
         red; intros. apply Conventions1.loc_arguments_rec_charact in H. 
-           destruct l; try contradiction.
+           destruct l0; try contradiction.
            destruct sl; try contradiction. trivial. }
     { (*agree_init*) 
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; trivial.
@@ -1416,6 +1439,7 @@ Proof. intros.
           apply orb_true_iff. left. apply genv2blocksBool_char1.
             simpl. exists id; eassumption.
 Qed.
+
 Require Import Conventions.
 
 Lemma MATCH_corediagram: forall st1 m1 st1' m1'

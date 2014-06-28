@@ -38,6 +38,7 @@ Require Import effect_semantics.
 Require Import reach.
 Require Import Asm_coop.
 Require Import Asm_eff.
+Require Import load_frame.
 
 Lemma local_of_vis mu: forall b1 b2 d
    (LOC: local_of mu b1 = Some (b2,d))
@@ -233,13 +234,6 @@ Lemma preg_vals:
 Proof.
   induction l; simpl. constructor. constructor. eapply preg_val; eauto. auto.
 Qed.
-(*
-Lemma sp_val:
-  forall mu ms sp rs, agree mu ms sp rs -> sp = rs#SP.
-Proof.
-  intros. destruct H; auto.
-Qed.
-*)
 
 Lemma sp_as_inj:
   forall mu ms sp rs, agree mu ms sp rs -> SM_wd mu ->
@@ -386,28 +380,7 @@ Proof.
        econstructor; try eassumption. trivial.
   intros. rewrite Pregmap.gso; auto with asmgen.
 Qed.
-(*Lemma agree_change_sp:
-  forall mu ms sp rs sp' tsp',
-  agree mu ms sp rs -> 
-  (*NEW:*) sp_spec mu sp' ->
-  val_inject (as_inj mu) sp' tsp' -> SM_wd mu ->
-  agree mu ms sp' (rs#SP <- tsp').
-Proof.
-  intros. inv H. split; auto.
-  rewrite Pregmap.gss.
-    destruct H0 as [ZERO | [spb' [z [tspb' [SPB' LOC]]]]]; subst; inv H1.
-     constructor.
-     rewrite (local_in_all _ H2 _ _ _ LOC) in H3. inv H3.
-       econstructor; try eassumption. trivial.
-    destruct H0 as [ZERO | [spb' [z [tspb' [SPB' LOC]]]]]; subst; inv H1.
-       unfold Vzero; congruence. congruence.
-  intros. subst. inv H1.
-    destruct H0 as [ZERO | [spb' [z [tspb' [SPB' LOC]]]]]; subst. inv ZERO.
-    inv SPB'. rewrite (local_in_all _ H2 _ _ _ LOC) in H4; inv H4.
-    eexists; eassumption.
-  intros. rewrite Pregmap.gso; auto with asmgen.
-Qed.
-*)
+
 (** Connection between Mach and Asm calling conventions for external
     functions. *)
 
@@ -431,22 +404,6 @@ Proof.
   exists v'; split; auto.
   econstructor. eauto. assumption. 
 Qed.
-(*WAS:
-Lemma extcall_arg_match:
-  forall ms sp rs m m' l v,
-  agree ms sp rs ->
-  Mem.extends m m' ->
-  Mach.extcall_arg ms m sp l v ->
-  exists v', Asm.extcall_arg rs m' l v' /\ Val.lessdef v v'.
-Proof.
-  intros. inv H1.
-  exists (rs#(preg_of r)); split. constructor. eapply preg_val; eauto.
-  unfold load_stack in H2.
-  exploit Mem.loadv_extends; eauto. intros [v' [A B]].
-  rewrite (sp_val _ _ _ H) in A.
-  exists v'; split; auto.
-  econstructor. eauto. assumption. 
-Qed.*)
 
 Lemma extcall_args_match: forall mu ms sp rs m m' (WD: SM_wd mu), 
      agree mu ms sp rs -> Mem.inject (as_inj mu) m m' ->
@@ -498,31 +455,7 @@ Proof.
   eapply annot_arg_stack. apply eq_sym in H4. eassumption.
   rewrite Int.add_zero. trivial. 
 Qed.
-(*
-Lemma annot_arg_match:
-  forall mu ms sp rs m m' p v (WD: SM_wd mu),
-  agree mu ms sp rs ->
-  Mem.inject (as_inj mu) m m' ->
-  Mach.annot_arg ms m sp p v ->
-  exists v', Asm.annot_arg rs m' (transl_annot_param p) v' /\ 
-            val_inject (as_inj mu) v v'.
-Proof.
-  intros. inv H1; simpl.
-(* reg *)
-  exists (rs (preg_of r)); split. constructor. eapply preg_val; eauto.
-(* stack *)
-  inv H.
-  destruct (agree_sp_ptr0 _ _ (eq_refl _)) as [tstk stk_local]. 
-  exploit Mem.load_inject; eauto. eapply local_in_all; eauto.
-  rewrite Zplus_0_r.
-  intros [v' [A B]].
-  inv agree_sp0. rewrite H4 in stk_local. inv stk_local.
-    rewrite Int.add_zero in H3.
-  exists v'; split; auto.
-  eapply annot_arg_stack. apply eq_sym in H3. eassumption.
-  exploit Mem.load_inject; eauto. eapply local_in_all; eauto.
-Qed.
-*)
+
 Lemma annot_arguments_match:
   forall mu ms sp rs m m' (WD: SM_wd mu), agree mu ms sp rs -> 
          Mem.inject (as_inj mu) m m' -> (*Mem.extends m m' ->*)
@@ -932,14 +865,14 @@ Qed.
   (predicate [exec_straight]) correspond to correct Asm executions. *)
 
 Lemma exec_straight_steps_1:
-  forall c rs m c' rs' m' sg,
+  forall c rs m c' rs' m' lf,
   exec_straight c rs m c' rs' m' ->
   list_length_z (fn_code fn) <= Int.max_unsigned ->
   forall b ofs,
   rs#PC = Vptr b ofs ->
   Genv.find_funct_ptr ge b = Some (Internal fn) ->
   code_tail (Int.unsigned ofs) (fn_code fn) c ->
-  corestep_plus (Asm_eff_sem hf) ge (State sg rs) m (State sg rs') m'.
+  corestep_plus (Asm_eff_sem hf) ge (State rs lf) m (State rs' lf) m'.
 Proof.
   induction 1; intros.
   apply corestep_plus_one.
@@ -1169,14 +1102,14 @@ Qed.
   (predicate [exec_straight]) correspond to correct Asm executions. *)
 
 Lemma eff_exec_straight_steps_1:
-  forall U c rs m c' rs' m' sg,
+  forall U c rs m c' rs' m' lf,
   eff_exec_straight U c rs m c' rs' m' ->
   list_length_z (fn_code fn) <= Int.max_unsigned ->
   forall b ofs,
   rs#PC = Vptr b ofs ->
   Genv.find_funct_ptr ge b = Some (Internal fn) ->
   code_tail (Int.unsigned ofs) (fn_code fn) c ->
-  effstep_plus (Asm_eff_sem hf) ge U (State sg rs) m (State sg rs') m'.
+  effstep_plus (Asm_eff_sem hf) ge U (State rs lf) m (State rs' lf) m'.
 Proof.
   induction 1; intros.
   apply effstep_plus_one.
@@ -1266,20 +1199,5 @@ Proof. induction 1; trivial. left; trivial. Qed.
 Lemma parent_ra_spec: forall mu s, match_stack mu s -> ra_spec mu (parent_ra s).
 Proof. induction 1; trivial. left; trivial. Qed.
 
-(*Lenb: not needed any more
-Lemma lessdef_parent_sp:
-  forall j s v,
-  match_stack j s -> Val.lessdef (parent_sp s) v -> v = parent_sp s.
-Proof.
-  intros. inv H0. auto. exploit parent_sp_def; eauto. tauto.
-Qed.
-
-Lemma lessdef_parent_ra:
-  forall j s v,
-  match_stack j s -> Val.lessdef (parent_ra s) v -> v = parent_ra s.
-Proof.
-  intros. inv H0. auto. exploit parent_ra_def; eauto. tauto.
-Qed.
-*)
 End MATCH_STACK.
 

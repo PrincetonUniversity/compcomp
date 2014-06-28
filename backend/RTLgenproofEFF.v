@@ -2918,6 +2918,16 @@ Proof. intros.
   remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz; inv H0. 
     apply eq_sym in Heqzz.
   destruct f; try discriminate.
+  simpl; revert H1; case_eq 
+    (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0%Z => 0%Z
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
+  intros l _.
+  2: solve[simpl; rewrite andb_comm; inversion 2].
+
   exploit function_ptr_translated; eauto. intros [tf [FP TF]].
   exists (RTL_Callstate nil tf vals2).
   split.
@@ -2928,12 +2938,17 @@ Proof. intros.
     case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
     rewrite D. 
 
+  assert (Zlength vals2 = Zlength vals1) as ->. 
+  { apply forall_inject_val_list_inject in VInj. clear - VInj. 
+    induction VInj; auto. rewrite !Zlength_cons, IHVInj; auto. }
+
   assert (val_casted.val_has_type_list_func vals2
            (sig_args (funsig tf))=true) as ->.
   { eapply val_casted.val_list_inject_hastype; eauto.
     eapply forall_inject_val_list_inject; eauto.
     destruct (val_casted.vals_defined vals1); auto.
-    rewrite andb_comm in H1; simpl in H1. solve[inv H1].
+    rewrite andb_comm in H1; simpl in H1. 
+    solve[rewrite andb_comm in H1; inv H1].
     assert (sig_args (funsig tf)
           = sig_args (CminorSel.funsig (Internal f))) as ->.
     { erewrite sig_transl_function; eauto. }
@@ -2943,12 +2958,19 @@ Proof. intros.
   { eapply val_casted.val_list_inject_defined.
     eapply forall_inject_val_list_inject; eauto.
     destruct (val_casted.vals_defined vals1); auto.
-    rewrite andb_comm in H1; inv H1. }
+    rewrite <-andb_assoc, andb_comm in H1; inv H1. }
   monadInv TF. rename x into tf.
+  simpl; revert H1; case_eq 
+    (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0%Z => 0%Z
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
   solve[simpl; auto].
+  intros CONTRA. solve[elimtype False; auto].
+  intros CONTRA. solve[elimtype False; auto].
 
-  intros CONTRA.
-  solve[elimtype False; auto].
   destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
      VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
     as [AA [BB [CC [DD [EE [FF GG]]]]]].
@@ -6224,6 +6246,8 @@ assert (GDE: genvs_domain_eq ge tge).
     simpl. inv MS. trivial. }
 (* at_external*)
   { apply MATCH_atExternal. }
+(* order_wf *)
+  { apply lt_state_wf. }
 (* after_external*)
   { intros. 
     specialize (MATCH_afterExternal GDE _ _ _ _ _ _ _ _ _ _ _ 
@@ -6232,8 +6256,6 @@ assert (GDE: genvs_domain_eq ge tge).
        MemInjNu' RValInjNu' FwdSrc FwdTgt _ frgnSrcHyp _ frgnTgtHyp
        _ Mu'Hyp UnchPrivSrc UnchLOOR).
     intros. eapply H. }
-(* order_wf *)
-  { apply lt_state_wf. }
 (* core_diagram*)
   { intros. exploit MATCH_corestep; try eassumption.
      intros [st2' [m2' [mu' [CS' X]]]]. 

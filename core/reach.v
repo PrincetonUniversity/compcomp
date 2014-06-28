@@ -1777,3 +1777,45 @@ Proof. intros.
                   subst nu. rewrite replace_locals_as_inj; trivial.
                subst. rewrite AI. apply shared_in_all; eassumption.
 Qed.
+
+Lemma forall_vals_inject_restrictD' j vals1 vals2 X 
+      (Inj : Forall2 (val_inject (restrict j X)) vals1 vals2) :
+  Forall2 (val_inject j) vals1 vals2 
+  /\ (forall b : block, getBlocks vals1 b = true -> X b = true).
+Proof. 
+intros. induction Inj. constructor.
+constructor; trivial. unfold getBlocks. simpl. intros; congruence.
+destruct IHInj as [H0 H1]. split. constructor; auto.
+  eapply val_inject_restrictD in H. eassumption.
+intros b0 GET. rewrite getBlocksD in GET. 
+assert (H2: (exists ofs, x=Vptr b0 ofs) \/ getBlocks l b0=true).
+{ revert GET; case_eq x; auto. intros b1 i ? H2; subst x. 
+  rewrite orb_true_iff in H2. destruct H2; auto. 
+  destruct (eq_block b1 b0); try (simpl in H2; congruence). subst.
+  left. exists i. auto. }
+destruct H2 as [[ofs H2]|H2]. subst x. 
+inv H. apply restrictD_Some in H4. destruct H4; auto.
+apply H1; auto.
+Qed.
+
+Lemma forall_vals_inject_intern_incr mu mu' vals1 vals2 
+      (Inj : Forall2 (val_inject (as_inj mu)) vals1 vals2) 
+      (Incr : intern_incr mu mu') 
+      (WD : SM_wd mu') : 
+  Forall2 (val_inject (as_inj mu')) vals1 vals2. 
+Proof. 
+intros. induction Inj. constructor.
+constructor; trivial. apply val_inject_incr with (f1 := as_inj mu); auto.
+apply intern_incr_as_inj; auto.
+Qed.
+
+Lemma forall_vals_inject_extern_incr mu mu' vals1 vals2 
+      (Inj : Forall2 (val_inject (as_inj mu)) vals1 vals2) 
+      (Incr : extern_incr mu mu') 
+      (WD : SM_wd mu') : 
+  Forall2 (val_inject (as_inj mu')) vals1 vals2. 
+Proof. 
+intros. induction Inj. constructor.
+constructor; trivial. apply val_inject_incr with (f1 := as_inj mu); auto.
+apply extern_incr_as_inj; auto.
+Qed.

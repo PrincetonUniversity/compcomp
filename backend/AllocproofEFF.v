@@ -2481,6 +2481,17 @@ Proof. intros.
   remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz; inv H0. 
     apply eq_sym in Heqzz.
   destruct f; try discriminate.
+
+  simpl; revert H1; case_eq 
+    (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0%Z => 0%Z
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
+  intros l _.
+  2: simpl; solve[rewrite andb_comm; inversion 2].
+
   exploit function_ptr_translated; eauto. intros [tf [FP TF]].
   simpl. exists (LTL_Callstate nil tf 
                   (Locmap.setlist (loc_arguments (funsig tf)) 
@@ -2494,25 +2505,39 @@ Proof. intros.
     case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
     rewrite D.
 
+  assert (Zlength vals2 = Zlength vals1) as ->. 
+  { apply forall_inject_val_list_inject in VInj. clear - VInj. 
+    induction VInj; auto. rewrite !Zlength_cons, IHVInj; auto. }
+
   assert (val_casted.val_has_type_list_func vals2
            (sig_args (funsig tf))=true) as ->.
   { eapply val_casted.val_list_inject_hastype; eauto.
     eapply forall_inject_val_list_inject; eauto.
     destruct (val_casted.vals_defined vals1); auto.
-    rewrite andb_comm in H1; simpl in H1. solve[inv H1].
+    rewrite andb_comm in H1; simpl in H1. 
+    rewrite andb_comm in H1; solve[inv H1].
     assert (sig_args (funsig tf)
           = sig_args (RTL.funsig (Internal f))) as ->.
     { erewrite sig_function_translated; eauto. }
-    destruct (val_casted.val_has_type_list_func vals1
-      (sig_args (RTL.funsig (Internal f)))); auto. inv H1. }
+    simpl in H0. rewrite <-H0 in H1. simpl. rewrite <-H0.
+    destruct (val_casted.val_has_type_list_func 
+                vals1 (sig_args (funsig tf))); auto. 
+    simpl in H1; inv H1. }   
   assert (val_casted.vals_defined vals2=true) as ->.
   { eapply val_casted.val_list_inject_defined.
     eapply forall_inject_val_list_inject; eauto.
     destruct (val_casted.vals_defined vals1); auto.
-    rewrite andb_comm in H1; inv H1. }
+    rewrite <-andb_assoc, andb_comm in H1. inv H1. }
   monadInv TF. rename x into tf.
+  simpl; revert H1; case_eq 
+    (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0%Z => 0%Z
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
   solve[simpl; auto].
-
+  intros CONTRA. solve[elimtype False; auto].
   intros CONTRA. solve[elimtype False; auto].
 
   destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
@@ -2521,7 +2546,7 @@ Proof. intros.
   split.
     revert H1.
     case_eq (val_casted.val_has_type_list_func vals1
-               (sig_args (RTL.funsig (Internal f))) && val_casted.vals_defined vals1).
+               (sig_args (RTL.fn_sig f)) && val_casted.vals_defined vals1).
     intros H2. inversion 1; subst. clear H1.
     eapply match_states_call.
       constructor.
@@ -2542,12 +2567,12 @@ Proof. intros.
           { rewrite val_casted.val_has_type_list_func_charact; auto.
             eapply val_casted.val_list_inject_hastype. 
             eapply forall_inject_val_list_inject; eauto. auto.
-            rewrite A, H; auto. }
+            simpl in A. rewrite A, H; auto. }
 
           assert (len: 
             length (val_casted.encode_longs (sig_args (funsig tf)) vals2) =
             length (loc_arguments (funsig tf))).
-          { rewrite <-A in H. clear A. clear H H0 vals1 VInj.
+          { simpl in A. rewrite <-A in H. clear A. clear H H0 vals1 VInj.
             destruct (funsig tf). simpl. unfold loc_arguments. simpl. 
             revert vals2 B; generalize 0; induction sig_args; auto.
             destruct a; simpl. 
@@ -2572,9 +2597,9 @@ Proof. intros.
           apply has_type_list_locs_val_types; auto.
           solve[apply len].
 
-        intros. apply REACH_nil. rewrite H; intuition.
+        intros. apply REACH_nil. solve[rewrite H; intuition].
         simpl. red; intros. red in H. 
-          destruct l.
+          destruct l0.
             rewrite Locmap.gsetlisto; trivial. 
             apply Loc.notin_iff. intros. apply loc_arguments_rec_charact in H0.
             destruct l'; try contradiction. constructor.
@@ -2629,28 +2654,30 @@ Lemma MATCH_afterExternal: forall
       (pubTgtHyp: pubTgt' =
                  (fun b : block => 
                  locBlocksTgt mu b && REACH m2 (exportedTgt mu vals2) b))
-       nu (NuHyp: nu = replace_locals mu pubSrc' pubTgt')
-       nu' ret1 m1' ret2 m2' 
-       (INC: extern_incr nu nu')
-       (SEP: sm_inject_separated nu nu' m1 m2)
-       (WDnu': SM_wd nu')
-       (SMvalNu': sm_valid nu' m1' m2')
-       (MemInjNu': Mem.inject (as_inj nu') m1' m2')
-       (RValInjNu': val_inject (as_inj nu') ret1 ret2)
-       (FwdSrc: mem_forward m1 m1')
-       (FwdTgt: mem_forward m2 m2')
-       (frgnSrc' : block -> bool)
-       (frgnSrcHyp: frgnSrc' =
-             (fun b : block => DomSrc nu' b &&
-            (negb (locBlocksSrc nu' b) && REACH m1' (exportedSrc nu' (ret1 :: nil)) b)))
-       (frgnTgt' : block -> bool)
-       (frgnTgtHyp: frgnTgt' =
-            (fun b : block => DomTgt nu' b &&
-             (negb (locBlocksTgt nu' b) && REACH m2' (exportedTgt nu' (ret2 :: nil)) b)))
-       mu' (Mu'Hyp: mu' = replace_externs nu' frgnSrc' frgnTgt')
-       (UnchPrivSrc: Mem.unchanged_on
-               (fun b z => locBlocksSrc nu b = true /\ pubBlocksSrc nu b = false) m1 m1')
-       (UnchLOOR: Mem.unchanged_on (local_out_of_reach nu m1) m2 m2'),
+      nu (NuHyp: nu = replace_locals mu pubSrc' pubTgt')
+      nu' ret1 m1' ret2 m2' 
+      (HasTy1 : Val.has_type ret1 (proj_sig_res (AST.ef_sig e)))
+      (HasTy2 : Val.has_type ret2 (proj_sig_res (AST.ef_sig e')))
+      (INC: extern_incr nu nu')
+      (SEP: sm_inject_separated nu nu' m1 m2)
+      (WDnu': SM_wd nu')
+      (SMvalNu': sm_valid nu' m1' m2')
+      (MemInjNu': Mem.inject (as_inj nu') m1' m2')
+      (RValInjNu': val_inject (as_inj nu') ret1 ret2)
+      (FwdSrc: mem_forward m1 m1')
+      (FwdTgt: mem_forward m2 m2')
+      (frgnSrc' : block -> bool)
+      (frgnSrcHyp: frgnSrc' =
+            (fun b : block => DomSrc nu' b &&
+           (negb (locBlocksSrc nu' b) && REACH m1' (exportedSrc nu' (ret1 :: nil)) b)))
+      (frgnTgt' : block -> bool)
+      (frgnTgtHyp: frgnTgt' =
+           (fun b : block => DomTgt nu' b &&
+            (negb (locBlocksTgt nu' b) && REACH m2' (exportedTgt nu' (ret2 :: nil)) b)))
+      mu' (Mu'Hyp: mu' = replace_externs nu' frgnSrc' frgnTgt')
+      (UnchPrivSrc: Mem.unchanged_on
+              (fun b z => locBlocksSrc nu b = true /\ pubBlocksSrc nu b = false) m1 m1')
+      (UnchLOOR: Mem.unchanged_on (local_out_of_reach nu m1) m2 m2'),
   exists st1' st2',
   after_external (rtl_eff_sem hf) (Some ret1) st1 =Some st1' /\
   after_external (LTL_eff_sem hf) (Some ret2) st2 = Some st2' /\
@@ -2823,7 +2850,7 @@ assert (GFnu': forall b, isGlobalBlock (Genv.globalenv prog) b = true ->
           rewrite (frgnSrc_shared _ WDnu' _ Glob). intuition.
  
 assert (retty1: Val.has_type ret1 (proj_sig_res (ef_sig e'))).
-{ admit. (*ret typing condition*)}
+{ auto. }
 
 split. 
   unfold vis in *. 
@@ -3778,29 +3805,7 @@ Proof. intros.
           rewrite <- FRG. eapply H6; eassumption. 
   split; trivial. }
 
-{ (* annot *)
-  admit. (* We don't treat annotations yet.
-   exploit (exec_moves mv); eauto. intros [ls1 [A1 B1]]. 
-   exploit external_call_mem_extends; eauto. eapply add_equations_args_lessdef; eauto.
-  inv WTI. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto. 
-  intros [v' [m'' [F [G [J K]]]]].
-  assert (v = Vundef). red in H0; inv H0. auto.
-  econstructor; split.
-  eapply plus_left. econstructor; eauto. 
-  eapply star_trans. eexact A1. 
-  eapply star_two. econstructor.
-  eapply external_call_symbols_preserved' with (ge1 := ge).
-  econstructor; eauto. 
-  exact symbols_preserved. exact varinfo_preserved.
-  eauto. constructor. eauto. eauto. traceEq.
-  exploit satisf_successors. eauto. eauto. simpl; eauto. eauto. 
-  eapply satisf_undef_reg with (r := res).
-  eapply add_equations_args_satisf; eauto. 
-  intros [enext [U V]]. 
-  econstructor; eauto.
-  change (destroyed_by_builtin (EF_annot txt typ)) with (@nil mreg). 
-  simpl. subst v. assumption.
-  apply wt_regset_assign; auto. subst v. constructor. *) }
+{ (* annot *) simpl in *. elimtype False. apply H1; auto. }
 
 { (* cond *)
   exploit (exec_moves mv); eauto. intros [ls1 [A1 B1]].
@@ -5181,29 +5186,7 @@ induction CS;
     destruct H3 as [[EFF VB] _].
     eapply BuiltinEffect_Propagate; eassumption. }
 
-{ (* annot *)
-   admit. (*We don't treat ennotations yet
-   exploit (Eff_exec_moves mv); eauto. intros [ls1 [A1 B1]]. 
-   exploit external_call_mem_extends; eauto. eapply add_equations_args_lessdef; eauto.
-  inv WTI. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto. 
-  intros [v' [m'' [F [G [J K]]]]].
-  assert (v = Vundef). red in H0; inv H0. auto.
-  econstructor; split.
-  eapply plus_left. econstructor; eauto. 
-  eapply star_trans. eexact A1. 
-  eapply star_two. econstructor.
-  eapply external_call_symbols_preserved' with (ge1 := ge).
-  econstructor; eauto. 
-  exact symbols_preserved. exact varinfo_preserved.
-  eauto. constructor. eauto. eauto. traceEq.
-  exploit satisf_successors. eauto. eauto. simpl; eauto. eauto. 
-  eapply satisf_undef_reg with (r := res).
-  eapply add_equations_args_satisf; eauto. 
-  intros [enext [U V]]. 
-  econstructor; eauto.
-  change (destroyed_by_builtin (EF_annot txt typ)) with (@nil mreg). 
-  simpl. subst v. assumption.
-  apply wt_regset_assign; auto. subst v. constructor. *) }
+{ (* annot *) simpl in *. elimtype False; apply H1; auto. }
 
 { (* cond *)
   exploit (Eff_exec_moves mv); eauto. intros [ls1 [A1 B1]].
@@ -5516,7 +5499,7 @@ SM_simulation.SM_simulation_inject (rtl_eff_sem hf)
 Proof.
 intros.
 assert (GDE:= GDE_lemma).
- eapply effect_simulations_lemmas.inj_simulation_plus with
+ eapply effect_simulations_lemmas.inj_simulation_plus_typed with
   (match_states:=fun x mu st m st' m' => MATCH mu st m st' m')
   (measure:=fun x => O).
 (*genvs_dom_eq*)
@@ -5627,7 +5610,7 @@ assert (GDE:= GDE_lemma).
     extensionality b; eauto.
     extensionality b; eauto. }
 (* after_external*)
-  { apply MATCH_afterExternal. eassumption. }
+  { intros. eapply MATCH_afterExternal with (mu := mu); try eassumption. }
 (* core_diagram*)
   { intros x; intros. exploit MATCH_corestep; eauto.
     intros [st2' [m2' [mu' [CS2 MU']]]].

@@ -68,6 +68,7 @@ Definition CMin_initial_core (ge:Cminor.genv) (v: val) (args:list val): option C
                     match f with Internal fi =>
                       if val_has_type_list_func args (sig_args (funsig f))
                          && vals_defined args
+                         && zlt (4*(2*(Zlength args))) Int.max_unsigned
                       then Some (CMin_Callstate f args Kstop)
                       else None
                     | External _ => None

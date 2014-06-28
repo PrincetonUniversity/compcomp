@@ -69,38 +69,6 @@ Module SM_simulation. Section SharedMemory_simulation_inject.
     match_validblocks : forall d mu c1 m1 c2 m2, 
           match_state d mu c1 m1 c2 m2 ->
           sm_valid mu m1 m2;  
-(*
-    match_divalblocks : forall d mu c1 m1 c2 m2, 
-          match_state d mu c1 m1 c2 m2 ->
-          DomSrc mu = valid_block_dec m1 /\
-          DomTgt mu = valid_block_dec m2;
-*)
-(* experimental condition
-    match_protected: forall d mu c1 m1 c2 m2, 
-          match_state d mu c1 m1 c2 m2 ->
-          forall b, REACH m1 (extBlocksSrc mu) b = true ->
-                    locBlocksSrc mu b = true ->
-                    REACH m1 (frgnBlocksSrc mu) b = true; *)
-
-(* when the environment provides a structured injection:
-    core_initial_sm : forall v1 v2 sig,
-       In (v1,v2,sig) entry_points -> 
-       forall vals1 c1 m1 mu vals2 m2,
-          initial_core Sem1 ge1 v1 vals1 = Some c1 ->
-          Mem.inject (as_inj mu) m1 m2 -> 
-          Forall2 (val_inject (as_inj mu)) vals1 vals2 ->
-          meminj_preserves_globals ge1 (as_inj mu) ->
-          SM_wd mu -> sm_valid mu m1 m2 ->
-          (forall b, 
-             REACH m2 (fun b' => isGlobalBlock ge2 b' 
-                              || getBlocks vals2 b') b = true -> 
-             DomTgt mu b = true) ->
-       exists cd, exists c2, 
-            initial_core Sem2 ge2 v2 vals2 = Some c2 /\
-            match_state cd (mkinitial_SM mu 
-                 (REACH m1 (fun b => isGlobalBlock ge1 b || getBlocks vals1 b))
-                 (REACH m2 (fun b => isGlobalBlock ge2 b || getBlocks vals2 b)))
-                 c1 m1 c2 m2; *)
 
   core_initial : 
     forall v1 v2 sig, In (v1,v2,sig) entry_points -> 
@@ -260,6 +228,8 @@ Module SM_simulation. Section SharedMemory_simulation_inject.
         nu (NuHyp: nu = replace_locals mu pubSrc' pubTgt'),
 
       forall nu' ret1 m1' ret2 m2'
+        (HasTy1: Val.has_type ret1 (proj_sig_res (AST.ef_sig e)))
+        (HasTy2: Val.has_type ret2 (proj_sig_res (AST.ef_sig e')))
         (INC: extern_incr nu nu')  
         (SEP: sm_inject_separated nu nu' m1 m2)
 

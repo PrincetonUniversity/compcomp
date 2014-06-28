@@ -29,6 +29,7 @@ Require Import Op.
 Require Import Locations.
 Require Import Conventions.
 Require Stacklayout.
+Require Import load_frame. (*for load/store_stack*)
 
 (** * Abstract syntax *)
 
@@ -122,12 +123,6 @@ function.  The [return_address_offset] parameter is used to guess the
 value of the return address that the Asm code generated later will
 store in the reserved location.
 *)
-
-Definition load_stack (m: mem) (sp: val) (ty: typ) (ofs: int) :=
-  Mem.loadv (chunk_of_type ty) m (Val.add sp (Vint ofs)).
-
-Definition store_stack (m: mem) (sp: val) (ty: typ) (ofs: int) (v: val) :=
-  Mem.storev (chunk_of_type ty) m (Val.add sp (Vint ofs)) v.
 
 Module RegEq.
   Definition t := mreg.

@@ -3,8 +3,10 @@
 */*/*.vo
 */*~
 */*/*~
+*/.#*
 */#*#
 */*/#*#
+.depend
 runtime/*.o
 runtime/*.a
 tools/ndfun

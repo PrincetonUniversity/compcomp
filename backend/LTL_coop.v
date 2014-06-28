@@ -249,6 +249,7 @@ Definition LTL_initial_core (ge:genv) (v: val) (args:list val): option LTL_core 
                      let tyl := sig_args (funsig f) in
                      if val_has_type_list_func args (sig_args (funsig f))
                         && vals_defined args
+                        && zlt (4*(2*(Zlength args))) Int.max_unsigned
                      then Some (LTL_Callstate
                                       nil
                                       f 
