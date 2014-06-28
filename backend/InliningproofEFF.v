@@ -3138,9 +3138,6 @@ Qed.
     assumption.
 
 
-
-
-
 (* internal function, inlined *)
 inversion FB; subst.
 repeat open_Hyp.
@@ -3194,6 +3191,7 @@ Search core_semantics_lemmas.corestep_plus.
 eapply core_semantics_lemmas.corestep_plus_one.
 eapply rtl_corestep_exec_Inop; eauto. 
 
+
 exists mu'; intuition.
 
 Lemma sm_inject_separated_impication: forall mu mu' m1 m2 m1' m2' stk sp' delta (laloc: sm_locally_allocated mu mu' m1 m2 m1' m2')(C: as_inj mu' stk = Some (sp', delta))(H14: forall b : block, (b = stk -> False) -> as_inj mu' b = as_inj mu b)(WD: SM_wd mu) (WD': SM_wd mu'), sm_inject_separated mu mu' m1 m2.
@@ -3201,7 +3199,13 @@ Admitted.
 
 eapply sm_inject_separated_impication; eauto.
 
+
 unfold MATCH; intuition.
+
+(*Here is where I'm stuck.
+Best idea so far is: *)
+inversion P.
+(*The first case seems solvable, but the second case is almost the same as the original.*)
 
 (*How to solve the last two goals.*)
 Focus 2.
@@ -3210,16 +3214,50 @@ Focus 2.
      apply sm_inject_separated_mem; auto.
      eapply sm_inject_separated_impication; eauto.
 
-Focus 2.
+wFocus 2.
   - eapply H10 in H18.
     unfold intern_incr in B. repeat open_Hyp.
     rewrite <- H26; auto.
 (*End of last two goals*)
 
-- inversion P.
-  + 
+- Check star_E0_ind.
+  star_E0_ind.
+  
+inversion P.
+  Focus 2.
+  
+
+
+  + constructor; eauto; subst.
+    * SearchAbout star.
+      Check star_E0_ind.
+Print match_stacks_inside.
+
+ match_stacks_inside (restrict_sm mu  (vis mu )) m1  m2 s stk' f' ctx sp'
+          rs'
+ match_stacks_inside (restrict_sm mu' (vis mu')) m1' m2 s stk' f' ctx sp'
+     rs''
+
+
+ inversion MS0.
+      eapply match_stacks_inside_base; eauto.
+      SearchAbout match_stacks.
+      
+
+constructor.
+ 
+      constructor.
+    Focus 2.
+    Search agree_regs.
+    eapply agree_regs_incr; eauto.
+    autorewrite with restrict.
+    eapply intern_incr_restrict; eauto.
+
+    
+    
   +
 
+(* HERE is where I'm stuck *)
 Print match_states.
 Focus 2.
 Print step.
