@@ -28,10 +28,8 @@ Notation "a # b <- c" := (Pregmap.set b c a) (at level 1, b at next level).
 
 Inductive load_frame: Type :=
 | mk_load_frame:
-    forall (sp: block)          (**r pointer to argument frame *)
-           (args: list val)     (**r initial program arguments *)
-           (tys: list typ)      (**r initial argument types *)
-           (retty: option typ), (**r optional return type *)
+    forall (sp: block)           (**r pointer to argument frame *)
+           (retty: option typ),  (**r return type *)
     load_frame.
 
 Section ASM_COOP.
@@ -145,7 +143,7 @@ Definition Asm_initial_core (ge:genv) (v: val) (args:list val):
 
 Definition Asm_halted (q : state): option val :=
     match q with
-      State rs (mk_load_frame b args tys retty) => 
+      State rs (mk_load_frame b retty) => 
         if Val.cmp_bool Ceq (rs#PC) Vzero 
                   then match retty 
                        with Some Tlong =>

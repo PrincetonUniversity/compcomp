@@ -25,6 +25,7 @@ Require Import Events.
 Require Import Smallstep.
 Require Import Locations.
 Require Import Mach.
+Require Import Mach_coop.
 Require Import AsmEFF.
 Require Import AsmgenEFF.
 Require Import Conventions.
@@ -179,16 +180,14 @@ Qed.
 
 (** * Agreement between Mach registers and processor registers *)
 
-(*NEW: sp is always Vzero, or a pointer that's mapped by local.
-  Note that tb <> b may holds, but the offset is always 0*)
 Definition sp_spec (mu: SM_Injection) (v:val) :=
-  v = Vzero \/ exists b ofs tb, v = Vptr b ofs /\ local_of mu b = Some(tb,0).
+  exists b ofs tb, v = Vptr b ofs /\ local_of mu b = Some(tb,0).
 
 Lemma sp_spec_ptr: forall mu b ofs (SP: sp_spec mu (Vptr b ofs)), 
       exists tb, local_of mu b = Some(tb,0).
 Proof. intros.
   destruct SP. inv H.
-  destruct H as [? [? [tb [TB LOC]]]]. inv TB.
+  destruct H0 as [tb [TB LOC]]. inv TB.
   exists tb; trivial.
 Qed.
 
@@ -196,16 +195,14 @@ Lemma sp_spec_intern_incr mu mu': forall
    (INC: intern_incr mu mu') v
    (ZLOC: sp_spec mu v), sp_spec mu' v.
 Proof. intros.
-destruct ZLOC as [Zero | [b [ofs [tb [SP LOC]]]]]; subst.
-  left; trivial.
-  right. apply INC in LOC. 
+destruct ZLOC as [b [ofs [tb [SP LOC]]]]; subst.
+  apply INC in LOC. 
     exists b, ofs, tb; split; trivial.
 Qed.
 
 (*Lenb: added parameter j:meminj and changed lessdef into val_inject*)
 Record agree mu (ms: Mach.regset) (sp: val) (rs: AsmEFF.regset) : Prop := mkagree {
   (*Modified*) agree_sp_local: val_inject (local_of mu) sp (rs#SP);
-  (*New:*) agree_sp_spec: sp_spec mu sp;
   agree_mregs: forall r: mreg, val_inject (as_inj mu) (ms r) (rs#(preg_of r))
 }.
 
@@ -216,7 +213,6 @@ Lemma agree_intern_incr ms sp rs: forall mu mu' (WD': SM_wd mu')
 Proof. intros. inv A.
   split; auto.
     eapply val_inject_incr; try eassumption. eapply INC.
-    eapply sp_spec_intern_incr; eassumption.
   intros. apply intern_incr_as_inj in INC; trivial. 
           eapply (val_inject_incr _ _ _ _ INC). auto.
 Qed.
@@ -374,8 +370,7 @@ Lemma agree_change_sp:
 Proof.
   intros. inv H. split; auto.
   rewrite Pregmap.gss.
-    destruct H0 as [ZERO | [spb' [z [tspb' [SPB' LOC]]]]]; subst; inv H1.
-     constructor.
+    destruct H0 as [spb' [z [tspb' [SPB' LOC]]]]; subst; inv H1.
      rewrite (local_in_all _ H2 _ _ _ LOC) in H3. inv H3.
        econstructor; try eassumption. trivial.
   intros. rewrite Pregmap.gso; auto with asmgen.
@@ -428,47 +423,6 @@ Lemma extcall_arguments_match:
 Proof.
   unfold Mach.extcall_arguments, AsmEFF.extcall_arguments; intros.
   eapply extcall_args_match; eauto.
-Qed.
-
-(** Translation of arguments to annotations. *)
-
-Lemma annot_arg_match:
-  forall mu ms sp rs m m' p v (WD: SM_wd mu),
-  agree mu ms sp rs ->
-  Mem.inject (as_inj mu) m m' ->
-  Mach.annot_arg ms m sp p v ->
-  exists v', AsmEFF.annot_arg rs m' (transl_annot_param p) v' /\ 
-            val_inject (as_inj mu) v v'.
-Proof.
-  intros. inv H1; simpl.
-(* reg *)
-  exists (rs (preg_of r)); split. constructor. eapply preg_val; eauto.
-(* stack *)
-  destruct (agree_sp_spec _ _ _ _ H). inv H1.
-  destruct H1 as [stk' [z [tstk [SP stk_local]]]]. inv SP. 
-  exploit Mem.load_inject; eauto. eapply local_in_all; eauto.
-  rewrite Zplus_0_r.
-  intros [v' [A B]].
-  exists v'; split; auto.
-  specialize (agree_sp_local _ _ _ _ H). intros ASL; inv ASL.
-  rewrite stk_local in H5. inv H5.
-  eapply annot_arg_stack. apply eq_sym in H4. eassumption.
-  rewrite Int.add_zero. trivial. 
-Qed.
-
-Lemma annot_arguments_match:
-  forall mu ms sp rs m m' (WD: SM_wd mu), agree mu ms sp rs -> 
-         Mem.inject (as_inj mu) m m' -> (*Mem.extends m m' ->*)
-  forall pl vl,
-  Mach.annot_arguments ms m sp pl vl ->
-  exists vl', AsmEFF.annot_arguments rs m' (map transl_annot_param pl) vl'
-           /\ val_list_inject (as_inj mu) vl vl'. (*Val.lessdef_list vl vl'.*)
-Proof.
-  induction 4; intros. 
-  exists (@nil val); split. constructor. constructor.
-  exploit annot_arg_match; eauto. intros [v1' [A B]].
-  destruct IHlist_forall2 as [vl' [C D]].
-  exists (v1' :: vl'); split; constructor; auto.
 Qed.
 
 (** * Correspondence between Mach code and Asm code *)
@@ -998,7 +952,6 @@ Proof. intros.
        eapply Mem.perm_valid_block; eassumption. 
 Qed. 
 
-
 Lemma eff_exec_straight_ax2: forall c1 rs1 m1 c2 rs2 m2,
        exec_straight ge fn c1 rs1 m1 c2 rs2 m2 ->
        exists M, eff_exec_straight M c1 rs1 m1 c2 rs2 m2.
@@ -1187,14 +1140,26 @@ Inductive match_stack mu : list Mach.stackframe -> Prop :=
 
 Lemma parent_sp_def: forall mu s, match_stack mu s -> parent_sp s <> Vundef.
 Proof. induction 1; simpl. unfold Vzero; congruence.
-  destruct H1 as [ZERO | [b [ofs X]]].
-    subst; unfold Vzero; congruence.
+  destruct H1 as [b [ofs X]].
   destruct X as [tb [SP LOC]]. subst; congruence.
 Qed.
 
-(*NEW*)
-Lemma parent_sp_spec: forall mu s, match_stack mu s -> sp_spec mu (parent_sp s).
-Proof. induction 1; trivial. left; trivial. Qed.
+Lemma parent_sp0_def: forall mu sp0 s, match_stack mu s -> parent_sp0 sp0 s<>Vundef.
+Proof. induction 1; simpl. unfold Vzero; congruence.
+  destruct H1 as [b [ofs X]].
+  destruct X as [tb [SP LOC]]. subst; congruence.
+Qed.
+
+Lemma parent_sp0_spec: 
+  forall mu sp0 tsp0 s, 
+  match_stack mu s -> 
+  local_of mu sp0 = Some (tsp0, 0) -> 
+  sp_spec mu (parent_sp0 sp0 s).
+Proof. 
+induction 1; trivial. simpl. 
+exists sp0, Int.zero, tsp0.
+split; auto.
+Qed.
 
 Lemma parent_ra_spec: forall mu s, match_stack mu s -> ra_spec mu (parent_ra s).
 Proof. induction 1; trivial. left; trivial. Qed.
