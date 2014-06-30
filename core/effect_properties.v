@@ -2097,7 +2097,6 @@ Proof. intros.
   rewrite (Genv.find_invert_symbol _ _ Find). reflexivity.
 Qed.
 
-
 (*New Lemma, based on (proof of) Mem.alloc_parallel_inject*)
 Theorem alloc_parallel_intern:
   forall mu m1 m2 lo1 hi1 m1' b1 lo2 hi2 
@@ -2202,6 +2201,52 @@ Proof.
 (*REACH_closed*)
   eapply REACH_closed_alloc_left_sm; eassumption.
 Qed.
+
+(*TODO: Move*)
+Lemma local_ofI_Some mu b b' z : 
+  SM_wd mu -> 
+  as_inj mu b = Some (b',z) -> 
+  locBlocksSrc mu b=true -> 
+  local_of mu b = Some (b',z).
+Proof.
+intros WD. destruct mu. simpl in *. unfold as_inj, join. simpl. 
+case_eq (extern_of b). intros [? ?] H. inversion 1; subst. 
+intros loc. exploit locBlocksSrc_externNone; eauto. simpl. 
+  rewrite H; intros; congruence.
+intros; auto.
+Qed.
+
+Lemma eq_block_refl b : exists P, eq_block b b = left P.
+Proof. destruct (eq_block b b). eexists; eauto. elimtype False; auto. Qed.
+
+Lemma alloc_parallel_intern':
+  forall mu m1 m2 lo1 hi1 m1' b1 lo2 hi2 
+        (SMV: sm_valid mu m1 m2) (WD: SM_wd mu),
+  Mem.inject (as_inj mu) m1 m2 ->
+  Mem.alloc m1 lo1 hi1 = (m1', b1) ->
+  lo2 <= lo1 -> hi1 <= hi2 ->
+  exists mu', exists m2', exists b2,
+  Mem.alloc m2 lo2 hi2 = (m2', b2)
+  /\ Mem.inject (as_inj mu') m1' m2'
+  /\ intern_incr mu mu'
+  /\ local_of mu' b1 = Some(b2, 0)
+  /\ (forall b, b <> b1 -> as_inj mu' b = as_inj mu b)
+  /\ sm_inject_separated mu mu' m1 m2 
+  /\ sm_locally_allocated mu mu' m1 m2 m1' m2'
+  /\ SM_wd mu' /\ sm_valid mu' m1' m2' /\
+  (REACH_closed m1 (vis mu) -> REACH_closed m1' (vis mu')). 
+Proof.
+  intros.
+  exploit alloc_parallel_intern; eauto.
+  intros [mu' [m2' [b2 [? [? [? [? [? [? [? [? [? ?]]]]]]]]]]]].
+  exists mu',m2',b2; intuition.
+  apply local_ofI_Some; auto. 
+  rewrite sm_locally_allocatedChar in H9. 
+  destruct H9 as [_ [_ [-> _]]].
+  rewrite orb_true_iff. right.
+  erewrite freshloc_alloc; eauto.
+  destruct (eq_block_refl b1) as [? ->]; auto.
+Qed. 
 
 Lemma freelist_right_inject: forall j m1 l m2 m2'
        (F:Mem.free_list m2 l = Some m2')

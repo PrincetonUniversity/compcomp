@@ -188,7 +188,7 @@ Inductive asm_effstep: (block -> Z -> bool) ->
       Mem.alloc m 0 (4*z) = (m1, stk) ->
       store_args m1 stk args tys = Some m2 -> 
       let rs0 := (Pregmap.init Vundef) 
-                  #PC <- (symbol_offset ge fb Int.zero) 
+                  #PC <- (Vptr fb Int.zero)
                   #RA <- Vzero 
                   # ESP <- (Vptr stk Int.zero) in
       asm_effstep EmptyEffect 

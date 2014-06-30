@@ -1901,18 +1901,6 @@ Opaque loadind.
   clear H2 H5. simpl in H0. destruct (eq_block b2 b0); simpl in *; inv H0.
   rewrite H5. eapply visPropagateR; eassumption. }
 
-
-(*TODO: move*)
-Lemma args_len_rec_bound args tys z : 
-  args_len_rec args tys = Some z -> z <= 2*Zlength args.
-Proof. 
-  revert args z. induction tys. destruct args. simpl. inversion 1; omega.
-  simpl. inversion 1. destruct args. inversion 1. intros z H.
-  apply args_len_recD in H. destruct H as [z1 [z2 [Zeq [? H2]]]]. subst z.
-  specialize (IHtys _ _ H). destruct a; subst z1; rewrite Zlength_cons; omega.
-Qed.
-
-
 { (* initial step *) 
   destruct PRE as [RC [PG [Glob [SMV WD]]]].
   eapply Genv.find_funct_ptr_transf_partial in TRANSF; eauto.
@@ -1921,23 +1909,31 @@ Qed.
   caseEq (transf_function f); simpl; try congruence.
   intros tfn TRANSL EQ. inversion EQ; clear EQ; subst tf.
   destruct WD as [VAL WD].
-  exploit (alloc_parallel_intern mu m m2 0 (4*z) m1 stk 0 (4*z)); 
+  exploit (alloc_parallel_intern' mu m m2 0 (4*z) m1 stk 0 (4*z)); 
     eauto; try solve[omega].
   intros [mu' [m2' [tsp0 [ALLOC' [INJ [INCR [ASINJ [X [? [? [? [? ?]]]]]]]]]]]].
   set (rs0 := (Pregmap.init Vundef) 
-                  #PC <- (symbol_offset tge fb Int.zero) 
+                  #PC <- (Vptr fb Int.zero)
                   #RA <- Vzero 
                   # ESP <- (Vptr tsp0 Int.zero)).
   exists (State rs0 (mk_load_frame tsp0 retty)).
   assert (VALSDEF': val_casted.vals_defined args' = true).
-  { admit. }
+  { eapply val_casted.val_list_inject_defined; eauto. }
+  assert (SIG: Mach.fn_sig f=fn_sig tfn).
+  { revert TRANSL. unfold transf_function. unfold bind.
+    destruct (transl_code' f (Mach.fn_code f) true); try solve[inversion 1].
+    destruct (zlt (list_length_z c) Int.max_unsigned); try solve[inversion 1].
+    inversion 1. simpl; auto. }
   assert (HASTY': Val.has_type_list args' (sig_args (fn_sig tfn))).
-  { admit. }
+  { rewrite val_casted.val_has_type_list_func_charact in HASTY|-*.
+    rewrite <-SIG. eapply val_casted.val_list_inject_hastype; eauto. }
   assert (ARGSLEN': args_len_rec args' (sig_args (fn_sig tfn)) = Some z).
-  { admit. }
+  { exploit args_len_rec_succeeds; eauto. intros [? ?]; eauto.
+    rewrite <-SIG in H7. exploit args_len_rec_inject; eauto.
+    intros; subst; auto. rewrite <-SIG. auto. }
   assert (LEN: Zlength args=Zlength args').
-  { admit. }
-  assert (SIG: Mach.fn_sig f = fn_sig tfn). admit.
+  { clear - VINJ. induction VINJ; auto. 
+    rewrite !Zlength_cons. rewrite IHVINJ. auto. }
   assert (STORE: exists m0', 
     store_args m2' tsp0 args' (sig_args (fn_sig tfn)) = Some m0').
   { unfold store_args; eapply store_args_rec_succeeds; eauto. 
@@ -1949,35 +1945,59 @@ Qed.
   eexists; eexists; split. left.
     eapply effstep_plus_one. simpl. rewrite SIG. 
     solve[eapply asm_exec_initialize_call; eauto].
+  assert (VIS': vis mu' stk=true).
+  { rewrite sm_locally_allocatedChar in H3.
+    unfold vis. destruct H3 as [_ [_ [-> _]]].
+    rewrite !orb_true_iff. left. right. 
+    erewrite freshloc_alloc; eauto. 
+    solve[destruct (eq_block_refl stk) as [? ->]; auto]. }
   exists mu'.
   intuition.
-  admit. (*locally allocated*)
+  eapply store_args_rec_only_stores in H1. 
+  eapply store_args_rec_only_stores in STORE. 
+  eapply sm_locally_allocated_only_stores; eauto.
+  solve[apply alloc_forward in H0; auto].
+  solve[apply alloc_forward in ALLOC'; auto].
   unfold MATCH.
   intuition.
   rewrite SIG.
   apply match_states_call_internal with (f:=f); auto.
   solve[constructor].
-  admit. (*store_args_inject*)
-  constructor. simpl. unfold rs0. rewrite Pregmap.gss. 
+  eapply store_args_inject with (args:=args) (args':=args'); eauto.
+  apply val_list_inject_forall_inject in VINJ.
+  apply forall_inject_val_list_inject.
+  apply forall_vals_inject_restrictD in VINJ; auto.
+  solve[eapply forall_vals_inject_intern_incr; eauto].
+  apply local_in_all in ASINJ. eauto. auto.
+  solve[rewrite SIG; auto].
+  { (*agree*) 
+    constructor. simpl. unfold rs0. rewrite Pregmap.gss. 
     apply val_inject_ptr with (delta := 0).
-    admit.
-  solve[rewrite Int.add_zero_l; auto].
-  admit.
-  unfold rs0. 
-    rewrite Pregmap.gso. rewrite Pregmap.gso.  
-    rewrite Pregmap.gss. unfold symbol_offset. 
-    admit.
-  congruence.
-  congruence.
-  simpl. unfold rs0. rewrite Pregmap.gso. rewrite Pregmap.gss. solve[constructor].
+    rewrite restrict_sm_local. apply restrictI_Some; auto. 
+    solve[rewrite Int.add_zero_l; auto].
+    intros r. 
+    assert (Regmap.init Vundef r = Vundef) as -> by (rewrite Regmap.gi; auto).
+    constructor. }
+  unfold rs0. rewrite Pregmap.gso. rewrite Pregmap.gss. simpl. constructor.
   congruence.
   constructor.
-  admit.
-  admit. (*REACH_store_args*)
-  admit. 
-  admit.
-  admit.
-  admit. }
+  apply restrictI_Some; auto. 
+  apply store_args_rec_only_stores in H1. 
+  eapply REACH_only_stores; eauto.
+  intros b' GET. apply val_casted.getBlocks_encode_longs in GET.
+  apply val_list_inject_forall_inject in VINJ.
+  apply forall_vals_inject_restrictD' in VINJ. destruct VINJ as [VINJ VINJ'].
+  apply VINJ' in GET. 
+  solve[eapply intern_incr_vis; eauto].
+  solve[destruct (intern_incr_meminj_preserves_globals_as_inj ge mu) 
+          with (mu' := mu'); auto].
+  (*last goal: globalfunction_ptr_inject *)
+  red; intros. destruct (Glob _ _ H6). split; trivial.
+  eapply intern_incr_as_inj; try eassumption.
+  solve[destruct INCR as [_ [_ [_ [_ [_ [_ [<- _]]]]]]]; eauto].
+  apply store_args_rec_only_stores in H1. 
+  apply store_args_rec_only_stores in STORE. 
+  eapply sm_valid_only_stores; eauto. }
 
 { (* Mcall_internal *)
   destruct PRE as [RC [PG [GFP [Glob [SMV WD]]]]].

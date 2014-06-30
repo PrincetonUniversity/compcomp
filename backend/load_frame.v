@@ -16,6 +16,9 @@ Require Import mem_lemmas. (*for mem_forward*)
 Require Import core_semantics.
 Require Import val_casted.
 Require Import BuiltinEffects.
+Require Import StructuredInjections.
+Require Import effect_properties.
+Require Import reach.
 
 Definition load_stack (m: mem) (sp: val) (ty: typ) (ofs: int) :=
   Mem.loadv (chunk_of_type ty) m (Val.add sp (Vint ofs)).
@@ -222,15 +225,15 @@ Lemma range_perm_shift m b lo sz n k p :
   Mem.range_perm m b (lo+n) (lo+sz+n) k p.
 Proof. intros A B C RNG ofs [H H2]; apply RNG; omega. Qed.
 
-Inductive only_stores (sp: block) : mem -> mem -> Type :=
-| only_stores_nil m : only_stores sp m m
-| only_stores_cons m ch ofs v m'' m' : 
+Inductive only_stores (sp: block) : list val -> mem -> mem -> Type :=
+| only_stores_nil m : only_stores sp nil m m 
+| only_stores_cons m ch ofs v m'' m' l : 
     Mem.store ch m sp ofs v = Some m'' -> 
-    only_stores sp m'' m' -> 
-    only_stores sp m m'.
+    only_stores sp l m'' m' -> 
+    only_stores sp (v::l) m m'.
 
-Lemma only_stores_fwd sp m m' : 
-  only_stores sp m m' -> mem_forward m m'.
+Lemma only_stores_fwd sp m m' l : 
+  only_stores sp l m m' -> mem_forward m m'.
 Proof.
 induction 1. apply mem_forward_refl. 
 eapply mem_forward_trans. eapply store_forward; eauto. apply IHX.
@@ -238,7 +241,7 @@ Qed.
 
 Lemma store_args_rec_only_stores m sp args tys z m' :
   store_args_rec m sp z args tys = Some m' -> 
-  only_stores sp m m'.
+  only_stores sp (encode_longs tys args) m m'.
 Proof.
 revert args z m. induction tys. destruct args; simpl.
 intros ? ?; inversion 1. constructor.
@@ -270,7 +273,7 @@ case_eq (Mem.store Mint32 m0 sp (Int.unsigned (Int.add Int.zero z'))
   try solve[intros; congruence].
 intros m1 STORE' H.
 eapply only_stores_cons; eauto.
-eapply only_stores_cons; eauto.
+solve[eapply only_stores_cons; eauto].
 - case_eq (store_stack m (Vptr sp Int.zero) Tsingle z' v); 
   try solve[intros; congruence].
 unfold store_stack, Mem.storev. simpl. intros m0 STORE H. 
@@ -705,3 +708,209 @@ simpl; intros ? ?; inversion 1; subst.
 eapply Mem.load_unchanged_on. eapply H0. intros. solve[simpl; auto].
 Qed.
 
+Lemma args_len_rec_bound args tys z : 
+  args_len_rec args tys = Some z -> z <= 2*Zlength args.
+Proof. 
+  revert args z. induction tys. destruct args. simpl. inversion 1; omega.
+  simpl. inversion 1. destruct args. inversion 1. intros z H.
+  apply args_len_recD in H. destruct H as [z1 [z2 [Zeq [? H2]]]]. subst z.
+  specialize (IHtys _ _ H). destruct a; subst z1; rewrite Zlength_cons; omega.
+Qed.
+
+Lemma store_args_inject args args' tys j m m' m2 m2' b b' z : 
+  val_list_inject j args args' -> 
+  Mem.inject j m m' -> 
+  j b = Some (b',0) -> 
+  store_args_rec m b z args tys = Some m2 -> 
+  store_args_rec m' b' z args' tys = Some m2' -> 
+  Mem.inject j m2 m2'.
+Proof.
+intros A B C D E.
+revert args args' m m' z A B D E. induction tys. 
+intros args args' m m' z H. inv H. simpl. 
+  inversion 2; subst. solve[inversion 1; subst; auto].
+intros ? ?; inversion 1. 
+intros ? ? ? ? ?. intros H. inv H. solve[inversion 2]. simpl. intros H.
+generalize
+ (Int.repr match z with
+             | 0 => 0 | Z.pos y' => Z.pos y'~0~0
+             | Z.neg y' => Z.neg y'~0~0 end) as z'.
+generalize
+ (Int.repr match z+1 with
+             | 0 => 0 | Z.pos y' => Z.pos y'~0~0
+             | Z.neg y' => Z.neg y'~0~0 end) as z''.
+intros z'' z'. destruct a.
+- case_eq (store_stack m (Vptr b Int.zero) Tint z' v); 
+  try solve[intros; congruence].
+unfold store_stack, Mem.storev. simpl. intros m0 STORE H2. 
+exploit Mem.store_mapped_inject; eauto.
+intros [m0' [STORE' INJ]].
+rewrite Zplus_0_r in STORE'. rewrite STORE'. intros H3.
+eapply IHtys; eauto.
+- case_eq (store_stack m (Vptr b Int.zero) Tfloat z' v); 
+  try solve[intros; congruence].
+unfold store_stack, Mem.storev. simpl. intros m0 STORE H2. 
+exploit Mem.store_mapped_inject; eauto.
+intros [m0' [STORE' INJ]].
+rewrite Zplus_0_r in STORE'. rewrite STORE'. intros H3.
+eapply IHtys; eauto.
+- inv H0; try solve[inversion 1].
+case_eq (store_stack m (Vptr b Int.zero) Tint z'' (Vint (Int64.hiword i))); 
+  try solve[intros; congruence].
+unfold store_stack, Mem.storev. simpl. intros m0 STORE H2. 
+exploit Mem.store_mapped_inject; eauto.
+intros [m0' [STORE' INJ]].
+rewrite Zplus_0_r in STORE'. rewrite STORE'. 
+revert H2. rewrite Int.add_zero_l. 
+case_eq (Mem.store Mint32 m0 b (Int.unsigned z') (Vint (Int64.loword i)));
+  try solve[intros; congruence].
+unfold store_stack, Mem.storev. simpl. intros m1 STORE1 H3. 
+exploit Mem.store_mapped_inject; eauto.
+intros [m1' [STORE1' INJ']]. rewrite Zplus_0_r in STORE1'. rewrite STORE1'.
+eapply IHtys; eauto.
+- case_eq (store_stack m (Vptr b Int.zero) Tsingle z' v); 
+  try solve[intros; congruence].
+unfold store_stack, Mem.storev. simpl. intros m0 STORE H2. 
+exploit Mem.store_mapped_inject; eauto.
+intros [m0' [STORE' INJ]].
+rewrite Zplus_0_r in STORE'. rewrite STORE'. intros H3.
+eapply IHtys; eauto.
+Qed.
+
+Lemma args_len_rec_inject j args args' tys z z' : 
+  val_list_inject j args args' -> 
+  args_len_rec args tys = Some z -> 
+  args_len_rec args' tys = Some z' -> 
+  z=z'.
+Proof.
+intros.
+revert tys z z' H0 H1.
+induction H.
+simpl. destruct tys; inversion 1. inversion 1; subst; auto.
+destruct tys; inversion 1. simpl. destruct t.
++ inv H1.
+revert H3 H4.
+case_eq (args_len_rec vl tys); try solve[intros; congruence]. intros.
+revert H2. case_eq (args_len_rec vl' tys); try solve[intros; congruence]. intros.
+exploit IHval_list_inject; eauto.
+intros. subst z0. inv H3; inv H4; inv H5. omega.
++ inv H1.
+revert H3 H4.
+case_eq (args_len_rec vl tys); try solve[intros; congruence]. intros.
+revert H2. case_eq (args_len_rec vl' tys); try solve[intros; congruence]. intros.
+exploit IHval_list_inject; eauto.
+intros. subst z0. inv H3; inv H4; inv H5. omega.
++ inv H1.
+revert H3 H4.
+destruct v; try solve[inversion 1].
+destruct v'; try solve[inversion 3].
+case_eq (args_len_rec vl tys); try solve[inversion 2].
+case_eq (args_len_rec vl' tys); try solve[intros; congruence]. intros.
+exploit IHval_list_inject; eauto.
+intros. subst z0. inv H3; inv H4; inv H5. omega.
++ inv H1.
+revert H3 H4.
+case_eq (args_len_rec vl tys); try solve[intros; congruence]. intros.
+revert H2. case_eq (args_len_rec vl' tys); try solve[intros; congruence]. intros.
+exploit IHval_list_inject; eauto.
+intros. subst z0. inv H3; inv H4; inv H5. omega.
+Qed.
+
+Lemma sm_locally_allocated_only_stores1 mu mu' b1 l1 m1 m2 m1' m2' m1'' : 
+  mem_forward m1 m1' -> 
+  sm_locally_allocated mu mu' m1 m2 m1' m2' ->
+  only_stores b1 l1 m1' m1'' -> 
+  sm_locally_allocated mu mu' m1 m2 m1'' m2'.
+Proof.
+intros. 
+revert m2 m2' mu mu' H H0. induction X; auto. intros.
+apply IHX.
+eapply mem_forward_trans; eauto. apply store_forward in e. auto. auto.
+rewrite sm_locally_allocatedChar in H0|-*.
+destruct H0 as [? [? [? [? [? ?]]]]].
+intuition.
+generalize e as e'. intro.
+apply store_freshloc in e. rewrite H0. 
+extensionality b. destruct (DomSrc mu b); auto. simpl.
+symmetry. rewrite <-freshloc_trans with (m'':= m); auto. rewrite e.
+  solve[rewrite orb_comm; auto].
+apply store_forward in e'. eauto.
+rewrite H2. extensionality b. destruct (locBlocksSrc mu b); simpl; auto.
+generalize e as e'. intro.
+apply store_freshloc in e. 
+symmetry. rewrite <-freshloc_trans with (m'':= m); auto. rewrite e.
+  solve[rewrite orb_comm; auto].
+apply store_forward in e'. eauto.
+Qed.
+
+Lemma sm_locally_allocated_only_stores2 mu mu' b2 l2 m1 m2 m1' m2' m2'' : 
+  mem_forward m2 m2' -> 
+  sm_locally_allocated mu mu' m1 m2 m1' m2' ->
+  only_stores b2 l2 m2' m2'' -> 
+  sm_locally_allocated mu mu' m1 m2 m1' m2''.
+Proof.
+intros. 
+revert m1 m1' mu mu' H H0. induction X; auto. intros.
+apply IHX; auto.
+eapply mem_forward_trans; eauto. apply store_forward in e. auto. 
+rewrite sm_locally_allocatedChar in H0|-*.
+destruct H0 as [? [? [? [? [? ?]]]]].
+intuition.
+generalize e as e'. intro.
+apply store_freshloc in e. rewrite H1. 
+extensionality b. destruct (DomTgt mu b); auto. simpl.
+symmetry. rewrite <-freshloc_trans with (m'':= m); auto. rewrite e.
+  solve[rewrite orb_comm; auto].
+apply store_forward in e'. eauto.
+rewrite H3. extensionality b. destruct (locBlocksTgt mu b); simpl; auto.
+generalize e as e'. intro.
+apply store_freshloc in e. 
+symmetry. rewrite <-freshloc_trans with (m'':= m); auto. rewrite e.
+  solve[rewrite orb_comm; auto].
+apply store_forward in e'. eauto.
+Qed.
+
+Lemma sm_locally_allocated_only_stores mu mu' b1 b2 l1 l2 m1 m2 m1' m2' m1'' m2'' : 
+  mem_forward m1 m1' -> 
+  mem_forward m2 m2' -> 
+  sm_locally_allocated mu mu' m1 m2 m1' m2' ->
+  only_stores b1 l1 m1' m1'' -> 
+  only_stores b2 l2 m2' m2'' -> 
+  sm_locally_allocated mu mu' m1 m2 m1'' m2''.
+Proof.
+intros. 
+eapply sm_locally_allocated_only_stores1; eauto.
+eapply sm_locally_allocated_only_stores2; eauto.
+Qed.
+
+Lemma sm_valid_only_stores mu b1 b2 l1 l2 m1 m2 m1' m2' : 
+  sm_valid mu m1 m2 -> 
+  only_stores b1 l1 m1 m1' -> 
+  only_stores b2 l2 m2 m2' -> 
+  sm_valid mu m1' m2'.
+Proof.
+revert m2 m2' b2 l2 mu; induction 2. induction 1; auto.
+apply Mem.nextblock_store in e.
+apply IHX. unfold sm_valid. unfold Mem.valid_block. rewrite e.
+destruct H. split; auto.
+intros. apply IHX; auto. apply Mem.nextblock_store in e.
+destruct H. unfold sm_valid, Mem.valid_block. rewrite e. auto.
+Qed.
+
+Lemma REACH_only_stores b l m m' roots : 
+  only_stores b l m m' -> 
+  roots b = true ->
+  (forall b' : block,
+     getBlocks l b' = true -> roots b' = true) ->
+  REACH_closed m roots -> 
+  REACH_closed m' roots.
+Proof.
+induction 1; auto. intros H H2 H3. apply IHX; auto.
+intros. apply H2. rewrite getBlocksD. destruct v; auto. 
+  solve[rewrite orb_true_iff; auto].
+eapply REACH_Store; eauto.
+intros. eapply H2. rewrite getBlocksD in H0|-*.
+destruct v; auto; try solve[rewrite getBlocksD_nil in H0; congruence].
+rewrite getBlocksD_nil, orb_comm in H0; simpl in H0.
+rewrite H0; auto.
+Qed.
