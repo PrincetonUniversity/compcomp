@@ -1386,28 +1386,33 @@ assert (II': inject_incr (local_of (restrict_sm mu (vis mu)))
          (negb (locBlocksSrc nu' b) &&
           REACH m1' (exportedSrc nu' (ret1 :: nil)) b)))).
 { clear - INC WDnu' WDmu.
-  generalize INC as INC'. intro.
-  apply extern_incr_local in INC.
-  rewrite <-INC.
-  rewrite replace_locals_local.
-  rewrite restrict_sm_local.
-  red; intros; clear INC. 
+  destruct INC as [_ [EQ [_ [_ [EQ1 [_ [_ [_ [EQ2 _]]]]]]]]].
+  rewrite replace_locals_local in EQ. 
+  rewrite replace_locals_locBlocksSrc in EQ1.
+  rewrite replace_locals_frgnBlocksSrc in EQ2.
+  rewrite restrict_sm_local. intros b b' d H.
   destruct (restrictD_Some _ _ _ _ _ H).
-  apply restrictI_Some; trivial.
-  unfold vis in H1. destruct (locBlocksSrc nu' b); simpl in *; trivial.
+  apply restrictI_Some.
+  solve[rewrite <-EQ; auto].
+  unfold vis in H1. rewrite orb_true_iff in H1. rewrite <-EQ1.
+  rewrite orb_true_iff.
+  destruct H1. solve[left; auto]. right.
   rewrite andb_true_iff. split.
-  eapply extern_incr_DomSrc; eauto.
-  rewrite replace_locals_DomSrc. unfold DomSrc.
-  rewrite orb_true_iff in H1. destruct H1. rewrite H1; auto. 
-  rewrite orb_true_iff. right. apply frgnBlocksSrc_extBlocksSrc in H1; auto. 
+  unfold DomSrc. rewrite orb_true_iff. 
+  rewrite EQ2 in H1. right. 
+  solve[eapply frgnBlocksSrc_extBlocksSrc; eauto].
+  rewrite andb_true_iff. split. 
+  apply frgnBlocksSrc_locBlocksSrc in H1; auto. 
+  solve[rewrite H1; auto].
   apply REACH_nil. unfold exportedSrc.
-  rewrite sharedSrc_iff_frgnpub; auto.
-  rewrite !orb_true_iff. right.
-  admit. }
+  rewrite EQ2 in H1.
+  apply frgnSrc_shared in H1; trivial.
+  solve[rewrite H1; intuition]. }
   
 split.
 { econstructor. 
-       rewrite replace_externs_vis. clear - LL II WDnuRE STACKS WDmu WDnu' RValInjNu' MemInjNu'.
+       rewrite replace_externs_vis. 
+       clear - LL II WDnuRE STACKS WDmu WDnu' RValInjNu' MemInjNu'.
        induction STACKS; econstructor; eauto.
        clear IHSTACKS STACKS H2 H H0. 
          destruct H1 as [b [ofs [tb [X Y]]]]. 
@@ -1497,7 +1502,8 @@ destruct CS; intros; destruct MTCH as [MS PRE]; try inv MS.
 
 { (* Mlabel *)
   exploit eff_exec_straight_steps; try eassumption.
-  intros. monadInv TR. econstructor; split. apply eff_exec_straight_one. simpl; eauto. auto. 
+  intros. monadInv TR. econstructor; split. apply eff_exec_straight_one. 
+    simpl; eauto. auto. 
     reflexivity.
     split. apply agree_nextinstr; auto. eassumption. simpl; congruence.
   intros [st' [CS' MS']].
@@ -1652,7 +1658,8 @@ Local Transparent destroyed_by_setstack.
   exploit (Mem.load_inject (as_inj (restrict_sm mu (vis mu)))).
     rewrite restrict_sm_all. eapply inject_restrict; eassumption.
     { unfold Mem.loadv in H3. revert H3.
-      case_eq (Val.add (parent_sp0 sp2 s) (Vint ofs)); try solve[intros; congruence|eauto]. }
+      case_eq (Val.add (parent_sp0 sp2 s) (Vint ofs)); 
+        try solve[intros; congruence|eauto]. }
     eauto.
   intros [v' [C D]].
 Opaque loadind.
@@ -1675,7 +1682,8 @@ Opaque loadind.
     rewrite <- H1 in C. clear H1.
     destruct ep; simpl in TR.
     (* EDX contains parent *)
-      assert (VI: val_inject (as_inj (restrict_sm mu (vis mu))) (Vptr b i) (rs0 EDX)) by eauto.
+      assert (VI: val_inject (as_inj (restrict_sm mu (vis mu))) (Vptr b i) (rs0 EDX)) 
+        by eauto.
       clear DXP. inv VI. rewrite H4 in H6. inv H6.
       exploit loadind_correct_eff. eexact TR. 
         instantiate (2 := rs0). rewrite <- H5. simpl. apply C. 
@@ -2196,13 +2204,10 @@ Opaque loadind.
     split.
       { econstructor; eauto.
         apply agree_set_other; auto. apply agree_nextinstr. apply agree_set_other; auto.
-        (*WAS:eapply agree_change_sp; eauto. eapply parent_sp_def; eauto.*)
         eapply agree_change_sp. eassumption.
           eapply (parent_sp0_spec _ _ _ _ _ STACKS).
-          inv MLF.
-          instantiate (1 := tsp0). admit. (*TODO: make sp0 local_of*)
-          assumption.
-          apply restrict_sm_WD; trivial.
+          inv MLF. instantiate (1 := tsp0). rewrite restrict_sm_local. solve[auto].
+          assumption. apply restrict_sm_WD; trivial.
         Simplifs. rewrite Pregmap.gso; auto. 
         generalize (preg_of_not_SP rf). rewrite (ireg_of_eq _ _ EQ1). congruence. 
         inv MLF. constructor. auto.
@@ -2247,10 +2252,9 @@ Opaque loadind.
     split.
       eapply match_states_call_internal; eauto.
       apply agree_set_other; auto. apply agree_nextinstr. apply agree_set_other; auto.
-      (*WAS:eapply agree_change_sp; eauto. eapply parent_sp_def; eauto.*)
        eapply agree_change_sp; try eassumption.
          apply (parent_sp0_spec _ _ _ tsp0 _ STACKS).
-         inv MLF. admit.
+         inv MLF. rewrite restrict_sm_local. solve[auto].
        Simplif. unfold symbol_offset. rewrite symbols_preserved. rewrite H. auto.
        inv MLF. constructor. auto.
     intuition.
@@ -2305,32 +2309,6 @@ Opaque loadind.
     split; trivial.
   destruct XX; subst. rewrite Int.add_zero, Zplus_0_r in *.
   clear H12 H11.
-(*
-  (*exploit lessdef_parent_sp; eauto. intros. subst parent'. clear B.*)
-  assert (parent' = parent_sp s).
-    destruct (parent_sp_zero_or_ptr _ _ _ STACKS).
-    rewrite H0 in B. inv B. rewrite H0; trivial.
-    destruct H0 as [b [z [PAR LOC]]]. rewrite PAR in B.
-       inv B. apply local_in_all in LOC; trivial.
-       rewrite LOC in H11; inv H11.
-       rewrite PAR, Int.add_zero; trivial. 
-  subst parent'.
-
-  (*exploit lessdef_parent_ra; eauto. intros. subst ra'. clear D.*)
-  assert (ra' = parent_ra s).
-    destruct (parent_ra_zero_or_ptr _ _ _ STACKS).
-    rewrite H0 in D. inv D. rewrite H0; trivial.
-    destruct H0 as [b [z [RA [LOC | GLOB]]]].
-      rewrite RA in D. inv D. apply local_in_all in LOC; trivial.
-       rewrite LOC in H11; inv H11.
-       rewrite RA, Int.add_zero; trivial.
-      rewrite RA in D; inv D. rewrite restrict_sm_all in H11. 
-       destruct (restrictD_Some _ _ _ _ _ H11); clear H11.
-        rewrite (meminj_preserves_globals_isGlobalBlock _ _ PG _ GLOB) in H0; inv H0.
-        rewrite RA, Int.add_zero. trivial.
-       
-  subst ra'.*)
-
   exploit free_parallel_inject; eauto.
     eapply local_in_all; eassumption.
   repeat rewrite Zplus_0_r. intros [m2' [E F]].
@@ -2356,11 +2334,11 @@ Opaque loadind.
   assert (AG1: agree (restrict_sm mu (vis mu)) rs (parent_sp0 sp1 s)
             (nextinstr (rs0 # ESP <- parent') # RA <- ra') # PC <-
             (nextinstr (rs0 # ESP <- parent') # RA <- ra' x0)).
-  { apply agree_set_other; auto. apply agree_nextinstr. apply agree_set_other; auto.
-    (*WAS:eapply agree_change_sp; eauto. eapply parent_sp_def; eauto.*)
+  { apply agree_set_other; auto. apply agree_nextinstr. 
+      apply agree_set_other; auto.
     eapply agree_change_sp; try eassumption.
        apply (parent_sp0_spec _ _ _ tsp0 _ STACKS). 
-       admit. }
+       inv MLF. solve[rewrite restrict_sm_local; auto]. }
   exploit extcall_arguments_match.
     eapply WDR.
     eapply AG1.
@@ -2430,8 +2408,7 @@ Opaque loadind.
   { apply agree_set_other; auto. apply agree_nextinstr. apply agree_set_other; auto.
     eapply agree_change_sp; eauto.
       eapply (parent_sp0_spec _ _ _ tsp0 _ STACKS).
-      admit.
-  }
+      inv MLF. solve[rewrite restrict_sm_local; auto]. }
   exploit extcall_arguments_match.
     apply (restrict_sm_WD _ WD (vis mu)); trivial.
     apply AG1.
@@ -2441,9 +2418,10 @@ Opaque loadind.
   intros [targs' [TExtcallArgs ArgsInj]].
   eexists; eexists; eexists; split.
     left. eapply effstep_plus_trans'.
-             eapply effstep_plus_one. eapply asm_effexec_step_internal. rewrite <- H6. eauto.
-              eapply functions_transl; eauto. eapply find_instr_tail; eauto.    
-              simpl. rewrite <- RSP; simpl. rewrite C. rewrite A. rewrite E. eauto.
+             eapply effstep_plus_one. eapply asm_effexec_step_internal. 
+               rewrite <- H6. eauto.
+             eapply functions_transl; eauto. eapply find_instr_tail; eauto.    
+             simpl. rewrite <- RSP; simpl. rewrite C. rewrite A. rewrite E. eauto.
     eapply effstep_plus_two. eapply asm_effexec_step_internal. 
       transitivity (Val.add rs0#PC Vone). auto. rewrite <- H6. simpl. eauto.
       eapply functions_transl; eauto. eapply find_instr_tail; eauto. 
@@ -2495,7 +2473,8 @@ Opaque loadind.
   exploit functions_transl; eauto. intro FN.
   generalize (transf_function_no_overflow _ _ H3); intro NOOV.
   exploit (inlineable_extern_inject _ _ GDE_lemma); eauto.
-    admit. (*ge/tge*)
+    unfold ge, tge. 
+    eapply Genv.find_symbol_transf_partial; eauto.
     rewrite <- restrict_sm_all. eapply decode_longs_inject.
     eapply preg_vals; eauto.
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
@@ -2514,7 +2493,7 @@ Opaque loadind.
     split. econstructor; eauto.
       eapply match_stack_intern_incr; try eassumption.
         eapply restrict_sm_intern_incr; eassumption. 
-     (* instantiate (2 := tf); *)instantiate (1 := x).
+      instantiate (1 := x).
       unfold nextinstr_nf, nextinstr. rewrite Pregmap.gss.
       rewrite undef_regs_other. rewrite set_pregs_other_2. rewrite undef_regs_other_2.
       rewrite <- H. simpl. econstructor; eauto.
@@ -2534,7 +2513,12 @@ Opaque loadind.
 
       eapply sp_spec_intern_incr; eassumption.
       inv MLF; constructor. 
-      solve[apply intern_incr_restrict in INCR; auto].
+      generalize INCR as INCR'; intro.
+      apply intern_incr_local in INCR.
+      apply restrictD_Some in SP. destruct SP as [X Y].
+      apply restrictI_Some. 
+      apply INCR; auto.
+      solve[eapply intern_incr_vis in INCR'; eauto].
     intuition. 
     eapply meminj_preserves_incr_sep. eapply PG. eassumption. 
              apply intern_incr_as_inj; trivial.
@@ -2571,7 +2555,7 @@ Opaque loadind.
   split. split; intuition. 
     econstructor; eauto.
       eapply agree_exten. eassumption.
-       (*was:  eauto with asmgen.*) intros r Dr. eapply INV. intros Hr; subst. inv Dr.
+       intros r Dr. eapply INV. intros Hr; subst. inv Dr.
       congruence.
   simpl. intuition.  }
 
@@ -2638,8 +2622,6 @@ Opaque loadind.
 
 { (* Mcond false *)
   destruct PRE as [RC [PG [GFP [Glob [SMV WD]]]]].
-  (*destruct (agree_sp_shape _ _ _ _ AG) as [spb [z [SP [LocSP RSP]]]].
-  subst. simpl in *.*)
   exploit eval_condition_inject.
     eapply preg_vals; eauto.
     rewrite restrict_sm_all. eapply inject_restrict; eassumption.
@@ -2721,7 +2703,6 @@ Opaque loadind.
            econstructor; eauto. 
 Transparent destroyed_by_jumptable.   
       simpl. eapply agree_exten; eauto.
-      (*WAS: intros. rewrite C; auto with asmgen.*)
         intros r Dr. apply C. intros; subst. inv Dr.
       congruence.
   intuition. }
@@ -2791,8 +2772,8 @@ Transparent destroyed_by_jumptable.
         apply agree_set_other; auto. apply agree_nextinstr. apply agree_set_other; auto.
           eapply agree_change_sp; eauto. 
             eapply (parent_sp0_spec _ _ _ tsp0 _ STACKS). 
-            admit. 
-            inv MLF. constructor; auto.
+            inv MLF. solve[rewrite restrict_sm_local; auto].
+            inv MLF. solve[constructor; auto].
      intuition.
      eapply REACH_closed_free; try eassumption.
      split; intros. 
@@ -2817,7 +2798,8 @@ Transparent destroyed_by_jumptable.
   assert (WDR: SM_wd (restrict_sm mu (vis mu))).
      eapply (restrict_sm_WD _ WD ); trivial. 
   exploit alloc_parallel_intern; try eassumption. apply Z.le_refl. apply Z.le_refl.
-  intros [mu' [tm1 [tstk [TAlloc [INJ1 [INC [STK [Mu'Mu [SEP [LOCALLOC [WD' [WMV' RC1]]]]]]]]]]]]. 
+  intros [mu' [tm1 [tstk [TAlloc [INJ1 [INC [STK [Mu'Mu 
+         [SEP [LOCALLOC [WD' [WMV' RC1]]]]]]]]]]]]. 
   assert (stk_local: local_of (restrict_sm mu' (vis mu')) stk = Some (tstk, 0)).
     rewrite restrict_sm_local'; trivial.
     destruct (joinD_Some _ _ _ _ _ STK) as [EXT | [_ LOC]]; trivial.
@@ -2888,7 +2870,8 @@ Transparent destroyed_by_jumptable.
       unfold nextinstr. rewrite Pregmap.gss.
         repeat rewrite Pregmap.gso; auto with asmgen. 
       rewrite ATPC. simpl. constructor; eauto.
-        subst x. unfold fn_code. eapply code_tail_next_int. rewrite list_length_z_cons. omega. 
+        subst x. unfold fn_code. eapply code_tail_next_int. 
+          rewrite list_length_z_cons. omega. 
       constructor.
      { (*agree *) subst sp.
        apply agree_nextinstr. eapply agree_change_sp; eauto.
@@ -2898,7 +2881,7 @@ Transparent destroyed_at_function_entry.
          apply restrict_sm_WD; trivial. 
        apply restrict_sm_intern_incr; try eassumption; trivial.
        simpl; intros. apply Pregmap.gso; auto with asmgen. tauto. 
-       right. exists stk, Int.zero, tstk; split; trivial.
+       exists stk, Int.zero, tstk; split; trivial.
        econstructor. eapply local_in_all; try eassumption.
         apply restrict_sm_WD; trivial. 
         rewrite Int.add_zero. trivial.
@@ -2907,16 +2890,25 @@ Transparent destroyed_at_function_entry.
        rewrite Pregmap.gso. rewrite Pregmap.gso. rewrite Pregmap.gss.
        eapply val_inject_incr.
          2: apply (sp_as_inj _ _ _ _ AG WDR).
-         rewrite restrict_sm_all. rewrite restrict_sm_all. apply intern_incr_restrict; trivial.
+         rewrite restrict_sm_all. rewrite restrict_sm_all. 
+           apply intern_incr_restrict; trivial.
        congruence. congruence.
-     subst sp. right. exists stk, Int.zero, tstk. split; trivial. 
+     subst sp. exists stk, Int.zero, tstk. split; trivial. 
        rewrite restrict_sm_local' in stk_local; trivial. 
      assert (stkVIS: vis mu' stk = true).
-       unfold vis. rewrite restrict_sm_local' in stk_local; trivial.
-        destruct (local_DomRng _ WD' _ _ _ stk_local) as [DS DT].
-        rewrite DS; trivial. 
-     admit.
-     assert (parentra_VIS: forall b' (Hb' : getBlocks (parent_ra s :: nil) b' = true), vis mu' b' = true).
+     { unfold vis. rewrite restrict_sm_local' in stk_local; trivial.
+       destruct (local_DomRng _ WD' _ _ _ stk_local) as [DS DT].
+       rewrite DS; trivial. }
+    inv MLF. constructor; auto. 
+    { generalize INC as INCR'; intro.
+      apply intern_incr_local in INC.
+      apply restrictD_Some in SP. destruct SP as [X Y].
+      apply restrictI_Some. apply INC; auto.
+      solve[eapply intern_incr_vis in INCR'; eauto]. }
+
+
+     assert (parentra_VIS: forall b' (Hb' : getBlocks (parent_ra s :: nil) b' = true), 
+              vis mu' b' = true).
      { intros. apply getBlocks_char in Hb'.
        destruct Hb'. destruct H; try contradiction.
        destruct (parent_ra_spec _ _ _ STACKS).
@@ -2925,23 +2917,24 @@ Transparent destroyed_at_function_entry.
        destruct H4 as [bb [z [PAR [[tb LOC] | GL]]]]; rewrite PAR in H; inv H.
        rewrite restrict_sm_local' in LOC; trivial.
        destruct (local_DomRng _ WD _ _ _ LOC). intuition. intuition. }
+
     intuition.
     eapply REACH_Store. eapply H2. 
       rewrite restrict_sm_local in stk_local.
       apply restrictD_Some in stk_local. destruct stk_local; auto. 
       eassumption.
-    eapply REACH_Store. eapply H1. 
+    { eapply REACH_Store. eapply H1. 
       rewrite restrict_sm_local in stk_local.
       apply restrictD_Some in stk_local. destruct stk_local; auto. 
-    intros. eapply (intern_incr_vis _ _ INC). unfold vis. 
-     destruct (parent_sp0_spec _ _ sp1 tsp0 _ STACKS). 
-       admit.
-       rewrite H5 in H4. unfold getBlocks in H4; simpl in H4. discriminate.
-     destruct H5 as [bb [z [tbb [PARSP LOC]]]]. rewrite PARSP in H4.
-     apply getBlocks_char in H4. destruct H4. destruct H4; try contradiction. inv H4.
-     rewrite restrict_sm_local' in LOC; trivial.
-       destruct (local_DomRng _ WD _ _ _ LOC). intuition.
-    assumption.
+      intros. eapply (intern_incr_vis _ _ INC). unfold vis. 
+      destruct (parent_sp0_spec _ _ sp1 tsp0 _ STACKS) as [bb [z [tbb [PARSP LOC]]]].
+      inv MLF. solve[rewrite restrict_sm_local; auto].
+      rewrite PARSP in H4.
+      apply getBlocks_char in H4. destruct H4. 
+      destruct H4; try contradiction. inv H4.
+      rewrite restrict_sm_local' in LOC; trivial.
+      destruct (local_DomRng _ WD _ _ _ LOC). intuition.
+      assumption. }
     eapply meminj_preserves_incr_sep. eapply PG. eassumption. 
              apply intern_incr_as_inj; trivial.
              apply sm_inject_separated_mem; eassumption.
@@ -2979,16 +2972,18 @@ Transparent destroyed_at_function_entry.
     unfold vis. intuition. }
   inv H0.
   exploit (inlineable_extern_inject _ _ GDE_lemma); eauto.
-    admit. (*ge/tge*)
+    eapply Genv.find_symbol_transf_partial; eauto.
     apply (EFhelpers _ _ OBS).
     apply decode_longs_inject. rewrite restrict_sm_all in ArgsInj. eapply ArgsInj.
-  intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH [A [B [C [D [E F]]]]]]]]]]]]].
+  intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
+         [A [B [C [D [E F]]]]]]]]]]]]].
   eexists; eexists; eexists.
   split.
   left.
   apply effstep_plus_one.
   econstructor; eauto.
-  admit.
+  exploit Genv.find_funct_ptr_transf_partial; eauto.
+  intros [tf' [X Y]]. unfold tge. rewrite X. simpl in Y. solve[inv Y; auto].
   eapply external_call'_intro; eauto. 
   exists mu'.
   intuition.
@@ -3009,10 +3004,11 @@ Transparent destroyed_at_function_entry.
       apply restrict_sm_intern_incr; auto.
       eapply restrict_sm_WD in D; eauto.
       inv MLF. constructor. 
-      apply intern_incr_restrict in A.
-      apply A. auto.
-      auto.
-      intuition. 
+      apply restrictD_Some in SP. destruct SP as [X Y]. 
+      apply restrictI_Some; auto.
+      apply intern_incr_local in A. apply A; auto.
+      solve[eapply intern_incr_vis in A; eauto].
+    intuition.
     eapply meminj_preserves_incr_sep. eapply PG. eassumption. 
              apply intern_incr_as_inj; trivial.
              apply sm_inject_separated_mem; eassumption.
@@ -3021,12 +3017,14 @@ Transparent destroyed_at_function_entry.
           eapply intern_incr_as_inj; eassumption.    
     assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply A.
           rewrite <- FRG. eapply (Glob _ H0).
-  admit. (*fix BuiltinEffect_Propagate*)
-  (* eapply BuiltinEffect_Propagate with 
-      (vargs := (decode_longs (sig_args (ef_sig callee)) args))
-      (tvargs := (decode_longs (sig_args (ef_sig callee)) args')); eauto.
-    eapply decode_longs_inject. rewrite <- restrict_sm_all. auto.*)
-  admit. }
+    eapply BuiltinEffect_Propagate' with 
+      (vargs := args)
+      (tvargs := args'); eauto.
+    econstructor; eauto. rewrite <-restrict_sm_all; auto.
+    eapply BuiltinEffect_Propagate' with 
+      (vargs := args)
+      (tvargs := args'); eauto.
+    econstructor; eauto. rewrite <-restrict_sm_all; auto. }
 
 { (* return *)
   inv STACKS. simpl in *.
