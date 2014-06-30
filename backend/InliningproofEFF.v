@@ -265,6 +265,72 @@ Proof.
   destruct H2; discriminate.
 Qed.
 
+Lemma tr_moves_init_regs':
+  forall F hf stk f sp m ctx1 ctx2, context_below ctx1 ctx2 ->
+                                 forall rdsts rsrcs vl pc1 pc2 rs1,
+                                   tr_moves f.(fn_code) pc1 (sregs ctx1 rsrcs) (sregs ctx2 rdsts) pc2 ->
+                                   (forall r, In r rdsts -> Ple r ctx2.(mreg)) ->
+                                   list_forall2 (val_reg_charact F ctx1 rs1) vl rsrcs ->
+                                   exists rs2, core_semantics_lemmas.corestep_star (rtl_eff_sem hf) tge
+                                                             (RTL_State stk f sp pc1 rs1) m
+                                                             (RTL_State stk f sp pc2 rs2) m
+                                               /\ agree_regs F ctx2 (init_regs vl rdsts) rs2
+                                               /\ forall r, Plt r ctx2.(dreg) -> rs2#r = rs1#r.
+Proof.
+  induction rdsts; simpl; intros.
+  (* rdsts = nil *)
+  inv H0. exists rs1; split. apply core_semantics_lemmas.corestep_star_zero. split. apply agree_regs_init. auto.
+  (* rdsts = a :: rdsts *)
+  inv H2. inv H0. 
+  exists rs1; split. apply core_semantics_lemmas.corestep_star_zero. split. apply agree_regs_init. auto.
+  simpl in H0. inv H0.
+  exploit IHrdsts; eauto. intros [rs2 [A [B C]]].
+  exists (rs2#(sreg ctx2 a) <- (rs2#(sreg ctx1 b1))).
+  split. eapply core_semantics_lemmas.corestep_star_trans; eauto. 
+  eapply core_semantics_lemmas.corestep_star_one.
+eapply  rtl_corestep_exec_Iop; eauto.
+  split. destruct H3 as [[P Q] | [P Q]].
+  subst a1. eapply agree_set_reg_undef; eauto.
+  eapply agree_set_reg; eauto. rewrite C; auto.  apply context_below_lt; auto.
+  intros. rewrite Regmap.gso. auto. apply sym_not_equal. eapply sreg_below_diff; eauto.
+  destruct H2; discriminate.
+Qed.
+
+Lemma tr_moves_init_regs_eff:
+  forall F hf stk f sp m ctx1 ctx2, context_below ctx1 ctx2 ->
+                                    forall rdsts rsrcs vl pc1 pc2 rs1,
+                                      tr_moves f.(fn_code) pc1 (sregs ctx1 rsrcs) (sregs ctx2 rdsts) pc2 ->
+                                      (forall r, In r rdsts -> Ple r ctx2.(mreg)) ->
+                                      list_forall2 (val_reg_charact F ctx1 rs1) vl rsrcs ->
+                                      exists rs2,
+                                        effstep_star (rtl_eff_sem hf) tge EmptyEffect
+                                                     (RTL_State stk f sp pc1 rs1) m
+                                                     (RTL_State stk f sp pc2 rs2) m
+                                        /\ agree_regs F ctx2 (init_regs vl rdsts) rs2
+                                        /\ forall r, Plt r ctx2.(dreg) -> rs2#r = rs1#r.
+Proof.
+  induction rdsts; simpl; intros.
+  (* rdsts = nil *)
+  inv H0. exists rs1; split. apply effstep_star_zero. split. apply agree_regs_init. auto.
+  (* rdsts = a :: rdsts *)
+  inv H2. inv H0. 
+  exists rs1; split. apply effstep_star_zero. split. apply agree_regs_init. auto.
+  simpl in H0. inv H0.
+  exploit IHrdsts; eauto. intros [rs2 [A [B C]]].
+  exists (rs2#(sreg ctx2 a) <- (rs2#(sreg ctx1 b1))).
+  split. 
+  eapply effstep_star_trans'; eauto.
+  eapply effstep_star_one.
+  eapply  rtl_effstep_exec_Iop; eauto.
+  extensionality x. reflexivity.
+  split. destruct H3 as [[P Q] | [P Q]].
+  subst a1. eapply agree_set_reg_undef; eauto.
+  eapply agree_set_reg; eauto. rewrite C; auto.  apply context_below_lt; auto.
+  intros. rewrite Regmap.gso. auto. apply sym_not_equal. eapply sreg_below_diff; eauto.
+  destruct H2; discriminate.
+Qed.
+
+
 (** ** Memory invariants *)
 
 (** A stack location is private if it is not the image of a valid
@@ -3167,30 +3233,14 @@ rewrite orb_true_l; simpl; assumption.
 replace (ofs + delta' - delta') with ofs by omega.
 apply Mem.perm_max with k. apply Mem.perm_implies with p; auto with mem.
 intros [mu' [A [B [C D]]]].
-(*
-tr_moves_init_regs
-     : forall (F : meminj) (stk : list stackframe) 
-         (f : function) (sp : val) (m : mem) (ctx1 ctx2 : context),
-       context_below ctx1 ctx2 ->
-       forall (rdsts rsrcs : list reg) (vl : list val) 
-         (pc1 pc2 : node) (rs1 : regset),
-       tr_moves (fn_code f) pc1 (sregs ctx1 rsrcs) (sregs ctx2 rdsts) pc2 ->
-       (forall r : reg, In r rdsts -> Ple r (mreg ctx2)) ->
-       list_forall2 (val_reg_charact F ctx1 rs1) vl rsrcs ->
-       exists rs2 : regset,
-         star step tge (State stk f sp pc1 rs1 m) E0
-           (State stk f sp pc2 rs2 m) /\
-         agree_regs F ctx2 (init_regs vl rdsts) rs2 /\
-         (forall r : positive, Plt r (dreg ctx2) -> rs2 # r = rs1 # r)
-*)
-exploit tr_moves_init_regs; eauto. intros [rs'' [P [Q R]]].
+exploit tr_moves_init_regs'; eauto. intros [rs'' [P [Q R]]].
 eexists. eexists.
 split; simpl. 
 left.
-Search core_semantics_lemmas.corestep_plus.
-eapply core_semantics_lemmas.corestep_plus_one.
+eapply core_semantics_lemmas.corestep_plus_star_trans.
+eapply core_semantics_lemmas.corestep_plus_one. 
 eapply rtl_corestep_exec_Inop; eauto. 
-
+eapply P.
 
 exists mu'; intuition.
 
@@ -3199,15 +3249,23 @@ Admitted.
 
 eapply sm_inject_separated_impication; eauto.
 
-
 unfold MATCH; intuition.
+constructor; eauto.
+eapply match_stacks_inside_invariant; try eassumption.
+eapply restrict_sm_intern_incr; eassumption.
 
-(*Here is where I'm stuck.
-Best idea so far is: *)
-inversion P.
-(*The first case seems solvable, but the second case is almost the same as the original.*)
+eauto.
+SearchAbout SM_wd restrict_sm.
+induction MS0.
+constructor.
 
-(*How to solve the last two goals.*)
+Print match_stacks.
+
+constructor.
+
+Print match_stacks.
+
+
 Focus 2.
   -  apply (meminj_preserves_incr_sep ge (as_inj mu) H9 m1 m2); eauto.
      apply intern_incr_as_inj; auto.
@@ -3401,6 +3459,7 @@ econstructor.
 
 
 (* external function *)
+
 (*  exploit match_stacks_globalenvs; eauto. intros [bound MG].
   (*exploit external_call_mem_inject; eauto.
     eapply match_globalenvs_preserves_globals; eauto.
@@ -3710,7 +3769,14 @@ exists (mu' : SM_Injection),
     eapply effstep_plus_one. eapply rtl_effstep_exec_Istore; eauto.
 
     intros b ofs eff; split.
-    apply U2vis in eff.
+    Print StoreEffect.
+    unfold StoreEffect in eff.
+    destruct a'; try discriminate.
+    
+    unfold visTgt.
+
+
+    apply U2vis. in eff.
     apply 
     unfold StoreEffect in eff.
     destruct a'; simpl in *; try discriminate.
