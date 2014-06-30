@@ -645,6 +645,116 @@ Proof.
   inv H8.
 Qed.
 
+Lemma BuiltinEffect_Propagate': forall {F V TF TV:Type}
+       (ge:Genv.t F V) (tge:Genv.t TF TV) ef m vargs t vres m'
+       (EC : external_call' ef ge vargs m t vres m') mu m2 tvargs
+       (ArgsInj : val_list_inject (restrict (as_inj mu) (vis mu)) vargs tvargs)
+       (WD : SM_wd mu) (MINJ : Mem.inject (as_inj mu) m m2),
+     forall b ofs, BuiltinEffect tge ef tvargs m2 b ofs = true ->
+       visTgt mu b = true /\
+       (locBlocksTgt mu b = false ->
+        exists b1 delta1,
+           foreign_of mu b1 = Some (b, delta1) /\
+           BuiltinEffect ge ef vargs m b1 (ofs - delta1) = true /\
+           Mem.perm m b1 (ofs - delta1) Max Nonempty).
+Proof.
+ intros. 
+ destruct ef; try inv H.
+  (*free*)
+  { simpl in EC. inv EC. 
+    inv ArgsInj. inv H. inv H. inv H0. 
+    rewrite H1. unfold free_Effect in H1.
+    destruct (restrictD_Some _ _ _ _ _ H7) as [AIb VISb].
+    exploit (Mem.load_inject (as_inj mu) m); try eassumption.
+    intros [v [TLD Vinj]]. inv Vinj.
+    assert (RP: Mem.range_perm m b0 (Int.unsigned lo - 4)
+                               (Int.unsigned lo + Int.unsigned sz) Cur Freeable).
+    { eapply Mem.free_range_perm; eauto. }
+    exploit Mem.address_inject. eapply MINJ. 
+    { apply Mem.perm_implies with Freeable; auto with mem.
+      apply RP. instantiate (1 := lo). omega. }
+    eassumption. 
+    intro EQ.
+    rewrite EQ in *.
+    assert (Arith4: Int.unsigned lo - 4 + delta = Int.unsigned lo + delta - 4) by omega.
+    rewrite Arith4, TLD in *.
+    destruct (eq_block b b2); subst; simpl in *; try inv H1.
+    { rewrite H0,H4.
+      split. eapply visPropagateR; eassumption.
+      intros. exists b0, delta.
+      rewrite restrict_vis_foreign_local in H7; trivial.
+      destruct (joinD_Some _ _ _ _ _ H7) as [FRG | [FRG LOC]]; clear H7.
+      Focus 2. destruct (local_DomRng _ WD _ _ _ LOC). solve[rewrite H3 in H; discriminate].
+      split; trivial.
+      inv H2.
+      destruct (eq_block b0 b0); simpl in *.
+      Focus 2. elim n; trivial. 
+      clear e.
+      rewrite !andb_true_iff in H0.
+      destruct H0 as [[[? ?] ?] ?].
+      destruct (zlt 0 (Int.unsigned sz)); simpl in *; try inv H1.
+      destruct (zle (Int.unsigned lo + delta - 4) ofs); simpl in *; try inv H2.
+      destruct (zlt ofs (Int.unsigned lo + delta + Int.unsigned sz)); simpl in *; try inv H3.
+      destruct (zle (Int.unsigned lo - 4) (ofs - delta)); simpl in *; try omega.
+      split. destruct (zlt (ofs - delta) (Int.unsigned lo + Int.unsigned sz)); trivial.
+      omega. 
+      eapply Mem.perm_implies. 
+      eapply Mem.perm_max. eapply RP. split; trivial. omega.
+      constructor. 
+      congruence. }
+    { (*b<>b2*)
+      destruct vl'; try congruence.
+      rewrite !andb_true_iff in H0.
+      destruct H0 as [[[? ?] ?] ?].
+      destruct (eq_block b b2). subst. congruence. simpl in H. congruence. }}
+  { (*memcpy*)
+    simpl in EC. inv EC.
+    inv ArgsInj. inv H. inv H2. inv H. 
+    rewrite H1. unfold memcpy_Effect in H1. inv H.
+    inv H0; try congruence. 
+    inv H3; try congruence.
+    inv H4; try congruence.
+    destruct (eq_block b b2); subst; simpl in *; try inv H1.
+    destruct (zle (Int.unsigned (Int.add odst (Int.repr delta))) ofs); simpl in *; try inv H4. 
+    destruct (zlt ofs (Int.unsigned (Int.add odst (Int.repr delta)) + sz)); simpl in *; try inv H3.
+    destruct (valid_block_dec m2 b2); simpl in *; try inv H4.
+    split. eapply visPropagateR; eassumption.
+    intros. exists bdst, delta.
+    destruct (restrictD_Some _ _ _ _ _ H5).
+    exploit Mem.address_inject.
+    eapply MINJ.
+    eapply Mem.storebytes_range_perm; eauto.
+    split. apply Z.le_refl.
+    rewrite (Mem.loadbytes_length _ _ _ _ _ H12).
+    rewrite nat_of_Z_eq; omega. 
+    eassumption.
+    intros UNSIG; rewrite UNSIG in *.
+    assert (MP: Mem.perm m bdst (ofs - delta) Max Nonempty).
+    { eapply Mem.perm_implies.
+      eapply Mem.perm_max. 
+      eapply Mem.storebytes_range_perm. eassumption.
+      rewrite (Mem.loadbytes_length _ _ _ _ _ H12).
+      rewrite nat_of_Z_eq; omega.
+      constructor. }
+    rewrite (restrict_vis_foreign_local _ WD) in H5.
+    destruct (joinD_Some _ _ _ _ _ H5) as [FRG | [FRG LOC]]; clear H5.
+    split; trivial. split; trivial.
+    destruct (eq_block bdst bdst); simpl. clear e.
+    destruct (zle (Int.unsigned odst) (ofs - delta)); simpl.
+    destruct (zlt (ofs - delta) (Int.unsigned odst + sz)); simpl.
+    destruct (valid_block_dec m bdst); trivial.
+    elim n. eapply Mem.perm_valid_block; eassumption.
+    omega.
+    omega.
+    elim n; trivial.
+    destruct (local_DomRng _ WD _ _ _ LOC).
+    rewrite H5 in H. discriminate.
+  inv H8.
+  congruence.
+  congruence.
+  congruence. }
+Qed.
+
 Lemma helpers_EmptyEffect: forall {F V:Type} (ge: Genv.t F V) 
    hf ef args m,
    EFisHelper hf ef -> (BuiltinEffect ge ef args m = EmptyEffect).
