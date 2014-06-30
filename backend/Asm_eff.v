@@ -19,6 +19,7 @@ Require Import mem_lemmas. (*for mem_forward*)
 Require Import core_semantics.
 Require Import effect_semantics.
 Require Import BuiltinEffects.
+Require Import load_frame.
 
 Notation SP := ESP (only parsing).
 
@@ -179,7 +180,21 @@ Inductive asm_effstep: (block -> Z -> bool) ->
       external_call' callee ge args m t res m' ->
       rs' = (set_regs (loc_external_result (ef_sig callee)) res rs) #PC <- (rs RA) ->
       asm_effstep  (BuiltinEffect ge callee args m)
-         (Asm_CallstateOut callee args rs lf) m (State rs' lf) m'.
+         (Asm_CallstateOut callee args rs lf) m (State rs' lf) m'
+  (*NOTE [loader]*)
+  | asm_exec_initialize_call: 
+      forall m args tys retty m1 stk m2 fb z,
+      args_len_rec args tys = Some z -> 
+      Mem.alloc m 0 (4*z) = (m1, stk) ->
+      store_args m1 stk args tys = Some m2 -> 
+      let rs0 := (Pregmap.init Vundef) 
+                  #PC <- (symbol_offset ge fb Int.zero) 
+                  #RA <- Vzero 
+                  # ESP <- (Vptr stk Int.zero) in
+      asm_effstep EmptyEffect 
+               (Asm_CallstateIn fb args tys retty) m 
+               (State rs0 (mk_load_frame stk retty)) m2.
+
 End EFFSEM.
 
 Section ASM_EFFSEM.
@@ -312,6 +327,16 @@ split. econstructor; eauto.
          eapply H3. 
        unfold BuiltinEffect; simpl.
          destruct callee; simpl; trivial; contradiction.
+split. econstructor; eassumption. 
+  { assert (sp_fresh: ~Mem.valid_block m stk).
+    { eapply Mem.fresh_block_alloc; eauto. }
+    eapply mem_unchanged_on_sub_strong.
+    eapply unchanged_on_trans with (m2 := m1).
+    solve[eapply Mem.alloc_unchanged_on; eauto].
+    solve[eapply store_args_unch_on; eauto].
+    solve[apply alloc_forward in H0; auto].
+    simpl. intros b ofs H2 _ H3. subst. 
+    solve[apply sp_fresh; auto]. } 
 Qed.       
 
 Lemma asmstep_effax2: forall  g c m c' m',
@@ -324,6 +349,7 @@ intros. (*unfold corestep, Asm_coop_sem in H; simpl in H.*)
     try solve [eexists; econstructor; try eassumption].
   eexists. eapply asm_effexec_step_builtin; try eassumption. trivial.
   eexists. econstructor; eassumption.
+  eexists. econstructor; eauto.
   eexists. econstructor; eauto.
 Qed.
 

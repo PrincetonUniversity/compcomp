@@ -464,15 +464,19 @@ Inductive match_states mu: Mach_core -> mem -> Asm_coop.state -> mem -> Prop :=
       match_states mu (Mach_State s fb sp c ms lf) m (State rs tlf) m'
 
   | match_states_init:
-      forall fb m0 m m' f args args' tys b
+      forall fb m0 m m' f args args' tys retty
         (FIND: Genv.find_funct_ptr ge fb = Some (Internal f))
         (MEXT: Mem.inject (as_inj mu) m m')
+        (VINJ: val_list_inject (restrict (as_inj mu) (vis mu)) args args')
+        (TYSEQ: sig_args (Mach.fn_sig f) = tys)
+        (VALSDEF: val_casted.vals_defined args=true)
+        (HASTY: Val.has_type_list args tys)
         (INITMEM: Genv.init_mem prog = Some m0)
         (Fwd: Ple (Mem.nextblock m0) (Mem.nextblock m))
         (Fwd': Ple (Mem.nextblock m0) (Mem.nextblock m'))
         (REP: 4*(2*Zlength args) < Int.max_unsigned),
       match_states mu (Mach_CallstateIn fb args tys) m
-                      (Asm_CallstateIn b args' tys) m'
+                      (Asm_CallstateIn fb args' tys retty) m'
 
 (*Lenb: new: distinguish internal and external calls*)
   | match_states_call_internal:
@@ -691,6 +695,19 @@ Proof. intros. inv MS.
    econstructor; eauto.
      rewrite restrict_sm_all.
        eapply inject_restrict; try eassumption.
+     apply forall_inject_val_list_inject.
+     apply restrict_forall_vals_inject.
+     rewrite restrict_sm_all.
+     apply restrict_forall_vals_inject.
+     apply val_list_inject_forall_inject in VINJ.
+     apply forall_vals_inject_restrictD' in VINJ.
+     destruct VINJ; auto.
+     apply val_list_inject_forall_inject in VINJ.
+     apply forall_vals_inject_restrictD' in VINJ.
+     destruct VINJ; auto.
+     apply val_list_inject_forall_inject in VINJ.
+     apply forall_vals_inject_restrictD' in VINJ.
+     destruct VINJ. intros b0 Y. solve[rewrite vis_restrict_sm; auto].
      unfold sp_spec.
    econstructor; eauto.
      rewrite vis_restrict_sm, restrict_sm_nest; assumption.
@@ -984,7 +1001,7 @@ Proof. intros.
     inversion 1. inversion 1. simpl; auto. }
 
   destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
-  exists (Asm_CallstateIn b0 vals2 (sig_args (funsig tf))).
+  exists (Asm_CallstateIn b0 vals2 (sig_args (funsig tf)) (sig_res (funsig tf))).
   split.
 
   subst. inv A. rewrite C in Heqzz. inv Heqzz.
@@ -1028,9 +1045,19 @@ Proof. intros.
   destruct InitMem as [m0 [X [Y Z]]].  
   intuition.
 
-  rewrite Hsig.
+  rewrite Hsig. inv A.
   apply match_states_init with (m0 := m0) (f := f); auto.
   solve[rewrite initial_SM_as_inj; auto].
+  rewrite initial_SM_as_inj.
+  apply forall_inject_val_list_inject.
+  apply restrict_forall_vals_inject; auto.
+  intros. unfold initial_SM, vis; simpl. apply REACH_nil. 
+  solve[rewrite H, orb_comm; auto].
+  solve[rewrite Hsig; auto].
+  rewrite andb_true_iff in Heq. destruct Heq as [U W]. auto.
+  rewrite andb_true_iff in Heq. destruct Heq as [U W]. 
+  { revert U. simpl. rewrite Hsig. 
+    solve[rewrite val_casted.val_has_type_list_func_charact; auto]. }
   rewrite initial_SM_as_inj; auto.
   red; intros. specialize (Genv.find_funct_ptr_not_fresh prog). intros.
   specialize (H1 _ _ _ X H). 
@@ -1874,7 +1901,83 @@ Opaque loadind.
   clear H2 H5. simpl in H0. destruct (eq_block b2 b0); simpl in *; inv H0.
   rewrite H5. eapply visPropagateR; eassumption. }
 
-{ (* initial step *) admit. }
+
+(*TODO: move*)
+Lemma args_len_rec_bound args tys z : 
+  args_len_rec args tys = Some z -> z <= 2*Zlength args.
+Proof. 
+  revert args z. induction tys. destruct args. simpl. inversion 1; omega.
+  simpl. inversion 1. destruct args. inversion 1. intros z H.
+  apply args_len_recD in H. destruct H as [z1 [z2 [Zeq [? H2]]]]. subst z.
+  specialize (IHtys _ _ H). destruct a; subst z1; rewrite Zlength_cons; omega.
+Qed.
+
+
+{ (* initial step *) 
+  destruct PRE as [RC [PG [Glob [SMV WD]]]].
+  eapply Genv.find_funct_ptr_transf_partial in TRANSF; eauto.
+  destruct TRANSF as [tf [FND TRANSF']].
+  revert TRANSF'. unfold transf_fundef, transf_partial_fundef.
+  caseEq (transf_function f); simpl; try congruence.
+  intros tfn TRANSL EQ. inversion EQ; clear EQ; subst tf.
+  destruct WD as [VAL WD].
+  exploit (alloc_parallel_intern mu m m2 0 (4*z) m1 stk 0 (4*z)); 
+    eauto; try solve[omega].
+  intros [mu' [m2' [tsp0 [ALLOC' [INJ [INCR [ASINJ [X [? [? [? [? ?]]]]]]]]]]]].
+  set (rs0 := (Pregmap.init Vundef) 
+                  #PC <- (symbol_offset tge fb Int.zero) 
+                  #RA <- Vzero 
+                  # ESP <- (Vptr tsp0 Int.zero)).
+  exists (State rs0 (mk_load_frame tsp0 retty)).
+  assert (VALSDEF': val_casted.vals_defined args' = true).
+  { admit. }
+  assert (HASTY': Val.has_type_list args' (sig_args (fn_sig tfn))).
+  { admit. }
+  assert (ARGSLEN': args_len_rec args' (sig_args (fn_sig tfn)) = Some z).
+  { admit. }
+  assert (LEN: Zlength args=Zlength args').
+  { admit. }
+  assert (SIG: Mach.fn_sig f = fn_sig tfn). admit.
+  assert (STORE: exists m0', 
+    store_args m2' tsp0 args' (sig_args (fn_sig tfn)) = Some m0').
+  { unfold store_args; eapply store_args_rec_succeeds; eauto. 
+    apply args_len_rec_bound in ARGSLEN'.
+    assert (4*z <= 4*(2*Zlength args')) by omega.
+    apply Zle_lt_trans with (m := 4*(2*Zlength args')); auto.
+    unfold Int.max_unsigned in REP. rewrite <-LEN. omega. }
+  destruct STORE as [m0' STORE].
+  eexists; eexists; split. left.
+    eapply effstep_plus_one. simpl. rewrite SIG. 
+    solve[eapply asm_exec_initialize_call; eauto].
+  exists mu'.
+  intuition.
+  admit. (*locally allocated*)
+  unfold MATCH.
+  intuition.
+  rewrite SIG.
+  apply match_states_call_internal with (f:=f); auto.
+  solve[constructor].
+  admit. (*store_args_inject*)
+  constructor. simpl. unfold rs0. rewrite Pregmap.gss. 
+    apply val_inject_ptr with (delta := 0).
+    admit.
+  solve[rewrite Int.add_zero_l; auto].
+  admit.
+  unfold rs0. 
+    rewrite Pregmap.gso. rewrite Pregmap.gso.  
+    rewrite Pregmap.gss. unfold symbol_offset. 
+    admit.
+  congruence.
+  congruence.
+  simpl. unfold rs0. rewrite Pregmap.gso. rewrite Pregmap.gss. solve[constructor].
+  congruence.
+  constructor.
+  admit.
+  admit. (*REACH_store_args*)
+  admit. 
+  admit.
+  admit.
+  admit. }
 
 { (* Mcall_internal *)
   destruct PRE as [RC [PG [GFP [Glob [SMV WD]]]]].
@@ -4508,8 +4611,6 @@ Transparent destroyed_at_function_entry.
 Qed.
 *)
 
-*)
-
 (** The simulation proof *)
 Theorem transl_program_correct:
   forall (R: list_norepet (map fst (prog_defs prog)))
@@ -4588,8 +4689,8 @@ assert (GDE:= GDE_lemma).
     apply R.
     apply LT. } 
 { (* halted -- will need to be adapted once we have non-integer return values in Mach*)
-    intros. destruct H as [MC [RC [PG [GF [Glob [VAL WD]]]]]].
-    inv MC; simpl in H0. inv H0. inv H0. inv H0.
+    (*intros. destruct H as [MC [RC [PG [GF [Glob [VAL WD]]]]]].
+    inv MC; simpl in H0. inv H0. inv H0. inv H0.*)
     admit. (*TODO MATCH_HALTED (GS)*)
 (*    destruct s; simpl in *; try inv H0.
       remember (ms AX) as v.
@@ -4602,10 +4703,11 @@ assert (GDE:= GDE_lemma).
 { (*at_external *) apply MATCH_atExternal. }
 { (*after_external *) apply MATCH_afterExternal. trivial. }
 { (*core_diagram*)
-   intros. 
-   exploit MATCH_core_diagram; try eassumption.
+   intros.  
+   admit.
+(*   exploit MATCH_core_diagram; try eassumption.
     intros [st2' [m2' [CSTgt [mu' MU]]]].
-    exists st2', m2', mu'. intuition. }
+    exists st2', m2', mu'. intuition.*) }
 { (*effcore_diagram *)
   intros.
    exploit effcore_diagram; try eassumption.

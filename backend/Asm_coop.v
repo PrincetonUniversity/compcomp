@@ -48,7 +48,8 @@ Inductive state: Type :=
   | Asm_CallstateIn: 
       forall (f: block)                (**r pointer to function to call *)
              (args: list val)          (**r arguments passed to initial_core *)
-             (tys: list typ),          (**r argument types *)
+             (tys: list typ)           (**r argument types *)
+             (retty: option typ),      (**r return type *)       
         state
 
   (*Auxiliary state: for marshalling arguments OUT OF memory*)
@@ -91,7 +92,19 @@ Inductive asm_step: state -> mem -> state -> mem -> Prop :=
       Genv.find_funct_ptr ge b = Some (External callee) ->
       external_call' callee ge args m t res m' ->
       rs' = (set_regs (loc_external_result (ef_sig callee)) res rs) #PC <- (rs RA) ->
-      asm_step (Asm_CallstateOut callee args rs lf) m (State rs' lf) m'.
+      asm_step (Asm_CallstateOut callee args rs lf) m (State rs' lf) m'
+  (*NOTE [loader]*)
+  | asm_exec_initialize_call: 
+      forall m args tys retty m1 stk m2 fb z,
+      args_len_rec args tys = Some z -> 
+      Mem.alloc m 0 (4*z) = (m1, stk) ->
+      store_args m1 stk args tys = Some m2 -> 
+      let rs0 := (Pregmap.init Vundef) 
+                  #PC <- (symbol_offset ge fb Int.zero) 
+                  #RA <- Vzero 
+                  # ESP <- (Vptr stk Int.zero) in
+      asm_step (Asm_CallstateIn fb args tys retty) m 
+               (State rs0 (mk_load_frame stk retty)) m2.
 
 End RELSEM.
 
@@ -132,7 +145,7 @@ Definition Asm_initial_core (ge:genv) (v: val) (args:list val):
                      if val_has_type_list_func args (sig_args (funsig f))
                         && vals_defined args
                         && zlt (4*(2*(Zlength args))) Int.max_unsigned
-                     then Some (Asm_CallstateIn b args tyl)
+                     then Some (Asm_CallstateIn b args tyl (sig_res (funsig f)))
                      else None
                    | External _ => None
                    end
@@ -188,6 +201,7 @@ Lemma Asm_corestep_not_halted : forall ge m q m' q',
     rewrite H0; simpl. trivial. destruct lf; auto.
     rewrite H0; simpl. trivial. destruct lf; auto.
     trivial.
+    auto.
   Qed.
  
 Definition Asm_core_sem : CoreSemantics genv state mem.
@@ -301,6 +315,10 @@ Lemma Asm_forward : forall g c m c' m'
    eapply exec_instr_forward; eassumption.
    inv H2. eapply external_call_mem_forward; eassumption.
    inv H1. eapply external_call_mem_forward; eassumption.
+   inv H1. unfold store_args in H3. 
+     eapply mem_forward_trans.
+     eapply alloc_forward; eauto.
+     eapply store_args_fwd; eauto.
 Qed.
    
 Program Definition Asm_coop_sem : 
