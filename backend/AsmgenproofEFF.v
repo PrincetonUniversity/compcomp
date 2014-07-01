@@ -921,19 +921,10 @@ destruct H2. left; auto.
 right. rewrite replace_locals_local. assumption.
 Qed.
 
-Lemma MATCH_initial: forall (v1 v2 : val) (sig : signature) entrypoints
-  (EP: In (v1, v2, sig) entrypoints)
-  (entry_points_ok : forall (v1 v2 : val) (sig : signature),
-                  In (v1, v2, sig) entrypoints ->
-                  exists
-                    (b : Values.block) f1 f2,
-                    v1 = Vptr b Int.zero /\
-                    v2 = Vptr b Int.zero /\
-                    Genv.find_funct_ptr ge b = Some f1 /\
-                    Genv.find_funct_ptr tge b = Some f2)
+Lemma MATCH_initial: forall v
   (vals1 : list val) c1 (m1 : mem) (j : meminj)
   (vals2 : list val) (m2 : mem) (DomS DomT : Values.block -> bool)
-  (Ini :initial_core (Mach_eff_sem hf return_address_offset) ge v1 vals1 = Some c1)
+  (Ini :initial_core (Mach_eff_sem hf return_address_offset) ge v vals1 = Some c1)
   (Inj: Mem.inject j m1 m2)
   (VInj: Forall2 (val_inject j) vals1 vals2)
   (PG: meminj_preserves_globals ge j)
@@ -950,7 +941,7 @@ Lemma MATCH_initial: forall (v1 v2 : val) (sig : signature) entrypoints
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
-  initial_core (Asm_eff_sem hf)tge v2 vals2 = Some c2 /\
+  initial_core (Asm_eff_sem hf)tge v vals2 = Some c2 /\
   MATCH c1
     (initial_SM DomS DomT
        (REACH m1
@@ -961,7 +952,7 @@ exists c2,
 Proof. intros.
   inversion Ini.
   unfold Mach_initial_core in H0. unfold ge in *. unfold tge in *.
-  destruct v1; inv H0.
+  destruct v; inv H0.
   remember (Int.eq_dec i Int.zero) as z; destruct z; inv H1. clear Heqz.
   remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz; inv H0. 
     apply eq_sym in Heqzz.
@@ -1000,15 +991,12 @@ Proof. intros.
     destruct (zlt (list_length_z c) Int.max_unsigned); try solve[inversion 1].
     inversion 1. inversion 1. simpl; auto. }
 
-  destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
-  exists (Asm_CallstateIn b0 vals2 (sig_args (funsig tf)) (sig_res (funsig tf))).
+  exists (Asm_CallstateIn b vals2 (sig_args (funsig tf)) (sig_res (funsig tf))).
   split.
 
-  subst. inv A. rewrite C in Heqzz. inv Heqzz.
-  unfold tge in FP. rewrite D in FP. inv FP.
+  subst. inv Heqzz. unfold tge in FP. inv FP. rewrite H2. inv Ini.
   unfold Asm_eff_sem, Asm_coop_sem. simpl.
   case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
-  rewrite D. 
 
   assert (val_casted.val_has_type_list_func vals2 (sig_args (funsig tf))=true) as ->.
   { eapply val_casted.val_list_inject_hastype; eauto.
@@ -1045,7 +1033,7 @@ Proof. intros.
   destruct InitMem as [m0 [X [Y Z]]].  
   intuition.
 
-  rewrite Hsig. inv A.
+  rewrite Hsig. 
   apply match_states_init with (m0 := m0) (f := f); auto.
   solve[rewrite initial_SM_as_inj; auto].
   rewrite initial_SM_as_inj.
@@ -4757,18 +4745,9 @@ Qed.
 (** The simulation proof *)
 Theorem transl_program_correct:
   forall (R: list_norepet (map fst (prog_defs prog)))
-         entrypoints
-         (entry_points_ok : 
-            forall v1 v2 sig,
-              In (v1, v2, sig) entrypoints -> 
-              exists b f1 f2, 
-                v1 = Vptr b Int.zero 
-                /\ v2 = Vptr b Int.zero
-                /\ Genv.find_funct_ptr ge b = Some f1
-                /\ Genv.find_funct_ptr tge b = Some f2)
          (init_mem: exists m0, Genv.init_mem prog = Some m0),
-SM_simulation.SM_simulation_inject 
-   (Mach_eff_sem hf return_address_offset) (Asm_eff_sem hf)ge tge entrypoints.
+  SM_simulation.SM_simulation_inject 
+   (Mach_eff_sem hf return_address_offset) (Asm_eff_sem hf) ge tge.
 Proof.
 intros.
 assert (GDE:= GDE_lemma). 
@@ -4787,11 +4766,11 @@ assert (GDE:= GDE_lemma).
 (*MATCH_preserves_globals*)
   apply MATCH_PG.
 (* init*) { intros.
-    eapply (MATCH_initial _ _ _ entrypoints); eauto.
+    eapply (MATCH_initial _ _ _); eauto.
     destruct init_mem as [m0 INIT].
     exists m0; split; auto.
-    unfold meminj_preserves_globals in H3.    
-    destruct H3 as [A [B C]].
+    unfold meminj_preserves_globals in H2.    
+    destruct H2 as [A [B C]].
 
     assert (P: forall p q, {Ple p q} + {Plt q p}).
       intros p q.
@@ -4810,19 +4789,19 @@ assert (GDE:= GDE_lemma).
     destruct (P (Mem.nextblock m0) (Mem.nextblock m1)); auto.
     exfalso. 
     destruct (D _ p).
-    apply A in H3.
+    apply A in H2.
     assert (Mem.valid_block m1 (Mem.nextblock m1)).
       eapply Mem.valid_block_inject_1; eauto.
-    clear - H8; unfold Mem.valid_block in H8.
+    clear - H7; unfold Mem.valid_block in H7.
     xomega.
 
     destruct (P (Mem.nextblock m0) (Mem.nextblock m2)); auto.
     exfalso. 
     destruct (D _ p).
-    apply A in H3.
+    apply A in H2.
     assert (Mem.valid_block m2 (Mem.nextblock m2)).
       eapply Mem.valid_block_inject_2; eauto.
-    clear - H8; unfold Mem.valid_block in H8.
+    clear - H7; unfold Mem.valid_block in H7.
     xomega.
     
     intros b LT.    
