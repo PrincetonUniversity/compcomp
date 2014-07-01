@@ -2215,6 +2215,9 @@ intros.
   unfold CSharpMin_initial_core. 
   case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
   rewrite D.
+  assert (Hlen: Zlength vals2 = Zlength vals1).
+  { apply forall_inject_val_list_inject in VInj. clear - VInj. 
+    induction VInj; auto. rewrite !Zlength_cons, IHVInj; auto. }
 
   assert (val_casted.val_has_type_list_func vals2
            (sig_args (funsig tf'))=true) as ->.
@@ -2228,10 +2231,17 @@ intros.
   { eapply val_casted.val_list_inject_defined.
     eapply forall_inject_val_list_inject; eauto.
     destruct (val_casted.vals_defined vals1); auto. }
-  monadInv TR. rename x into tf'. solve[simpl; auto].
-
-  intros CONTRA.
-  solve[elimtype False; auto].
+  monadInv TR. rename x into tf'. 
+  rewrite Hlen. simpl.
+  case_eq 
+    (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0%Z => 0%Z
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
+  simpl; auto. simpl. inversion 1. omega.
+  intros CONTRA. solve[elimtype False; auto].
 
   assert (H : exists targs tres, type_of_fundef (Internal f) = Tfunction targs tres).
   { destruct f; simpl. eexists; eexists. reflexivity. }

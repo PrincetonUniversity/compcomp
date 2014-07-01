@@ -2716,33 +2716,39 @@ intros. apply H.
     destruct MTCH as [MC [RC [PG [GFP [Glob [VAL [WD INJ]]]]]]].
     revert H0. simpl. destruct c1; try solve[inversion 1]. inversion 1.
     revert H1. destruct stack; try solve[inversion 1].
-    destruct retty.
+    destruct lf.
+    case_eq (sig_res (fn_sig f)). intros t eq.
     { inv MC.
     destruct t; try solve[inversion 1]; simpl. inversion 1; subst. clear H1.
     + exists (tls (R AX)). split; auto. split. 
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
       destruct AGREE as [AGREE_R _]; specialize (AGREE_R AX); auto.
-      inv H7; auto. 
+      inv H8; auto. 
+      rewrite eq; simpl; auto.
     + inversion 1; subst. exists (tls (R FP0)). split; auto. split.
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
       destruct AGREE as [AGREE_R _]; specialize (AGREE_R FP0); auto.
-      inv H7; auto. 
+      inv H8; auto. 
+      rewrite eq; simpl; auto.
     + inversion 1; subst. exists (Val.longofwords (tls (R DX)) (tls (R AX))).
       split; auto. split; auto. 
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
       apply val_longofwords_inject; auto.
       solve[destruct AGREE as [AGREE_R _]; specialize (AGREE_R DX); auto].
       solve[destruct AGREE as [AGREE_R _]; specialize (AGREE_R AX); auto].
-      inv H7; auto. 
+      inv H8; auto. 
+      rewrite eq; simpl; auto.
     + inversion 1; subst. exists (tls (R FP0)). split; auto. split; auto.
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
       destruct AGREE as [AGREE_R _]; specialize (AGREE_R FP0); auto.
-      inv H7; auto. }
+      inv H8; auto. 
+      rewrite eq; simpl; auto. }
     { inversion 1; subst. simpl in *.
       inv MC. simpl. exists (tls (R AX)). split; trivial.
       split. rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
-        destruct AGREE as [AGREE_R _]. apply (AGREE_R AX).
-      inv H8; auto. } }
+        destruct AGREE as [AGREE_R _]. inv H1. apply (AGREE_R AX).
+      inv H10; auto. 
+      rewrite H2; auto. } }
 (*atExternal*)
   { intros. destruct H as [MTCH CD]; subst cd.
     exploit MATCH_atExternal; try eassumption.
