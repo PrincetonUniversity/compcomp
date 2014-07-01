@@ -4708,9 +4708,12 @@ assert (GDE:= GDE_lemma).
     eapply INIT; auto.
     apply R.
     apply LT. } 
-{ (* halted -- will need to be adapted once we have non-integer return values in Mach*)
-    (*intros. destruct H as [MC [RC [PG [GF [Glob [VAL WD]]]]]].
-    inv MC; simpl in H0. inv H0. inv H0. inv H0.*)
+{ (* halted *)
+    intros. destruct H as [MC [RC [PG [GF [Glob [VAL WD]]]]]].
+    inv MC; simpl in H0. inv H0. inv H0. inv H0. inv H0. 
+    destruct s; try inv H0.
+
+
     admit. (*TODO MATCH_HALTED (GS)*)
 (*    destruct s; simpl in *; try inv H0.
       remember (ms AX) as v.

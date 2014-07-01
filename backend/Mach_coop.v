@@ -29,9 +29,10 @@ Notation "a # b <- c" := (Regmap.set b c a) (at level 1, b at next level).
 
 Inductive load_frame: Type :=
 | mk_load_frame:
-    forall (sp: block)       (**r pointer to argument frame *)
-           (args: list val)  (**r initial program arguments *)
-           (tys: list typ),  (**r initial argument types *)
+    forall (sp: block)          (**r pointer to argument frame *)
+           (args: list val)     (**r initial program arguments *)
+           (tys: list typ)      (**r initial argument types *)
+           (retty: option typ), (**r optional return type *)
     load_frame.
 
 Section MACH_COOPSEM.
@@ -60,7 +61,8 @@ Inductive Mach_core: Type :=
   | Mach_CallstateIn: 
       forall (f: block)                (**r pointer to function to call *)
              (args: list val)          (**r arguments passed to initial_core *)
-             (tys: list typ),          (**r argument types *)
+             (tys: list typ)           (**r argument types *)
+             (retty: option typ),      (**r return type *)
       Mach_core
 
   (*Auxiliary state: for marshalling arguments OUT OF memory*)
@@ -107,14 +109,14 @@ Inductive mach_step (ge:genv): Mach_core -> mem -> Mach_core -> mem -> Prop :=
                 (Mach_State s f sp c rs' lf) m'
 
   | Mach_exec_Mgetparam:
-      forall s fb f sp ofs ty dst c rs m v rs' sp0 args0 tys0,
+      forall s fb f sp ofs ty dst c rs m v rs' sp0 args0 tys0 retty,
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       load_stack m sp Tint f.(fn_link_ofs) = Some (parent_sp0 sp0 s) ->
       load_stack m (parent_sp0 sp0 s) ty ofs = Some v ->
       rs' = (rs # temp_for_parent_frame <- Vundef # dst <- v) ->
       mach_step ge (Mach_State s fb sp (Mgetparam ofs ty dst :: c) rs 
-                                    (mk_load_frame sp0 args0 tys0)) m
-                (Mach_State s fb sp c rs' (mk_load_frame sp0 args0 tys0)) m
+                                    (mk_load_frame sp0 args0 tys0 retty)) m
+                (Mach_State s fb sp c rs' (mk_load_frame sp0 args0 tys0 retty)) m
 
   | Mach_exec_Mop:
       forall s f sp op args res c rs m v rs' lf,
@@ -141,12 +143,13 @@ Inductive mach_step (ge:genv): Mach_core -> mem -> Mach_core -> mem -> Prop :=
 
   (*NOTE [loader]*)
   | Mach_exec_Minitialize_call: 
-      forall m args tys m1 stk m2 fb z,
+      forall m args tys m1 stk m2 fb z retty,
       args_len_rec args tys = Some z -> 
       Mem.alloc m 0 (4*z) = (m1, stk) ->
       store_args m1 stk args tys = Some m2 -> 
-      mach_step ge (Mach_CallstateIn fb args tys) m
-        (Mach_Callstate nil fb (Regmap.init Vundef) (mk_load_frame stk args tys)) m2
+      mach_step ge (Mach_CallstateIn fb args tys retty) m
+        (Mach_Callstate nil fb (Regmap.init Vundef) 
+              (mk_load_frame stk args tys retty)) m2
 
   | Mach_exec_Mcall_internal:
       forall s fb sp sig ros c rs m f f' ra callee lf,
@@ -172,7 +175,7 @@ Inductive mach_step (ge:genv): Mach_core -> mem -> Mach_core -> mem -> Prop :=
                   f' callee args rs lf) m
 
   | Mach_exec_Mtailcall_internal:
-      forall s fb stk soff sig ros c rs m f f' m' callee sp0 args0 tys0,
+      forall s fb stk soff sig ros c rs m f f' m' callee sp0 args0 tys0 retty,
       find_function_ptr ge ros rs = Some f' ->
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       load_stack m (Vptr stk soff) Tint f.(fn_link_ofs) = Some (parent_sp0 sp0 s) ->
@@ -181,11 +184,11 @@ Inductive mach_step (ge:genv): Mach_core -> mem -> Mach_core -> mem -> Prop :=
       (*NEW: check that the block f' actually contains a function:*)
       Genv.find_funct_ptr ge f' = Some (Internal callee) ->
       mach_step ge (Mach_State s fb (Vptr stk soff) (Mtailcall sig ros :: c) rs
-                                 (mk_load_frame sp0 args0 tys0)) m
-                (Mach_Callstate s f' rs (mk_load_frame sp0 args0 tys0)) m'
+                                 (mk_load_frame sp0 args0 tys0 retty)) m
+                (Mach_Callstate s f' rs (mk_load_frame sp0 args0 tys0 retty)) m'
 
   | Mach_exec_Mtailcall_external:
-      forall s fb stk soff sig ros c rs m f f' m' callee args sp0 args0 tys0,
+      forall s fb stk soff sig ros c rs m f f' m' callee args sp0 args0 tys0 retty,
       find_function_ptr ge ros rs = Some f' ->
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       load_stack m (Vptr stk soff) Tint f.(fn_link_ofs) = Some (parent_sp0 sp0 s) ->
@@ -195,9 +198,9 @@ Inductive mach_step (ge:genv): Mach_core -> mem -> Mach_core -> mem -> Prop :=
       Genv.find_funct_ptr ge f' = Some (External callee) ->
       extcall_arguments rs m' (parent_sp0 sp0 s) (ef_sig callee) args ->
       mach_step ge (Mach_State s fb (Vptr stk soff) (Mtailcall sig ros :: c) rs
-                                 (mk_load_frame sp0 args0 tys0)) m
+                                 (mk_load_frame sp0 args0 tys0 retty)) m
                 (Mach_CallstateOut s f' callee args rs 
-                                   (mk_load_frame sp0 args0 tys0)) m'
+                                   (mk_load_frame sp0 args0 tys0 retty)) m'
 
   | Mach_exec_Mbuiltin:
       forall s f sp rs m ef args res b t vl rs' m' lf,
@@ -249,26 +252,26 @@ Inductive mach_step (ge:genv): Mach_core -> mem -> Mach_core -> mem -> Prop :=
                 (Mach_State s fb sp c' rs' lf) m
 
   | Mach_exec_Mreturn:
-      forall s fb stk soff c rs m f m' sp0 args0 tys0,
+      forall s fb stk soff c rs m f m' sp0 args0 tys0 retty,
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       load_stack m (Vptr stk soff) Tint f.(fn_link_ofs) = Some (parent_sp0 sp0 s) ->
       load_stack m (Vptr stk soff) Tint f.(fn_retaddr_ofs) = Some (parent_ra s) ->
       Mem.free m stk 0 f.(fn_stacksize) = Some m' ->
       mach_step ge (Mach_State s fb (Vptr stk soff) (Mreturn :: c) rs
-                            (mk_load_frame sp0 args0 tys0)) m
+                            (mk_load_frame sp0 args0 tys0 retty)) m
                 (Mach_Returnstate s (sig_res (fn_sig f)) rs
-                            (mk_load_frame sp0 args0 tys0)) m'
+                            (mk_load_frame sp0 args0 tys0 retty)) m'
 
   | Mach_exec_function_internal:
-      forall s fb rs m f m1 m2 m3 stk rs' sp0 args0 tys0,
+      forall s fb rs m f m1 m2 m3 stk rs' sp0 args0 tys0 retty,
       Genv.find_funct_ptr ge fb = Some (Internal f) ->
       Mem.alloc m 0 f.(fn_stacksize) = (m1, stk) ->
       let sp := Vptr stk Int.zero in
       store_stack m1 sp Tint f.(fn_link_ofs) (parent_sp0 sp0 s) = Some m2 ->
       store_stack m2 sp Tint f.(fn_retaddr_ofs) (parent_ra s) = Some m3 ->
       rs' = undef_regs destroyed_at_function_entry rs ->
-      mach_step ge (Mach_Callstate s fb rs (mk_load_frame sp0 args0 tys0)) m
-                (Mach_State s fb sp f.(fn_code) rs' (mk_load_frame sp0 args0 tys0)) m3
+      mach_step ge (Mach_Callstate s fb rs (mk_load_frame sp0 args0 tys0 retty)) m
+                (Mach_State s fb sp f.(fn_code) rs' (mk_load_frame sp0 args0 tys0 retty)) m3
 (*
   | Mach_exec_function_external:
       forall s fb rs m t rs' ef args res m' lf
@@ -313,7 +316,7 @@ Definition Mach_initial_core (ge:genv) (v: val) (args:list val)
                    if val_has_type_list_func args (sig_args (funsig f))
                       && vals_defined args
                       && zlt (4*(2*(Zlength args))) Int.max_unsigned
-                   then Some (Mach_CallstateIn b args tyl)
+                   then Some (Mach_CallstateIn b args tyl (sig_res (funsig f)))
                    else None
                  | External _ => None
                end
@@ -328,7 +331,7 @@ Definition Mach_initial_core (ge:genv) (v: val) (args:list val)
 Definition Mach_halted (q : Mach_core): option val :=
     match q with 
       (*Return Tlong, which must be decoded*)
-      | Mach_Returnstate nil (Some Tlong) rs lf => 
+      | Mach_Returnstate nil ignored_retty rs (mk_load_frame _ _ _ (Some Tlong)) => 
            match loc_result (mksignature nil (Some Tlong)) with
              | nil => None
              | r1 :: r2 :: nil => 
@@ -340,7 +343,7 @@ Definition Mach_halted (q : Mach_core): option val :=
            end
 
       (*Return a value of any other typ*)
-      | Mach_Returnstate nil (Some retty) rs lf => 
+      | Mach_Returnstate nil ignored_retty rs (mk_load_frame _ _ _ (Some retty)) => 
            match loc_result (mksignature nil (Some retty)) with
             | nil => None
             | r :: TL => match TL with 
@@ -350,8 +353,8 @@ Definition Mach_halted (q : Mach_core): option val :=
            end
 
       (*Return Tvoid - modeled as integer return*)
-      | Mach_Returnstate nil None rs lf => Some (rs AX)
-
+      | Mach_Returnstate nil ignored_retty rs (mk_load_frame _ _ _ None) => Some (rs AX)
+                                                                                 
       | _ => None
     end.
 
@@ -364,7 +367,7 @@ Definition Mach_at_external (c: Mach_core):
         if observableEF_dec hf ef
         then Some (ef, ef_sig ef, decode_longs (sig_args (ef_sig ef)) args)
         else None
-  | Mach_CallstateIn _ _ _ => None
+  | Mach_CallstateIn _ _ _ _ => None
   | Mach_Returnstate _ _ _ _ => None
  end.
 
