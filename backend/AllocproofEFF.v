@@ -1931,15 +1931,15 @@ Opaque destroyed_by_op.
 Qed.*)
 
 Lemma exec_moves:
-  forall mv env rs s f sp bb m e e' ls j,
+  forall mv env rs s f sp bb m e e' ls j retty,
   track_moves env mv e = Some e' ->
   wf_moves mv ->
   satisf j rs ls e' ->
   wt_regset env rs ->
   exists ls',
     corestep_star (LTL_eff_sem hf) tge 
-                (LTL_Block s f sp (expand_moves mv bb) ls) m
-                (LTL_Block s f sp bb ls') m
+                (LTL_Block s f sp (expand_moves mv bb) ls retty) m
+                (LTL_Block s f sp bb ls' retty) m
   /\ satisf j rs ls' e.
 Proof.
 Opaque destroyed_by_op.
@@ -1974,15 +1974,15 @@ Opaque destroyed_by_op.
 Qed.
 
 Lemma Eff_exec_moves:
-  forall mv env rs s f sp bb m e e' ls j,
+  forall mv env rs s f sp bb m e e' ls j retty,
   track_moves env mv e = Some e' ->
   wf_moves mv ->
   satisf j rs ls e' ->
   wt_regset env rs ->
   exists ls',
     effstep_star (LTL_eff_sem hf) tge EmptyEffect
-                (LTL_Block s f sp (expand_moves mv bb) ls) m
-                (LTL_Block s f sp bb ls') m
+                (LTL_Block s f sp (expand_moves mv bb) ls retty) m
+                (LTL_Block s f sp bb ls' retty) m
   /\ satisf j rs ls' e.
 Proof.
 Opaque destroyed_by_op.
@@ -2055,7 +2055,7 @@ Inductive match_stackframes (j:meminj): list RTL.stackframe -> list LTL.stackfra
         (WTRS: wt_regset env rs)
         (WTRES: subtype (proj_sig_res sg) (env res) = true)
         (SP: sp_preserved j sp sp')
-        (STEPS: forall v ls1 m jj,
+        (STEPS: forall v ls1 m jj retty,
            inject_incr j jj ->
            (*Val.lessdef_list (encode_long (sig_res sg) v) (map ls1 (map R (loc_result sg))) ->*)
            val_list_inject jj (encode_long (sig_res sg) v) (map ls1 (map R (loc_result sg))) ->
@@ -2063,10 +2063,10 @@ Inductive match_stackframes (j:meminj): list RTL.stackframe -> list LTL.stackfra
            agree_callee_save ls ls1 ->
            exists ls2,
            corestep_star (LTL_eff_sem hf) tge 
-                           (LTL_Block ts tf sp' bb ls1) m
-                           (LTL_State ts tf sp' pc ls2) m
+                           (LTL_Block ts tf sp' bb ls1 retty) m
+                           (LTL_State ts tf sp' pc ls2 retty) m
            /\ satisf jj (rs#res <- v) ls2 e)
-        (EFFSTEPS: forall v ls1 m jj,
+        (EFFSTEPS: forall v ls1 m jj retty,
            inject_incr j jj ->
            (*Val.lessdef_list (encode_long (sig_res sg) v) (map ls1 (map R (loc_result sg))) ->*)
            val_list_inject jj (encode_long (sig_res sg) v) (map ls1 (map R (loc_result sg))) ->
@@ -2074,8 +2074,8 @@ Inductive match_stackframes (j:meminj): list RTL.stackframe -> list LTL.stackfra
            agree_callee_save ls ls1 ->
            exists ls2,
            effstep_star (LTL_eff_sem hf) tge EmptyEffect
-                           (LTL_Block ts tf sp' bb ls1) m
-                           (LTL_State ts tf sp' pc ls2) m
+                           (LTL_Block ts tf sp' bb ls1 retty) m
+                           (LTL_State ts tf sp' pc ls2 retty) m
            /\ satisf jj (rs#res <- v) ls2 e),
       match_stackframes  j
         (RTL.Stackframe res f sp pc rs :: s)
@@ -2103,44 +2103,63 @@ Qed.
            RTL_core -> mem -> LTL_core -> mem -> Prop,
         eliminated Mem.extends ( Mem.inject is enfoirced in MATCH below)
         added sp' and SP *)
+
+(* HERE: 
+   NEW INVARIANT: 
+
+       if stack is empty, then
+         either tf is tailcallable, or retty=sig_res (fn_sig tf)
+ *)
+
+Fixpoint last_frame (s: list RTL.stackframe) := 
+  match s with 
+    | nil => nil
+    | RTL.Stackframe _ _ _ _ _ :: nil => s
+    | _ :: s => last_frame s
+  end.
+
+Definition agree_retty (s: list RTL.stackframe) (retty: option typ) := 
+  match last_frame s with
+    | RTL.Stackframe res caller sp pc rs :: nil => sig_res (RTL.fn_sig caller)=retty
+    | _ => True
+  end.
+
 Inductive match_states (j:meminj): RTL_core -> mem -> LTL_core -> mem -> Prop :=
   | match_states_intro:
-      forall s f sp pc rs m ts tf ls m' an e env sp'
-        (*j0 (INCJ: inject_incr j0 j)*)
+      forall s f sp pc rs m ts tf ls m' an e env sp' retty
         (STACKS: match_stackframes j s ts (fn_sig tf))
         (FUN: transf_function f = OK tf)
         (ANL: analyze f env (pair_codes f tf) = Some an)
         (EQ: transfer f env (pair_codes f tf) pc an!!pc = OK e)
         (SAT: satisf j rs ls e)
-        (*(MEM: Mem.extends m m')*)
         (WTF: wt_function f env)
         (WTRS: wt_regset env rs)
-        (SP: sp_preserved j sp sp'),
+        (SP: sp_preserved j sp sp')
+        (AGRTY: agree_retty s retty) 
+        (AGNIL: s=nil -> sig_res (RTL.fn_sig f)=retty),
       match_states j (RTL_State s f sp pc rs) m
-                     (LTL_State ts tf sp' pc ls) m'
+                     (LTL_State ts tf sp' pc ls retty) m'
   | match_states_call:
-      forall s f args m ts tf ls m' (*j0
-        (INCJ: inject_incr j0 j)*)
-        (STACKS: match_stackframes j(*j0*) s ts (funsig tf))
+      forall s f args m ts tf ls m' retty
+        (STACKS: match_stackframes j s ts (funsig tf))
         (FUN: transf_fundef f = OK tf)
-        (*(ARGS: Val.lessdef_list args (decode_longs (sig_args (funsig tf)) (map ls (loc_arguments (funsig tf)))))*)
         (ARGS: val_list_inject j args (decode_longs (sig_args (funsig tf)) (map ls (loc_arguments (funsig tf)))))
         (AG: agree_callee_save (parent_locset ts) ls)
-        (*(MEM: Mem.extends m m')*) 
-        (WTARGS: Val.has_type_list args (sig_args (funsig tf))),
+        (WTARGS: Val.has_type_list args (sig_args (funsig tf)))
+        (AGRTY: agree_retty s retty) 
+        (AGNIL: s=nil -> sig_res (RTL.funsig f)=retty),
       match_states j (RTL_Callstate s f args) m
-                     (LTL_Callstate ts tf ls) m'
+                     (LTL_Callstate ts tf ls retty) m'
   | match_states_return:
-      forall s res m ts ls m' sg (*j0
-        (INCJ: inject_incr j0 j)*)
-        (STACKS: match_stackframes (*j0*)j s ts sg)
-        (*(RES: Val.lessdef_list (encode_long (sig_res sg) res) (map ls (map R (loc_result sg))))*)
+      forall s res m ts ls m' sg retty 
+        (STACKS: match_stackframes j s ts sg)
         (RES: val_list_inject j (encode_long (sig_res sg) res) (map ls (map R (loc_result sg))))
         (AG: agree_callee_save (parent_locset ts) ls)
-        (*(MEM: Mem.extends m m')*) 
-        (WTRES: Val.has_type res (proj_sig_res sg)),
+        (WTRES: Val.has_type res (proj_sig_res sg))
+        (AGRTY: agree_retty s retty) 
+        (AGNIL: s=nil -> sig_res sg=retty),
       match_states j (RTL_Returnstate s res) m
-                     (LTL_Returnstate ts (sig_res sg) ls) m'.
+                     (LTL_Returnstate ts (sig_res sg) ls retty) m'.
 
 Lemma match_stackframes_change_sig:
   forall j s ts sg sg',
@@ -2210,7 +2229,6 @@ Qed.
 
 (** The proof of semantic preservation is a simulation argument of the
     "plus" kind. *)
-
 
 Definition MATCH mu c1 m1 c2 m2:Prop :=
   match_states (restrict (as_inj mu) (vis mu)) c1 m1 c2 m2 /\
@@ -2496,7 +2514,7 @@ Proof. intros.
   simpl. exists (LTL_Callstate nil tf 
                   (Locmap.setlist (loc_arguments (funsig tf)) 
                     (val_casted.encode_longs (sig_args (funsig tf)) vals2) 
-                    (Locmap.init Vundef))). 
+                    (Locmap.init Vundef)) (sig_res (funsig tf))). 
  split. 
     destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
     subst. inv A. rewrite C in Heqzz. inv Heqzz.
@@ -2610,6 +2628,8 @@ Proof. intros.
     rewrite andb_true_iff in H2. destruct H2. 
     erewrite sig_function_translated; eauto. 
     solve[rewrite val_casted.val_has_type_list_func_charact; auto].
+    solve[unfold agree_retty; simpl; auto].
+    simpl. intros _. erewrite sig_function_translated; eauto. solve[simpl; auto].
     solve[inversion 2].
   intuition.
     rewrite match_genv_meminj_preserves_extern_iff_all.
@@ -3654,12 +3674,9 @@ Proof. intros.
          repeat split; extensionality bb; 
             try rewrite (freshloc_irrefl); intuition.
   split. exploit analyze_successors; eauto. simpl. left; eauto. intros [enext [U V]].
-(*         destruct SP as [spb [spb' [B [B' Rsp]]]]; subst.*)
-(*         assert (INC: inject_incr (fun b => if eq_block b spb then Some(spb',0) else j0 b)
-                               (restrict (as_inj mu) (vis mu))).
-           red; intros. destruct (eq_block b spb); subst. inv H1. assumption. 
-                apply INCJ; assumption.*)
-         split. econstructor; eauto.
+         split. 
+                assert (fn_sig tf = funsig (Internal tf)) as -> by auto.
+                econstructor; eauto.
                   econstructor; eauto.
                    inv WTI. rewrite SIG. auto.
                    intros. exploit (exec_moves mv2). eauto. eauto.
@@ -3694,7 +3711,10 @@ Proof. intros.
                        inv WTI. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto. 
                    simpl. red; auto.
                    inv WTI. rewrite SIG. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto.
-         intuition.
+  unfold agree_retty.
+  solve[destruct s; simpl; auto].
+  solve[intros; congruence].
+        intuition.
    split; trivial. }
 
 { (* tailcall *)
@@ -3741,6 +3761,8 @@ Proof. intros.
                   inv WTI. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto. 
                   apply return_regs_agree_callee_save.
                   rewrite SIG. inv WTI. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto.
+  intros; subst s. 
+  unfold sg in e0. rewrite e0. solve[auto].    
          intuition.
          eapply REACH_closed_free; eassumption.
   split; trivial. }
@@ -3887,6 +3909,7 @@ Proof. intros.
            unfold encode_long, loc_result. rewrite <- H11; rewrite H13. simpl; auto.
             apply return_regs_agree_callee_save.
             constructor.
+            intros; subst s. solve[rewrite <-H11; auto].
          intuition.
            eapply REACH_closed_free; eassumption.
            destruct (restrictD_Some _ _ _ _ _ Rsp).   
@@ -3917,6 +3940,7 @@ Proof. intros.
           apply return_regs_agree_callee_save.
           unfold proj_sig_res. rewrite <- H11; rewrite H13.
           eapply Val.has_subtype; eauto.
+          intros; subst s. solve[rewrite <-H11; auto].
          intuition. 
            eapply REACH_closed_free; eassumption.
            destruct (restrictD_Some _ _ _ _ _ Rsp).   
@@ -4057,7 +4081,11 @@ Proof. intros.
             try rewrite (freshloc_irrefl); intuition.
   split. split. econstructor; eauto.
            apply wt_regset_assign; auto. eapply Val.has_subtype; eauto.
-         intuition.
+  clear - AGRTY. 
+  revert AGRTY.
+  unfold agree_retty. destruct s; simpl; auto.
+  intros; subst s. revert AGRTY. unfold agree_retty. simpl. solve[auto].
+  intuition.
   split; eapply PRE. }
 Qed.
 
@@ -5054,6 +5082,9 @@ induction CS;
                        inv WTI. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto. 
                    simpl. red; auto.
                    inv WTI. rewrite SIG. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto.
+  unfold agree_retty.
+  solve[destruct s; simpl; auto].
+  solve[intros; congruence].
          intuition.
    intuition. }
 
@@ -5106,6 +5137,7 @@ induction CS;
                   inv WTI. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto. 
                   apply return_regs_agree_callee_save.
                   rewrite SIG. inv WTI. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto.
+  intros; subst s. unfold sg in e0. rewrite e0. auto.
          intuition.
          eapply REACH_closed_free; eassumption.
   intuition.
@@ -5280,6 +5312,7 @@ induction CS;
            unfold encode_long, loc_result. rewrite <- H11; rewrite H13. simpl; auto.
             apply return_regs_agree_callee_save.
             constructor.
+            intros. subst s. rewrite <-H11. auto.
          intuition.
            eapply REACH_closed_free; eassumption.
            destruct (restrictD_Some _ _ _ _ _ Rsp).   
@@ -5324,6 +5357,7 @@ induction CS;
           apply return_regs_agree_callee_save.
           unfold proj_sig_res. rewrite <- H11; rewrite H13.
           eapply Val.has_subtype; eauto.
+          intros. subst s. rewrite <-H11; auto.
          intuition. 
            eapply REACH_closed_free; eassumption.
            destruct (restrictD_Some _ _ _ _ _ Rsp).   
@@ -5477,6 +5511,8 @@ induction CS;
             try rewrite (freshloc_irrefl); intuition.
   split. split. econstructor; eauto.
            apply wt_regset_assign; auto. eapply Val.has_subtype; eauto.
+    unfold agree_retty. destruct s; simpl; auto. 
+    intros. subst s. unfold agree_retty in AGRTY; simpl in AGRTY. auto.
          intuition.
   intuition. }
 Qed.
@@ -5567,8 +5603,9 @@ assert (GDE:= GDE_lemma).
     inv STACKS.  
     unfold proj_sig_res in WTRES. unfold loc_result in RES.
     revert WTRES RES. destruct (sig_res sg). 
+    assert (EQ: retty = Some t) by (rewrite AGNIL; auto). rewrite EQ.
     destruct t; intros H; inversion 1; subst; inv RES.
-    + exists (ls (R AX)); split; auto. 
+    + exists (ls (R AX)). split; auto.
     + exists (ls (R FP0)); split; auto. 
     + exists (Val.longofwords (ls (R DX)) (ls (R AX))).
       split; auto. split; auto. 
@@ -5584,7 +5621,8 @@ assert (GDE:= GDE_lemma).
       { rewrite <-H0. auto. }
       inversion H5. subst vl vl' v' v. solve[rewrite Heq in H8; auto].
    + exists (ls (R FP0)); split; auto.
-   + simpl. intros H; inversion 1; subst. exists (ls (R AX)). split; auto. }
+   + simpl. rewrite <-AGNIL; auto.
+     intros H; inversion 1; subst. exists (ls (R AX)). split; auto. }
 (* at_external*)
   { intros. destruct H as [MC [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
     split; trivial.

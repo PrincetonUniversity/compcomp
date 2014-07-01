@@ -4140,7 +4140,8 @@ End ANNOT_ARGUMENTS.
 
 Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
   | match_states_intro:
-      forall cs f sp c ls ls0 f0 m cs' fb sp' rs m' tf args0 tys0 sp0
+      forall cs f sp c ls ls0 f0 m cs' fb sp' rs m' tf args0 tys0 sp0,
+        let retty := sig_res (Linear.fn_sig f0) in forall             
         (STACKS: match_stacks mu m m' sp0 ls0 cs cs' f.(Linear.fn_sig) sp sp')
         (TRANSL: transf_function f = OK tf)
         (FIND: Genv.find_funct_ptr tge fb = Some (Internal tf))
@@ -4157,13 +4158,15 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
                                     \/ tailcall_possible (Linear.fn_sig f)
                               | _::_ => True end),
       match_states mu
-        (Linear_State cs f (Vptr sp Int.zero) c ls (Linear_coop.mk_load_frame ls0 f0)) m
+        (Linear_State cs f (Vptr sp Int.zero) c ls 
+                     (Linear_coop.mk_load_frame ls0 f0)) m
         (Mach_State cs' fb (Vptr sp' Int.zero) 
                     (transl_code (make_env (function_bounds f)) c) rs 
-                    (mk_load_frame sp0 args0 tys0)) m'
+                    (mk_load_frame sp0 args0 tys0 retty)) m'
 
   | match_states_init:
-      forall f tf fb ls args tys m m' m0
+      forall f tf fb ls args tys m m' m0,
+        let retty := sig_res (Linear.fn_sig f) in forall
         (TRANSL: transf_function f = OK tf)
         (FIND: Genv.find_funct_ptr tge fb = Some (Internal tf))
         (WTLS: wt_locset ls)
@@ -4181,10 +4184,11 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
         (Fwd': Ple (Mem.nextblock m0) (Mem.nextblock m'))
         (REP: 4*(2*Zlength args) < Int.max_unsigned),
       match_states mu (Linear_CallstateIn nil (Internal f) ls (Linear_coop.mk_load_frame ls f)) m 
-                      (Mach_CallstateIn fb args tys) m'
+                      (Mach_CallstateIn fb args tys retty) m'
 
   | match_states_call_intern:
-      forall cs f ls ls0 f0 m cs' fb rs m' tf args0 tys0 sp0
+      forall cs f ls ls0 f0 m cs' fb rs m' tf args0 tys0 sp0,
+        let retty := sig_res (Linear.fn_sig f0) in forall
         (STACKS: match_stacks mu m m' sp0 ls0 cs cs' 
                    (Linear.funsig f) (Mem.nextblock m) (Mem.nextblock m'))
         (TRANSL: transf_fundef f = OK (Internal tf))
@@ -4197,10 +4201,11 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
                                     \/ tailcall_possible (Linear.funsig f) 
                               | _::_ => True end), 
       match_states mu (Linear_Callstate cs f ls (Linear_coop.mk_load_frame ls0 f0)) m
-                      (Mach_Callstate cs' fb rs (mk_load_frame sp0 args0 tys0)) m'
+                      (Mach_Callstate cs' fb rs (mk_load_frame sp0 args0 tys0 retty)) m'
 
   | match_states_call_extern:
-      forall cs f ls ls0 f0 m cs' fb rs m' tf args0 tys0 sp0
+      forall cs f ls ls0 f0 m cs' fb rs m' tf args0 tys0 sp0,
+        let retty := sig_res (Linear.fn_sig f0) in forall
         (STACKS: match_stacks mu m m' sp0 ls0 cs cs' 
                    (Linear.funsig f) (Mem.nextblock m) (Mem.nextblock m'))
         (TRANSL: transf_fundef f = OK (External tf))
@@ -4212,17 +4217,18 @@ Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
         (AGARGS: agree_args (Internal f0) mu args0 tys0 cs ls0 m' sp0)
         (INCTX: Zlength cs > 0 \/ tailcall_possible (Linear.funsig f)),
       match_states mu (Linear_Callstate cs f ls (Linear_coop.mk_load_frame ls0 f0)) m
-                      (Mach_CallstateOut cs' fb tf args rs (mk_load_frame sp0 args0 tys0)) m'
+                      (Mach_CallstateOut cs' fb tf args rs (mk_load_frame sp0 args0 tys0 retty)) m'
 
   | match_states_return:
-      forall cs ls ls0 f0 m cs' retty rs m' sg args0 tys0 sp0
+      forall cs ls ls0 f0 m cs' retty rs m' sg args0 tys0 sp0, 
+        let retty0 := sig_res (Linear.fn_sig f0) in forall
         (STACKS: match_stacks mu m m' sp0 ls0 cs cs' sg (Mem.nextblock m) (Mem.nextblock m'))
         (WTLS: wt_locset ls)
         (AGREGS: agree_regs (restrict (as_inj mu) (vis mu)) ls rs)
         (AGLOCS: agree_callee_save ls (parent_locset0 ls0 cs))
         (AGARGS: agree_args (Internal f0) mu args0 tys0 cs ls0 m' sp0),
       match_states mu (Linear_Returnstate cs retty ls (Linear_coop.mk_load_frame ls0 f0)) m
-                      (Mach_Returnstate cs' retty rs (mk_load_frame sp0 args0 tys0)) m'.
+                      (Mach_Returnstate cs' retty rs (mk_load_frame sp0 args0 tys0 retty0)) m'.
 
 Lemma match_states_restrict mu c1 m1 c2 m2 X: forall 
           (MS : match_states mu c1 m1 c2 m2)
@@ -4247,13 +4253,12 @@ econstructor; try eassumption.
     rewrite restrict_sm_all. intros. 
     apply restrictD_Some in H. destruct H. solve[eapply agree_sp_fresh0; eauto].
     solve[rewrite restrict_sm_locBlocksTgt; auto].
-econstructor; try eassumption.
+econstructor; eauto. 
   rewrite vis_restrict_sm. rewrite restrict_sm_all.
-    rewrite restrict_nest; assumption.
-econstructor; try eassumption.
+    rewrite restrict_nest; auto.
+  destruct ARGS0 as [x [U W]]. exists x. split; auto. 
   rewrite vis_restrict_sm. rewrite restrict_sm_all.
-    rewrite restrict_nest; assumption.
-auto.
+    rewrite restrict_nest. auto. auto.
 econstructor; try eassumption.
   eapply match_stacks_restrict; eassumption. 
   rewrite vis_restrict_sm. rewrite restrict_sm_all.
@@ -4694,7 +4699,7 @@ Proof. intros.
   case_eq (Int.eq_dec Int.zero Int.zero).
   2: solve[intros CONTRA; elimtype False; auto].
   intros ? e.
-  exists (Mach_CallstateIn b vals2 (sig_args (funsig tf))).
+  exists (Mach_CallstateIn b vals2 (sig_args (funsig tf)) (sig_res (funsig tf))).
   split. simpl. rewrite e, D. 
 
   assert (Zlength vals2 = Zlength vals1) as ->. 
@@ -4729,7 +4734,7 @@ Proof. intros.
   assert (Linear.fn_sig f=fn_sig x) as ->.
   { apply unfold_transf_function in TF; rewrite TF; auto. }
 
-  inv H0. eapply match_states_init; eauto. simpl.
+  inv H0. simpl. rewrite <-H3. eapply match_states_init; eauto. simpl.
 
   solve[apply wt_setlist_loc_arguments].
   solve[intros r; apply loc_arguments_gso_reg].
@@ -4746,19 +4751,19 @@ Proof. intros.
 
   simpl. unfold loc_arguments. rewrite initial_SM_as_inj.
   rewrite andb_true_iff in H2. destruct H2 as [H2 H4]. revert H2.
-  generalize (sig_args (fn_sig x)) as tys.
-  apply forall_inject_val_list_inject in VInj. intros tys.
+  remember (sig_args (fn_sig x)) as tys.
+  apply forall_inject_val_list_inject in VInj. 
   generalize (encode_longs_inject _ tys vals1 vals2 VInj).
-  solve[intros H2 H5; apply agree_args_match_init; auto].
+  intros H2 H5; apply agree_args_match_init; auto.
+  simpl; rewrite H3; auto. solve[rewrite <-Heqtys; auto].
 
-  solve[rewrite H3; auto].
   exists vals1. rewrite initial_SM_as_inj. 
     unfold initial_SM, vis. simpl. split; auto.
     apply forall_inject_val_list_inject.
     apply restrict_forall_vals_inject; auto.
     intros b0 GET. apply REACH_nil. 
     solve[rewrite orb_true_iff; right; auto].
-  solve[rewrite val_has_type_list_func_charact; auto].
+  solve[rewrite val_has_type_list_func_charact, H3; auto].
 
   assert (Zlength vals2 = Zlength vals1) as ->. 
   { apply forall_inject_val_list_inject in VInj. clear - VInj. 
@@ -5077,7 +5082,9 @@ assert (GFnu': forall b,
     rewrite (frgnSrc_shared _ WDnu' _ GFP). intuition. }}
 
 split.
-  econstructor. instantiate (1:=ef_sig e).
+  econstructor. 
+    eauto.
+    instantiate (1:=ef_sig e).
     { exploit match_stack_change_extcall. eapply FwdSrc. eapply FwdTgt.
        eassumption.
        eapply replace_locals_wd. assumption.
@@ -6382,8 +6389,6 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
               eapply Mach_exec_function_external; try assumption.
               econstructor. eapply EC.
               reflexivity. reflexivity. 
-          (*eapply external_call_symbols_preserved'; eauto.
-            exact symbols_preserved. exact varinfo_preserved.*)
   exists mu'.  
   assert (STACKS': match_stacks mu' m' tm' sp0 ls0 s cs' 
            (Linear.funsig (External ef))
@@ -6459,7 +6464,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     inv FRM. apply restrictD_Some in agree_inj0. 
     destruct agree_inj0 as [X Y]. solve[apply X].
     inv AGARGS. revert agree_args_frame_match0. simpl. destruct s; auto.
-    intros [Y|Y]. left; inv Y; auto. right; auto.
+    intros [Y|Y]. left; inversion Y; subst f; auto. right; auto.
   solve[intuition]. }
 Qed.
 
@@ -7621,7 +7626,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     inv FRM. apply restrictD_Some in agree_inj0. 
     destruct agree_inj0 as [X Y]. solve[apply X].
     inv AGARGS. revert agree_args_frame_match0. simpl. destruct s; auto.
-    intros [Y|Y]. left; inv Y; auto. right; auto.
+    intros [Y|Y]. left; inversion Y; subst f; auto. right; auto.
   solve[intuition]. }
 Qed.
 
@@ -7705,25 +7710,22 @@ assert (GDE:= GDE_lemma).
     apply LT. }
 (*halted*)
   { intros. destruct H as [MC [RC [PG [Glob [VAL [WD INJ]]]]]].
-    inv MC. 
-    simpl in H0; inv H0. 
-    simpl in H0; inv H0.
-    simpl in H0; inv H0.
-    simpl in H0; inv H0.
+    inv MC; try solve[inv H0]. simpl in H0.
+    destruct cs; simpl; try solve[congruence]. 
     specialize (match_states_return _ _ _ _ f0 _ _ retty _ _ _ args0 tys0 _ 
                                     STACKS WTLS AGREGS AGLOCS). intros.
-    destruct cs; inv H0.    
-    remember (ls (Locations.R AX)) as d.
+    remember (ls (Locations.R AX)) as d. simpl. 
     inv STACKS.
-    destruct retty. (* try solve[inv H2].*)
-    { destruct t; inv H2.
+    fold retty0 in H0.
+    destruct retty0.
+    { destruct t; inv H0.
       + exists (rs AX); split; auto. 
       + exists (rs FP0); split; auto. 
       + exists (Val.longofwords (rs DX) (rs AX)).
         split; auto. split; auto. 
         apply val_longofwords_inject; auto. 
       + exists (rs FP0); split; auto. }
-    { inv H2.
+    { inv H0.
       exists (rs AX); split; auto. } }
 (* at_external*) 
   { eapply MATCH_atExternal; eassumption. }
