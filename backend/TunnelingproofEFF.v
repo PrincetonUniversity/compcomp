@@ -539,38 +539,38 @@ Qed.
 
 Inductive match_states mu: LTL_core -> mem -> LTL_core-> mem -> Prop :=
   | match_states_intro:
-      forall s f sp pc ls m ts tsp tls tm
+      forall s f sp pc ls m ts tsp tls tm retty
       (*NEW*) (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls tls)
       (*NEW*) (SPlocal: sp_mapped mu sp tsp),
       list_forall2 (match_stackframes mu) s ts ->
-      match_states mu (LTL_State s f sp pc ls) m
-                   (LTL_State ts (tunnel_function f) tsp (branch_target f pc) tls) tm
+      match_states mu (LTL_State s f sp pc ls retty) m
+                   (LTL_State ts (tunnel_function f) tsp (branch_target f pc) tls retty) tm
   | match_states_block:
-      forall s f sp bb ls m ts tsp tls tm
+      forall s f sp bb ls m ts tsp tls tm retty
       (*NEW*) (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls tls)
       (*NEW*) (SPlocal: sp_mapped mu sp tsp),
       list_forall2 (match_stackframes mu) s ts ->
-      match_states mu (LTL_Block s f sp bb ls) m
-                   (LTL_Block ts (tunnel_function f) tsp (tunneled_block f bb) tls) tm
+      match_states mu (LTL_Block s f sp bb ls retty) m
+                   (LTL_Block ts (tunnel_function f) tsp (tunneled_block f bb) tls retty) tm
   | match_states_interm:
-      forall s f sp pc bb ls m ts tsp tls tm
+      forall s f sp pc bb ls m ts tsp tls tm retty
       (*NEW*) (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls tls)
       (*NEW*) (SPlocal: sp_mapped mu sp tsp),
       list_forall2 (match_stackframes mu) s ts ->
-      match_states mu (LTL_Block s f sp (Lbranch pc :: bb) ls) m
-                   (LTL_State ts (tunnel_function f) tsp (branch_target f pc) tls) tm
+      match_states mu (LTL_Block s f sp (Lbranch pc :: bb) ls retty) m
+                   (LTL_State ts (tunnel_function f) tsp (branch_target f pc) tls retty) tm
   | match_states_call:
-      forall s f ls m ts tls tm
+      forall s f ls m ts tls tm retty
       (*NEW*) (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls tls),
       list_forall2 (match_stackframes mu) s ts ->
-      match_states mu (LTL_Callstate s f ls) m
-                   (LTL_Callstate ts (tunnel_fundef f) tls) tm
+      match_states mu (LTL_Callstate s f ls retty) m
+                   (LTL_Callstate ts (tunnel_fundef f) tls retty) tm
   | match_states_return:
-      forall s ls m ts tls tm tyopt
+      forall s ls m ts tls tm tyopt retty
       (*NEW*) (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls tls),
       list_forall2 (match_stackframes mu) s ts ->
-      match_states mu (LTL_Returnstate s tyopt ls) m
-                   (LTL_Returnstate ts tyopt tls) tm.
+      match_states mu (LTL_Returnstate s tyopt ls retty) m
+                   (LTL_Returnstate ts tyopt tls retty) tm.
 
 (** To preserve non-terminating behaviours, we show that the transformed
   code cannot take an infinity of "zero transition" cases.
@@ -580,11 +580,11 @@ Inductive match_states mu: LTL_core -> mem -> LTL_core-> mem -> Prop :=
 (*Lenb: converted to LTL_core*)
 Definition measure (st: LTL_core) : nat :=
   match st with
-  | LTL_State s f sp pc ls => (count_gotos f pc * 2)%nat
-  | LTL_Block s f sp (Lbranch pc :: _) ls => (count_gotos f pc * 2 + 1)%nat
-  | LTL_Block s f sp bb ls => 0%nat
-  | LTL_Callstate s f ls => 0%nat
-  | LTL_Returnstate s tyopt ls => 0%nat
+  | LTL_State s f sp pc ls retty => (count_gotos f pc * 2)%nat
+  | LTL_Block s f sp (Lbranch pc :: _) ls retty => (count_gotos f pc * 2 + 1)%nat
+  | LTL_Block s f sp bb ls retty => 0%nat
+  | LTL_Callstate s f ls retty => 0%nat
+  | LTL_Returnstate s tyopt ls retty => 0%nat
   end.
 
 Definition lt_state (S1 S2: LTL_core) :=
@@ -697,15 +697,6 @@ Proof. intros.
 induction H; econstructor; eauto. clear IHlist_forall2.
 eapply replace_locals_stackframes; eassumption.
 Qed.
-
-(*WAS:
-Lemma match_parent_locset:
-  forall s ts,
-  list_forall2 match_stackframes s ts ->
-  parent_locset ts = parent_locset s.
-Proof.
-  induction 1; simpl. auto. inv H; auto.
-Qed.*)
 
 Lemma match_parent_locset mu:
   forall s ts,
@@ -1189,19 +1180,10 @@ intuition.
   rewrite replace_locals_as_inj. assumption.
 Qed. 
 
-Lemma MATCH_initial: forall (v1 v2 : val) (sig : signature) entrypoints
-  (EP: In (v1, v2, sig) entrypoints)
-  (entry_points_ok : forall (v1 v2 : val) (sig : signature),
-                  In (v1, v2, sig) entrypoints ->
-                  exists
-                    (b : Values.block) f1 f2,
-                    v1 = Vptr b Int.zero /\
-                    v2 = Vptr b Int.zero /\
-                    Genv.find_funct_ptr ge b = Some f1 /\
-                    Genv.find_funct_ptr tge b = Some f2)
+Lemma MATCH_initial: forall v 
   (vals1 : list val) c1 (m1 : mem) (j : meminj)
   (vals2 : list val) (m2 : mem) (DomS DomT : Values.block -> bool)
-  (Ini : initial_core (LTL_eff_sem hf) ge v1 vals1 = Some c1)
+  (Ini : initial_core (LTL_eff_sem hf) ge v vals1 = Some c1)
   (Inj: Mem.inject j m1 m2)
   (VInj: Forall2 (val_inject j) vals1 vals2)
   (PG: meminj_preserves_globals ge j)
@@ -1218,7 +1200,7 @@ Lemma MATCH_initial: forall (v1 v2 : val) (sig : signature) entrypoints
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
-  initial_core (LTL_eff_sem hf) tge v2 vals2 = Some c2 /\
+  initial_core (LTL_eff_sem hf) tge v vals2 = Some c2 /\
   MATCH 
     (initial_SM DomS DomT
        (REACH m1
@@ -1229,7 +1211,7 @@ exists c2,
 Proof. intros.
   inversion Ini.
   unfold LTL_initial_core in H0. unfold ge in *. unfold tge in *.
-  destruct v1; inv H0.
+  destruct v; inv H0.
   remember (Int.eq_dec i Int.zero) as z; destruct z; inv H1. clear Heqz.
   remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz; inv H0. 
     apply eq_sym in Heqzz.
@@ -1253,18 +1235,16 @@ Proof. intros.
   exists (LTL_Callstate nil (Internal (tunnel_function f))
             (Locmap.setlist (loc_arguments (fn_sig f)) 
               (val_casted.encode_longs (sig_args (fn_sig f)) vals2)
-              (Locmap.init Vundef))).
+              (Locmap.init Vundef)) (sig_res (fn_sig f))).
   split.
-    destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
-    subst. inv A. rewrite C in Heqzz. inv Heqzz.
-    unfold tge in FP. rewrite D in FP. inv FP.
+    subst. inv Heqzz. unfold tge in FP. inv FP. rewrite H2.
     simpl.
     case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
-    rewrite D.
     assert (Hlen: Zlength vals2 = Zlength vals1).
     { apply forall_inject_val_list_inject in VInj. clear - VInj. 
       induction VInj; auto. rewrite !Zlength_cons, IHVInj; auto. }
     rewrite Hlen.
+    change (fn_sig f) with (funsig (Internal (tunnel_function f))).
     assert (val_casted.val_has_type_list_func vals2 
              (sig_args (funsig (Internal (tunnel_function f))))=true) as ->.
     { eapply val_casted.val_list_inject_hastype; eauto.
@@ -1345,17 +1325,17 @@ Proof. intros.
   assert (DEFAULT: branch_target f pc = pc ->
     (exists (st2' : LTL_core) (m2' : mem),
   (corestep_plus (LTL_eff_sem hf) tge
-     (LTL_State ts (tunnel_function f) tsp (branch_target f pc) tls) m2 st2'
+     (LTL_State ts (tunnel_function f) tsp (branch_target f pc) tls retty) m2 st2'
      m2' \/
-   (measure (LTL_Block s f sp bb rs) < measure (LTL_State s f sp pc rs))%nat /\
+   (measure (LTL_Block s f sp bb rs retty) < measure (LTL_State s f sp pc rs retty))%nat /\
    corestep_star (LTL_eff_sem hf) tge
-     (LTL_State ts (tunnel_function f) tsp (branch_target f pc) tls) m2 st2'
+     (LTL_State ts (tunnel_function f) tsp (branch_target f pc) tls retty) m2 st2'
      m2') /\
   (exists mu' : SM_Injection,
      intern_incr mu mu' /\
      sm_inject_separated mu mu' m m2 /\
      sm_locally_allocated mu mu' m m2 m m2' /\
-     MATCH mu' (LTL_Block s f sp bb rs) m st2' m2'))). 
+     MATCH mu' (LTL_Block s f sp bb rs retty) m st2' m2'))). 
   intros. rewrite H0. 
   eexists; exists m2; split.
     left. apply corestep_plus_one. 
@@ -1562,7 +1542,7 @@ Proof. intros.
 
 { (* Ltailcall *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
-  specialize (match_parent_locset _ _ _ H11); intros parentsAGREE.
+  specialize (match_parent_locset _ _ _ H12); intros parentsAGREE.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in parentsAGREE; trivial.
   assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) (return_regs (parent_locset s) rs) (return_regs (parent_locset ts) tls)).
      eapply agree_regs_return; eassumption. 
@@ -1726,7 +1706,7 @@ Proof. intros.
   simpl in H0; rewrite Zplus_0_r in H0.
   rewrite (local_in_all _ WDR _ _ _ H2) in SPB; inv SPB.
 
-  specialize (match_parent_locset _ _ _ H8); intros parentsAGREE.
+  specialize (match_parent_locset _ _ _ H9); intros parentsAGREE.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in parentsAGREE; trivial.
   assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) (return_regs (parent_locset s) rs) (return_regs (parent_locset ts) tls)).
      eapply agree_regs_return; eassumption.
@@ -1846,7 +1826,7 @@ Proof. intros.
       split; eassumption. }
 
 { (* return *)
-  inv H5. inv H1.
+  inv H6. inv H1.
   eexists; eexists; split.
   left. apply corestep_plus_one. eapply ltl_exec_return.
   exists mu.
@@ -1891,17 +1871,17 @@ Proof. intros.
   assert (DEFAULT: branch_target f pc = pc ->
     (exists (st2' : LTL_core) (m2' : mem) (U2 : block -> Z -> bool),
   (effstep_plus (LTL_eff_sem hf) tge U2
-     (LTL_State ts (tunnel_function f) tsp (branch_target f pc) tls) m2 st2'
+     (LTL_State ts (tunnel_function f) tsp (branch_target f pc) tls retty) m2 st2'
      m2' \/
-   (measure (LTL_Block s f sp bb rs) < measure (LTL_State s f sp pc rs))%nat /\
+   (measure (LTL_Block s f sp bb rs retty) < measure (LTL_State s f sp pc rs retty))%nat /\
    effstep_star (LTL_eff_sem hf) tge U2
-     (LTL_State ts (tunnel_function f) tsp (branch_target f pc) tls) m2 st2'
+     (LTL_State ts (tunnel_function f) tsp (branch_target f pc) tls retty) m2 st2'
      m2') /\
   (exists mu' : SM_Injection,
      intern_incr mu mu' /\
      sm_inject_separated mu mu' m m2 /\
      sm_locally_allocated mu mu' m m2 m m2' /\
-     MATCH mu' (LTL_Block s f sp bb rs) m st2' m2' /\
+     MATCH mu' (LTL_Block s f sp bb rs retty) m st2' m2' /\
      (forall (b : block) (ofs : Z),
       U2 b ofs = true ->
       visTgt mu b = true /\
@@ -2136,7 +2116,7 @@ Proof. intros.
 
 { (* Ltailcall *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
-  specialize (match_parent_locset _ _ _ H11); intros parentsAGREE.
+  specialize (match_parent_locset _ _ _ H12); intros parentsAGREE.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in parentsAGREE; trivial.
   assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) (return_regs (parent_locset s) rs) (return_regs (parent_locset ts) tls)).
      eapply agree_regs_return; eassumption. 
@@ -2315,7 +2295,7 @@ Proof. intros.
   simpl in H0; rewrite Zplus_0_r in H0.
   rewrite (local_in_all _ WDR _ _ _ H2) in SPB; inv SPB.
 
-  specialize (match_parent_locset _ _ _ H8); intros parentsAGREE.
+  specialize (match_parent_locset _ _ _ H9); intros parentsAGREE.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in parentsAGREE; trivial.
   assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) (return_regs (parent_locset s) rs) (return_regs (parent_locset ts) tls)).
      eapply agree_regs_return; eassumption.
@@ -2456,7 +2436,7 @@ Proof. intros.
     rewrite BuiltinEffect_decode; trivial. }
 
 { (* return *)
-  inv H5. inv H1.
+  inv H6. inv H1.
   eexists; eexists; eexists; split.
   left. apply effstep_plus_one. eapply ltl_effstep_return.
   exists mu.
@@ -2472,20 +2452,10 @@ Qed.
 
 (*program structure not yet updated to module*)
 Theorem transl_program_correct:
-  forall (*(TRANSL: sel_program prog = OK tprog)*)
-         (LNR: list_norepet (map fst (prog_defs prog)))
-         entrypoints
-         (entry_points_ok : 
-            forall v1 v2 sig,
-              In (v1, v2, sig) entrypoints -> 
-              exists b f1 f2, 
-                v1 = Vptr b Int.zero 
-                /\ v2 = Vptr b Int.zero
-                /\ Genv.find_funct_ptr ge b = Some f1
-                /\ Genv.find_funct_ptr tge b = Some f2)
+  forall (LNR: list_norepet (map fst (prog_defs prog)))
          (init_mem: exists m0, Genv.init_mem prog = Some m0),
-SM_simulation.SM_simulation_inject (LTL_eff_sem hf) 
-  (LTL_eff_sem hf) ge tge entrypoints.
+  SM_simulation.SM_simulation_inject (LTL_eff_sem hf) 
+    (LTL_eff_sem hf) ge tge.
 Proof.
 intros.
 eapply (SM_simulation.Build_SM_simulation_inject) with
@@ -2506,11 +2476,11 @@ intros. apply H.
   intros. apply H.
 (*initial_core*)
   { intros. 
-    exploit (MATCH_initial _ _ _ _ H entry_points_ok); eauto.
+    exploit (MATCH_initial); eauto.
     destruct init_mem as [m0 INIT].
     exists m0; split; auto.
-    unfold meminj_preserves_globals in H3.    
-    destruct H3 as [A [B C]].
+    unfold meminj_preserves_globals in H2.    
+    destruct H2 as [A [B C]].
 
     assert (P: forall p q, {Ple p q} + {Plt q p}).
       intros p q.
@@ -2529,19 +2499,19 @@ intros. apply H.
     destruct (P (Mem.nextblock m0) (Mem.nextblock m1)); auto.
     exfalso. 
     destruct (D _ p).
-    apply A in H3.
+    apply A in H2.
     assert (Mem.valid_block m1 (Mem.nextblock m1)).
       eapply Mem.valid_block_inject_1; eauto.
-    clear - H8; unfold Mem.valid_block in H8.
+    clear - H7; unfold Mem.valid_block in H7.
     xomega.
 
     destruct (P (Mem.nextblock m0) (Mem.nextblock m2)); auto.
     exfalso. 
     destruct (D _ p).
-    apply A in H3.
+    apply A in H2.
     assert (Mem.valid_block m2 (Mem.nextblock m2)).
       eapply Mem.valid_block_inject_2; eauto.
-    clear - H8; unfold Mem.valid_block in H8.
+    clear - H7; unfold Mem.valid_block in H7.
     xomega.
     
     intros b LT.    
@@ -2586,33 +2556,33 @@ intros. apply H.
     destruct MTCH as [MC [RC [PG [GFP [Glob [VAL [WD INJ]]]]]]].
     revert H0. simpl. destruct c1; try solve[inversion 1]. inversion 1.
     revert H1. destruct stack; try solve[inversion 1].
-    destruct retty.
+    destruct retty0.
     { inv MC.
     destruct t; try solve[inversion 1]; simpl. inversion 1; subst. clear H1.
     + exists (tls (R AX)). split; auto. split. 
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
       destruct AGREE as [AGREE_R _]; specialize (AGREE_R AX); auto.
-      inv H6; auto. 
+      inv H7; auto. 
     + inversion 1; subst. exists (tls (R FP0)). split; auto. split.
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
       destruct AGREE as [AGREE_R _]; specialize (AGREE_R FP0); auto.
-      inv H6; auto. 
+      inv H7; auto. 
     + inversion 1; subst. exists (Val.longofwords (tls (R DX)) (tls (R AX))).
       split; auto. split; auto. 
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
       apply val_longofwords_inject; auto.
       solve[destruct AGREE as [AGREE_R _]; specialize (AGREE_R DX); auto].
       solve[destruct AGREE as [AGREE_R _]; specialize (AGREE_R AX); auto].
-      inv H6; auto. 
+      inv H7; auto. 
     + inversion 1; subst. exists (tls (R FP0)). split; auto. split; auto.
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
       destruct AGREE as [AGREE_R _]; specialize (AGREE_R FP0); auto.
-      inv H6; auto. }
+      inv H7; auto. }
     { inversion 1; subst. simpl in *.
       inv MC. simpl. exists (tls (R AX)). split; trivial.
       split. rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
         destruct AGREE as [AGREE_R _]. apply (AGREE_R AX).
-      inv H7; auto. } }
+      inv H8; auto. } }
 (*atExternal*)
   { intros. destruct H as [MTCH CD]; subst cd.
     exploit MATCH_atExternal; try eassumption.

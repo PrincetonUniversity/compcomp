@@ -30,6 +30,7 @@ Require Import Asm.
 Require Import Asmgen.
 Require Import Asmgenproof0.
 Require Import Asmgenproof1.
+Require Import load_frame.
 
 Section PRESERVATION.
 

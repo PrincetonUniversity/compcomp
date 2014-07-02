@@ -235,9 +235,10 @@ Inductive initial_state (p: program): state -> Prop :=
 
 (*Maybe generalize to other types?*)
 Definition Linear_halted (q : Linear_core): option val :=
-    match q with 
+    match q with Linear_Returnstate nil _ rs (mk_load_frame _ f) => 
+      match sig_res (fn_sig f) with
       (*Return Tlong, which must be decoded*)
-      | Linear_Returnstate nil (Some Tlong) rs _ => 
+      | Some Tlong => 
            match loc_result (mksignature nil (Some Tlong)) with
              | nil => None
              | r1 :: r2 :: nil => 
@@ -249,7 +250,7 @@ Definition Linear_halted (q : Linear_core): option val :=
            end
 
       (*Return a value of any other typ*)
-      | Linear_Returnstate nil (Some retty) rs _ => 
+      | Some retty => 
            match loc_result (mksignature nil (Some retty)) with
             | nil => None
             | r :: TL => match TL with 
@@ -259,10 +260,9 @@ Definition Linear_halted (q : Linear_core): option val :=
            end
 
       (*Return Tvoid - modeled as integer return*)
-      | Linear_Returnstate nil None rs _ => Some (rs (R AX))
-
-      | _ => None
-    end.
+      | None => Some (rs (R AX))
+      end 
+    | _ => None end.
 
 (*Original had this:
 Inductive final_state: state -> int -> Prop :=

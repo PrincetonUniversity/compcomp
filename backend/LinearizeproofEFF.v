@@ -868,72 +868,83 @@ Qed.
 
 Inductive match_states mu: LTL_core -> mem -> Linear_core -> mem -> Prop :=
   | match_states_add_branch:
-      forall s f sp1 sp2 pc ls1 ls2 m1 m2 tf ts c ls0
+      forall s f sp1 sp2 pc ls1 ls2 m1 m2 tf ts c retty ls0 f0
         (STACKS: list_forall2 (match_stackframes mu) s ts)
         (TRF: transf_function f = OK tf)
         (REACH: (reachable f)!!pc = true)
         (TAIL: is_tail c tf.(fn_code))
         (*NEW*) (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls1 ls2)
-        (*NEW*) (SPLocal: sp_mapped mu sp1 sp2),
-      match_states mu (LTL_State s f sp1 pc ls1) m1
-                      (Linear_State ts tf sp2 (add_branch pc c) ls2 ls0) m2
+        (*NEW*) (SPLocal: sp_mapped mu sp1 sp2)
+        (AGRTY: retty=sig_res (fn_sig f0)),
+      match_states mu (LTL_State s f sp1 pc ls1 retty) m1
+                      (Linear_State ts tf sp2 (add_branch pc c) ls2 
+                                    (mk_load_frame ls0 f0)) m2
   | match_states_cond_taken:
-      forall s f sp1 sp2 pc ls1 ls2 m1 m2 tf ts cond args c ls0
+      forall s f sp1 sp2 pc ls1 ls2 m1 m2 tf ts cond args c retty ls0 f0
         (STACKS: list_forall2 (match_stackframes mu) s ts)
         (TRF: transf_function f = OK tf)
         (REACH: (reachable f)!!pc = true)
         (JUMP: eval_condition cond (reglist ls1 args) m1 = Some true)
         (*NEW*) (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls1 ls2)
-        (*NEW*) (SPLocal: sp_mapped mu sp1 sp2),
-      match_states mu (LTL_State s f sp1 pc (undef_regs (destroyed_by_cond cond) ls1)) m1
-                     (Linear_State ts tf sp2 (Lcond cond args pc :: c) ls2 ls0) m2
+        (*NEW*) (SPLocal: sp_mapped mu sp1 sp2)
+        (AGRTY: retty=sig_res (fn_sig f0)),
+      match_states mu (LTL_State s f sp1 pc (undef_regs (destroyed_by_cond cond) ls1) retty) m1
+                     (Linear_State ts tf sp2 (Lcond cond args pc :: c) ls2 
+                                   (mk_load_frame ls0 f0)) m2
   | match_states_jumptable:
-      forall s f sp1 sp2 pc ls1 ls2 m1 m2 tf ts arg tbl c n ls0
+      forall s f sp1 sp2 pc ls1 ls2 m1 m2 tf ts arg tbl c n retty ls0 f0
         (STACKS: list_forall2 (match_stackframes mu) s ts)
         (TRF: transf_function f = OK tf)
         (REACH: (reachable f)!!pc = true)
         (ARG: ls1 (R arg) = Vint n)
         (JUMP: list_nth_z tbl (Int.unsigned n) = Some pc)
         (*NEW*) (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls1 ls2)
-        (*NEW*) (SPLocal: sp_mapped mu sp1 sp2),
-      match_states mu (LTL_State s f sp1 pc (undef_regs destroyed_by_jumptable ls1)) m1
-                      (Linear_State ts tf sp2 (Ljumptable arg tbl :: c) ls2 ls0) m2
+        (*NEW*) (SPLocal: sp_mapped mu sp1 sp2)
+        (AGRTY: retty=sig_res (fn_sig f0)),
+      match_states mu (LTL_State s f sp1 pc (undef_regs destroyed_by_jumptable ls1) retty) m1
+                      (Linear_State ts tf sp2 (Ljumptable arg tbl :: c) ls2
+                                (mk_load_frame ls0 f0)) m2
   | match_states_block:
-      forall s f sp1 sp2 bb ls1 ls2 m1 m2 tf ts c ls0
+      forall s f sp1 sp2 bb ls1 ls2 m1 m2 tf ts c retty ls0 f0
         (STACKS: list_forall2 (match_stackframes mu) s ts)
         (TRF: transf_function f = OK tf)
         (REACH: forall pc, In pc (successors_block bb) -> (reachable f)!!pc = true)
         (TAIL: is_tail c tf.(fn_code))
         (*NEW*) (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls1 ls2)
-        (*NEW*) (SPLocal: sp_mapped mu sp1 sp2),
-      match_states mu (LTL_Block s f sp1 bb ls1) m1
-                      (Linear_State ts tf sp2 (linearize_block bb c) ls2 ls0) m2
+        (*NEW*) (SPLocal: sp_mapped mu sp1 sp2)
+        (AGRTY: retty=sig_res (fn_sig f0)),
+      match_states mu (LTL_Block s f sp1 bb ls1 retty) m1
+                      (Linear_State ts tf sp2 (linearize_block bb c) ls2 
+                                (mk_load_frame ls0 f0)) m2
   | match_states_call0:
-      forall s (f:LTL.fundef) ls1 ls2 m1 m2 tf ts ls0,
+      forall s (f:LTL.fundef) ls1 ls2 m1 m2 tf ts retty ls0 f0,
       list_forall2 (match_stackframes mu) s ts ->
       transf_fundef f = OK tf ->
       match f with Internal _ => True | External _ => False end -> 
-      (*NEW*) forall (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls1 ls2),
-      match_states mu (LTL_Callstate s f ls1) m1
-                      (Linear_CallstateIn ts tf ls2 ls0) m2
+      (*NEW*) forall (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls1 ls2)
+      (AGRTY: retty=sig_res (fn_sig f0)),
+      match_states mu (LTL_Callstate s f ls1 retty) m1
+                      (Linear_CallstateIn ts tf ls2 (mk_load_frame ls0 f0)) m2
   | match_states_call:
-      forall s f ls1 ls2 m1 m2 tf ts ls0,
+      forall s f ls1 ls2 m1 m2 tf ts retty ls0 f0,
       list_forall2 (match_stackframes mu) s ts ->
       transf_fundef f = OK tf ->
-      (*NEW*) forall (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls1 ls2),
-      match_states mu (LTL_Callstate s f ls1) m1
-                      (Linear_Callstate ts tf ls2 ls0) m2
+      (*NEW*) forall (AGREE: agree_regs (restrict (as_inj mu) (vis mu)) ls1 ls2)
+      (AGRTY: retty=sig_res (fn_sig f0)),
+      match_states mu (LTL_Callstate s f ls1 retty) m1
+                      (Linear_Callstate ts tf ls2 (mk_load_frame ls0 f0)) m2
   | match_states_return:
-      forall s ls1 ls2 m1 m2 ts retty ls0,
+      forall s ls1 ls2 m1 m2 ts retty retty0 ls0 f0,
       list_forall2 (match_stackframes mu) s ts ->
-      (*NEW*) forall (AGREE:agree_regs (restrict (as_inj mu) (vis mu)) ls1 ls2),
-      match_states mu (LTL_Returnstate s retty ls1) m1
-                      (Linear_Returnstate ts retty ls2 ls0) m2.
+      (*NEW*) forall (AGREE:agree_regs (restrict (as_inj mu) (vis mu)) ls1 ls2)
+      (AGRTY: retty0=sig_res (fn_sig f0)),
+      match_states mu (LTL_Returnstate s retty ls1 retty0) m1
+                      (Linear_Returnstate ts retty ls2 (mk_load_frame ls0 f0)) m2.
 
 Definition measure (S: LTL_core) : nat :=
   match S with
-  | LTL_State s f sp pc ls => 0%nat
-  | LTL_Block s f sp bb ls => 1%nat
+  | LTL_State s f sp pc ls retty => 0%nat
+  | LTL_Block s f sp bb ls retty => 1%nat
   | _ => 0%nat
   end.
 
@@ -1492,6 +1503,7 @@ split.
             apply orb_true_iff; left.
             solve[rewrite getBlocks_char; eexists; left; reflexivity].
       apply map_R_outgoing.  
+      simpl; auto.
 destruct (eff_after_check2 _ _ _ _ _ MemInjNu' RValInjNu' 
       _ (eq_refl _) _ (eq_refl _) _ (eq_refl _) WDnu' SMvalNu').
 unfold vis in *.
@@ -1504,19 +1516,9 @@ intuition.
   rewrite replace_locals_as_inj. assumption.
 Qed. 
 
-Lemma MATCH_initial: forall (v1 v2 : val) (sig : signature) entrypoints
-  (EP: In (v1, v2, sig) entrypoints)
-  (entry_points_ok : forall (v1 v2 : val) (sig : signature),
-                  In (v1, v2, sig) entrypoints ->
-                  exists
-                    (b : Values.block) f1 f2,
-                    v1 = Vptr b Int.zero /\
-                    v2 = Vptr b Int.zero /\
-                    Genv.find_funct_ptr ge b = Some f1 /\
-                    Genv.find_funct_ptr tge b = Some f2)
-  (vals1 : list val) c1 (m1 : mem) (j : meminj)
+Lemma MATCH_initial: forall v (vals1 : list val) c1 (m1 : mem) (j : meminj)
   (vals2 : list val) (m2 : mem) (DomS DomT : Values.block -> bool)
-  (Ini : initial_core (LTL_eff_sem hf) ge v1 vals1 = Some c1)
+  (Ini : initial_core (LTL_eff_sem hf) ge v vals1 = Some c1)
   (Inj: Mem.inject j m1 m2)
   (VInj: Forall2 (val_inject j) vals1 vals2)
   (PG: meminj_preserves_globals ge j)
@@ -1533,7 +1535,7 @@ Lemma MATCH_initial: forall (v1 v2 : val) (sig : signature) entrypoints
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
-  initial_core (Linear_eff_sem hf) tge v2 vals2 = Some c2 /\
+  initial_core (Linear_eff_sem hf) tge v vals2 = Some c2 /\
   MATCH 
     (initial_SM DomS DomT
        (REACH m1
@@ -1544,7 +1546,7 @@ exists c2,
 Proof. intros.
   inversion Ini.
   unfold LTL_initial_core in H0. unfold ge in *. unfold tge in *.
-  destruct v1; inv H0.
+  destruct v; inv H0.
   remember (Int.eq_dec i Int.zero) as z; destruct z; inv H1. clear Heqz.
   remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz; inv H0. 
     apply eq_sym in Heqzz.
@@ -1574,18 +1576,16 @@ Proof. intros.
               (Locmap.init Vundef)) 
             (mk_load_frame (init_locset (sig_args (funsig tf)) vals2) fi)).
   split.
-    destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
-    subst. inv A. rewrite C in Heqzz. inv Heqzz.
-    unfold tge in FP. rewrite D in FP. inv FP.
+    subst. inv Heqzz. unfold tge in FP. inv FP. rewrite H2.
     unfold Linear_eff_sem, Linear_coop_sem. simpl.
-    case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
-    rewrite D.
-
+    case_eq (Int.eq_dec Int.zero Int.zero). intros ? e. 
+  
   assert (Zlength vals2 = Zlength vals1) as ->. 
   { apply forall_inject_val_list_inject in VInj. clear - VInj. 
     induction VInj; auto. rewrite !Zlength_cons, IHVInj; auto. }
 
     set (tf := Internal fi).
+    change (fn_sig fi) with (funsig tf).
     assert (val_casted.val_has_type_list_func vals2 (sig_args (funsig tf))=true) as ->.
     { eapply val_casted.val_list_inject_hastype; eauto.
       eapply forall_inject_val_list_inject; eauto.
@@ -1640,6 +1640,7 @@ Proof. intros.
            destruct l0; try contradiction.
            destruct sl; try contradiction. trivial. 
     trivial.
+    eapply sig_preserved in TF. revert TF. simpl. solve[intros ->; auto].
   rewrite initial_SM_as_inj.
   intuition.
       red; intros. specialize (Genv.find_funct_ptr_not_fresh prog). intros.
@@ -1928,12 +1929,11 @@ Proof. intros.
 
 { (* Ltailcall *)
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
-  destruct ls0; simpl.
-  specialize (match_parent_locset0 _ _ rs0 _ STACKS); intros parentsAGREE.
+  specialize (match_parent_locset0 _ _ ls0 _ STACKS); intros parentsAGREE.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in parentsAGREE; trivial.
   assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) 
                                (return_regs (LTL.parent_locset s) rs) 
-                               (return_regs (parent_locset0 rs0 ts) ls2)).
+                               (return_regs (parent_locset0 ls0 ts) ls2)).
      eapply agree_regs_return; eassumption. 
   exploit agree_find_function_translated; try eassumption.
     eapply agree_regs_incr; try eapply AGREERET. apply restrict_incr.
@@ -2129,7 +2129,6 @@ Proof. intros.
     split; intuition. econstructor; eauto. }
 
 { (* Lreturn *)
-  destruct ls0.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   assert (WDR: SM_wd (restrict_sm mu (vis mu))).
    apply restrict_sm_WD; try eassumption. trivial.
@@ -2140,10 +2139,10 @@ Proof. intros.
   simpl in H0; rewrite Zplus_0_r in H0.
   rewrite (local_in_all _ WDR _ _ _ H2) in SPB; inv SPB.
   exists (Linear_Returnstate ts (sig_res (fn_sig tf)) 
-           (return_regs (parent_locset0 rs0 ts) ls2) (mk_load_frame rs0 f0)).
+           (return_regs (parent_locset0 ls0 ts) ls2) (mk_load_frame ls0 f1)).
   exists tm'; split.
   left. apply corestep_plus_one. 
-    apply (lin_exec_Lreturn hf tge ts tf spb c ls2 m2 tm' rs0 f0); auto.
+    apply (lin_exec_Lreturn hf tge ts tf spb c ls2 m2 tm' ls0 f1); auto.
     rewrite (stacksize_preserved _ _ TRF). eauto.
   assert (SMV': sm_valid mu m' tm').
     split; intros;  
@@ -2170,10 +2169,9 @@ Proof. intros.
       eapply REACH_closed_free; try eassumption. }
 
 { (* dummy step *)
-  destruct ls0.
   assert (REACH: (reachable f)!!(LTL.fn_entrypoint f) = true).
     apply reachable_entrypoint.
-  monadInv H8.
+  monadInv H9.
   edestruct alloc_parallel_intern 
     as [mu' [tm' [b' [Alloc' [MInj' [IntInc [mu'SP mu'MuR]]]]]]]; 
       eauto; try apply Zle_refl.
@@ -2231,7 +2229,7 @@ Proof. intros.
 { (* internal functions *)
   assert (REACH: (reachable f)!!(LTL.fn_entrypoint f) = true).
     apply reachable_entrypoint.
-  monadInv H8.
+  monadInv H9.
   edestruct alloc_parallel_intern 
     as [mu' [tm' [b' [Alloc' [MInj' [IntInc [mu'SP mu'MuR]]]]]]]; 
       eauto; try apply Zle_refl.
@@ -2286,7 +2284,7 @@ Proof. intros.
 
 { contradiction. }
 {  (* unobservable external function *)
-  monadInv H9. inv H0.
+  monadInv H10. inv H0.
   rewrite vis_restrict_sm, restrict_sm_all in AGREE.
   rewrite restrict_nest in AGREE; trivial.
   assert (ArgsInj: val_list_inject (restrict (as_inj mu) (vis mu))
@@ -2329,7 +2327,7 @@ Proof. intros.
           rewrite <- FRG. apply Glob; assumption. }
 
 { (* return *) 
-  inv H5. inv H1.
+  inv H6. inv H1.
   eexists; eexists; split.
   left. apply corestep_plus_one. econstructor.
   exists mu.
@@ -2639,11 +2637,10 @@ Proof. intros.
     rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; trivial. }
 
 { (* Ltailcall *)
-  destruct ls0.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
-  specialize (match_parent_locset0 _ _ rs0 _ STACKS); intros parentsAGREE.
+  specialize (match_parent_locset0 _ _ ls0 _ STACKS); intros parentsAGREE.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in parentsAGREE; trivial.
-  assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) (return_regs (LTL.parent_locset s) rs) (return_regs (parent_locset0 rs0 ts) ls2)).
+  assert (AGREERET: agree_regs (restrict (as_inj mu) (vis mu)) (return_regs (LTL.parent_locset s) rs) (return_regs (parent_locset0 ls0 ts) ls2)).
      eapply agree_regs_return; eassumption. 
   exploit agree_find_function_translated; try eassumption.
     eapply agree_regs_incr; try eapply AGREERET. apply restrict_incr.
@@ -2857,7 +2854,6 @@ Proof. intros.
     split; intuition. econstructor; eauto. }
 
 { (* Lreturn *)
-  destruct ls0.
   rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
   assert (WDR: SM_wd (restrict_sm mu (vis mu))).
    apply restrict_sm_WD; try eassumption. trivial.
@@ -2905,10 +2901,9 @@ Proof. intros.
     rewrite <- (stacksize_preserved _ _ TRF); eauto. }
 
 { (* dummy step *)
-  destruct ls0.
   assert (REACH: (reachable f)!!(LTL.fn_entrypoint f) = true).
     apply reachable_entrypoint.
-  monadInv H8.
+  monadInv H9.
   edestruct alloc_parallel_intern 
     as [mu' [tm' [b' [Alloc' [MInj' [IntInc [mu'SP mu'MuR]]]]]]]; eauto; 
       try apply Zle_refl.
@@ -2966,7 +2961,7 @@ Proof. intros.
 { (* internal functions *)
   assert (REACH: (reachable f)!!(LTL.fn_entrypoint f) = true).
     apply reachable_entrypoint.
-  monadInv H8.
+  monadInv H9.
   edestruct alloc_parallel_intern 
     as [mu' [tm' [b' [Alloc' [MInj' [IntInc [mu'SP mu'MuR]]]]]]]; eauto; 
       try apply Zle_refl.
@@ -3022,7 +3017,7 @@ Proof. intros.
 
 { contradiction. }
 {  (* unobservable external function *)
-  monadInv H9. inv H0.
+  monadInv H10. inv H0.
   rewrite vis_restrict_sm, restrict_sm_all in AGREE.
   rewrite restrict_nest in AGREE; trivial.
   assert (ArgsInj: val_list_inject (restrict (as_inj mu) (vis mu))
@@ -3083,7 +3078,7 @@ Proof. intros.
        unfold BuiltinEffect; simpl. destruct ef; trivial. }
 
 { (* return *) 
-  inv H5. inv H1.
+  inv H6. inv H1.
   eexists; eexists; eexists; split.
   left. apply effstep_plus_one. econstructor.
   exists mu.
@@ -3099,20 +3094,10 @@ Qed.
 
 (*program structure not yet updated to module*)
 Theorem transl_program_correct:
-  forall (*(TRANSL: sel_program prog = OK tprog)*)
-         (LNR: list_norepet (map fst (prog_defs prog)))
-         entrypoints
-         (entry_points_ok : 
-            forall v1 v2 sig,
-              In (v1, v2, sig) entrypoints -> 
-              exists b f1 f2, 
-                v1 = Vptr b Int.zero 
-                /\ v2 = Vptr b Int.zero
-                /\ Genv.find_funct_ptr ge b = Some f1
-                /\ Genv.find_funct_ptr tge b = Some f2)
+  forall (LNR: list_norepet (map fst (prog_defs prog)))
          (init_mem: exists m0, Genv.init_mem prog = Some m0),
 SM_simulation.SM_simulation_inject (LTL_eff_sem  hf)
-  (Linear_eff_sem hf) ge tge entrypoints.
+  (Linear_eff_sem hf) ge tge.
 Proof.
 intros.
 assert (GDE:= GDE_lemma). 
@@ -3133,11 +3118,11 @@ assert (GDE:= GDE_lemma).
   intros x. eapply MATCH_PG. 
 (*initial_core*)
   { intros.
-    eapply (MATCH_initial _ _ _ entrypoints); eauto.
+    eapply (MATCH_initial _ _ _); eauto.
     destruct init_mem as [m0 INIT].
     exists m0; split; auto.
-    unfold meminj_preserves_globals in H3.    
-    destruct H3 as [A [B C]].
+    unfold meminj_preserves_globals in H2.    
+    destruct H2 as [A [B C]].
 
     assert (P: forall p q, {Ple p q} + {Plt q p}).
       intros p q.
@@ -3156,19 +3141,19 @@ assert (GDE:= GDE_lemma).
     destruct (P (Mem.nextblock m0) (Mem.nextblock m1)); auto.
     exfalso. 
     destruct (D _ p).
-    apply A in H3.
+    apply A in H2.
     assert (Mem.valid_block m1 (Mem.nextblock m1)).
       eapply Mem.valid_block_inject_1; eauto.
-    clear - H8; unfold Mem.valid_block in H8.
+    clear - H7; unfold Mem.valid_block in H7.
     xomega.
 
     destruct (P (Mem.nextblock m0) (Mem.nextblock m2)); auto.
     exfalso. 
     destruct (D _ p).
-    apply A in H3.
+    apply A in H2.
     assert (Mem.valid_block m2 (Mem.nextblock m2)).
       eapply Mem.valid_block_inject_2; eauto.
-    clear - H8; unfold Mem.valid_block in H8.
+    clear - H7; unfold Mem.valid_block in H7.
     xomega.
     
     intros b LT.    
@@ -3181,33 +3166,37 @@ assert (GDE:= GDE_lemma).
   { intros. destruct H as [MC [RC [PG [GFP [Glob [VAL [WD INJ]]]]]]].
     revert H0. simpl. destruct c1; try solve[inversion 1]. inversion 1.
     revert H1. destruct stack; try solve[inversion 1].
-    destruct retty.
-    { inv MC.
-    destruct t; try solve[inversion 1]; simpl. inversion 1; subst. clear H1.
+    destruct retty0.
+    { inv MC. inv AGRTY.
+    destruct t; try solve[inversion 1]; simpl. inversion 1; subst. inv H1. clear H2.
     + exists (ls2 (R AX)). split; auto. split. 
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
       destruct AGREE as [AGREE_R _]; specialize (AGREE_R AX); auto.
-      inv H6; auto. 
-    + inversion 1; subst. exists (ls2 (R FP0)). split; auto. split.
+      inv H7; auto. 
+    + inversion 1; subst. exists (ls2 (R FP0)). split; auto. split. clear H2.
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
       destruct AGREE as [AGREE_R _]; specialize (AGREE_R FP0); auto.
-      inv H6; auto. 
+      inv H7; auto. 
+      inv H1; auto.
     + inversion 1; subst. exists (Val.longofwords (ls2 (R DX)) (ls2 (R AX))).
       split; auto. split; auto. 
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
       apply val_longofwords_inject; auto.
       solve[destruct AGREE as [AGREE_R _]; specialize (AGREE_R DX); auto].
       solve[destruct AGREE as [AGREE_R _]; specialize (AGREE_R AX); auto].
-      inv H6; auto. 
+      inv H7; auto. 
+      inv H1; auto.
     + inversion 1; subst. exists (ls2 (R FP0)). split; auto. split; auto.
       rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
       destruct AGREE as [AGREE_R _]; specialize (AGREE_R FP0); auto.
-      inv H6; auto. }
+      inv H7; auto. 
+      inv H1; auto. }
     { inversion 1; subst. simpl in *.
       inv MC. simpl. exists (ls2 (R AX)). split; trivial.
       split. rewrite vis_restrict_sm, restrict_sm_all, restrict_nest in AGREE; trivial.
         destruct AGREE as [AGREE_R _]. apply (AGREE_R AX).
-      inv H7; auto. } }
+      inv H8; auto. 
+      rewrite <-AGRTY. auto. } }
 (*atExternal*)
   { eapply MATCH_atExternal; eassumption. }
 (*afterExternal*)
@@ -3230,196 +3219,5 @@ assert (GDE:= GDE_lemma).
     split; try eapply MU'. 
     exists U2. split. assumption. apply MU'. }
 Qed.
-(*
-Theorem transf_step_correct:
-  forall s1 t s2, LTL.step ge s1 t s2 ->
-  forall s1' (MS: match_states s1 s1'),
-  (exists s2', plus Linear.step tge s1' t s2' /\ match_states s2 s2')
-  \/ (measure s2 < measure s1 /\ t = E0 /\ match_states s2 s1')%nat.
-Proof.
-  induction 1; intros; try (inv MS).
 
-  (* start of block, at an [add_branch] *)
-  exploit find_label_lin; eauto. intros [k F]. 
-  left; econstructor; split.
-  eapply add_branch_correct; eauto. 
-  econstructor; eauto. 
-  intros; eapply reachable_successors; eauto.
-  eapply is_tail_lin_block; eauto. eapply is_tail_find_label; eauto.
-
-  (* start of block, target of an [Lcond] *)
-  exploit find_label_lin; eauto. intros [k F]. 
-  left; econstructor; split.
-  apply plus_one. eapply exec_Lcond_true; eauto. 
-  econstructor; eauto. 
-  intros; eapply reachable_successors; eauto.
-  eapply is_tail_lin_block; eauto. eapply is_tail_find_label; eauto.
-
-  (* start of block, target of an [Ljumptable] *)
-  exploit find_label_lin; eauto. intros [k F]. 
-  left; econstructor; split.
-  apply plus_one. eapply exec_Ljumptable; eauto. 
-  econstructor; eauto. 
-  intros; eapply reachable_successors; eauto.
-  eapply is_tail_lin_block; eauto. eapply is_tail_find_label; eauto.
-
-  (* Lop *)
-  left; econstructor; split. simpl.
-  apply plus_one. econstructor; eauto. 
-  instantiate (1 := v); rewrite <- H; apply eval_operation_preserved. 
-  exact symbols_preserved.
-  econstructor; eauto. 
-
-  (* Lload *)
-  left; econstructor; split. simpl.
-  apply plus_one. econstructor. 
-  instantiate (1 := a). rewrite <- H; apply eval_addressing_preserved. 
-  exact symbols_preserved. eauto. eauto. 
-  econstructor; eauto.
-
-  (* Lgetstack *)
-  left; econstructor; split. simpl.
-  apply plus_one. econstructor; eauto.
-  econstructor; eauto.
-
-  (* Lsetstack *)
-  left; econstructor; split. simpl.
-  apply plus_one. econstructor; eauto. 
-  econstructor; eauto.
-
-  (* Lstore *)
-  left; econstructor; split. simpl.
-  apply plus_one. econstructor. 
-  instantiate (1 := a). rewrite <- H; apply eval_addressing_preserved. 
-  exact symbols_preserved. eauto. eauto. 
-  econstructor; eauto.
-
-  (* Lcall *)
-  exploit find_function_translated; eauto. intros [tfd [A B]].
-  left; econstructor; split. simpl.
-  apply plus_one. econstructor; eauto.
-  symmetry; eapply sig_preserved; eauto.
-  econstructor; eauto. constructor; auto. econstructor; eauto. 
-
-  (* Ltailcall *)
-  exploit find_function_translated; eauto. intros [tfd [A B]].
-  left; econstructor; split. simpl.
-  apply plus_one. econstructor; eauto.
-  rewrite (match_parent_locset _ _ STACKS). eauto.
-  symmetry; eapply sig_preserved; eauto.
-  rewrite (stacksize_preserved _ _ TRF); eauto. 
-  rewrite (match_parent_locset _ _ STACKS).
-  econstructor; eauto.
-
-  (* Lbuiltin *)
-  left; econstructor; split. simpl.
-  apply plus_one. eapply exec_Lbuiltin; eauto.
-  eapply external_call_symbols_preserved'; eauto.
-  exact symbols_preserved. exact varinfo_preserved.
-  econstructor; eauto.
-
-  (* Lannot *)
-  left; econstructor; split. simpl.
-  apply plus_one. eapply exec_Lannot; eauto.
-  eapply external_call_symbols_preserved'; eauto.
-  exact symbols_preserved. exact varinfo_preserved.
-  econstructor; eauto.
-
-  (* Lbranch *)
-  assert ((reachable f)!!pc = true). apply REACH; simpl; auto.
-  right; split. simpl; omega. split. auto. simpl. econstructor; eauto.
-
-  (* Lcond *)
-  assert (REACH1: (reachable f)!!pc1 = true) by (apply REACH; simpl; auto).
-  assert (REACH2: (reachable f)!!pc2 = true) by (apply REACH; simpl; auto).
-  simpl linearize_block.
-  destruct (starts_with pc1 c).
-  (* branch if cond is false *)
-  assert (DC: destroyed_by_cond (negate_condition cond) = destroyed_by_cond cond).
-    destruct cond; reflexivity.
-  destruct b.
-  (* cond is true: no branch *)
-  left; econstructor; split.
-  apply plus_one. eapply exec_Lcond_false. 
-  rewrite eval_negate_condition. rewrite H. auto. eauto.
-  rewrite DC. econstructor; eauto.
-  (* cond is false: branch is taken *)
-  right; split. simpl; omega. split. auto.  rewrite <- DC. econstructor; eauto. 
-  rewrite eval_negate_condition. rewrite H. auto.
-  (* branch if cond is true *)
-  destruct b.
-  (* cond is true: branch is taken *)
-  right; split. simpl; omega. split. auto. econstructor; eauto. 
-  (* cond is false: no branch *)
-  left; econstructor; split.
-  apply plus_one. eapply exec_Lcond_false. eauto. eauto. 
-  econstructor; eauto.
-
-  (* Ljumptable *)
-  assert (REACH': (reachable f)!!pc = true).
-    apply REACH. simpl. eapply list_nth_z_in; eauto. 
-  right; split. simpl; omega. split. auto. econstructor; eauto. 
-
-  (* Lreturn *)
-  left; econstructor; split.
-  simpl. apply plus_one. econstructor; eauto.
-  rewrite (stacksize_preserved _ _ TRF). eauto.
-  rewrite (match_parent_locset _ _ STACKS). econstructor; eauto.
-
-  (* internal functions *)
-  assert (REACH: (reachable f)!!(LTL.fn_entrypoint f) = true).
-    apply reachable_entrypoint.
-  monadInv H7.
-  left; econstructor; split.
-  apply plus_one. eapply exec_function_internal; eauto. 
-  rewrite (stacksize_preserved _ _ EQ). eauto.
-  generalize EQ; intro EQ'; monadInv EQ'. simpl. 
-  econstructor; eauto. simpl. eapply is_tail_add_branch. constructor.
-
-  (* external function *)
-  monadInv H8. left; econstructor; split.
-  apply plus_one. eapply exec_function_external; eauto.
-  eapply external_call_symbols_preserved'; eauto.
-  exact symbols_preserved. exact varinfo_preserved.
-  econstructor; eauto.
-
-  (* return *)
-  inv H3. inv H1.
-  left; econstructor; split.
-  apply plus_one. econstructor. 
-  econstructor; eauto. 
-Qed.
-
-Lemma transf_initial_states:
-  forall st1, LTL.initial_state prog st1 ->
-  exists st2, Linear.initial_state tprog st2 /\ match_states st1 st2.
-Proof.
-  intros. inversion H.
-  exploit function_ptr_translated; eauto. intros [tf [A B]].  
-  exists (Callstate nil tf (Locmap.init Vundef) m0); split.
-  econstructor; eauto. eapply Genv.init_mem_transf_partial; eauto. 
-  replace (prog_main tprog) with (prog_main prog).
-  rewrite symbols_preserved. eauto.
-  symmetry. apply (transform_partial_program_main transf_fundef _ TRANSF). 
-  rewrite <- H3. apply sig_preserved. auto.
-  constructor. constructor. auto.
-Qed.
-
-Lemma transf_final_states:
-  forall st1 st2 r, 
-  match_states st1 st2 -> LTL.final_state st1 r -> Linear.final_state st2 r.
-Proof.
-  intros. inv H0. inv H. inv H6. econstructor; eauto.
-Qed.
-
-Theorem transf_program_correct:
-  forward_simulation (LTL.semantics prog) (Linear.semantics tprog).
-Proof.
-  eapply forward_simulation_star.
-  eexact symbols_preserved.
-  eexact transf_initial_states.
-  eexact transf_final_states.
-  eexact transf_step_correct.
-Qed.
-*)
 End LINEARIZATION.

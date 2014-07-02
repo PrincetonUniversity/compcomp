@@ -2877,17 +2877,9 @@ Proof.
     apply MC. apply MC.
 Qed.
 
-Lemma MATCH_initial: forall v1 v2 sig entrypoints
-      (EP: In (v1, v2, sig) entrypoints)
-      (entry_points_ok : forall (v1 v2 : val) (sig : signature),
-                  In (v1, v2, sig) entrypoints ->
-                  exists b f1 f2,
-                    v1 = Vptr b Int.zero /\
-                    v2 = Vptr b Int.zero /\
-                    Genv.find_funct_ptr ge b = Some f1 /\
-                    Genv.find_funct_ptr tge b = Some f2)
+Lemma MATCH_initial: forall v
       vals1 c1 m1 j vals2 m2 (DomS DomT : block -> bool)
-      (Ini: initial_core (cminsel_eff_sem hf) ge v1 vals1 = Some c1)
+      (Ini: initial_core (cminsel_eff_sem hf) ge v vals1 = Some c1)
       (Inj: Mem.inject j m1 m2)
       (VInj: Forall2 (val_inject j) vals1 vals2)
       (PG:meminj_preserves_globals ge j)
@@ -2904,7 +2896,7 @@ Lemma MATCH_initial: forall v1 v2 sig entrypoints
       (HDomS: forall b : block, DomS b = true -> Mem.valid_block m1 b)
       (HDomT: forall b : block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
-  initial_core (rtl_eff_sem hf) tge v2 vals2 = Some c2 /\
+  initial_core (rtl_eff_sem hf) tge v vals2 = Some c2 /\
   MATCH c1
     (initial_SM DomS DomT
        (REACH m1 (fun b : block => isGlobalBlock ge b || getBlocks vals1 b))
@@ -2913,7 +2905,7 @@ exists c2,
 Proof. intros.
   inversion Ini.
   unfold CMinSel_initial_core in H0. unfold ge in *. unfold tge in *.
-  destruct v1; inv H0.
+  destruct v; inv H0.
   remember (Int.eq_dec i Int.zero) as z; destruct z; inv H1. clear Heqz.
   remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz; inv H0. 
     apply eq_sym in Heqzz.
@@ -2931,12 +2923,9 @@ Proof. intros.
   exploit function_ptr_translated; eauto. intros [tf [FP TF]].
   exists (RTL_Callstate nil tf vals2).
   split.
-    destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
-    subst. inv A. rewrite C in Heqzz. inv Heqzz.
-    unfold tge in FP. rewrite D in FP. inv FP.
+    subst. inv Heqzz. unfold tge in FP. inv FP. rewrite H2.
     unfold cminsel_eff_sem, cminsel_coop_sem. simpl.
     case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
-    rewrite D. 
 
   assert (Zlength vals2 = Zlength vals1) as ->. 
   { apply forall_inject_val_list_inject in VInj. clear - VInj. 
@@ -3011,7 +3000,6 @@ Proof. intros.
     rewrite initial_SM_as_inj; assumption.
 Qed.
 
-
 Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
        (MTCH: MATCH c1 mu c1 m1 c2 m2)
        (AtExtSrc: at_external (cminsel_eff_sem hf) c1 = Some (e, ef_sig, vals1)),
@@ -3062,231 +3050,7 @@ intuition.
   eapply inject_shared_replace_locals; try eassumption.
   subst; trivial.
 Qed.
-(*
-Lemma MATCH_atExternal_strong mu c1 m1 c2 m2 e vals1 sg: forall
-        (MTCH : MATCH c1 mu c1 m1 c2 m2)
-        (ATEXT: at_external cminsel_eff_sem c1 = Some (e, sg, vals1)),
-      Mem.inject (as_inj mu) m1 m2 /\
-      exists vals2 : list val,
-         Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\
-         at_external rtl_eff_sem c2 = Some (e, sg, vals2) /\
-      forall (pubSrc' pubTgt' : block -> bool)
-        (pubSrcHyp : pubSrc' =
-                 (fun b : block => 
-                 locBlocksSrc mu b && REACH m1 (exportedSrc mu vals1) b))
-        (pubTgtHyp: pubTgt' =
-                 (fun b : block => 
-                 locBlocksTgt mu b && REACH m2 (exportedTgt mu vals2) b))
-        nu (Hnu: nu = (replace_locals mu pubSrc' pubTgt')),
-      MATCH c1 nu c1 m1 c2 m2 /\ Mem.inject (shared_of nu) m1 m2 /\
-      Forall2 (val_inject (restrict (as_inj nu) (sharedSrc nu))) vals1 vals2 /\
-      exportedSrc nu vals1 = mapped (shared_of nu) /\
-      REACH_closed m1 (exportedSrc nu vals1)
-      (*/\  (vals_def vals1=true -> REACH_closed m2 (exportedTgt nu vals2))*).
-Proof. intros.
- destruct MTCH as [MC [RC [PG [GFP [Glob [SMV [WDmu INJ]]]]]]].
- split; trivial. 
- simpl in *. inv MC; simpl in *; inv ATEXT.
- destruct f; inv H0. 
- destruct tf; inv TF.
- destruct (observableEF e1); inv H1.
- rename targs into vals2.
- rewrite vis_restrict_sm, restrict_sm_nest in *; trivial.
- rewrite restrict_sm_all, restrict_nest in *; trivial.
- eexists.
-    split. eapply val_list_inject_forall_inject. eassumption.
-    split. reflexivity.
- intros.
-assert (WDnu: SM_wd nu).
-  subst.
-  eapply replace_locals_wd; eauto.
-    intros.
-    apply andb_true_iff in H. destruct H.
-    exploit (REACH_local_REACH _ WDmu); try eassumption.
-      eapply val_list_inject_forall_inject. 
-      eapply val_list_inject_incr; try eassumption.
-      apply restrict_incr.
-    intros [b2 [d [loc R2]]].
-      exists b2, d.
-      rewrite loc, R2. destruct (local_DomRng _ WDmu _ _ _ loc). intuition.
-   intros. apply andb_true_iff in H. eapply H.
-(*split. subst.
-  split; rewrite replace_locals_vis.
-    econstructor; eauto.
-    rewrite restrict_sm_nest, vis_restrict_sm; trivial.
-    rewrite replace_locals_vis. 
-    eapply match_stacks_intern_incr; try eassumption.
-      eapply restrict_sm_WD; trivial.
-        rewrite replace_locals_vis. trivial.
-   split. repeat rewrite restrict_sm_local.
-          rewrite replace_locals_local. apply inject_incr_refl. 
-          repeat rewrite restrict_sm_locBlocksSrc.
-          repeat rewrite restrict_sm_locBlocksTgt.
-          repeat rewrite restrict_sm_extern. 
-          repeat rewrite restrict_sm_extBlocksSrc. 
-          repeat rewrite restrict_sm_extBlocksTgt. 
-          repeat rewrite restrict_sm_frgnBlocksSrc. 
-          repeat rewrite restrict_sm_frgnBlocksTgt. 
-          repeat rewrite restrict_sm_pubBlocksSrc. 
-          repeat rewrite restrict_sm_pubBlocksTgt. 
-          repeat rewrite replace_locals_pubBlocksTgt. 
-          repeat rewrite replace_locals_locBlocksSrc.
-          repeat rewrite replace_locals_locBlocksTgt.
-          repeat rewrite replace_locals_extern. 
-          repeat rewrite replace_locals_extBlocksSrc. 
-          repeat rewrite replace_locals_extBlocksTgt. 
-          repeat rewrite replace_locals_frgnBlocksSrc. 
-          repeat rewrite replace_locals_frgnBlocksTgt. 
-          repeat rewrite replace_locals_pubBlocksSrc. intuition. 
-          repeat rewrite replace_locals_pubBlocksTgt. 
-          restrict_sm_extBlocksSrc. rewrite replace_locals_local.
-              apply inject_incr_refl.
-     rewrite restrict_sm_extern,
-             restrict_sm_extBlocksSrc. Search intern_incr.
-    rewrite restrict_sm_all, restrict_nest, vis_restrict_sm; trivial.
-    rewrite replace_locals_as_inj, replace_locals_vis. trivial.
-    rewrite vis_restrict_sm, replace_locals_vis. trivial.
-    rewrite restrict_sm_all, replace_locals_as_inj; trivial.
-rewrite replace_locals_as_inj, replace_locals_vis, 
-   replace_locals_frgnBlocksSrc; trivial.
-intuition.
-  split; intros.
-    rewrite replace_locals_DOM in H. eapply SMV; trivial.
-    rewrite replace_locals_RNG in H. eapply SMV; trivial.
-*)  (*rewrite replace_locals_DomTgt. assumption.*)
-assert (RCnu: REACH_closed m1 (mapped (shared_of nu))).
-  subst. rewrite replace_locals_shared.
-  red; intros. apply REACHAX in H. destruct H as [L HL].
-    generalize dependent b.
-    induction L; simpl; intros; inv HL. trivial.
-    specialize (IHL _ H1); clear H1.
-    destruct (mappedD_true _ _ IHL) as [[bb ofs] Hbb]. clear IHL.
-    apply mapped_charT.
-    assert (MV:= Mem.mi_memval _ _ _ (Mem.mi_inj _ _ _ MINJ)).
-    destruct (joinD_Some _ _ _ _ _ Hbb); clear Hbb.
-      exploit (MV b' z bb ofs).
-        eapply restrictI_Some. apply foreign_in_all; eassumption.
-          unfold vis. unfold foreign_of in H. destruct mu. simpl in *. destruct (frgnBlocksSrc b'); inv H. intuition.
-        assumption.
-      clear MV; intros. rewrite H4 in H0. inv H0.
-      exists (b2, delta). apply joinI.
-      remember (locBlocksSrc mu b) as d.
-      destruct d; apply eq_sym in Heqd. 
-        right; simpl. destruct (restrictD_Some _ _ _ _ _ H5); clear H5.
-        split. eapply locBlocksSrc_foreignNone; eassumption.
-        destruct (joinD_Some _ _ _ _ _ H0).
-          destruct (extern_DomRng _ WDmu _ _ _ H3).
-          apply extBlocksSrc_locBlocksSrc in H5. rewrite H5 in Heqd; inv Heqd.
-           trivial.
-        destruct H3. rewrite H5.
-        assert (REACH m1 (exportedSrc mu vals1) b = true).
-          eapply REACH_cons; try eassumption.
-          eapply REACH_nil. unfold exportedSrc, sharedSrc. apply foreign_in_shared in H. rewrite H. intuition.
-        rewrite H6. trivial.
-      left. eapply restrict_vis_foreign; try eassumption.
-               destruct (restrictD_Some _ _ _ _ _ H5).
-               rewrite (as_inj_locBlocks _ _ _ _ WDmu H0) in Heqd. trivial.
-    destruct H. remember (locBlocksSrc mu b' && REACH m1 (exportedSrc mu vals1) b') as d. 
-       destruct d; apply eq_sym in Heqd; inv H0.
-       apply andb_true_iff in Heqd; destruct Heqd.
-      exploit (MV b' z bb ofs).
-        eapply restrictI_Some. apply local_in_all; eassumption.
-          unfold vis. rewrite H0; trivial.
-        assumption.
-      clear MV; intros. rewrite H4 in H5. inv H5.
-      exists (b2, delta). apply joinI.
-      remember (locBlocksSrc mu b) as d.
-      destruct d; apply eq_sym in Heqd. 
-        right; simpl. destruct (restrictD_Some _ _ _ _ _ H8); clear H8.
-        split. eapply locBlocksSrc_foreignNone; eassumption.
-        destruct (joinD_Some _ _ _ _ _ H5).
-          destruct (extern_DomRng _ WDmu _ _ _ H7).
-          apply extBlocksSrc_locBlocksSrc in H8. rewrite H8 in Heqd; inv Heqd.
-           trivial.
-        destruct H7. rewrite H8.
-        assert (REACH m1 (exportedSrc mu vals1) b = true).
-          eapply REACH_cons; try eassumption.
-        rewrite H9. trivial.
-      simpl. left. eapply restrict_vis_foreign; try eassumption.
-               destruct (restrictD_Some _ _ _ _ _ H8).
-               rewrite (as_inj_locBlocks _ _ _ _ WDmu H5) in Heqd. trivial.
-assert (MINJNU: Mem.inject (shared_of nu) m1 m2).
-  eapply inject_mapped. eapply INJ. eassumption.
-  subst. rewrite replace_locals_shared.
-    red; intros. destruct (joinD_Some _ _ _ _ _ H); clear H.
-    eapply foreign_in_all; eassumption.
-    destruct H0.
-      destruct (locBlocksSrc mu b && REACH m1 (exportedSrc mu vals1) b); inv H0.
-      rewrite H2; eapply local_in_all; eassumption.
-split.
-  split.
-split; trivial.
-rewrite restrict_SharedSrc; trivial.
-assert (ValInjShared: val_list_inject (shared_of nu) vals1 vals2).
-  eapply val_list_inject_sub_on'; try eassumption.
-  intros. rewrite restrict_vis_foreign_local in H0; trivial.
-    unfold shared_of. subst. clear MINJNU.
-    rewrite replace_locals_foreign, replace_locals_pub.
-    apply joinI.
-    destruct (joinD_Some _ _ _ _ _ H0); clear H0.
-      left; trivial.
-    destruct H1. right; split; trivial.
-      destruct (local_DomRng _ WDmu _ _ _ H1).
-      rewrite H2, H1, (getBlocks_REACH_exportedSrc _ _ _ _ H); trivial.
-split. 
-  eapply val_list_inject_forall_inject; trivial.
-assert (exportedSrc nu vals1 = mapped (shared_of nu)).
-  clear MINJNU RCnu.
-  unfold exportedSrc, mapped.
-  extensionality b. unfold sharedSrc.
-  remember (shared_of nu b) as d.
-  destruct d; simpl. apply orb_true_r.
-  rewrite orb_false_r.
-  subst. rewrite replace_locals_shared in Heqd.
-    apply eq_sym in Heqd.
-    apply joinD_None in Heqd. destruct Heqd.
-    remember (getBlocks vals1 b) as d.
-    destruct d; simpl; trivial. apply eq_sym in Heqd.
-    rewrite (getBlocks_REACH_exportedSrc _ _ _ _ Heqd) in H0.
-    rewrite andb_true_r in H0.
-    exploit getBlocks_inject.
-      eapply val_list_inject_forall_inject. eapply AINJ.
-      eassumption.
-    intros [b2 [delta [Rb GB2]]].
-    destruct (restrictD_Some _ _ _ _ _ Rb); clear Rb.
-    unfold vis in H2.
-    destruct (foreign_None_frgnBlocksSrc_false _ _ WDmu H).
-      rewrite H3 in H1; discriminate.
-      rewrite H3, orb_false_r in H2.
-      rewrite H2 in H0. 
-      rewrite (locBlocksSrc_as_inj_local _ _ WDmu H2) in H1.
-      rewrite H1 in H0; discriminate.
-rewrite H.
-split; trivial.
-Qed. 
 
-Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
-       (MTCH: MATCH c1 mu c1 m1 c2 m2)
-       (AtExtSrc: at_external cminsel_eff_sem c1 = Some (e, ef_sig, vals1)),
-     Mem.inject (as_inj mu) m1 m2 /\
-     exists vals2,
-       Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\
-       at_external rtl_eff_sem c2 = Some (e, ef_sig, vals2) /\
-      (forall pubSrc' pubTgt',
-       pubSrc' = (fun b => locBlocksSrc mu b && REACH m1 (exportedSrc mu vals1) b) ->
-       pubTgt' = (fun b => locBlocksTgt mu b && REACH m2 (exportedTgt mu vals2) b) ->
-       forall nu : SM_Injection, nu = replace_locals mu pubSrc' pubTgt' ->
-       MATCH c1 nu c1 m1 c2 m2 /\ Mem.inject (shared_of nu) m1 m2).
-Proof. intros.
-  exploit MATCH_atExternal_strong; try eassumption. intros [INJ [vals2 H]].
-  split; trivial. exists vals2. intuition.
-  eapply (H2 _ _ H1 H3 _ H4).
-  destruct MTCH as [MC [RC [PG [GFP [Glob [SMV [WDmu _]]]]]]].
-  eapply inject_shared_replace_locals; try eassumption.
-  subst. apply forall_vals_inject_restrictD in H0.
-         eapply replace_locals_wd_AtExternal; assumption.
-Qed.    
-*)
 Lemma MATCH_afterExternal: forall
       (GDE : genvs_domain_eq ge tge)
       mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
@@ -3474,14 +3238,6 @@ assert (RR1: REACH_closed m1'
            destruct (mappedD_true _ _ RC') as [[? ?] ?].
            eapply as_inj_DomRng; eassumption.
     eapply REACH_cons; try eassumption.
-(*assert (RRR: REACH_closed m1' (exportedSrc nu' (ret1 :: nil))).
-    intros b Hb. apply REACHAX in Hb.
-       destruct Hb as [L HL].
-       generalize dependent b.
-       induction L ; simpl; intros; inv HL; trivial.
-       specialize (IHL _ H1); clear H1.
-       unfold exportedSrc.
-       eapply REACH_cons; eassumption.*)
     
 assert (RRC: REACH_closed m1' (fun b : Values.block =>
                          mapped (as_inj nu') b &&
@@ -3610,14 +3366,10 @@ split. rewrite replace_externs_vis.
 unfold vis in *.
 rewrite replace_externs_locBlocksSrc, replace_externs_frgnBlocksSrc,
         replace_externs_as_inj in *.
-(*  eapply inject_mapped; try eassumption.
-  eapply restrict_mapped_closed; try eassumption.*)
   
 destruct (eff_after_check2 _ _ _ _ _ MemInjNu' RValInjNu' 
       _ (eq_refl _) _ (eq_refl _) _ (eq_refl _) WDnu' SMvalNu').
 unfold vis in *.
-(*  rewrite replace_externs_locBlocksSrc, replace_externs_frgnBlocksSrc,
-          (*replace_externs_DomTgt, *) replace_externs_as_inj in *.*)
 intuition.
 (*as in selectionproofEFF*)
   red; intros. destruct (GFP _ _ H1). split; trivial.
@@ -6152,18 +5904,9 @@ Qed.
 (** The simulation proof *)
 Theorem transl_program_correct:
   forall (R: list_norepet (map fst (prog_defs prog)))
-         entrypoints
-         (entry_points_ok : 
-            forall v1 v2 sig,
-              In (v1, v2, sig) entrypoints -> 
-              exists b f1 f2, 
-                v1 = Vptr b Int.zero 
-                /\ v2 = Vptr b Int.zero
-                /\ Genv.find_funct_ptr ge b = Some f1
-                /\ Genv.find_funct_ptr tge b = Some f2)
          (init_mem: exists m0, Genv.init_mem prog = Some m0),
 SM_simulation.SM_simulation_inject (cminsel_eff_sem hf)
-   (rtl_eff_sem hf) ge tge entrypoints.
+   (rtl_eff_sem hf) ge tge.
 Proof.
 intros.
 assert (GDE: genvs_domain_eq ge tge).
@@ -6191,11 +5934,11 @@ assert (GDE: genvs_domain_eq ge tge).
   apply MATCH_PG.
 (*MATCHinitial*)
   { intros.
-    eapply (MATCH_initial _ _ _ entrypoints); eauto.
+    eapply (MATCH_initial _ _ _); eauto.
     destruct init_mem as [m0 INIT].
     exists m0; split; auto.
     unfold meminj_preserves_globals in H3.    
-    destruct H3 as [A [B C]].
+    destruct H2 as [A [B C]].
 
     assert (P: forall p q, {Ple p q} + {Plt q p}).
       intros p q.
@@ -6214,19 +5957,19 @@ assert (GDE: genvs_domain_eq ge tge).
     destruct (P (Mem.nextblock m0) (Mem.nextblock m1)); auto.
     exfalso. 
     destruct (D _ p).
-    apply A in H3.
+    apply A in H2.
     assert (Mem.valid_block m1 (Mem.nextblock m1)).
       eapply Mem.valid_block_inject_1; eauto.
-    clear - H8; unfold Mem.valid_block in H8.
+    clear - H7; unfold Mem.valid_block in H7.
     xomega.
 
     destruct (P (Mem.nextblock m0) (Mem.nextblock m2)); auto.
     exfalso. 
     destruct (D _ p).
-    apply A in H3.
+    apply A in H2.
     assert (Mem.valid_block m2 (Mem.nextblock m2)).
       eapply Mem.valid_block_inject_2; eauto.
-    clear - H8; unfold Mem.valid_block in H8.
+    clear - H7; unfold Mem.valid_block in H7.
     xomega.
     
     intros b LT.    

@@ -22,8 +22,7 @@ Section Eff_INJ_SIMU_DIAGRAMS.
           {Sem2 : @EffectSem (Genv.t F2 V2) C2}
 
           {ge1: Genv.t F1 V1} 
-          {ge2: Genv.t F2 V2} 
-          {entry_points : list (val * val * signature)}. 
+          {ge2: Genv.t F2 V2}.
 
   Let core_data := C1.
 
@@ -53,10 +52,8 @@ Section Eff_INJ_SIMU_DIAGRAMS.
           meminj_preserves_globals ge1 (extern_of mu) /\
           (forall b, isGlobalBlock ge1 b = true -> frgnBlocksSrc mu b = true).
 
-   Hypothesis inj_initial_cores: forall v1 v2 sig,
-       In (v1,v2,sig) entry_points -> 
-       forall vals1 c1 m1 j vals2 m2 DomS DomT,
-          initial_core Sem1 ge1 v1 vals1 = Some c1 ->
+   Hypothesis inj_initial_cores: forall v vals1 c1 m1 j vals2 m2 DomS DomT,
+          initial_core Sem1 ge1 v vals1 = Some c1 ->
           Mem.inject j m1 m2 -> 
           Forall2 (val_inject j) vals1 vals2 ->
           meminj_preserves_globals ge1 j ->
@@ -71,7 +68,7 @@ Section Eff_INJ_SIMU_DIAGRAMS.
          (forall b, DomT b = true -> Mem.valid_block m2 b) ->
 
        exists c2, 
-            initial_core Sem2 ge2 v2 vals2 = Some c2 /\
+            initial_core Sem2 ge2 v vals2 = Some c2 /\
             match_states c1 (initial_SM DomS
                                        DomT 
                                        (REACH m1 (fun b => isGlobalBlock ge1 b || getBlocks vals1 b)) 
@@ -200,7 +197,7 @@ Hypothesis order_wf: well_founded order.
                            Mem.perm m1 b1 (ofs-delta1) Max Nonempty))).
 
 Lemma  inj_simulation_star_wf: 
-  SM_simulation.SM_simulation_inject Sem1 Sem2 ge1 ge2 entry_points.
+  SM_simulation.SM_simulation_inject Sem1 Sem2 ge1 ge2.
 Proof.
   eapply SM_simulation.Build_SM_simulation_inject with
     (core_ord := order)
@@ -214,8 +211,8 @@ clear - match_restrict. intros. destruct H; subst. eauto.
 clear - match_validblocks. intros.
     destruct H; subst. eauto.
 clear - inj_initial_cores. intros.
-    destruct (inj_initial_cores _ _ _ H
-         _ _ _ _ _ _ _ _ H0 H1 H2 H3 H4 H5 H6 H7)
+    destruct (inj_initial_cores _ _ _ _ _ _ _ _ _ H
+         H0 H1 H2 H3 H4 H5 H6)
     as [c2 [INI MS]].
   exists c1, c2. intuition. 
 clear - inj_core_diagram.
@@ -345,7 +342,7 @@ Hypothesis order_wf: well_founded order.
                            Mem.perm m1 b1 (ofs-delta1) Max Nonempty))).
 
 Lemma  inj_simulation_star_wf_typed: 
-  SM_simulation.SM_simulation_inject Sem1 Sem2 ge1 ge2 entry_points.
+  SM_simulation.SM_simulation_inject Sem1 Sem2 ge1 ge2.
 Proof.
   eapply SM_simulation.Build_SM_simulation_inject with
     (core_ord := order)
@@ -359,8 +356,7 @@ clear - match_restrict. intros. destruct H; subst. eauto.
 clear - match_validblocks. intros.
     destruct H; subst. eauto.
 clear - inj_initial_cores. intros.
-    destruct (inj_initial_cores _ _ _ H
-         _ _ _ _ _ _ _ _ H0 H1 H2 H3 H4 H5 H6 H7)
+    destruct (inj_initial_cores _ _ _ _ _ _ _ _ _ H H0 H1 H2 H3 H4 H5 H6)
     as [c2 [INI MS]].
   exists c1, c2. intuition. 
 clear - inj_core_diagram.
@@ -485,7 +481,7 @@ Section EFF_INJ_SIMULATION_STAR.
                            Mem.perm m1 b1 (ofs-delta1) Max Nonempty)).
 
 Lemma inj_simulation_star: 
-  SM_simulation.SM_simulation_inject Sem1 Sem2 ge1 ge2 entry_points.
+  SM_simulation.SM_simulation_inject Sem1 Sem2 ge1 ge2.
 Proof.
   eapply inj_simulation_star_wf.
   apply  (well_founded_ltof _ measure).
@@ -597,7 +593,7 @@ Section EFF_INJ_SIMULATION_STAR_TYPED.
                            Mem.perm m1 b1 (ofs-delta1) Max Nonempty)).
 
 Lemma inj_simulation_star_typed: 
-  SM_simulation.SM_simulation_inject Sem1 Sem2 ge1 ge2 entry_points.
+  SM_simulation.SM_simulation_inject Sem1 Sem2 ge1 ge2.
 Proof.
   eapply inj_simulation_star_wf_typed.
   apply  (well_founded_ltof _ measure).
@@ -706,7 +702,7 @@ Section EFF_INJ_SIMULATION_PLUS.
                            Mem.perm m1 b1 (ofs-delta1) Max Nonempty)).
   
 Lemma inj_simulation_plus: 
-  SM_simulation.SM_simulation_inject Sem1 Sem2 ge1 ge2 entry_points.
+  SM_simulation.SM_simulation_inject Sem1 Sem2 ge1 ge2.
 Proof.
   apply inj_simulation_star with (measure:=measure); auto.
 Qed.
@@ -804,7 +800,7 @@ Section EFF_INJ_SIMULATION_PLUS_TYPED.
                            Mem.perm m1 b1 (ofs-delta1) Max Nonempty)).
   
 Lemma inj_simulation_plus_typed: 
-  SM_simulation.SM_simulation_inject Sem1 Sem2 ge1 ge2 entry_points.
+  SM_simulation.SM_simulation_inject Sem1 Sem2 ge1 ge2.
 Proof.
   apply inj_simulation_star_typed with (measure:=measure); auto.
 Qed.

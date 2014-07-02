@@ -1039,19 +1039,10 @@ intuition.
   rewrite replace_locals_as_inj. assumption.
 Qed.
 
-Lemma MATCH_initial: forall (v1 v2 : val) (sig : signature) entrypoints
-  (EP: In (v1, v2, sig) entrypoints)
-  (entry_points_ok : forall (v1 v2 : val) (sig : signature),
-                  In (v1, v2, sig) entrypoints ->
-                  exists
-                    (b : Values.block) f1 f2,
-                    v1 = Vptr b Int.zero /\
-                    v2 = Vptr b Int.zero /\
-                    Genv.find_funct_ptr ge b = Some f1 /\
-                    Genv.find_funct_ptr tge b = Some f2)
+Lemma MATCH_initial: forall v 
   (vals1 : list val) c1 (m1 : mem) (j : meminj)
   (vals2 : list val) (m2 : mem) (DomS DomT : Values.block -> bool)
-  (Ini : initial_core (rtl_eff_sem hf) ge v1 vals1 = Some c1)
+  (Ini : initial_core (rtl_eff_sem hf) ge v vals1 = Some c1)
   (Inj: Mem.inject j m1 m2)
   (VInj: Forall2 (val_inject j) vals1 vals2)
   (PG: meminj_preserves_globals ge j)
@@ -1068,7 +1059,7 @@ Lemma MATCH_initial: forall (v1 v2 : val) (sig : signature) entrypoints
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
-  initial_core (rtl_eff_sem hf) tge v2 vals2 = Some c2 /\
+  initial_core (rtl_eff_sem hf) tge v vals2 = Some c2 /\
   MATCH c1
     (initial_SM DomS DomT
        (REACH m1
@@ -1080,7 +1071,7 @@ Proof.
 intros.
   inversion Ini.
   unfold RTL_initial_core in H0. unfold ge in *. unfold tge in *.
-  destruct v1; inv H0.
+  destruct v; inv H0.
   remember (Int.eq_dec i Int.zero) as z; destruct z; inv H1. clear Heqz.
   remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz; inv H0. 
     apply eq_sym in Heqzz.
@@ -1103,17 +1094,15 @@ intros.
 
   simpl. inversion 1. 
   exploit funct_ptr_translated; eauto. intros FP.
-    destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
-    subst. inv A. rewrite C in Heqzz. inv Heqzz.
-    unfold tge in FP. rewrite D in FP. inv FP.
+    subst. inv Heqzz. unfold tge in FP. inv FP. rewrite H3. 
     unfold rtl_eff_sem, rtl_coop_sem. simpl.
     case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
-    rewrite D.
 
   assert (Zlength vals2 = Zlength vals1) as ->. 
   { apply forall_inject_val_list_inject in VInj. clear - VInj. 
     induction VInj; auto. rewrite !Zlength_cons, IHVInj; auto. }
 
+  change (fn_sig (transf_function f)) with (funsig (Internal (transf_function f))).
   assert (val_casted.val_has_type_list_func vals2
            (sig_args (funsig (Internal (transf_function f))))=true) as ->.
   { eapply val_casted.val_list_inject_hastype; eauto.
@@ -1123,7 +1112,7 @@ intros.
     assert (sig_args (funsig (Internal (transf_function f)))
           = sig_args (funsig (Internal f))) as ->.
     { specialize (sig_preserved (Internal f)). simpl. intros. 
-      rewrite H0. reflexivity. }
+      rewrite H4. reflexivity. }
     destruct (val_casted.val_has_type_list_func vals1
       (sig_args (funsig (Internal f)))); auto. }
 
@@ -1166,8 +1155,8 @@ intros.
     (*as in selectionproofEFF*)
       red; intros. specialize (Genv.find_funct_ptr_not_fresh prog). intros.
          destruct InitMem as [m0 [INIT_MEM [? ?]]].
-         specialize (H4 _ _ _ INIT_MEM H2). 
-         destruct (valid_init_is_global _ R _ INIT_MEM _ H4) as [id Hid]. 
+         specialize (H6 _ _ _ INIT_MEM H2). 
+         destruct (valid_init_is_global _ R _ INIT_MEM _ H6) as [id Hid]. 
            destruct PG as [PGa [PGb PGc]]. split. eapply PGa; eassumption.
          unfold isGlobalBlock. 
           apply orb_true_iff. left. apply genv2blocksBool_char1.
@@ -2189,18 +2178,9 @@ Qed.
 
 Theorem transl_program_correct:
   forall (R: list_norepet (map fst (prog_defs prog)))
-         entrypoints
-         (entry_points_ok : 
-            forall v1 v2 sig,
-              In (v1, v2, sig) entrypoints -> 
-              exists b f1 f2, 
-                v1 = Vptr b Int.zero 
-                /\ v2 = Vptr b Int.zero
-                /\ Genv.find_funct_ptr ge b = Some f1
-                /\ Genv.find_funct_ptr tge b = Some f2)
          (init_mem: exists m0, Genv.init_mem prog = Some m0),
 SM_simulation.SM_simulation_inject (rtl_eff_sem hf)
-   (rtl_eff_sem hf) ge tge entrypoints.
+   (rtl_eff_sem hf) ge tge.
 Proof.
 intros.
 assert (GDE:= GDE_lemma).
@@ -2222,11 +2202,11 @@ apply effect_simulations_lemmas.inj_simulation_plus with
   apply MATCH_PG.
 (*MATCHinitial*)
   { intros.
-    eapply (MATCH_initial _ _ _ entrypoints); eauto.
+    eapply (MATCH_initial _ _ _); eauto.
     destruct init_mem as [m0 INIT].
     exists m0; split; auto.
-    unfold meminj_preserves_globals in H3.    
-    destruct H3 as [A [B C]].
+    unfold meminj_preserves_globals in H2.    
+    destruct H2 as [A [B C]].
 
     assert (P: forall p q, {Ple p q} + {Plt q p}).
       intros p q.
@@ -2245,19 +2225,19 @@ apply effect_simulations_lemmas.inj_simulation_plus with
     destruct (P (Mem.nextblock m0) (Mem.nextblock m1)); auto.
     exfalso. 
     destruct (D _ p).
-    apply A in H3.
+    apply A in H2.
     assert (Mem.valid_block m1 (Mem.nextblock m1)).
       eapply Mem.valid_block_inject_1; eauto.
-    clear - H8; unfold Mem.valid_block in H8.
+    clear - H7; unfold Mem.valid_block in H7.
     xomega.
 
     destruct (P (Mem.nextblock m0) (Mem.nextblock m2)); auto.
     exfalso. 
     destruct (D _ p).
-    apply A in H3.
+    apply A in H2.
     assert (Mem.valid_block m2 (Mem.nextblock m2)).
       eapply Mem.valid_block_inject_2; eauto.
-    clear - H8; unfold Mem.valid_block in H8.
+    clear - H7; unfold Mem.valid_block in H7.
     xomega.
     
     intros b LT.    
@@ -2302,215 +2282,3 @@ apply effect_simulations_lemmas.inj_simulation_plus with
 Qed.
 
 End PRESERVATION.
-
-(*Original CompCert proofs:
-Lemma transf_step_correct:
-  forall s1 t s2, step ge s1 t s2 ->
-  forall s1' (MS: match_states s1 s1'),
-  (exists s2', step tge s1' t s2' /\ match_states s2 s2')
-  \/ (measure s2 < measure s1 /\ t = E0 /\ match_states s2 s1')%nat.
-Proof.
-  induction 1; intros; inv MS; EliminatedInstr.
-
-(* nop *)
-  TransfInstr. left. econstructor; split. 
-  eapply exec_Inop; eauto. constructor; auto.
-(* eliminated nop *)
-  assert (s0 = pc') by congruence. subst s0.
-  right. split. simpl. omega. split. auto. 
-  econstructor; eauto. 
-
-(* op *)
-  TransfInstr.
-  assert (Val.lessdef_list (rs##args) (rs'##args)). apply regset_get_list; auto. 
-  exploit eval_operation_lessdef; eauto. 
-  intros [v' [EVAL' VLD]]. 
-  left. exists (State s' (transf_function f) (Vptr sp0 Int.zero) pc' (rs'#res <- v') m'); split.
-  eapply exec_Iop; eauto.  rewrite <- EVAL'.
-  apply eval_operation_preserved. exact symbols_preserved.
-  econstructor; eauto. apply regset_set; auto.
-(* eliminated move *)
-  rewrite H1 in H. clear H1. inv H. 
-  right. split. simpl. omega. split. auto.
-  econstructor; eauto. simpl in H0. rewrite PMap.gss. congruence. 
-
-(* load *)
-  TransfInstr.
-  assert (Val.lessdef_list (rs##args) (rs'##args)). apply regset_get_list; auto. 
-  exploit eval_addressing_lessdef; eauto. 
-  intros [a' [ADDR' ALD]].
-  exploit Mem.loadv_extends; eauto. 
-  intros [v' [LOAD' VLD]].
-  left. exists (State s' (transf_function f) (Vptr sp0 Int.zero) pc' (rs'#dst <- v') m'); split.
-  eapply exec_Iload with (a := a'). eauto.  rewrite <- ADDR'.
-  apply eval_addressing_preserved. exact symbols_preserved. eauto.
-  econstructor; eauto. apply regset_set; auto.
-
-(* store *)
-  TransfInstr.
-  assert (Val.lessdef_list (rs##args) (rs'##args)). apply regset_get_list; auto. 
-  exploit eval_addressing_lessdef; eauto. 
-  intros [a' [ADDR' ALD]].
-  exploit Mem.storev_extends. 2: eexact H1. eauto. eauto. apply RLD.  
-  intros [m'1 [STORE' MLD']].
-  left. exists (State s' (transf_function f) (Vptr sp0 Int.zero) pc' rs' m'1); split.
-  eapply exec_Istore with (a := a'). eauto.  rewrite <- ADDR'.
-  apply eval_addressing_preserved. exact symbols_preserved. eauto.
-  destruct a; simpl in H1; try discriminate.
-  econstructor; eauto.
-
-(* call *)
-  exploit find_function_translated; eauto. intro FIND'.  
-  TransfInstr.
-(* call turned tailcall *)
-  assert ({ m'' | Mem.free m' sp0 0 (fn_stacksize (transf_function f)) = Some m''}).
-    apply Mem.range_perm_free. rewrite stacksize_preserved. rewrite H7. 
-    red; intros; omegaContradiction.
-  destruct X as [m'' FREE].
-  left. exists (Callstate s' (transf_fundef fd) (rs'##args) m''); split.
-  eapply exec_Itailcall; eauto. apply sig_preserved. 
-  constructor. eapply match_stackframes_tail; eauto. apply regset_get_list; auto.
-  eapply Mem.free_right_extends; eauto.
-  rewrite stacksize_preserved. rewrite H7. intros. omegaContradiction.
-(* call that remains a call *)
-  left. exists (Callstate (Stackframe res (transf_function f) (Vptr sp0 Int.zero) pc' rs' :: s')
-                          (transf_fundef fd) (rs'##args) m'); split.
-  eapply exec_Icall; eauto. apply sig_preserved. 
-  constructor. constructor; auto. apply regset_get_list; auto. auto. 
-
-(* tailcall *) 
-  exploit find_function_translated; eauto. intro FIND'.
-  exploit Mem.free_parallel_extends; eauto. intros [m'1 [FREE EXT]].
-  TransfInstr.
-  left. exists (Callstate s' (transf_fundef fd) (rs'##args) m'1); split.
-  eapply exec_Itailcall; eauto. apply sig_preserved.
-  rewrite stacksize_preserved; auto.
-  constructor. auto.  apply regset_get_list; auto. auto. 
-
-(* builtin *)
-  TransfInstr.
-  assert (Val.lessdef_list (rs##args) (rs'##args)). apply regset_get_list; auto. 
-  exploit external_call_mem_extends; eauto.
-  intros [v' [m'1 [A [B [C D]]]]].
-  left. exists (State s' (transf_function f) (Vptr sp0 Int.zero) pc' (rs'#res <- v') m'1); split.
-  eapply exec_Ibuiltin; eauto.
-  eapply external_call_symbols_preserved; eauto.
-  exact symbols_preserved. exact varinfo_preserved.
-  econstructor; eauto. apply regset_set; auto.
-
-(* cond *)
-  TransfInstr. 
-  left. exists (State s' (transf_function f) (Vptr sp0 Int.zero) (if b then ifso else ifnot) rs' m'); split.
-  eapply exec_Icond; eauto.
-  apply eval_condition_lessdef with (rs##args) m; auto. apply regset_get_list; auto.
-  constructor; auto. 
-
-(* jumptable *)
-  TransfInstr. 
-  left. exists (State s' (transf_function f) (Vptr sp0 Int.zero) pc' rs' m'); split.
-  eapply exec_Ijumptable; eauto.
-  generalize (RLD arg). rewrite H0. intro. inv H2. auto.
-  constructor; auto. 
-
-(* return *)
-  exploit Mem.free_parallel_extends; eauto. intros [m'1 [FREE EXT]].
-  TransfInstr.
-  left. exists (Returnstate s' (regmap_optget or Vundef rs') m'1); split.
-  apply exec_Ireturn; auto. rewrite stacksize_preserved; auto.
-  constructor. auto.
-  destruct or; simpl. apply RLD. constructor.
-  auto.
-
-(* eliminated return None *)
-  assert (or = None) by congruence. subst or. 
-  right. split. simpl. omega. split. auto. 
-  constructor. auto.
-  simpl. constructor.
-  eapply Mem.free_left_extends; eauto. 
-
-(* eliminated return Some *)
-  assert (or = Some r) by congruence. subst or.
-  right. split. simpl. omega. split. auto.
-  constructor. auto.
-  simpl. auto.
-  eapply Mem.free_left_extends; eauto.
-
-(* internal call *)
-  exploit Mem.alloc_extends; eauto.
-    instantiate (1 := 0). omega.
-    instantiate (1 := fn_stacksize f). omega.
-  intros [m'1 [ALLOC EXT]].
-  assert (fn_stacksize (transf_function f) = fn_stacksize f /\
-          fn_entrypoint (transf_function f) = fn_entrypoint f /\
-          fn_params (transf_function f) = fn_params f).
-    unfold transf_function. destruct (zeq (fn_stacksize f) 0 && eliminate_tailcalls tt); auto. 
-  destruct H0 as [EQ1 [EQ2 EQ3]]. 
-  left. econstructor; split.
-  simpl. eapply exec_function_internal; eauto. rewrite EQ1; eauto.
-  rewrite EQ2. rewrite EQ3. constructor; auto.
-  apply regset_init_regs. auto. 
-
-(* external call *)
-  exploit external_call_mem_extends; eauto.
-  intros [res' [m2' [A [B [C D]]]]].
-  left. exists (Returnstate s' res' m2'); split.
-  simpl. econstructor; eauto.
-  eapply external_call_symbols_preserved; eauto.
-  exact symbols_preserved. exact varinfo_preserved.
-  constructor; auto. 
-
-(* returnstate *)
-  inv H2. 
-(* synchronous return in both programs *)
-  left. econstructor; split. 
-  apply exec_return. 
-  constructor; auto. apply regset_set; auto. 
-(* return instr in source program, eliminated because of tailcall *)
-  right. split. unfold measure. simpl length. 
-  change (S (length s) * (niter + 2))%nat
-   with ((niter + 2) + (length s) * (niter + 2))%nat. 
-  generalize (return_measure_bounds (fn_code f) pc). omega.  
-  split. auto. 
-  econstructor; eauto.
-  rewrite Regmap.gss. auto. 
-Qed.
-
-Lemma transf_initial_states:
-  forall st1, initial_state prog st1 ->
-  exists st2, initial_state tprog st2 /\ match_states st1 st2.
-Proof.
-  intros. inv H. 
-  exploit funct_ptr_translated; eauto. intro FIND.
-  exists (Callstate nil (transf_fundef f) nil m0); split.
-  econstructor; eauto. apply Genv.init_mem_transf. auto.
-  replace (prog_main tprog) with (prog_main prog).
-  rewrite symbols_preserved. eauto.
-  reflexivity.
-  rewrite <- H3. apply sig_preserved.
-  constructor. constructor. constructor. apply Mem.extends_refl. 
-Qed.
-
-Lemma transf_final_states:
-  forall st1 st2 r, 
-  match_states st1 st2 -> final_state st1 r -> final_state st2 r.
-Proof.
-  intros. inv H0. inv H. inv H5. inv H3. constructor. 
-Qed.
-
-
-(** The preservation of the observable behavior of the program then
-  follows. *)
-
-Theorem transf_program_correct:
-  forward_simulation (RTL.semantics prog) (RTL.semantics tprog).
-Proof.
-  eapply forward_simulation_opt with (measure := measure); eauto.
-  eexact symbols_preserved.
-  eexact transf_initial_states.
-  eexact transf_final_states.
-  exact transf_step_correct. 
-Qed.
-
-End PRESERVATION.
-
-*)

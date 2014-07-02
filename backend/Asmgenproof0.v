@@ -28,6 +28,7 @@ Require Import Mach.
 Require Import Asm.
 Require Import Asmgen.
 Require Import Conventions.
+Require Import load_frame.
 
 (** * Processor registers and register states *)
 
