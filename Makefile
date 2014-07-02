@@ -104,7 +104,7 @@ BACKEND=\
   Bounds.v Stacklayout.v Stacking.v Stackingproof.v StackingproofEFF.v \
   Asm.v Asmgen.v Asmgenproof0.v Asmgenproof1.v Asmgenproof.v \
   AsmEFF.v AsmgenEFF.v Asm_coop.v Asm_eff.v \
-  Asmgenproof0EFF.v Asmgenproof1EFF.v AsmgenproofEFF.v
+  Asmgenproof0EFF.v Asmgenproof1EFF.v AsmgenproofEFF.v Asm_nucular.v \
 
 # C front-end modules (in cfrontend/)
 
@@ -131,7 +131,7 @@ CORE=Extensionality.v base.v eq_dec.v Address.v \
   effect_interpolation_II.v effect_interpolants.v effect_interpolation_proofs.v \
   effect_simulationsEXP.v \
   arguments.v compcert.v \
-  closed_safety.v trace_semantics.v open_semantics_preservation.v \
+  closed_safety.v trace_semantics.v\
   nucular_semantics.v \
   wholeprog_simulations.v wholeprog_lemmas.v barebones_simulations.v \
   val_casted.v
@@ -139,7 +139,7 @@ CORE=Extensionality.v base.v eq_dec.v Address.v \
 # Linking files
 
 LINKING=cast.v pos.v stack.v seq_lemmas.v pred_lemmas.v core_semantics_tcs.v \
-  sepcomp.v gallina_coresem.v inj_lemmas.v join_sm.v reestablish.v wf_lemmas.v stacking.v \
+  sepcomp.v gallina_coresem.v inj_lemmas.v join_sm.v reestablish.v wf_lemmas.v\
   linking_spec.v linking.v compcert_linking.v linking_lemmas.v compcert_linking_lemmas.v \
   disjointness.v reach_lemmas.v rc_semantics.v rc_semantics_lemmas.v \
   linking_inv.v ret_lemmas.v call_lemmas.v linking_proof.v context_equiv.v

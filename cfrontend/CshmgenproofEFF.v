@@ -2138,23 +2138,14 @@ Proof.
     apply MC. apply MC.
 Qed.
 
-Lemma MATCH_initial: forall v1 v2 sig entrypoints
-      (EP: In (v1, v2, sig) entrypoints)
-      (entry_points_ok : forall (v1 v2 : val) (sig : signature),
-                  In (v1, v2, sig) entrypoints ->
-                  exists b f1 f2,
-                    v1 = Vptr b Int.zero /\
-                    v2 = Vptr b Int.zero /\
-                    Genv.find_funct_ptr ge b = Some f1 /\
-                    Genv.find_funct_ptr tge b = Some f2)
-      vals1 c1 m1 j vals2 m2 (DomS DomT : block -> bool)
+Lemma MATCH_initial: forall v vals1 c1 m1 j vals2 m2 (DomS DomT : block -> bool)
       (FE : Clight.function -> list val -> mem -> Clight.env -> Clight.temp_env -> mem -> Prop)
       (FE_FWD : forall f vargs m e lenv m', FE f vargs m e lenv m' ->
                 mem_forward m m')
       (FE_UNCH : forall f vargs m e lenv m', FE f vargs m e lenv m' ->
           Mem.unchanged_on
             (fun (b : block) (z : Z) => EmptyEffect b z = false) m m')
-      (Ini: initial_core (clight_eff_sem hf FE FE_FWD FE_UNCH) ge v1 vals1 = Some c1)
+      (Ini: initial_core (clight_eff_sem hf FE FE_FWD FE_UNCH) ge v vals1 = Some c1)
       (Inj: Mem.inject j m1 m2)
       (VInj: Forall2 (val_inject j) vals1 vals2)
       (PG:meminj_preserves_globals ge j)
@@ -2171,7 +2162,7 @@ Lemma MATCH_initial: forall v1 v2 sig entrypoints
       (HDomS: forall b : block, DomS b = true -> Mem.valid_block m1 b)
       (HDomT: forall b : block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
-  initial_core (csharpmin_eff_sem hf) tge v2 vals2 = Some c2 /\
+  initial_core (csharpmin_eff_sem hf) tge v vals2 = Some c2 /\
   MATCH c1
     (initial_SM DomS DomT
        (REACH m1 (fun b : block => isGlobalBlock ge b || getBlocks vals1 b))
@@ -2181,7 +2172,7 @@ Proof.
 intros.
   simpl in Ini.
   unfold  CL_initial_core in Ini. unfold ge in *. unfold tge in *.
-  destruct v1; inv Ini.
+  destruct v; inv Ini.
   remember (Int.eq_dec i Int.zero) as z; destruct z; inv H0. clear Heqz.
   remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz.
     apply eq_sym in Heqzz.
@@ -2209,12 +2200,12 @@ intros.
   exploit function_ptr_translated; eauto. intros [tf' [FIND TR]].
   exists (CSharpMin_Callstate tf' vals2 Kstop).
   split. simpl. 
-  destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
-  subst. inv A. rewrite C in Heqzz. inv Heqzz. 
-  unfold tge in FIND. rewrite D in FIND. inv FIND.
+  subst. inv Heqzz. unfold tge in FIND. inv FIND. rewrite H2.
   unfold CSharpMin_initial_core. 
   case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
-  rewrite D.
+  assert (Hlen: Zlength vals2 = Zlength vals1).
+  { apply forall_inject_val_list_inject in VInj. clear - VInj. 
+    induction VInj; auto. rewrite !Zlength_cons, IHVInj; auto. }
 
   assert (val_casted.val_has_type_list_func vals2
            (sig_args (funsig tf'))=true) as ->.
@@ -2228,10 +2219,17 @@ intros.
   { eapply val_casted.val_list_inject_defined.
     eapply forall_inject_val_list_inject; eauto.
     destruct (val_casted.vals_defined vals1); auto. }
-  monadInv TR. rename x into tf'. solve[simpl; auto].
-
-  intros CONTRA.
-  solve[elimtype False; auto].
+  monadInv TR. rename x into tf'. 
+  rewrite Hlen. simpl.
+  case_eq 
+    (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0%Z => 0%Z
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
+  simpl; auto. simpl. inversion 1. omega.
+  intros CONTRA. solve[elimtype False; auto].
 
   assert (H : exists targs tres, type_of_fundef (Internal f) = Tfunction targs tres).
   { destruct f; simpl. eexists; eexists. reflexivity. }
@@ -4212,18 +4210,9 @@ Qed.
 (** The simulation proof *)
 Theorem transl_program_correct:
   forall (R: list_norepet (map fst (prog_defs prog)))
-         entrypoints
-         (entry_points_ok : 
-            forall v1 v2 sig,
-              In (v1, v2, sig) entrypoints -> 
-              exists b f1 f2, 
-                v1 = Vptr b Int.zero 
-                /\ v2 = Vptr b Int.zero
-                /\ Genv.find_funct_ptr ge b = Some f1
-                /\ Genv.find_funct_ptr tge b = Some f2)
          (init_mem: exists m0, Genv.init_mem prog = Some m0),
 SM_simulation.SM_simulation_inject (CL_eff_sem2 hf)
-   (csharpmin_eff_sem hf) ge tge entrypoints.
+   (csharpmin_eff_sem hf) ge tge.
 Proof.
 intros.
  eapply effect_simulations_lemmas.inj_simulation_plus with
@@ -4242,11 +4231,11 @@ intros.
   apply MATCH_PG.
 (*MATCHinitial*)
   { intros.
-    eapply (MATCH_initial _ _ _ entrypoints); eauto.
+    eapply (MATCH_initial _ _ _); eauto.
     destruct init_mem as [m0 INIT].
     exists m0; split; auto.
     unfold meminj_preserves_globals in H3.    
-    destruct H3 as [A [B C]].
+    destruct H2 as [A [B C]].
 
     assert (P: forall p q, {Ple p q} + {Plt q p}).
       intros p q.
@@ -4265,7 +4254,7 @@ intros.
     destruct (P (Mem.nextblock m0) (Mem.nextblock m1)); auto.
     exfalso. 
     destruct (D _ p).
-    apply A in H3.
+    apply A in H2.
     assert (VB: Mem.valid_block m1 (Mem.nextblock m1)).
       eapply Mem.valid_block_inject_1; eauto.
     clear - VB; unfold Mem.valid_block in VB.
@@ -4274,7 +4263,7 @@ intros.
     destruct (P (Mem.nextblock m0) (Mem.nextblock m2)); auto.
     exfalso. 
     destruct (D _ p).
-    apply A in H3.
+    apply A in H2.
     assert (VB: Mem.valid_block m2 (Mem.nextblock m2)).
       eapply Mem.valid_block_inject_2; eauto.
     clear - VB; unfold Mem.valid_block in VB.

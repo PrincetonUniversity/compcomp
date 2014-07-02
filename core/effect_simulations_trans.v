@@ -20,9 +20,7 @@ Require Import effect_simulations_lemmas.
 Require Import Wellfounded.
 Require Import Relations.
 Require Import effect_corediagram_trans.
-
 Require Import effect_interpolants.
-(*Require Import effect_interpolation_proofs. not necessary - interface suffices*)
 
 Declare Module EFFAX : EffectInterpolationAxioms.
 
@@ -182,14 +180,12 @@ Context {F1 V1 C1 F2 V2 C2 F3 V3 C3:Type}
         (Sem3 : @EffectSem (Genv.t F3 V3) C3)
         (g1 : Genv.t F1 V1)
         (g2 : Genv.t F2 V2)
-        (g3 : Genv.t F3 V3) 
-        epts12 epts23 epts13
-        (EPC : entrypoints_compose epts12 epts23 epts13).
+        (g3 : Genv.t F3 V3).
 
 Theorem eff_sim_trans: forall 
-        (SIM12: @SM_simulation_inject _ _ _ _ _ _ Sem1 Sem2 g1 g2 epts12)
-        (SIM23: @SM_simulation_inject _ _ _ _ _ _ Sem2 Sem3 g2 g3 epts23),
-        @SM_simulation_inject _ _ _ _ _ _ Sem1 Sem3 g1 g3 epts13.
+        (SIM12: @SM_simulation_inject _ _ _ _ _ _ Sem1 Sem2 g1 g2)
+        (SIM23: @SM_simulation_inject _ _ _ _ _ _ Sem2 Sem3 g2 g3),
+        @SM_simulation_inject _ _ _ _ _ _ Sem1 Sem3 g1 g3.
 Proof. (*follows structure of forward_simulations_trans.injinj*)
   intros.
   destruct SIM12 
@@ -299,21 +295,20 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
     destruct H as [c2 [m2 [mu12 [mu23 [X [J [INV [MC12 MC23]]]]]]]]; subst.
     simpl. apply (match_protected12 _ _ _ _ _ _ MC12 _ H0 H1).*)
  (*initial_core*)
-   clear - EPC genvs_dom_eq12 core_initial12 genvs_dom_eq23 core_initial23.
-   intros. rename m2 into m3. rename v2 into v3. rename vals2 into vals3. 
-    rewrite (EPC v1 v3 sig) in H. destruct H as [v2 [EP12 EP23]].
+   clear - genvs_dom_eq12 core_initial12 genvs_dom_eq23 core_initial23.
+   intros. rename m2 into m3. rename v into v3. rename vals2 into vals3. 
     (*assert (HT: Forall2 Val.has_type vals1 (sig_args sig)). 
       eapply forall_valinject_hastype; eassumption.*)
-    destruct (initial_inject_split _ _ _ H1) 
+    destruct (initial_inject_split _ _ _ H0) 
        as [m2 [j1 [j2 [J [Inj12 [Inj23 [X [Y [XX YY]]]]]]]]].
     subst.
-    destruct (forall_val_inject_split _ _ _ _ H2)
+    destruct (forall_val_inject_split _ _ _ _ H1)
        as [vals2 [ValsInj12 ValsInj23]].
     assert (PG1: meminj_preserves_globals g1 j1).
-      clear - X Y XX YY H3 H4.
+      clear - X Y XX YY H2 H3.
       apply meminj_preserves_genv2blocks.
-      apply meminj_preserves_genv2blocks in H3.
-      destruct H3 as [AA [BB CC]].
+      apply meminj_preserves_genv2blocks in H2.
+      destruct H2 as [AA [BB CC]].
       split; intros.
          specialize (AA _ H).
          destruct (compose_meminjD_Some _ _ _ _ _ AA)
@@ -326,10 +321,10 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
          destruct (XX _ _ _ J1); subst. trivial.
       destruct (XX _ _ _ H0); subst. trivial.
   assert (PG2: meminj_preserves_globals g2 j2).
-    clear - XX YY X Y PG1 H3 genvs_dom_eq12.
+    clear - XX YY X Y PG1 H2 genvs_dom_eq12.
     apply meminj_preserves_genv2blocks.
-     apply meminj_preserves_genv2blocks in H3.
-      destruct H3 as [AA [BB CC]].
+     apply meminj_preserves_genv2blocks in H2.
+      destruct H2 as [AA [BB CC]].
      apply meminj_preserves_genv2blocks in PG1.
       destruct PG1 as [AA1 [BB1 CC1]].
       destruct genvs_dom_eq12.
@@ -357,16 +352,16 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
              apply (CC _ _ _ H1 H4).
            destruct XX as [mm [? ?]]; subst.
              apply (CC _ _ _ H1 H4).
-    destruct (core_initial12 _ _ _ EP12 _ _ _ _ vals2 _ 
-       DomS (fun b => match j2 b with None => false | Some (b3,d) => DomT b3 end) H0 Inj12)
+    destruct (core_initial12 _ _ _ _ _ vals2 _ 
+       DomS (fun b => match j2 b with None => false | Some (b3,d) => DomT b3 end) H Inj12)
      as [d12 [c2 [Ini2 MC12]]]; try assumption.
       (*eapply forall_valinject_hastype; eassumption.*)
       intros. destruct (X b1) as [_ J1Comp]. 
               destruct J1Comp as [b3 [dd COMP]]. exists b2, d; trivial.
-              specialize (H4 _ _ _ COMP).
+              specialize (H3 _ _ _ COMP).
               destruct (compose_meminjD_Some _ _ _ _ _ COMP)
                 as [bb2 [dd1 [dd2 [J1 [J2 D]]]]]; subst; clear COMP.
-              rewrite J1 in H; inv H. rewrite J2. apply H4.
+              rewrite J1 in H7; inv H7. rewrite J2. apply H3.
       intros.
         assert (Q: forall b,  isGlobalBlock g2 b || getBlocks vals2 b = true ->
                    exists jb d, j2 b = Some (jb, d) /\ 
@@ -382,19 +377,19 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
         destruct (REACH_inject _ _ _ Inj23 
             (fun b' : block => isGlobalBlock g2 b' || getBlocks vals2 b')
             (fun b' : block => isGlobalBlock g3 b' || getBlocks vals3 b')
-            Q _ H) as [b3 [d2 [J2 R3]]].
+            Q _ H7) as [b3 [d2 [J2 R3]]].
         rewrite J2.
         destruct (Y _ _ _ J2) as [b1 [d COMP]].
-        apply (H4 _ _ _ COMP).
+        apply (H3 _ _ _ COMP).
       intros b2 Hb2. remember (j2 b2) as d.
         destruct d; inv Hb2; apply eq_sym in Heqd. destruct p.
         eapply Mem.valid_block_inject_1; eassumption.
-    destruct (core_initial23 _ _ _ EP23 _ _ _ _ vals3 _ 
+    destruct (core_initial23 _ _ _ _ _ vals3 _ 
        (fun b => match j2 b with None => false | Some (b3,d) => DomT b3 end) DomT Ini2 Inj23)
      as [d23 [c3 [Ini3 MC23]]]; try assumption. 
        intros b2 b3 d2 J2. rewrite J2.
          destruct (Y _ _ _ J2) as [b1 [d COMP]].
-         destruct (H4 _ _ _ COMP). split; trivial.
+         destruct (H3 _ _ _ COMP). split; trivial.
     intros b2 Hb2. remember (j2 b2) as d.
         destruct d; inv Hb2; apply eq_sym in Heqd. destruct p.
         eapply Mem.valid_block_inject_1; eassumption.

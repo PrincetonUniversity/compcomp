@@ -23,8 +23,7 @@ Module SM_simulation. Section SharedMemory_simulation_inject.
           (Sem1 : @EffectSem (Genv.t F1 V1) C1)
           (Sem2 : @EffectSem (Genv.t F2 V2) C2)
           (ge1 : Genv.t F1 V1)
-          (ge2 : Genv.t F2 V2)
-          (entry_points : list (val * val * signature)).
+          (ge2 : Genv.t F2 V2).
 
   Record SM_simulation_inject := 
   { core_data : Type;
@@ -71,9 +70,8 @@ Module SM_simulation. Section SharedMemory_simulation_inject.
           sm_valid mu m1 m2;  
 
   core_initial : 
-    forall v1 v2 sig, In (v1,v2,sig) entry_points -> 
-    forall vals1 c1 m1 j vals2 m2 DomS DomT,
-    initial_core Sem1 ge1 v1 vals1 = Some c1 ->
+    forall v vals1 c1 m1 j vals2 m2 DomS DomT,
+    initial_core Sem1 ge1 v vals1 = Some c1 ->
     Mem.inject j m1 m2 -> 
     Forall2 (val_inject j) vals1 vals2 ->
     meminj_preserves_globals ge1 j ->
@@ -90,7 +88,7 @@ Module SM_simulation. Section SharedMemory_simulation_inject.
     (forall b, DomT b = true -> Mem.valid_block m2 b) ->
 
     exists cd, exists c2, 
-    initial_core Sem2 ge2 v2 vals2 = Some c2 
+    initial_core Sem2 ge2 v vals2 = Some c2 
     (*Lemma StructuredInjections.initial_SM_as_inj implies 
       that Mem.inject (initial_SM DomS DomT 
             (REACH m1 (fun b => isGlobalBlock ge1 b || getBlocks vals1 b)) 

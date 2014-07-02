@@ -810,19 +810,10 @@ forall d mu c1 m1 c2 m2, MATCH d mu c1 m1 c2 m2 ->
         sm_valid mu m1 m2.
 Proof. intros. apply H. Qed.
 
-Lemma Match_init_core: forall (v1 v2 : val) (sig : signature) entrypoints
-  (EP: In (v1, v2, sig) entrypoints)
-  (entry_points_ok : forall (v1 v2 : val) (sig : signature),
-                  In (v1, v2, sig) entrypoints ->
-                  exists
-                    (b : Values.block) (f1 : Csharpminor.fundef) (f2 : fundef),
-                    v1 = Vptr b Int.zero /\
-                    v2 = Vptr b Int.zero /\
-                    Genv.find_funct_ptr ge b = Some f1 /\
-                    Genv.find_funct_ptr tge b = Some f2)
+Lemma Match_init_core: forall v 
   (vals1 : list val) (c1 : CSharpMin_core) (m1 : mem) (j : meminj)
   (vals2 : list val) (m2 : mem) (DomS DomT : Values.block -> bool)
-  (CSM_Ini :initial_core (csharpmin_eff_sem hf) ge v1 vals1 = Some c1)
+  (CSM_Ini :initial_core (csharpmin_eff_sem hf) ge v vals1 = Some c1)
   (Inj: Mem.inject j m1 m2)
   (VInj: Forall2 (val_inject j) vals1 vals2)
   (PG: meminj_preserves_globals ge j)
@@ -839,7 +830,7 @@ Lemma Match_init_core: forall (v1 v2 : val) (sig : signature) entrypoints
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
 exists c2 : CMin_core,
-  initial_core (cmin_eff_sem hf) tge v2 vals2 = Some c2 /\
+  initial_core (cmin_eff_sem hf) tge v vals2 = Some c2 /\
   MATCH c1
     (initial_SM DomS DomT
        (REACH m1
@@ -849,7 +840,7 @@ exists c2 : CMin_core,
        j) c1 m1 c2 m2. 
 Proof. intros.
   unfold  CSharpMin_initial_core in CSM_Ini. unfold ge in *. unfold tge in *.
-  destruct v1; inv CSM_Ini.
+  destruct v; inv CSM_Ini.
   remember (Int.eq_dec i Int.zero) as z; destruct z; inv H0. clear Heqz.
   remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz.
     apply eq_sym in Heqzz.
@@ -874,11 +865,9 @@ Proof. intros.
   exists (CMin_Callstate tf vals2 Cminor.Kstop).
   split.
   simpl. 
-  destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
-  subst. inv A. rewrite C in Heqzz. inv Heqzz. rewrite D in FIND. inv FIND.
+  subst. inv Heqzz. inv FIND. rewrite H2.
   unfold CMin_initial_core. 
   case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
-  rewrite D.
 
   assert (Zlength vals2 = Zlength vals1) as ->. 
   { apply forall_inject_val_list_inject in VInj. clear - VInj. 
@@ -4441,19 +4430,10 @@ Qed.
 
 (*program structure not yet updated to module*)
 Theorem transl_program_correct:
-  forall  (R: list_norepet (map fst (prog_defs prog)))
-         entrypoints
-         (entry_points_ok : 
-            forall v1 v2 sig,
-              In (v1, v2, sig) entrypoints -> 
-              exists b f1 f2, 
-                v1 = Vptr b Int.zero 
-                /\ v2 = Vptr b Int.zero
-                /\ Genv.find_funct_ptr ge b = Some f1
-                /\ Genv.find_funct_ptr tge b = Some f2)
+  forall (R: list_norepet (map fst (prog_defs prog)))
          (init_mem: exists m0, Genv.init_mem prog = Some m0),
 SM_simulation.SM_simulation_inject (csharpmin_eff_sem hf) 
-   (cmin_eff_sem hf) ge tge entrypoints.
+   (cmin_eff_sem hf) ge tge.
 Proof.
 intros.
 assert (GDE:= GDE_lemma).
@@ -4476,7 +4456,7 @@ assert (GDE:= GDE_lemma).
    destruct init_mem as [m0 INIT].
    exists m0; split; trivial.
    unfold meminj_preserves_globals in H3.    
-   destruct H3 as [A [B C]].
+   destruct H2 as [A [B C]].
    assert (P: forall p q, {Ple p q} + {Plt q p}).
         intros p q.
         case_eq (Pos.leb p q).
@@ -4494,7 +4474,7 @@ assert (GDE:= GDE_lemma).
       destruct (P (Mem.nextblock m0) (Mem.nextblock m1)); auto.
       exfalso. 
       destruct (D _ p).
-      apply A in H3.
+      apply A in H2.
       assert (VB: Mem.valid_block m1 (Mem.nextblock m1)).
         eapply Mem.valid_block_inject_1; eauto.
       clear - VB; unfold Mem.valid_block in VB.
@@ -4503,7 +4483,7 @@ assert (GDE:= GDE_lemma).
       destruct (P (Mem.nextblock m0) (Mem.nextblock m2)); auto.
       exfalso. 
       destruct (D _ p).
-      apply A in H3.
+      apply A in H2.
       assert (VB:Mem.valid_block m2 (Mem.nextblock m2)).
         eapply Mem.valid_block_inject_2; eauto.
       clear - VB; unfold Mem.valid_block in VB.
