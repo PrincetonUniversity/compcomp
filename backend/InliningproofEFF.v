@@ -3127,7 +3127,7 @@ Qed.
     destruct (valid_block_dec m2' sp'); destruct (valid_block_dec m2 sp'); intuition.
     rewrite fl; apply orb_true_r.
     Qed.
-    (*End of theorem.*)
+    (*End of lemma.*)
     eapply alloc_local_restrict; eauto.
 
     auto. auto. auto.
@@ -3138,21 +3138,31 @@ Qed.
     eapply intern_incr_restrict; try (apply C); auto.
     autorewrite with restrict in VINJ; auto.
     inv H1; auto. 
-    Print Mem.alloc.
-    autorewrite with restrict.
-    unfold restrict.
-    rewrite D.
-    unfold vis.
+    
+    Lemma freshalloc_restricted_map: forall mu mu' stk m1 m1' m2 m2' f sp' delta,
+                                 Mem.alloc m1 0 (fn_stacksize f) = (m1', stk) ->
+                                 sm_locally_allocated mu mu' m1 m2 m1' m2' ->
+                                 as_inj mu' stk = Some (sp', delta) ->
+                                 as_inj (restrict_sm mu' (vis mu')) stk = Some (sp', delta).
+    intros mu mu' stk m1 m1' m2 m2' f sp' delta alloc loc_alloc map.
+      autorewrite with restrict.
+      unfold restrict.
+      rewrite map.
+      unfold vis.
 
 
     (*This should be a lemma*)
-    assert (locBlocksSrc mu' stk = true).
-    rewrite (Mem.alloc_result _ _ _ _ stk H0).
-    rewrite (Mem.alloc_result _ _ _ _ stk H0) in H0.
-    unfold sm_locally_allocated in H15.
+    Lemma allocated_is_local: forall mu mu' stk m1 m1' m2 m2' f,  
+                     Mem.alloc m1 0 (fn_stacksize f) = (m1', stk) ->
+                     sm_locally_allocated mu mu' m1 m2 m1' m2' ->
+                     locBlocksSrc mu' stk = true. 
+    intros  mu mu' stk m1 m1' m2 m2' f H1 H2.
+    rewrite (Mem.alloc_result _ _ _ _ stk H1).
+    rewrite (Mem.alloc_result _ _ _ _ stk H1) in H1.
+    unfold sm_locally_allocated in H2.
     destruct mu; destruct mu'; simpl in *.
     intuition.
-    rewrite H20.
+    rewrite H.
     assert (fl: freshloc m1 m1' (Mem.nextblock m1) = true).
     unfold freshloc.
     assert (vb: ~ Mem.valid_block m1 (Mem.nextblock m1)).
@@ -3165,13 +3175,13 @@ Qed.
     auto.
     destruct (valid_block_dec m1' (Mem.nextblock m1)); destruct (valid_block_dec m1 (Mem.nextblock m1)); intuition.
     rewrite fl; apply orb_true_r.
-
-    (*End of Lemma *)
-
-
-    rewrite H20. rewrite orb_true_l.
+    Qed.
+    
+    erewrite allocated_is_local; eauto.
+    Qed.
+    eapply  freshalloc_restricted_map; eauto.
     rewrite H2; auto.
-
+    
     autorewrite with restrict.
     apply inject_restrict; auto.
 
@@ -3244,219 +3254,76 @@ eapply P.
 
 exists mu'; intuition.
 
-Lemma sm_inject_separated_impication: forall mu mu' m1 m2 m1' m2' stk sp' delta (laloc: sm_locally_allocated mu mu' m1 m2 m1' m2')(C: as_inj mu' stk = Some (sp', delta))(H14: forall b : block, (b = stk -> False) -> as_inj mu' b = as_inj mu b)(WD: SM_wd mu) (WD': SM_wd mu'), sm_inject_separated mu mu' m1 m2.
-Admitted.
-
-eapply sm_inject_separated_impication; eauto.
+(* sm_inject_separated mu mu' m1 m2 *)
+admit.
 
 unfold MATCH; intuition.
 constructor; eauto.
-eapply match_stacks_inside_invariant; try eassumption.
-eapply restrict_sm_intern_incr; eassumption.
+assert (SM_wd (restrict_sm mu (vis mu))).
+apply restrict_sm_WD; auto.
+assert (SM_wd (restrict_sm mu' (vis mu'))).
+apply restrict_sm_WD; auto.
+eapply (match_stacks_inside_alloc_left (restrict_sm mu (vis mu))); eauto.
+eapply match_stacks_inside_invariant; eauto.
+eapply restrict_sm_intern_incr; eauto.
+eapply freshalloc_restricted_map; eauto.
+Lemma injection_almost_equality_restrict: forall mu mu' m1 m2 m1' m2' stk f,
+                                            Mem.alloc m1 0 (fn_stacksize f) = (m1', stk) ->
+                                            intern_incr mu mu' ->
+                                            sm_locally_allocated mu mu' m1 m2 m1' m2' ->
+                                            (forall b : block, (b = stk -> False) -> 
+                                                               as_inj mu' b = as_inj mu b) ->
+                                            forall b1 : block,
+                                              b1 <> stk ->
+                                              as_inj (restrict_sm mu' (vis mu')) b1 =
+                                              as_inj (restrict_sm mu (vis mu)) b1.
 
-eauto.
-SearchAbout SM_wd restrict_sm.
-induction MS0.
-constructor.
-
-Print match_stacks.
-
-constructor.
-
-Print match_stacks.
-
-
-Focus 2.
-  -  apply (meminj_preserves_incr_sep ge (as_inj mu) H9 m1 m2); eauto.
-     apply intern_incr_as_inj; auto.
-     apply sm_inject_separated_mem; auto.
-     eapply sm_inject_separated_impication; eauto.
-
-wFocus 2.
-  - eapply H10 in H18.
-    unfold intern_incr in B. repeat open_Hyp.
-    rewrite <- H26; auto.
-(*End of last two goals*)
-
-- Check star_E0_ind.
-  star_E0_ind.
-  
-inversion P.
-  Focus 2.
-  
-
-
-  + constructor; eauto; subst.
-    * SearchAbout star.
-      Check star_E0_ind.
-Print match_stacks_inside.
-
- match_stacks_inside (restrict_sm mu  (vis mu )) m1  m2 s stk' f' ctx sp'
-          rs'
- match_stacks_inside (restrict_sm mu' (vis mu')) m1' m2 s stk' f' ctx sp'
-     rs''
-
-
- inversion MS0.
-      eapply match_stacks_inside_base; eauto.
-      SearchAbout match_stacks.
-      
-
-constructor.
- 
-      constructor.
-    Focus 2.
-    Search agree_regs.
-    eapply agree_regs_incr; eauto.
-    autorewrite with restrict.
-    eapply intern_incr_restrict; eauto.
-
-    
-    
-  +
-
-(* HERE is where I'm stuck *)
-Print match_states.
-Focus 2.
-Print step.
-Print star.
-SearchAbout star spc.
-Print step.
-eapply match_regular_states; eauto.
-SearchAbout match_stacks_inside restrict.
-Print match_stacks_inside.
-
-
-assert match_stacks_inside mu' _ _ _ _ _ _ _ _.
-
-induction stk'.
-econstructor.
-eapply match_stacks_inside_inlined.
-eapply match_stacks_inside_alloc_left.
-apply restrict_sm_WD; eauto.
-eapply MS0.
-intros b HH; apply HH.
-apply MS0.
-apply restrict_sm_WD; intros; assumption.
-eassumption.
-eapply restrict_sm_intern_incr; try assumption.
-autorewrite with restrict.
-unfold restrict; unfold vis.
-erewrite as_inj_locBlocks; eauto.
-
-assert (loc_sp: locBlocksTgt mu sp' = true).
-destruct MS0; unfold restrict_sm in SL; destruct mu; simpl in *; eassumption.
-
-unfold sm_locally_allocated in H17.
-destruct mu; destruct mu'; simpl in H17; simpl in *.
-repeat open_Hyp;
-subst locBlocksTgt0.
-rewrite loc_sp.
-repeat rewrite orb_true_l.
-eassumption.
-
+Lemma intern_incr_localloc_vis: forall mu mu' m1 m2 m1' m2',
+                                  intern_incr mu mu' ->
+                                  sm_locally_allocated mu mu' m1 m2 m1' m2' ->
+                                  forall b, vis mu' b = vis mu b || freshloc m1 m1' b.
+unfold sm_locally_allocated, intern_incr, vis.
+intros; destruct mu, mu'; simpl in *.
+repeat open_Hyp.
+rewrite H0. rewrite H9.
+repeat rewrite <- orb_assoc.
+f_equal.
+apply orb_comm.
+Qed.
 intros.
 autorewrite with restrict.
-unfold restrict; unfold vis.
-inv B.
-repeat open_Hyp.
-rewrite H26.
-rewrite H14; auto.
-destruct (locBlocksSrc mu b1) eqn: lbl_eq.
-rewrite H22; auto.
-assert (HH: freshloc m1 m1' b1 = false).
-SearchAbout freshloc Mem.alloc.
-apply freshloc_alloc in H0; rewrite H0. 
-destruct eq_block; intuition.
+unfold restrict.
+erewrite intern_incr_localloc_vis; eauto.
+erewrite (freshloc_alloc _ _ _ _ stk H).
+destruct (eq_block b1 stk).
+simpl. apply H3 in e; inversion e.
+simpl; rewrite orb_false_r. rewrite H2; eauto.
+Qed.
+eapply injection_almost_equality_restrict; eauto.
 
-unfold sm_locally_allocated in H17; destruct mu; destruct mu'; simpl in *.
-repeat open_Hyp.
-subst locBlocksSrc0.
-rewrite lbl_eq. 
-rewrite HH.
-simpl.
-auto.
+omega.
 
-xomega.
-
-auto.
-
-auto.
-
-eapply agree_regs_incr; eauto.
-
-autorewrite with restrict.
-apply intern_incr_restrict; auto.
+apply agree_regs_incr with (as_inj (restrict_sm mu (vis mu))); auto.
+apply intern_incr_as_inj; try apply restrict_sm_intern_incr; eauto.
+apply restrict_sm_WD; auto.
+eapply freshalloc_restricted_map; eauto.
+autorewrite with restrict. 
+eapply inject_restrict; eauto.
+rewrite H3. eapply range_private_alloc_left; eauto.
+eapply freshalloc_restricted_map; eauto.
 
 
-assert (SL: locBlocksTgt (restrict_sm mu (vis mu)) sp' = true ).
-inv MS0; assumption.
-assert (SL': locBlocksTgt mu sp' = true ).
-unfold restrict_sm in SL. destruct mu; simpl in *; assumption.
-assert (SL'': locBlocksTgt mu' sp' = true ).
-unfold sm_locally_allocated in H17.
+eapply injection_almost_equality_restrict; eauto.
 
-destruct mu; destruct mu'; repeat open_Hyp; simpl in *; subst locBlocksTgt0;
-rewrite SL'; rewrite orb_true_l; auto.
+eapply meminj_preserves_incr_sep; eauto.
+apply intern_incr_as_inj; eauto.
+eapply sm_inject_separated_mem; eauto.
+(* sm_inject_separated mu mu' m1 m2 *)
+admit.
 
-autorewrite with restrict.
-unfold restrict; unfold vis.
-erewrite as_inj_locBlocks; eauto. rewrite SL''; rewrite orb_true_l; auto.
-
-autorewrite with restrict.
-apply inject_restrict; auto.
-
-auto.
-
-Check range_private_alloc_left. rewrite H3.
-eapply range_private_alloc_left; eauto.
-
-assert (SL: locBlocksTgt (restrict_sm mu (vis mu)) sp' = true ).
-inv MS0; assumption.
-assert (SL': locBlocksTgt mu sp' = true ).
-unfold restrict_sm in SL. destruct mu; simpl in *; assumption.
-assert (SL'': locBlocksTgt mu' sp' = true ).
-unfold sm_locally_allocated in H17.
-destruct mu; destruct mu'; repeat open_Hyp; simpl in *; subst locBlocksTgt0;
-rewrite SL'; rewrite orb_true_l; auto.
-
-autorewrite with restrict.
-erewrite <- as_inj_locBlocks in SL''; eauto.
-
-unfold restrict; unfold vis; rewrite SL''. rewrite orb_true_l; simpl; auto.
-
-intros.
-autorewrite with restrict.
-unfold restrict; unfold vis.
-inv B.
-repeat open_Hyp.
-rewrite H26.
-rewrite H14; auto.
-destruct (locBlocksSrc mu b) eqn: lbl_eq.
-rewrite H22; auto.
-assert (HH: freshloc m1 m1' b = false).
-SearchAbout freshloc Mem.alloc.
-apply freshloc_alloc in H0; rewrite H0. 
-destruct eq_block; intuition.
-
-
-unfold sm_locally_allocated in H17; destruct mu; destruct mu'; simpl in *.
-repeat open_Hyp.
-subst locBlocksSrc0.
-rewrite lbl_eq. 
-rewrite HH.
-simpl.
-auto.
-
-xomega.
-
-auto.
-
-Print star.
-
-econstructor.
-*)
-
+exploit (intern_incr_meminj_preserves_globals ge); eauto; try split; eauto.
+eapply match_genv_meminj_preserves_extern_iff_all; eauto.
+intros D; destruct D as [? isGlobal_frgn]; auto.
 
 (* external function *)
 
