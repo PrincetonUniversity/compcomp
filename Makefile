@@ -104,7 +104,7 @@ BACKEND=\
   Bounds.v Stacklayout.v Stacking.v Stackingproof.v StackingproofEFF.v \
   Asm.v Asmgen.v Asmgenproof0.v Asmgenproof1.v Asmgenproof.v \
   AsmEFF.v AsmgenEFF.v Asm_coop.v Asm_eff.v \
-  Asmgenproof0EFF.v Asmgenproof1EFF.v AsmgenproofEFF.v
+  Asmgenproof0EFF.v Asmgenproof1EFF.v AsmgenproofEFF.v Asm_nucular.v \
 
 # C front-end modules (in cfrontend/)
 

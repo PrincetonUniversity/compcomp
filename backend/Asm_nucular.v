@@ -692,8 +692,6 @@ Qed.
 Section ASM_NUC.
 Variable hf : I64Helpers.helper_functions.
 
-(*Variable ge: genv.*)
-Print load_frame.
 Definition Inv (c: state) (m:mem): Prop :=
   mem_wd m /\ (*valid_genv ge m /\*)
   match c with
@@ -1654,3 +1652,5 @@ econstructor. instantiate (1:= Inv).
     destruct (rs EAX); simpl; trivial. 
   inv H1. apply REGS. }
 Qed.
+
+End ASM_NUC.
