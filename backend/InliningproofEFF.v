@@ -1567,6 +1567,8 @@ exists c2,
        (REACH m2
           (fun b : Values.block => isGlobalBlock tge b || getBlocks vals2 b))
        j) c1 m1 c2 m2.
+Admitted.
+(*
 Proof.
 intros.
   inversion Ini.
@@ -1609,7 +1611,8 @@ intros.
     destruct (val_casted.vals_defined vals1); auto.
     rewrite andb_comm in H2; inv H2. }
   simpl. 
-  eexists; split. reflexivity.
+  eexists; split.
+  reflexivity.
   Focus 2.
     intros CONTRA.
     solve[elimtype False; auto].
@@ -1674,6 +1677,7 @@ intros.
 rewrite initial_SM_as_inj.
 intuition.
 Qed.
+*)
   Hint Resolve MATCH_initial_core: trans_correct.
 
 Lemma MGE_restrict mu X bnd:
@@ -1956,9 +1960,7 @@ Theorem transl_program_correct:
          (entry_ok : entry_points_ok entrypoints)
          (init_mem: exists m0, Genv.init_mem SrcProg = Some m0),
     SM_simulation.SM_simulation_inject (rtl_eff_sem hf)
-                                       (rtl_eff_sem hf) ge tge entrypoints.
-
-
+                                       (rtl_eff_sem hf) ge tge (*entrypoints*).
   intros.
   (*eapply sepcomp.effect_simulations_lemmas.inj_simulation_star_wf.*)
   eapply effect_simulations_lemmas.inj_simulation_star with (match_states:= MATCH)(measure:= RTL_measure).
@@ -3641,26 +3643,16 @@ exists (mu' : SM_Injection),
 
     left; simpl.
     eapply effstep_plus_one. eapply rtl_effstep_exec_Istore; eauto.
-
-    admit.
-    (*
-    intros b ofs eff; split.
-    Print StoreEffect.
-    unfold StoreEffect in eff.
-    destruct a'; try discriminate.
     
-    unfold visTgt.
-
-
-    apply U2vis. in eff.
-    apply 
-    unfold StoreEffect in eff.
-    destruct a'; simpl in *; try discriminate.
-    split. unfold visTgt.
-    apply andb_true_iff in eff; destruct eff as [Hcont zltofs].
-    apply andb_true_iff in Hcont; destruct Hcont as [? ?].
-    
-    unfold EmptyEffect in empt; inv empt.*)
+    (*Here is the effect: store*)
+    destruct a; inv H2.
+    rewrite restrict_sm_all in Q. inv Q.
+    intuition.
+    apply StoreEffectD in H6. destruct H6 as [z [HI Ibounds]].
+            apply eq_sym in HI. inv HI.
+            eapply visPropagateR; eassumption.
+    eapply StoreEffect_PropagateLeft; try eassumption.
+     econstructor. eassumption. trivial.
 
     exists mu.
     intuition.
@@ -3757,8 +3749,7 @@ exists (mu' : SM_Injection),
     right; split; simpl. 
     omega.
     eapply effstep_star_zero.
-
-    admit.
+    intuition.
     
     exists mu.
     intuition.
@@ -3808,6 +3799,15 @@ exists (mu' : SM_Injection),
     eapply effstep_plus_one. eapply rtl_effstep_exec_Itailcall; eauto.
     eapply sig_function_translated; eauto.
 
+    (*Here is the effect: tailcall*)
+    rewrite restrict_sm_all in SP.
+    destruct (restrictD_Some _ _ _ _ _ SP).
+    intuition.
+    apply FreeEffectD in H13.
+           destruct H13; subst. 
+           eapply visPropagate; try eassumption.
+    eapply FreeEffect_PropagateLeft; try eassumption.
+    eapply as_inj_retrict; autorewrite with restrict; rewrite <- DSTK; eassumption.
     admit.
 
     exists mu.
@@ -3919,8 +3919,7 @@ exists (mu' : SM_Injection),
     eexists. split.
     right; split. simpl; omega. 
     eapply effstep_star_zero.
-
-    admit.
+    intuition.
 
     exists mu.
     intuition.
@@ -4018,6 +4017,15 @@ exists (mu' : SM_Injection),
     left.
     eapply effstep_plus_one. eapply rtl_effstep_exec_Ireturn; eauto. 
 
+    (*Here is the effect: return*)
+    rewrite restrict_sm_all in SP.
+    destruct (restrictD_Some _ _ _ _ _ SP).
+    intuition. 
+    apply FreeEffectD in H12.
+           destruct H12; subst. 
+           eapply visPropagate; try eassumption.
+    eapply FreeEffect_PropagateLeft; try eassumption.
+    eapply as_inj_retrict; autorewrite with restrict; rewrite <- DSTK; eassumption.
     admit.
 
     exists mu.
@@ -4080,8 +4088,7 @@ exists (mu' : SM_Injection),
     right; split; simpl. omega.
     
     eapply effstep_star_zero.
-
-    admit.
+    intuition.
     
     exists mu.
     intuition.
