@@ -109,11 +109,13 @@ Import Modsem.
 
 Record t := mk
   { i  : 'I_N
-  ; c  :> (cores i).(C) }.
+  ; c  :> (cores i).(C) 
+  ; sg : signature }.
 
 Definition upd (core : t) (new : (cores core.(i)).(C)) :=
   {| i := core.(i)
-   ; c := new |}.
+   ; c := new 
+   ; sg:= core.(sg) |}.
 
 End core. End Core.
 
@@ -122,6 +124,8 @@ Arguments Core.t {N} cores.
 Arguments Core.i {N cores} !t /.
 
 Arguments Core.c {N cores} !t /.
+
+Arguments Core.sg {N cores} !t /.
 
 Arguments Core.upd {N cores} !core _ /.
 
@@ -138,7 +142,7 @@ Variable N : pos.
 Variable cores : 'I_N -> Modsem.t.
 
 Definition atExternal (c: Core.t cores) :=
-  let: (Core.mk i c) := c in
+  let: (Core.mk i c sg) := c in
   let: F := (cores i).(F) in
   let: V := (cores i).(V) in
   let: C := (cores i).(C) in
@@ -294,13 +298,13 @@ Import Modsem.
 (* We take the RC initial core here because we want to make sure the args *)
 (* are properly stashed in the [c] tuple.                                 *)
 
-Definition initCore (ix: 'I_N) (v: val) (args: list val) 
+Definition initCore (sg: signature) (ix: 'I_N) (v: val) (args: list val) 
   : option (Core.t my_cores):=
   if @initial_core _ _ _ 
        (my_cores ix).(sem)
        (my_cores ix).(Modsem.ge) 
        v args 
-  is Some c then Some (Core.mk _ my_cores ix c)
+  is Some c then Some (Core.mk _ my_cores ix c sg)
   else None.
 
 End linkerDefs.
@@ -364,7 +368,7 @@ Variable my_fn_tbl: ident -> option 'I_N.
 
 Section handle.
 
-Variables (id: ident) (l: linker N my_cores) (args: list val).
+Variables (sg: signature) (id: ident) (l: linker N my_cores) (args: list val).
 
 Import CallStack.
 
@@ -374,7 +378,7 @@ Definition handle :=
                -> option (linker N my_cores)) with
     | true => fun pf => 
         if l.(fn_tbl) id is Some ix then
-        if initCore my_cores ix (Vptr id Int.zero) args is Some c 
+        if initCore my_cores sg ix (Vptr id Int.zero) args is Some c 
           then Some (pushCore l c pf)
         else None else None
     | false => fun _ => None
@@ -386,11 +390,11 @@ Section handle_lems.
 
 Import CallStack.
 
-Lemma handleP id l args l' :
-  handle id l args = Some l' <-> 
+Lemma handleP sg id l args l' :
+  handle sg id l args = Some l' <-> 
   (exists (pf : all (atExternal my_cores) l.(stack).(callStack)) ix c,
      [/\ l.(fn_tbl) id = Some ix 
-       , initCore my_cores ix (Vptr id Int.zero) args = Some c
+       , initCore my_cores sg ix (Vptr id Int.zero) args = Some c
        & l' = pushCore l c pf]).
 Proof.
 rewrite/handle.
@@ -414,12 +418,14 @@ Qed.
 
 End handle_lems.
 
+Definition main_sig := mksignature nil (Some Tint).
+
 Definition initial_core (tt: ge_ty) (v: val) (args: list val)
   : option (linker N my_cores) :=
   if v is Vptr id ofs then 
   if Int.eq ofs Int.zero then
   if my_fn_tbl id is Some ix then
-  if initCore my_cores ix (Vptr id Int.zero) args is Some c 
+  if initCore my_cores main_sig ix (Vptr id Int.zero) args is Some c 
   then Some (mkLinker my_fn_tbl (CallStack.singl c))
   else None else None else None else None.
 
@@ -436,19 +442,25 @@ Definition at_external0 (l: linker N my_cores) :=
 
 Arguments at_external0 !l.
 
+Require Import val_casted. (*for val_has_type_func*)
+
 Definition halted0 (l: linker N my_cores) :=
   let: c   := peekCore l in
   let: ix  := c.(Core.i) in
+  let: sg  := c.(Core.sg) in
   let: sem := (my_cores ix).(Modsem.sem) in
   let: F   := (my_cores ix).(Modsem.F) in
   let: V   := (my_cores ix).(Modsem.V) in
-    @halted (Genv.t F V) _ _ sem (Core.c c).
+  if @halted (Genv.t F V) _ _ sem (Core.c c) is Some v then
+    if val_casted.val_has_type_func v (proj_sig_res sg) then Some v
+    else None 
+  else None.
 
 Arguments halted0 !l.
 
 (* [corestep0] lifts a corestep of the runing core to a corestep of the   *)
 (* whole program semantics.                                               *)
-(* Note: we call the RC version of corestep here.                         *)                        
+(* Note: we call the RC version of corestep here.                         *) 
 
 Definition corestep0 
   (l: linker N my_cores) (m: Mem.mem) (l': linker N my_cores) (m': Mem.mem) := 
@@ -474,7 +486,7 @@ Definition fun_id (ef: external_function) : option ident :=
 Definition at_external (l: linker N my_cores) :=
   if at_external0 l is Some (ef, dep_sig, args) 
     then if fun_id ef is Some id then
-         if handle id l args is None then Some (ef, dep_sig, args) else None
+         if handle (ef_sig ef) id l args is None then Some (ef, dep_sig, args) else None
          else None
   else at_external0 l.
 
@@ -500,6 +512,13 @@ Definition halted (l: linker N my_cores) :=
   if halted0 l is Some rv then Some rv
   else None else None.
 
+(* Return type of topmost core *)
+
+Definition retType0 (l: linker N my_cores) : option typ :=
+  let: c  := peekCore l in 
+  let: sg := c.(Core.sg) in 
+    sig_res sg.
+
 (* Corestep relation of linking semantics *)
 
 Definition corestep 
@@ -514,7 +533,6 @@ Definition corestep
   (m=m' 
    /\ ~corestep0 l m l' m' 
    /\
-
       (** 3- at_external, in which case we push a core onto the stack to handle 
          the external function call (or this is not possible because no module 
          handles the external function id, in which case the entire linker is 
@@ -522,7 +540,7 @@ Definition corestep
 
       if at_external0 l is Some (ef, dep_sig, args) then
       if fun_id ef is Some id then
-      if handle id l args is Some l'' then l'=l'' else False else False
+      if handle (ef_sig ef) id l args is Some l'' then l'=l'' else False else False
       else 
 
       (** 4- or halted, in which case we pop the halted core from the call stack
@@ -564,7 +582,7 @@ Inductive Corestep (ge : ge_ty) : linker N my_cores -> mem
   let: d_sem := Modsem.sem (my_cores d_ix) in
 
   core_semantics.initial_core d_sem d_ge (Vptr id Int.zero) args = Some d -> 
-  Corestep ge l m (pushCore l (Core.mk _ _ _ d) pf) m
+  Corestep ge l m (pushCore l (Core.mk _ _ _ d (ef_sig ef)) pf) m
 
 | Corestep_return : 
   forall (l : linker N my_cores) l'' m rv d',
@@ -573,6 +591,7 @@ Inductive Corestep (ge : ge_ty) : linker N my_cores -> mem
 
   let: c  := peekCore l in
   let: c_ix  := Core.i c in
+  let: c_sg  := Core.sg c in
   let: c_ge  := Modsem.ge (my_cores c_ix) in
   let: c_sem := Modsem.sem (my_cores c_ix) in
 
@@ -584,6 +603,7 @@ Inductive Corestep (ge : ge_ty) : linker N my_cores -> mem
   let: d_sem := Modsem.sem (my_cores d_ix) in
 
   core_semantics.halted c_sem (Core.c c) = Some rv -> 
+  val_has_type_func rv (proj_sig_res c_sg)=true -> 
   core_semantics.after_external d_sem (Some rv) (Core.c d) = Some d' -> 
   Corestep ge l m (updCore l'' (Core.upd d d')) m.
 
@@ -623,7 +643,7 @@ have at_ext:
          (Core.c (peekCore l)))=> //.
   by rewrite H2. }
 rewrite /inContext A /at_external0 H1 at_ext.
-by rewrite /halted0 H2 /after_external H3.
+by rewrite /halted0 H2 /after_external H3 H4. 
 Qed.
 
 Lemma CorestepI ge l m l' m' : 
@@ -637,7 +657,7 @@ case=> <-.
 case=> nstep.
 case atext: (at_external0 _)=> [[[ef dep_sig] args]|//].
 case funid: (fun_id ef)=> [id|//].
-case hdl:   (handle id l args)=> [l''|//] ->.
+case hdl:   (handle (ef_sig ef) id l args)=> [l''|//] ->.
 move: hdl; case/handleP=> pf []ix []c []fntbl init ->.
 move: init; rewrite /initCore.
 case init: (core_semantics.initial_core _ _ _ _)=> [c'|//]; case=> <-. 
@@ -647,7 +667,10 @@ case hlt: (halted0 _)=> [rv|//].
 case pop: (popCore _)=> [c|//].
 case aft: (after_external _ _)=> [l''|//] ->.
 move: aft; rewrite /after_external.
-case aft: (core_semantics.after_external _ _ _)=> [c''|//]; case=> <-.
+case aft: (core_semantics.after_external _ _ _)=> [c''|//]. 
+rewrite /halted0 in hlt; move: hlt.
+case hlt: (core_semantics.halted _ _)=> //. 
+case oval: (val_has_type_func _ _)=> //; case=> Heq. subst. case=> <-.
 by apply: (@Corestep_return _ _ _ _ rv c'').
 Qed.
 
@@ -660,7 +683,12 @@ Lemma corestep_not_at_external0 m c m' c' :
 Proof. by move=>[]newCore []H1 H2; apply corestep_not_at_external in H1. Qed.
 
 Lemma at_external_halted_excl0 c : at_external0 c = None \/ halted0 c = None.
-Proof. by apply: at_external_halted_excl. Qed.
+Proof. 
+case: (at_external_halted_excl (Modsem.sem (my_cores (Core.i (peekCore c))))
+        (Core.c (peekCore c))).
+by rewrite /at_external0=> ->; left.
+by rewrite /halted0=> ->; right.
+Qed.
 
 Lemma corestep_not_halted0 m c m' c' : corestep0 c m c' m' -> halted c = None.
 Proof.
@@ -711,7 +739,9 @@ Notation cast'' pf x := (cast (Modsem.C \o my_cores) (sym_eq pf) x).
 
 Lemma after_externalE rv c c' : 
   after_external rv c = Some c' -> 
-  exists fn_tbl hd hd' tl pf pf' (eq_pf : Core.i hd = Core.i hd'),
+  exists fn_tbl hd hd' tl pf pf' 
+         (eq_pf : Core.i hd = Core.i hd') 
+         (sig_pf : Core.sg hd = Core.sg hd'),
   [/\ c  = mkLinker fn_tbl (CallStack.mk [:: hd & tl] pf)
     , c' = mkLinker fn_tbl (CallStack.mk [:: hd' & tl]  pf')
     & core_semantics.after_external
@@ -721,8 +751,8 @@ Proof.
 case: c=> fntbl; case; case=> // hd stk pf aft; exists fntbl,hd.
 move: aft; rewrite /after_external /=.
 case e: (core_semantics.after_external _ _ _)=> // [hd']; case=> <-.
-exists (Core.mk N my_cores (Core.i hd) hd'),stk,pf,pf.
-rewrite /=; exists refl_equal; split=> //; f_equal; f_equal.
+exists (Core.mk N my_cores (Core.i hd) hd' (Core.sg hd)),stk,pf,pf.
+rewrite /=; exists refl_equal; exists refl_equal; split=> //; f_equal; f_equal.
 by apply: proof_irr.
 Qed.
 

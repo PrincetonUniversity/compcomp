@@ -107,7 +107,6 @@ Record SM_simulation_inject :=
            corestep_star Sem2 ge2 st2 m2 st2' m2' /\
            core_ord cd' cd) *)
 
-
 ; effcore_diagram : 
     forall st1 m1 st1' m1' U1, 
     effstep Sem1 ge1 U1 st1 m1 st1' m1' ->
@@ -164,73 +163,75 @@ Record SM_simulation_inject :=
        match_state cd nu c1 m1 c2 m2 
        /\ Mem.inject (shared_of nu) m1 m2
 
+; eff_after_external: 
+    forall cd mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
+      (MemInjMu: Mem.inject (as_inj mu) m1 m2)
+      (MatchMu: match_state cd mu st1 m1 st2 m2)
+      (AtExtSrc: at_external Sem1 st1 = Some (e,ef_sig,vals1))
 
+        (* We include the clause AtExtTgt to ensure that vals2 is
+         uniquely determined. We have e=e' and ef_sig=ef_sig' by the
+         at_external clause, but omitting the hypothesis AtExtTgt
+         would result in in 2 not necesssarily equal target argument
+         lists in language 3 in the transitivity, as val_inject is not
+         functional in the case where the left value is Vundef. (And
+         we need to keep ValInjMu since vals2 occurs in pubTgtHyp) *)
 
-; eff_after_external : 
-  forall cd mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
-  (MemInjMu: Mem.inject (as_inj mu) m1 m2)
-  (MatchMu: match_state cd mu st1 m1 st2 m2)
-  (AtExtSrc: at_external Sem1 st1 = Some (e,ef_sig,vals1))
+      (AtExtTgt: at_external Sem2 st2 = Some (e',ef_sig',vals2)) 
+      (ValInjMu: Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2)  
 
-  (* We include the clause AtExtTgt to ensure that vals2 is
-     uniquely determined. We have e=e' and ef_sig=ef_sig' by the
-     at_external clause, but omitting the hypothesis AtExtTgt
-     would result in in 2 not necesssarily equal target argument
-     lists in language 3 in the transitivity, as val_inject is not
-     functional in the case where the left value is Vundef. (And
-     we need to keep ValInjMu since vals2 occurs in pubTgtHyp) *)
-
-  (AtExtTgt: at_external Sem2 st2 = Some (e',ef_sig',vals2)) 
-
-  (ValInjMu: Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2)  
-
-  pubSrc' 
-  (pubSrcHyp : 
-    pubSrc' = fun b => locBlocksSrc mu b && REACH m1 (exportedSrc mu vals1) b)
+      pubSrc' 
+      (pubSrcHyp: 
+         pubSrc' 
+         = (fun b => locBlocksSrc mu b && REACH m1 (exportedSrc mu vals1) b))
         
-  pubTgt' 
-  (pubTgtHyp : 
-    pubTgt' = fun b => locBlocksTgt mu b && REACH m2 (exportedTgt mu vals2) b)
+      pubTgt' 
+      (pubTgtHyp: 
+         pubTgt' 
+         = fun b => locBlocksTgt mu b && REACH m2 (exportedTgt mu vals2) b)
 
-  nu (NuHyp: nu = replace_locals mu pubSrc' pubTgt'),
+      nu (NuHyp: nu = replace_locals mu pubSrc' pubTgt'),
 
-  forall nu' ret1 m1' ret2 m2'
-  (INC: extern_incr nu nu')  
-  (SEP: sm_inject_separated nu nu' m1 m2)
-    
-  (WDnu': SM_wd nu') (SMvalNu': sm_valid nu' m1' m2')
+      forall nu' ret1 m1' ret2 m2'
+        (HasTy1: Val.has_type ret1 (proj_sig_res (AST.ef_sig e)))
+        (HasTy2: Val.has_type ret2 (proj_sig_res (AST.ef_sig e')))
+        (INC: extern_incr nu nu')  
+        (SEP: sm_inject_separated nu nu' m1 m2)
 
-  (MemInjNu': Mem.inject (as_inj nu') m1' m2')
-  (RValInjNu': val_inject (as_inj nu') ret1 ret2)
+        (WDnu': SM_wd nu') (SMvalNu': sm_valid nu' m1' m2')
 
-  (FwdSrc: mem_forward m1 m1') (FwdTgt: mem_forward m2 m2')
+        (MemInjNu': Mem.inject (as_inj nu') m1' m2')
+        (RValInjNu': val_inject (as_inj nu') ret1 ret2)
 
-  frgnSrc' 
-  (frgnSrcHyp: 
-    frgnSrc' 
-    = fun b => DomSrc nu' b 
-               && (negb (locBlocksSrc nu' b) 
-                   && REACH m1' (exportedSrc nu' (ret1::nil)) b))
-  frgnTgt' 
-  (frgnTgtHyp: 
-    frgnTgt' 
-    = fun b => DomTgt nu' b 
-               && (negb (locBlocksTgt nu' b) 
-                   && REACH m2' (exportedTgt nu' (ret2::nil)) b))
+        (FwdSrc: mem_forward m1 m1') (FwdTgt: mem_forward m2 m2')
 
-  mu' (Mu'Hyp: mu' = replace_externs nu' frgnSrc' frgnTgt')
+        frgnSrc' 
+        (frgnSrcHyp: 
+           frgnSrc' 
+           = fun b => DomSrc nu' b && 
+                      (negb (locBlocksSrc nu' b) && 
+                       REACH m1' (exportedSrc nu' (ret1::nil)) b))
 
-  (UnchPrivSrc: 
-    Mem.unchanged_on (fun b ofs => 
-      locBlocksSrc nu b = true /\ 
-      pubBlocksSrc nu b = false) m1 m1') 
+        frgnTgt' 
+        (frgnTgtHyp: 
+           frgnTgt' 
+           = fun b => DomTgt nu' b &&
+                      (negb (locBlocksTgt nu' b) &&
+                       REACH m2' (exportedTgt nu' (ret2::nil)) b))
 
-  (UnchLOOR: Mem.unchanged_on (local_out_of_reach nu m1) m2 m2'),
+        mu' (Mu'Hyp: mu' = replace_externs nu' frgnSrc' frgnTgt')
+ 
+         (UnchPrivSrc: 
+            Mem.unchanged_on (fun b ofs => 
+              locBlocksSrc nu b = true /\ 
+              pubBlocksSrc nu b = false) m1 m1') 
 
-  exists cd', exists st1', exists st2',
-  after_external Sem1 (Some ret1) st1 = Some st1'
-  /\ after_external Sem2 (Some ret2) st2 = Some st2' 
-  /\ match_state cd' mu' st1' m1' st2' m2' }.
+         (UnchLOOR: Mem.unchanged_on (local_out_of_reach nu m1) m2 m2'),
+
+        exists cd', exists st1', exists st2',
+          after_external Sem1 (Some ret1) st1 = Some st1' /\
+          after_external Sem2 (Some ret2) st2 = Some st2' /\
+          match_state cd' mu' st1' m1' st2' m2' }.
 
 End SharedMemory_simulation_inject. 
 

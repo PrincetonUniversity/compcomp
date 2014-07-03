@@ -4,7 +4,7 @@ Require Export mem_lemmas.
 Require Export StructuredInjections.
 Require Export effect_semantics.
 Require Export reach. 
-Require Export effect_simulationsEXP.
+Require Export effect_simulations.
 Require Export wholeprog_simulations.
 Require Export barebones_simulations.
 Require Export effect_properties.
