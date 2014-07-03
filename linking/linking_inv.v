@@ -53,6 +53,36 @@ Import SM_simulation.
 Import Linker. 
 Import Modsem.
 
+Section typingInv.
+
+Variable N : pos.
+
+Variable cores : 'I_N -> Modsem.t.
+
+Variable fun_tbl : ident -> option 'I_N.
+
+Let linker := effsem N cores fun_tbl.
+
+Definition sig_of (c : Core.t cores) :=
+  match at_external (cores c.(Core.i)).(sem) c.(Core.c) with
+    | None => None 
+    | Some (ef,sg,args) => Some (ef_sig ef)
+  end.
+
+Fixpoint tys_agree_rec (sg : signature) (s : seq.seq (Core.t cores)) :=
+  if s is [:: c & s'] then 
+    if sig_of c is Some sg' then [/\ sg=sg' & tys_agree_rec sg' s']
+    else False
+  else True.
+
+Definition tys_agree (s : seq.seq (Core.t cores)) :=
+  if s is [:: c & s'] then 
+    if sig_of c is Some sg then tys_agree_rec sg s'
+    else False
+  else True.
+
+End typingInv.
+
 Section linkingInv.
 
 Variable N : pos.
@@ -900,7 +930,8 @@ Import seq.
 Fixpoint frame_all (mus : seq frame_pkg) m1 m2 s1 s2 :=
   match mus, s1, s2 with
     | Build_frame_pkg mu0 m10 m20 _ :: mus', c :: s1', d :: s2' => 
-      [/\ exists (pf : c.(Core.i)=d.(Core.i)) cd0,
+      [/\ exists (pf : c.(Core.i)=d.(Core.i)) 
+                 (sig_pf : c.(Core.sg)=d.(Core.sg)) cd0,
           exists e1 ef_sig1 vals1,
           exists e2 ef_sig2 vals2, 
             @frame_inv c d pf cd0 mu0 
@@ -919,7 +950,8 @@ Lemma frame_all_inv mu0 m10 m20 x mus m1 m2 s1 s2 :
   exists c s1' d s2',
     [/\ s1 = c :: s1'
       , s2 = d :: s2' 
-      & exists (pf : c.(Core.i)=d.(Core.i)) cd0,
+      & exists (pf : c.(Core.i)=d.(Core.i)) 
+               (sig_pf : c.(Core.sg)=d.(Core.sg)) cd0,
         exists e1 ef_sig1 vals1,
         exists e2 ef_sig2 vals2, 
           [/\ @frame_inv c d pf cd0 mu0 
@@ -927,10 +959,10 @@ Lemma frame_all_inv mu0 m10 m20 x mus m1 m2 s1 s2 :
             & frame_all mus m1 m2 s1' s2']].
 Proof.
 case: s1=> // c s1'; case: s2=> // d s2' /=.
-move=> [][]pf => [][]cd []ef1 []sig1 []vals1 []ef2 []sig2 []vals2. 
+move=> [][]pf => [][]sig_pf []cd []ef1 []sig1 []vals1 []ef2 []sig2 []vals2. 
 case=> A B C D E F.
 exists c, s1', d, s2'; split=> //.
-by exists pf, cd, ef1, sig1, vals1, ef2, sig2, vals2; split.
+by exists pf, sig_pf, cd, ef1, sig1, vals1, ef2, sig2, vals2; split.
 Qed.
 
 Lemma frame_all_match mu0 m10 m20 x mus m1 m2 s1 s2 :
@@ -938,14 +970,15 @@ Lemma frame_all_match mu0 m10 m20 x mus m1 m2 s1 s2 :
   exists c s1' d s2',
     [/\ s1 = c :: s1'
       , s2 = d :: s2' 
-      & exists (pf : c.(Core.i)=d.(Core.i)) cd0,
+      & exists (pf : c.(Core.i)=d.(Core.i)) 
+               (sig_pf : c.(Core.sg)=d.(Core.sg)) cd0,
         (sims c.(Core.i)).(match_state) cd0 mu0 
         c.(Core.c) m10 (cast'' pf d.(Core.c)) m20].
 Proof.
 case: s1=> // c s1'; case: s2=> // d s2' /=.
-move=> [][]pf => [][]cd []ef1 []sig1 []vals1 []ef2 []sig2 []vals2 []A B C.
+move=> [][]pf => [][]sig_pf []cd []ef1 []sig1 []vals1 []ef2 []sig2 []vals2 []A B C.
 exists c, s1', d, s2'; split=> //.
-by exists pf, cd. 
+by exists pf, sig_pf, cd. 
 Qed.
 
 Lemma frame_all_fwd1 pkg mus m1 m2 s1 s2 :
@@ -953,7 +986,7 @@ Lemma frame_all_fwd1 pkg mus m1 m2 s1 s2 :
   mem_forward pkg.(frame_m10) m1.
 Proof.
 case: pkg=> ? ? ? ?.
-move/frame_all_inv=> []? []? []? []? []? ? []? []? []? []? []? []? []? []? [].
+move/frame_all_inv=> []? []? []? []? []? ? []? []? []? []? []? []? []? []? []? [].
 by case.
 Qed.
 
@@ -962,7 +995,7 @@ Lemma frame_all_fwd2 pkg mus m1 m2 s1 s2 :
   mem_forward pkg.(frame_m20) m2.
 Proof.
 case: pkg=> ? ? ? ?.
-move/frame_all_inv=> []? []? []? []? []? ? []? []? []? []? []? []? []? []? [].
+move/frame_all_inv=> []? []? []? []? []? ? []? []? []? []? []? []? []? []? []? [].
 by case.
 Qed.
 
@@ -972,7 +1005,7 @@ Lemma frame_all_tail pkg mus m1 m2 s1 s2 :
 Proof.
 case: pkg=> ? ? ? ?.
 move/frame_all_inv=> []? []? []? []? []-> ->. 
-by move=> []? []? []? []? []? []? []? []? [] _.
+by move=> []? []? []? []? []? []? []? []? []? []_.
 Qed.
 
 Section frame_all_lems.
@@ -987,7 +1020,7 @@ Proof.
 move: frameall.
 move: m1 m2 s1 s2; elim: mus=> //; case=> mu' ? ? ? mus' IH m1' m2' s1' s2' A.
 move: (frame_all_inv A)=> []c []s1'' []d []s2'' []_ _.
-move=> []pf []cd []? []? []? []? []? []? []B C. 
+move=> []pf []cd []? []? []? []? []? []? []? []B C. 
 case: B=> ? ? ? ? ?; move/match_genv=> []_ D; split.
 by rewrite (genvs_domain_eq_isGlobal _ _ (my_ge_S (Core.i c))); apply: D.
 by apply: (IH _ _ _ _ C).
@@ -1000,7 +1033,7 @@ Proof.
 move: frameall.
 move: m1 m2 s1 s2; elim: mus=> //; case=> mu' ? ? ? mus' IH m1' m2' s1' s2' A.
 move: (frame_all_inv A)=> []c []s1'' []d []s2'' []_ _.
-move=> []pf []cd []? []? []? []? []? []? []B C.
+move=> []pf []cd []? []? []? []? []? []? []? []B C.
 case: B=> ? ? ? ? ?; move/match_genv=> []D _; split=> /=.
 rewrite -meminj_preserves_genv2blocks.
 rewrite (genvs_domain_eq_match_genvs (my_ge_S (Core.i c))).
@@ -1014,7 +1047,7 @@ Proof.
 move: frameall.
 move: m1 m2 s1 s2; elim: mus=> //; case=> mu' ? ? ? mus' IH m1' m2' s1' s2' A.
 move: (frame_all_inv A)=> []c []s1'' []d []s2'' []_ _.
-move=> []pf []cd []? []? []? []? []? []? []B C.
+move=> []pf []cd []? []? []? []? []? []? []? []B C.
 case: B=> ? ? ? ? val; move/match_genv=> []_ D; split=> /=.
 by apply: (sm_valid_fwd val).
 by apply: (IH _ _ _ _ C).
@@ -1035,7 +1068,8 @@ Lemma tail_inv_inv mu0 m10 m20 x mus s1 s2 m1 m2 :
   exists c s1' d s2',
     [/\ s1 = c :: s1'
       , s2 = d :: s2' 
-      , (exists (pf : c.(Core.i)=d.(Core.i)) cd0,
+      , (exists (pf : c.(Core.i)=d.(Core.i)) 
+                (sig_pf : c.(Core.sg)=d.(Core.sg)) cd0,
          exists e1 ef_sig1 vals1,
          exists e2 ef_sig2 vals2, 
            @frame_inv c d pf cd0 mu0 
@@ -1043,9 +1077,9 @@ Lemma tail_inv_inv mu0 m10 m20 x mus s1 s2 m1 m2 :
        & tail_inv mus (STACK.pop s1) (STACK.pop s2) m1 m2].
 Proof.
 case; case=> H1 H2; move/frame_all_inv=> []c []s1' []d []s2' []B C.
-move=> []pf []cd []ef1 []sig1 []vals1 []ef2 []sig2 []vals2 []D E.
+move=> []pf []sg_pf []cd []ef1 []sig1 []vals1 []ef2 []sig2 []vals2 []D E.
 exists c,s1',d,s2'; split=> //.
-by exists pf,cd,ef1,sig1,vals1,ef2,sig2,vals2.
+by exists pf,sg_pf,cd,ef1,sig1,vals1,ef2,sig2,vals2.
 by split=> //; rewrite B C.
 Qed.
 
@@ -1055,7 +1089,8 @@ Lemma tail_inv_match mu0 m10 m20 x mus s1 s2 m1 m2 :
   exists c s1' d s2',
     [/\ s1 = c :: s1'
       , s2 = d :: s2' 
-      & exists (pf : c.(Core.i)=d.(Core.i)) cd0,
+      & exists (pf : c.(Core.i)=d.(Core.i)) 
+               (sig_pf : c.(Core.sg)=d.(Core.sg)) cd0,
         (sims c.(Core.i)).(match_state) cd0 mu0 
         c.(Core.c) m10 (cast'' pf d.(Core.c)) m20].
 Proof. by move=> []_; move/frame_all_match. Qed.
@@ -1108,7 +1143,8 @@ Proof.
 by case: tlinv=> _; move/frame_all_size_eq.
 Qed.
 
-Lemma head_tail_inv c d pf cd (mu : frame_pkg) e sig args1 args2
+Lemma head_tail_inv c d (sig_pf : c.(Core.sg)=d.(Core.sg)) 
+                    pf cd (mu : frame_pkg) e sig args1 args2
   (val : sm_valid mu m1 m2)
   (atext1 : at_external (sem (cores_S (Core.i c))) (Core.c c) 
             = Some (e,sig,args1))
@@ -1123,7 +1159,7 @@ split=> /=.
 split; first by apply: (head_rel inv).
 by case: tlinv.
 split. 
-exists pf,cd,e,sig,args1,e,sig,args2; split=> //.
+exists pf,sig_pf,cd,e,sig,args1,e,sig,args2; split=> //.
 by apply: (head_match inv).
 by apply: (head_vis inv).
 by apply: (head_domt inv).
@@ -1336,11 +1372,11 @@ case: pkg E=> mu0 m10 m20 val' E.
 
 move/frame_all_inv.
 move=> []c []s1'' []d []s2'' []-> ->.
-move=> []pf []cd []e1 []sig1 []vals1 []e2 []sig2 []vals2.
+move=> []pf []sig_pf []cd []e1 []sig1 []vals1 []e2 []sig2 []vals2.
 move=> []inv all.
 
 split.
-exists pf,cd,e1,sig1,vals1,e2,sig2,vals2.
+exists pf,sig_pf,cd,e1,sig1,vals1,e2,sig2,vals2.
 
 case: inv=> ? ? ? ? val'' frmatch ? ?. 
 move=> frvinj visinv domt nuke fwd1' fwd2' ? ?. 
@@ -1503,6 +1539,10 @@ Record R (data : sig_data N (fun ix : 'I_N => (sims ix).(core_data)))
     (* side conditions *)
   ; R_fntbl : x1.(fn_tbl)=x2.(fn_tbl) 
   ; R_ge    : forall ix : 'I_N, valid_genv (ge (cores_T ix)) m2 
+
+    (* typing conditions *)
+  ; R_tys1  : tys_agree (callStack s1)
+  ; R_tys2  : tys_agree (callStack s2)
   }.
 
 End R.
@@ -1599,41 +1639,41 @@ End R_lems.
 
 Section initCore_lems.
 
-Context (my_cores : 'I_N -> t) c1 ix v vs 
-        (init1 : initCore my_cores ix v vs = Some c1).
+Context (my_cores : 'I_N -> t) c1 sg ix v vs 
+        (init1 : initCore my_cores sg ix v vs = Some c1).
 
 Lemma initCore_ix : ix = Core.i c1.
 Proof.
 move: init1; rewrite /init1 /initCore.
-by case: (core_semantics.initial_core _ _ _ _)=> // c; 
-  case; case: c1=> ? ?; case.
+by case: (core_semantics.initial_core _ _ _ _)=> // c;
+  case; case: c1=> ? ? ?; case.
 Qed.
 
 End initCore_lems.
 
 Section initCore_lems2.
 
-Context c1 ix v vs (init1 : initCore cores_S ix v vs = Some c1).
+Context c1 sg ix v vs (init1 : initCore cores_S sg ix v vs = Some c1).
 
 Lemma initCore_args : RC.args (Core.c c1) = vs.
 Proof.
 move: init1; rewrite /initCore /= /RC.initial_core.
 case: (initial_core _ _ _ _)=> // c. 
-by case; case: c1=> ?; case=> ? ? ? ? /=; case=> _ _ ->.
+by case; case: c1=> ?; case=> ? ? ? ? ? /=; case=> _ _ ->.
 Qed.
 
 Lemma initCore_rets : RC.rets (Core.c c1) = [::].
 Proof.
 move: init1; rewrite /initCore /= /RC.initial_core.
 case: (initial_core _ _ _ _)=> // c. 
-by case; case: c1=> ?; case=> ? ? ? ? /=; case=> _ _ _ ->.
+by case; case: c1=> ?; case=> ? ? ? ? ? /=; case=> _ _ _ ->.
 Qed.
 
 Lemma initCore_locs : RC.locs (Core.c c1) = (fun _ => false).
 Proof.
 move: init1; rewrite /initCore /= /RC.initial_core.
 case: (initial_core _ _ _ _)=> // c. 
-by case; case: c1=> ?; case=> ? ? ? ? /=; case=> _ _ _ _ ->.
+by case; case: c1=> ?; case=> ? ? ? ? ? /=; case=> _ _ _ _ ->.
 Qed.
 
 End initCore_lems2.

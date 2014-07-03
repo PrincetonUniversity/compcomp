@@ -29,7 +29,7 @@ Lemma peek_upd (st : Linker.t N cores) :
   updCore st (peekCore st) = st.
 Proof.
 case: st=> fn_tbl; case; case=> //= a l pf.
-by case: a pf=> ? c pf /=; do 2 f_equal=> //=; apply: proof_irr.
+by case: a pf=> ? c sg pf /=; do 2 f_equal=> //=; apply: proof_irr.
 Qed.
 
 Lemma upd_peek (st : Linker.t N cores) c : peekCore (updCore st c) = c.

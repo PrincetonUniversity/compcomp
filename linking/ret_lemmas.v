@@ -96,17 +96,36 @@ Lemma hlt2 : exists rv2, LinkerSem.halted0 st2 = Some rv2.
 Proof.
 case: (R_inv inv)=> pf []mu_top []mus []mu_eq.
 move=> []pf2 hdinv tlinv.
-move: hlt1; rewrite /LinkerSem.halted0=> hlt10.
+move: hlt1; rewrite /LinkerSem.halted0.
+case hlt10: (halted _ _)=> //[rv].
+case oval: (LinkerSem.oval_has_type_func _ _)=> //. 
+case=> Heq; subst rv1.
 case: (core_halted (sims sims' (Core.i (peekCore st1)))
        _ _ _ _ _ _ (head_match hdinv) hlt10)
        => rv2 []inj12 []vinj hlt2.
 exists rv2.
 set T := C \o cores_T.
-set P := fun ix (x : T ix) => 
-  halted (sem (cores_T ix)) x = Some rv2.
-change (P (Core.i (peekCore st2)) (Core.c (peekCore st2))).
-apply: (cast_indnatdep' (j := Core.i (peekCore st1)))=> // H.
-rewrite /P; move: hlt2; rewrite /= /RC.halted /= => <-. 
+set P := fun sg ix (x : T ix) => 
+  match
+     halted (sem (cores_T ix)) x
+  with
+   | Some mv =>
+       if LinkerSem.oval_has_type_func (Some mv) (sig_res sg)
+       then Some mv
+       else None
+   | None => None
+   end = Some rv2.
+change (P (Core.sg (peekCore st2)) 
+          (Core.i (peekCore st2)) (Core.c (peekCore st2))).
+apply: (cast_indnatdep'' (j := Core.i (peekCore st1))).
+rewrite /P; move: hlt2; rewrite /= /RC.halted /= => ->. 
+
+have H: exists t, [/\ sig_res (Core.sg (peekCore st2))  
+                    & val_casted.val_has_type_func rv2 t].
+{ move: hlt1; rewrite /LinkerSem.halted0.
+  case: (halted _ _)=> //[rv'].
+  case oval: (LinkerSem.oval_has_type_func _ _)=> //.
+
 f_equal.
 f_equal.
 f_equal.

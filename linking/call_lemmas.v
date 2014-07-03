@@ -81,11 +81,11 @@ Notation R := (@R N cores_S' cores_T nucular_T sims' my_ge).
 
 Context
 (mu : Inj.t) m1 m2 ef sig args1 
-(st1 st1' : linker N cores_S) cd st2 id 
+(st1 st1' : linker N cores_S) cd st2 sg id 
 (valid : sm_valid mu m1 m2)
 (fid : LinkerSem.fun_id ef = Some id)
 (atext1 : LinkerSem.at_external0 st1 = Some (ef,sig,args1))
-(hdl1 : LinkerSem.handle id st1 args1 = Some st1')
+(hdl1 : LinkerSem.handle sg id st1 args1 = Some st1')
 (inv : R cd mu st1 m1 st2 m2).
 
 Lemma atext2 : 
@@ -135,7 +135,7 @@ Require Import mem_wd.
 Lemma hdl2 args2 : 
   LinkerSem.at_external0 st2 = Some (ef,sig,args2) -> 
   exists cd' st2' mu',
-    LinkerSem.handle id st2 args2 = Some st2'
+    LinkerSem.handle sg id st2 args2 = Some st2'
     /\ R cd' mu' st1' m1 st2' m2.
 Proof.
 move=> A.
@@ -252,7 +252,7 @@ have all_at2: all (atExternal cores_T) (CallStack.callStack st2).
   move=> /=; apply/andP; split=> //.
   move: A; rewrite /LinkerSem.at_external0 /atExternal.
   rewrite /d /s2 /pf2 /peekCore.
-  by case: (STACK.head _ _)=> ? /= d atext2_; rewrite /RC.at_external atext2_. }
+  by case: (STACK.head _ _)=> ? ? /= d atext2_; rewrite /RC.at_external atext2_. }
 
 have globs_frgnS:
   forall b,
@@ -316,21 +316,21 @@ have [cd_new [c2 [pf_new [init2 mtch12]]]]:
   exists (cd_new : core_data (sims sims' (Core.i c1))) 
          (c2 : Core.t cores_T)
          (pf : Core.i c1 = Core.i c2),
-    [/\ initCore cores_T ix (Vptr id Integers.Int.zero) args2 = Some c2
+    [/\ initCore cores_T sg ix (Vptr id Integers.Int.zero) args2 = Some c2
       & match_state (sims sims' (Core.i c1)) cd_new
         (initial_SM domS domT frgnS frgnT j) 
         (Core.c c1) m1 (cast'' pf (Core.c c2)) m2].
 { move: init1; rewrite /initCore.
   case init1: (core_semantics.initial_core _ _ _ _)=> //[c1']; case=> X.
   generalize dependent c1; case=> c1_i c1; intros.
-  move: (X) init1; case=> eq _ init1; subst ix=> /=.
+  move: (X) init1; case=> eq _ _ init1; subst ix=> /=.
   case: (core_initial _ _ _ _ (sims sims' c1_i) _ 
          args1 _ m1 j args2 m2 domS domT init1 inj vinj')=> //.
   move=> cd' []c2' []init2 mtch_init12.
-  exists cd',(Core.mk N cores_T c1_i c2'),erefl.
+  exists cd',(Core.mk N cores_T c1_i c2' sg),erefl.
   move: init2=> /= ->; split=> //=.
   rewrite cast_ty_erefl; move: X; case=> X.
-  move: (EqdepFacts.eq_sigT_snd X)=> /= <-. 
+  move: (EqdepFacts.eq_sigT_snd X)=> /= <-. intros. subst sg.
   rewrite -Eqdep_dec.eq_rect_eq_dec; first by apply: mtch_init12.
   move=> m n; case e: (m == n); first by left; move: (eqP e).
   right=> Contra; rewrite Contra in e. 

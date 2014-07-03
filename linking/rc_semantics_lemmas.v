@@ -38,9 +38,9 @@ Variable sim : SM_simulation_inject eff_S eff_T ge_S ge_T.
 Lemma rc_sim : 
   SM_simulation_inject (RC.effsem eff_S) eff_T ge_S ge_T.
 Proof.
-case: sim=> cd mtch ord d e f g h i j init step halt atext aftext.
-eapply Build_SM_simulation_inject
-  with (core_data   := cd)
+case: sim=> cd mtch ord d e f g h i j init step halt atext aftext. 
+eapply Build_SM_simulation_inject with
+       (core_data   := cd)
        (core_ord    := ord)
        (match_state := 
          fun cd mu c m d tm => 
@@ -76,13 +76,13 @@ case: (atext cd0 mu (RC.core c1) m1 c2 m2 e0 vals1 ef_sig mtch' at1').
 by move=> H H2; split. }
 { move=> cd0 mu st1 st2 m1 e0 vals1 m2 sig vals2 e' ef_sig'.
 move=> inj mtch' at1 at2 vinj pSrc' H pTgt' I nu J nu' ret1 m1' ret2 m2'.
-move=> eincr sep wd val inj' vinj' fwd fwd' fS' K fT' L mu' M unch1 unch2.
+move=> ty1 ty2 eincr sep wd val inj' vinj' fwd fwd' fS' K fT' L mu' M unch1 unch2.
 have at1': at_external eff_S (RC.core st1) = Some (e0, sig, vals1).
 { move: at1; rewrite /= /RC.at_external.
   by case q: (at_external _ _)=> [[[? ?] ?]|//]; case r: (vals_def _). }
 case: (aftext cd0 mu (RC.core st1) st2 m1 e0 vals1 m2 sig vals2 e' ef_sig'
   inj mtch' at1' at2 vinj pSrc' H pTgt' I nu J nu' ret1 m1' ret2 m2'
-  eincr sep wd val inj' vinj' fwd fwd' fS' K fT' L mu' M unch1 unch2).
+  ty1 ty2 eincr sep wd val inj' vinj' fwd fwd' fS' K fT' L mu' M unch1 unch2).
 move=> cd' []st1' []st2' []aft1' []aft2' mtch12'.
 exists cd'.
 exists (RC.mk st1' (RC.args st1) (ret1 :: RC.rets st1) (RC.locs st1)).
