@@ -129,7 +129,6 @@ CORE=Extensionality.v base.v eq_dec.v Address.v \
   effect_simulations_trans.v \
   FiniteMaps.v mem_interpolation_defs.v mem_interpolation_II.v \
   effect_interpolation_II.v effect_interpolants.v effect_interpolation_proofs.v \
-  effect_simulationsEXP.v \
   arguments.v compcert.v \
   closed_safety.v trace_semantics.v\
   nucular_semantics.v \
