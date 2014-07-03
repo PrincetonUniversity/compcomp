@@ -192,15 +192,13 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
     as [core_data12 match_core12 core_ord12 core_ord_wf12 
       match_sm_wd12 genvs_dom_eq12 match_genv12
       match_visible12 match_restrict12 
-      match_sm_valid12 (*match_sm_dival12 match_protected12*) core_initial12 
-      core_diagram12 effcore_diagram12
+      match_sm_valid12 core_initial12 effcore_diagram12
       core_halted12 core_at_external12 eff_after_external12].  
   destruct SIM23 
     as [core_data23 match_core23 core_ord23 core_ord_wf23 
       match_sm_wd23 genvs_dom_eq23 match_genv23
       match_visible23 match_restrict23
-      match_sm_valid23 (*match_sm_dival23 match_protected23*) core_initial23 
-      core_diagram23 effcore_diagram23
+      match_sm_valid23 core_initial23 effcore_diagram23
       core_halted23 core_at_external23 eff_after_external23].
   eapply Build_SM_simulation_inject with
     (core_ord := clos_trans _ (sem_compose_ord_eq_eq core_ord12 core_ord23 C2))
@@ -214,19 +212,20 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
            (forall b, frgnBlocksTgt mu1 b = true -> frgnBlocksSrc mu2 b = true)) /\ 
           match_core12 d1 mu1 c1 m1 c2 m2 /\ match_core23 d2 mu2 c2 m2 c3 m3 
       end).
- (*well_founded*)
-  eapply wf_clos_trans. eapply well_founded_sem_compose_ord_eq_eq; assumption.
- (*match_sm_wd*) clear - match_sm_wd12 match_sm_wd23.
+{ (*well_founded*)
+  eapply wf_clos_trans. 
+  eapply well_founded_sem_compose_ord_eq_eq; assumption. }
+{ (*match_sm_wd*) clear - match_sm_wd12 match_sm_wd23.
   intros. rename c2 into c3. rename m2 into m3.
   destruct d as [[d12 cc2] d23].
   destruct H as [c2 [m2 [mu12 [mu23 [X [J [INV [MC12 MC23]]]]]]]]; subst.
   specialize (match_sm_wd12 _ _ _ _ _ _ MC12).
   specialize (match_sm_wd23 _ _ _ _ _ _ MC23).
   destruct INV as [INVa [INVb [INVc INVd]]].
-  eapply (compose_sm_wd); eauto.
- (*genvs_domain_eq*)
-  eapply genvs_domain_eq_trans; eassumption.
- (*match_genv*)
+  eapply (compose_sm_wd); eauto. }
+{ (*genvs_domain_eq*)
+  eapply genvs_domain_eq_trans; eassumption. }
+{ (*match_genv*)
   clear - genvs_dom_eq12 match_sm_wd12 match_genv12 match_genv23.
   intros. rename c2 into c3. rename m2 into m3.
   destruct d as [[d12 cc2] d23].
@@ -238,19 +237,19 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
          apply meminj_preserves_genv2blocks in GE23a.
          rewrite compose_sm_extern.
          solve [eapply meminj_preserves_globals_ind_compose; eassumption].
-  apply GE12b.
- (*match_reach_closed*)
+  apply GE12b. }
+{ (*match_reach_closed*)
     clear - match_sm_wd12 match_visible12.
     intros. rename c2 into c3. rename m2 into m3.
-      destruct d as [[d12 cc2] d23].
-      destruct H as [c2 [m2 [mu12 [mu23 [X [J [INV [MC12 MC23]]]]]]]]; subst.
-      simpl. rewrite vis_compose_sm. eapply match_visible12. eassumption. 
- (*match_restrict*)
+    destruct d as [[d12 cc2] d23].
+    destruct H as [c2 [m2 [mu12 [mu23 [X [J [INV [MC12 MC23]]]]]]]]; subst.
+    simpl. rewrite vis_compose_sm. eapply match_visible12. eassumption. }
+{ (*match_restrict*)
     clear - match_restrict12.
     intros. rename c2 into c3. rename m2 into m3.
     destruct d as [[d12 cc2] d23].
-    destruct H as [c2 [m2 [mu12 [mu23 [XX [J [INV [MC12 MC23]]]]]]]]; subst.
-    simpl in *.
+    destruct H as [c2 [m2 [mu12 [mu23 [XX [J [INV [MC12 MC23]]]]]]]]; 
+      subst; simpl in *.
     exists c2, m2, (restrict_sm mu12 X), mu23.
     specialize (match_restrict12 _ _ _ _ _ _ X MC12 H0 H1).
     intuition.
@@ -267,8 +266,8 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
       destruct mu12; simpl in *. assumption.
       destruct mu12; simpl in *. assumption.
       destruct mu12; simpl in *. apply (H2 _ H4).
-      destruct mu12; simpl in *. apply (H5 _ H4).
- (*sm_valid*)
+      destruct mu12; simpl in *. apply (H5 _ H4). }
+{ (*sm_valid*)
     clear - match_sm_valid12 match_sm_valid23.
     intros. rename c2 into c3.  rename m2 into m3.
     destruct d as [[d12 cc2] d23].
@@ -277,24 +276,8 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
     specialize (match_sm_valid23 _ _ _ _ _ _ MC23).
     unfold sm_valid, compose_sm. destruct mu12; destruct mu23; simpl in *.
     split; intros. eapply match_sm_valid12. apply H.
-    eapply match_sm_valid23. apply H.
- (*sm_dival
-    clear - match_sm_dival12 match_sm_dival23.
-    intros. rename c2 into c3.  rename m2 into m3.
-    destruct d as [[d12 cc2] d23].
-    destruct H as [c2 [m2 [mu12 [mu23 [X [J [INV [MC12 MC23]]]]]]]]; subst.
-    destruct (match_sm_dival12 _ _ _ _ _ _ MC12) as [DV _].
-    destruct (match_sm_dival23 _ _ _ _ _ _ MC23) as [_ TV].
-    rewrite compose_sm_DomSrc, compose_sm_DomTgt.
-    split; assumption.*)
- (*match_protected
-    clear - match_sm_wd12 match_protected12
-            match_sm_wd23 match_protected23.
-    intros. rename c2 into c3.  rename m2 into m3.
-    destruct d as [[d12 cc2] d23].
-    destruct H as [c2 [m2 [mu12 [mu23 [X [J [INV [MC12 MC23]]]]]]]]; subst.
-    simpl. apply (match_protected12 _ _ _ _ _ _ MC12 _ H0 H1).*)
- (*initial_core*)
+    eapply match_sm_valid23. apply H. }
+{ (*initial_core*)
    clear - genvs_dom_eq12 core_initial12 genvs_dom_eq23 core_initial23.
    intros. rename m2 into m3. rename v into v3. rename vals2 into vals3. 
     (*assert (HT: Forall2 Val.has_type vals1 (sig_args sig)). 
@@ -353,7 +336,8 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
            destruct XX as [mm [? ?]]; subst.
              apply (CC _ _ _ H1 H4).
     destruct (core_initial12 _ _ _ _ _ vals2 _ 
-       DomS (fun b => match j2 b with None => false | Some (b3,d) => DomT b3 end) H Inj12)
+       DomS (fun b => match j2 b with None => false
+                      | Some (b3,d) => DomT b3 end) H Inj12)
      as [d12 [c2 [Ini2 MC12]]]; try assumption.
       (*eapply forall_valinject_hastype; eassumption.*)
       intros. destruct (X b1) as [_ J1Comp]. 
@@ -417,22 +401,15 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
   split. subst. unfold initial_SM, compose_sm; simpl.
            f_equal.
   split. subst; simpl. repeat (split; trivial).
-  split; trivial. 
- (*core_diagram*)
-  clear - match_sm_wd12 match_sm_valid12 core_diagram12 
-          match_sm_wd23 match_sm_valid23 core_diagram23.
-  intros. rename st2 into st3. rename m2 into m3.
-  destruct cd as [[d12 cc2] d23].
-  destruct H0 as [c2 [m2 [mu12 [mu23 [X [J [INV [MC12 MC23]]]]]]]]; subst.
-  eapply core_diagram_trans; try eassumption.
- (*effcore_diagram*)
-  clear - match_sm_wd12 match_sm_valid12 effcore_diagram12 
-          match_sm_wd23 match_sm_valid23 effcore_diagram23.
-  intros. rename st2 into st3. rename m2 into m3.
-  destruct cd as [[d12 cc2] d23].
-  destruct H0 as [c2 [m2 [mu12 [mu23 [X [J [INV [MC12 MC23]]]]]]]]; subst.
-  eapply effcore_diagram_trans; eassumption.
-(*halted*)
+  split; trivial. }
+{ (*effcore_diagram*)
+   clear - match_sm_wd12 match_sm_valid12 effcore_diagram12 
+            match_sm_wd23 match_sm_valid23 effcore_diagram23.
+   intros. rename st2 into st3. rename m2 into m3.
+   destruct cd as [[d12 cc2] d23].
+   destruct H0 as [c2 [m2 [mu12 [mu23 [X [J [INV [MC12 MC23]]]]]]]]; subst.
+   eapply effcore_diagram_trans; eassumption. }
+{ (*halted*)
   clear - match_sm_wd12 core_halted12 match_sm_wd23 core_halted23.
   intros. rename c2 into c3. rename m2 into m3.  
   destruct cd as [[d12 cc2] d23].
@@ -452,8 +429,8 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
          eapply val_inject_compose; try eassumption.
          eapply val_inject_incr; try eassumption.
          apply restrict_incr.
-  assumption.
-(*at_external*)
+  assumption. }
+{ (*at_external*)
   clear - match_sm_wd12 core_at_external12 match_sm_wd23 core_at_external23.
   intros. rename c2 into c3. rename m2 into m3.
   rename H0 into AtExtSrc. 
@@ -461,9 +438,11 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
   destruct H as [st2 [m2 [mu12 [mu23 [Hst2 [HMu [GLUEINV [MC12 MC23]]]]]]]]. 
   subst.
   destruct (core_at_external12 _ _ _ _ _ _ _ _ _ MC12 AtExtSrc)
-    as [MInj12 [vals2 [ArgsInj12 (*[ArgsHT2*) [AtExt2 SH12](*]*)]]]; clear core_at_external12.
+    as [MInj12 [vals2 [ArgsInj12 [AtExt2 SH12]]]]; 
+     clear core_at_external12.
   destruct (core_at_external23 _ _ _ _ _ _ _ _ _ MC23 AtExt2)
-    as [MInj23 [vals3 [ArgsInj23 (*[ArgsHTTgt*) [AtExtTgt SH23](*]*)]]]; clear core_at_external23.
+    as [MInj23 [vals3 [ArgsInj23 [AtExtTgt SH23]]]]; 
+     clear core_at_external23.
   rewrite compose_sm_as_inj; try eauto.   
     split. eapply Mem.inject_compose; eassumption.
     exists vals3.
@@ -538,11 +517,12 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
               intros. apply andb_true_iff in H; destruct H.
                 rewrite H; trivial.
   eapply GLUEINV. 
-  eapply GLUEINV.
-(*after_external*)
-  clear - match_sm_wd12 match_sm_valid12 core_at_external12 eff_after_external12 
-          match_visible12 match_restrict12
-          match_sm_wd23 match_sm_valid23 core_at_external23 eff_after_external23.
+  eapply GLUEINV. }
+{ (*after_external*)
+  clear - match_sm_wd12 match_sm_valid12 core_at_external12 
+          eff_after_external12  match_visible12 match_restrict12
+          match_sm_wd23 match_sm_valid23 core_at_external23 
+          eff_after_external23.
   intros. rename st2 into st3. rename m2 into m3. 
           rename vals2 into vals3'. rename m2' into m3'.
           rename UnchLOOR into UnchLOOR13.
@@ -631,7 +611,7 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
   
   (*Prove uniqueness of e, ef_sig, vals3. We do this by hand, instead of 
      rewrite AtExtTgt in AtExt3; inv Atext3 in order to avoid the subst
-     taht's inherent in inv AtExt3. Probably there's a better way to do this..*)
+     that's inherent in inv AtExt3. Probably there's a better way to do this..*)
   assert (e' = e /\ ef_sig' = ef_sig /\ vals3'=vals3).
      rewrite AtExtTgt in AtExt3. inv AtExt3. intuition.
   destruct H as [HH1 [HH2 HH3]].
@@ -958,7 +938,7 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
                             left. intuition.
                             right. intuition.
                assumption.
-   split; assumption.
+   split; assumption. }
 Qed.
 
 End Eff_sim_trans. 
