@@ -277,6 +277,62 @@ Definition terminates {G C M} (csem : CoreSemantics G C M)
   exists c' m', corestep_star csem ge c m c' m' 
   /\ exists v, halted csem c' = Some v.
 
+Section termination_preservation.
+Context  {F V TF TV C D Z data : Type}
+         {source : @EffectSem (Genv.t F V) C}
+         {target : @EffectSem (Genv.t TF TV) D}
+         {geS : Genv.t F V}
+         {geT : Genv.t TF TV}
+         (main : val)
+
+  (sim : Wholeprog_simulation source target geS geT main)
+.
+
+Lemma termination_preservation:
+  forall cd c m d tm j c' m' rv1,
+  match_state sim cd j c m d tm -> 
+  corestep_star source geS c m c' m' -> 
+  halted source c' = Some rv1 -> 
+  terminates target geT d tm.
+Proof.
+intros.
+destruct H0 as [n H0].
+revert cd j c m d tm H H0.
+induction n; intros.
+simpl in H0. symmetry in H0; inv H0.
+cut (@halt_match F V _ _ C D source target c d). intro.
+unfold halt_match in H0.
+destruct H0 as [rv [trv [? ?]]].
+exists d, tm; split; auto. 
+solve[exists O; simpl; auto].
+solve[exists trv; auto].
+generalize H1 as H1'; intro.
+eapply core_halted in H1; eauto. 
+destruct H1 as [? [rv2 [? [? [? ?]]]]]. 
+exists rv1, rv2; split; auto.
+simpl in H0.
+destruct H0 as [c2 [m2 [STEP STEPN]]].
+generalize STEP as STEP'; intro.
+apply corestep_not_halted in STEP.
+eapply core_diagram in STEP'; eauto.
+destruct STEP' as [? [? [cd' [j' [MATCH ?]]]]].
+clear H.
+destruct H0 as [X|[X Y]].
+eapply IHn in MATCH; eauto.
+unfold terminates in MATCH|-*.
+destruct MATCH as [x' [tm' [Y [v W]]]].
+exists x', tm'; split; eauto.
+eapply corestep_star_trans; eauto.
+solve[eapply corestep_plus_star; eauto].
+eapply IHn in MATCH; eauto.
+unfold terminates in MATCH|-*.
+destruct MATCH as [x' [tm' [U [v W]]]].
+exists x', tm'; split; eauto.
+solve[eapply corestep_star_trans; eauto].
+Qed.
+
+End termination_preservation.
+
 Section equitermination.
 Context  {F V TF TV C D Z data : Type}
          {source : @EffectSem (Genv.t F V) C}
@@ -291,53 +347,6 @@ Context  {F V TF TV C D Z data : Type}
 
   (TGT_DET : corestep_fun target)
 .
-
-Lemma termination_preservation:
-  forall cd c m d tm j c' m' rv1
-  (source_safe : forall n, safeN source geS n c m),
-  match_state sim cd j c m d tm -> 
-  corestep_star source geS c m c' m' -> 
-  halted source c' = Some rv1 -> 
-  terminates target geT d tm.
-Proof.
-intros.
-destruct H0 as [n H0].
-revert cd j c m d tm H H0 source_safe.
-induction n; intros.
-simpl in H0. symmetry in H0; inv H0.
-apply (corestep_ord' main sim c d m tm) in H; auto.
-cut (@halt_match F V _ _ C D source target c d). intro.
-unfold halt_match in H0.
-destruct H0 as [rv [trv [? ?]]].
-exists d, tm; split; auto. 
-solve[exists O; simpl; auto].
-solve[exists trv; auto].
-destruct H; auto.
-destruct H as [? [? [? [? [STEP ?]]]]].
-destruct STEP as [n STEP].
-simpl in STEP.
-destruct STEP as [c2 [m2 [STEP ?]]].
-apply corestep_not_halted in STEP.
-rewrite STEP in H1; congruence.
-simpl in H0.
-destruct H0 as [c2 [m2 [? ?]]].
-generalize H0 as H0'; intro.
-eapply core_diagram in H0; eauto.
-destruct H0 as [d2 [tm2 [cd2 [j2 [? ?]]]]].
-assert (SAFE: forall n, safeN source geS n c2 m2). 
-  intros n0.
-  solve[eapply safe_corestep_forward in H0'; eauto].
-specialize (IHn cd2 j2 c2 m2 d2 tm2 H0 H2 SAFE).
-destruct IHn as [d' [tm' [trv [? ?]]]].
-exists d', tm'.
-split; auto.
-eapply corestep_star_trans; eauto.
-destruct H3.
-destruct H3 as [n0 H3].
-solve[exists (S n0); auto].
-destruct H3; auto.
-solve[exists x; auto].
-Qed.
 
 Lemma termination_reflection:
   forall n c m d tm cd j d' tm' hv'
