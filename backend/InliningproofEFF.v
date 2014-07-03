@@ -2884,7 +2884,74 @@ Qed.
     (*  Mem.inject (as_inj mu) m1' m2' *)
     eapply Mem.free_left_inject; eauto.
 
-    { admit. (*TODO: BUILTIN*) }
+    { (* builtin*)
+      exploit tr_funbody_inv; eauto. intros TR; inv TR.
+      rename MINJ into MINJR.
+      destruct H as [RC [PG [Glob [SMV [WD MINJ]]]]].
+      assert (PGR: meminj_preserves_globals ge (restrict (as_inj mu) (vis mu))).
+        rewrite <- restrict_sm_all.
+        eapply restrict_sm_preserves_globals; try eassumption.
+          unfold vis. intuition.
+      rewrite restrict_sm_all in *.
+      assert (ArgsInj:= agree_val_regs _ _ _ _ args AG).
+      exploit (BuiltinEffects.inlineable_extern_inject _ _ GDE_lemma);
+        try eapply H1; try eassumption.
+        apply symbols_preserved. 
+      intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
+           [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
+      exists (RTL_State stk' f' (Vptr sp' Int.zero) (spc ctx pc')
+               (rs'#(sreg ctx res) <- vres')), tm'; split.
+        left. apply core_semantics_lemmas.corestep_plus_one. 
+                eapply rtl_corestep_exec_Ibuiltin; eauto. 
+      exists mu'. intuition.
+      assert (ISEP: inject_separated (restrict (as_inj mu) (vis mu))
+                    (restrict (as_inj mu') (vis mu')) m1 m2).
+                red. intros ??? RAI RAI'.
+                destruct (restrictD_Some _ _ _ _ _ RAI')
+                  as [AI' VIS']; clear RAI'.
+                destruct (restrictD_None' _ _ _ RAI) 
+                    as [AI | [bb2 [dd [AI VIS]]]]; clear RAI.
+                  apply sm_inject_separated_mem in SEPARATED.
+                  apply (SEPARATED _ _ _ AI AI'). trivial. 
+                rewrite (intern_incr_vis_inv _ _ WD WD' 
+                    INCR _ _ _ AI VIS') in VIS; discriminate.
+      split. 
+      {  econstructor; eauto.
+        { eapply match_stacks_inside_set_reg.
+            apply restrict_sm_WD; trivial.  
+            eapply match_stacks_inside_extcall; try eapply MS0.
+              apply restrict_sm_WD; trivial.  
+              apply restrict_sm_WD; trivial.  
+              intros; eapply external_call_max_perm; eauto. 
+              intros; eapply external_call_max_perm; eauto.
+              rewrite restrict_sm_all. apply OUTOFREACH.
+              rewrite restrict_sm_all. apply MINJR.
+              apply restrict_sm_intern_incr; trivial. 
+              repeat rewrite restrict_sm_all; trivial.
+              clear - SMV. destruct SMV.
+                split; intros.
+                 rewrite restrict_sm_DOM in H1. apply (H _ H1).
+                 rewrite restrict_sm_RNG in H1. apply (H0 _ H1). 
+              apply VB. }
+        rewrite restrict_sm_all. apply agree_set_reg; eauto.  
+          eapply agree_regs_incr; eauto. 
+          apply (intern_incr_restrict _ _ WD' INCR).
+        rewrite restrict_sm_all. 
+          apply (intern_incr_restrict _ _ WD' INCR). assumption.
+        rewrite restrict_sm_all. apply inject_restrict; assumption.
+        eapply external_call_mem_forward; try eassumption.
+        { rewrite restrict_sm_all.
+          eapply range_private_extcall; try eassumption.
+            intros. eapply external_call_mem_forward; eauto. 
+            apply (intern_incr_restrict _ _ WD' INCR). }
+        intros. apply SSZ2. eapply external_call_max_perm; eauto. 
+      }
+      intuition.
+      eapply meminj_preserves_incr_sep. eapply PG. eassumption. 
+             apply intern_incr_as_inj; trivial.
+             apply sm_inject_separated_mem; eassumption.
+      assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
+          rewrite <- FRG. apply Glob; assumption. }
 
     (* Icond *)
 
@@ -3248,11 +3315,10 @@ eapply core_semantics_lemmas.corestep_plus_star_trans.
 eapply core_semantics_lemmas.corestep_plus_one. 
 eapply rtl_corestep_exec_Inop; eauto. 
 eapply P.
+assert (SEP: sm_inject_separated mu mu' m1 m2).
+  admit.
 
 exists mu'; intuition.
-
-(* sm_inject_separated mu mu' m1 m2 *)
-admit.
 
 unfold MATCH; intuition.
 constructor; eauto.
@@ -3315,36 +3381,71 @@ eapply injection_almost_equality_restrict; eauto.
 eapply meminj_preserves_incr_sep; eauto.
 apply intern_incr_as_inj; eauto.
 eapply sm_inject_separated_mem; eauto.
-(* sm_inject_separated mu mu' m1 m2 *)
-admit.
 
 exploit (intern_incr_meminj_preserves_globals ge); eauto; try split; eauto.
 eapply match_genv_meminj_preserves_extern_iff_all; eauto.
 intros D; destruct D as [? isGlobal_frgn]; auto.
 
-(* external function *)
-
-(*  exploit match_stacks_globalenvs; eauto. intros [bound MG].
-  (*exploit external_call_mem_inject; eauto.
-    eapply match_globalenvs_preserves_globals; eauto.
-    Check external_call.
-    Print extcall_sem. 
-  intros [F1 [v1 [m1' [A [B [C [D [E [J K]]]]]]]]].*)
-  simpl in FD. inv FD. 
-  left; econstructor; split.
-  eapply core_semantics_lemmas.plus_one. eapply exec_function_external; eauto. 
-    eapply external_call_symbols_preserved; eauto. 
-    exact symbols_preserved. exact varinfo_preserved.
-  econstructor.
-    eapply match_stacks_bound with (Mem.nextblock m'0).
-    eapply match_stacks_extcall with (F1 := F) (F2 := F1) (m1 := m) (m1' := m'0); eauto.
-    intros; eapply external_call_max_perm; eauto. 
-    intros; eapply external_call_max_perm; eauto.
-    xomega.
-    eapply external_call_nextblock; eauto. 
-    auto. auto.*)
-
- {admit. (*TODO: external call of i64helper cunction*) }
+ { (* nonobservable external call *)
+      rename MINJ into MINJR.
+      destruct H as [RC [PG [Glob [SMV [WD MINJ]]]]].
+      assert (PGR: meminj_preserves_globals ge (restrict (as_inj mu) (vis mu))).
+        rewrite <- restrict_sm_all.
+        eapply restrict_sm_preserves_globals; try eassumption.
+          unfold vis. intuition.
+      rewrite restrict_sm_all in *.
+      simpl in FD. inv FD. 
+      specialize (BuiltinEffects.EFhelpers _ _ OBS); intros.
+      exploit (BuiltinEffects.inlineable_extern_inject _ _ GDE_lemma);
+        try eapply H0; try eassumption.
+        apply symbols_preserved. 
+      intros [mu' [vres' [tm' [EC [RESINJ [MINJ' [UNMAPPED [OUTOFREACH 
+           [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
+      eexists; eexists. 
+      split. left. 
+             eapply core_semantics_lemmas.corestep_plus_one. 
+             eapply rtl_corestep_exec_function_external; eauto.
+      exists mu'. intuition.
+      assert (ISEP: inject_separated (restrict (as_inj mu) (vis mu))
+                    (restrict (as_inj mu') (vis mu')) m1 m2).
+                red. intros ??? RAI RAI'.
+                destruct (restrictD_Some _ _ _ _ _ RAI')
+                  as [AI' VIS']; clear RAI'.
+                destruct (restrictD_None' _ _ _ RAI) 
+                    as [AI | [bb2 [dd [AI VIS]]]]; clear RAI.
+                  apply sm_inject_separated_mem in SEPARATED.
+                  apply (SEPARATED _ _ _ AI AI'). trivial. 
+                rewrite (intern_incr_vis_inv _ _ WD WD' 
+                    INCR _ _ _ AI VIS') in VIS; discriminate.
+      split. 
+      {  econstructor; try solve[rewrite restrict_sm_all; eassumption].
+        { (*eapply match_stacks_inside_set_reg.
+            apply restrict_sm_WD; trivial.  *)
+           eapply match_stacks_bound.
+             eapply match_stacks_extcall. 10: eapply MS0.
+              apply restrict_sm_WD; trivial.  
+              apply restrict_sm_WD; trivial.  
+              intros; eapply external_call_max_perm; eauto. 
+              intros; eapply external_call_max_perm; eauto.
+              rewrite restrict_sm_all. apply OUTOFREACH.
+              rewrite restrict_sm_all. apply MINJR.
+              apply restrict_sm_intern_incr; trivial. 
+              repeat rewrite restrict_sm_all; trivial.
+              clear - SMV. destruct SMV.
+                split; intros.
+                 rewrite restrict_sm_DOM in H1. apply (H _ H1).
+                 rewrite restrict_sm_RNG in H1. apply (H0 _ H1). 
+              xomega.
+           eapply forward_nextblock. 
+             eapply external_call_mem_forward; eassumption. }
+        rewrite restrict_sm_all. apply inject_restrict; assumption.
+      }
+      intuition.
+      eapply meminj_preserves_incr_sep. eapply PG. eassumption. 
+             apply intern_incr_as_inj; trivial.
+             apply sm_inject_separated_mem; eassumption.
+      assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
+          rewrite <- FRG. apply Glob; assumption. }
 
 (* return fron noninlined function *)
 inv MS0.
@@ -3948,7 +4049,76 @@ exists (mu' : SM_Injection),
     (*  Mem.inject (as_inj mu) m1' m2' *)
     eapply Mem.free_left_inject; eauto.
 
-    { admit. (*TODO: BUILTIN*) }
+    { (* builtin*)
+      exploit tr_funbody_inv; eauto. intros TR; inv TR.
+      rename MINJ into MINJR.
+      destruct H as [RC [PG [Glob [SMV [WD MINJ]]]]].
+      assert (PGR: meminj_preserves_globals ge (restrict (as_inj mu) (vis mu))).
+        rewrite <- restrict_sm_all.
+        eapply restrict_sm_preserves_globals; try eassumption.
+          unfold vis. intuition.
+      rewrite restrict_sm_all in *.
+      assert (ArgsInj:= agree_val_regs _ _ _ _ args AG).
+      exploit (BuiltinEffects.inlineable_extern_inject _ _ GDE_lemma);
+        try eapply H1; try eassumption.
+        apply symbols_preserved. 
+      intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
+           [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
+      exists (RTL_State stk' f' (Vptr sp' Int.zero) (spc ctx pc')
+               (rs'#(sreg ctx res) <- vres')), tm'.
+      split. eexists.
+        split. left. apply effstep_plus_one. 
+                eapply rtl_effstep_exec_Ibuiltin; eauto. 
+        intros. eapply BuiltinEffects.BuiltinEffect_Propagate; eassumption.
+      exists mu'. intuition.
+      assert (ISEP: inject_separated (restrict (as_inj mu) (vis mu))
+                    (restrict (as_inj mu') (vis mu')) m1 m2).
+                red. intros ??? RAI RAI'.
+                destruct (restrictD_Some _ _ _ _ _ RAI')
+                  as [AI' VIS']; clear RAI'.
+                destruct (restrictD_None' _ _ _ RAI) 
+                    as [AI | [bb2 [dd [AI VIS]]]]; clear RAI.
+                  apply sm_inject_separated_mem in SEPARATED.
+                  apply (SEPARATED _ _ _ AI AI'). trivial. 
+                rewrite (intern_incr_vis_inv _ _ WD WD' 
+                    INCR _ _ _ AI VIS') in VIS; discriminate.
+      split. 
+      {  econstructor; eauto.
+        { eapply match_stacks_inside_set_reg.
+            apply restrict_sm_WD; trivial.  
+            eapply match_stacks_inside_extcall; try eapply MS0.
+              apply restrict_sm_WD; trivial.  
+              apply restrict_sm_WD; trivial.  
+              intros; eapply external_call_max_perm; eauto. 
+              intros; eapply external_call_max_perm; eauto.
+              rewrite restrict_sm_all. apply OUTOFREACH.
+              rewrite restrict_sm_all. apply MINJR.
+              apply restrict_sm_intern_incr; trivial. 
+              repeat rewrite restrict_sm_all; trivial.
+              clear - SMV. destruct SMV.
+                split; intros.
+                 rewrite restrict_sm_DOM in H1. apply (H _ H1).
+                 rewrite restrict_sm_RNG in H1. apply (H0 _ H1). 
+              apply VB. }
+        rewrite restrict_sm_all. apply agree_set_reg; eauto.  
+          eapply agree_regs_incr; eauto. 
+          apply (intern_incr_restrict _ _ WD' INCR).
+        rewrite restrict_sm_all. 
+          apply (intern_incr_restrict _ _ WD' INCR). assumption.
+        rewrite restrict_sm_all. apply inject_restrict; assumption.
+        eapply external_call_mem_forward; try eassumption.
+        { rewrite restrict_sm_all.
+          eapply range_private_extcall; try eassumption.
+            intros. eapply external_call_mem_forward; eauto. 
+            apply (intern_incr_restrict _ _ WD' INCR). }
+        intros. apply SSZ2. eapply external_call_max_perm; eauto. 
+      }
+      intuition.
+      eapply meminj_preserves_incr_sep. eapply PG. eassumption. 
+             apply intern_incr_as_inj; trivial.
+             apply sm_inject_separated_mem; eassumption.
+      assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
+          rewrite <- FRG. apply Glob; assumption. }
 
     (* Icond *)
 
@@ -4270,10 +4440,10 @@ eapply P.
 
 apply Empty_Effect_implication.
 
-exists mu'; intuition.
+assert (SEP: sm_inject_separated mu mu' m1 m2).
+  admit.
 
-(* sm_inject_separated mu mu' m1 m2 *)
-admit.
+exists mu'; intuition.
 
 unfold MATCH; intuition.
 constructor; eauto.
@@ -4304,36 +4474,73 @@ eapply injection_almost_equality_restrict; eauto.
 eapply meminj_preserves_incr_sep; eauto.
 apply intern_incr_as_inj; eauto.
 eapply sm_inject_separated_mem; eauto.
-(* sm_inject_separated mu mu' m1 m2 *)
-admit.
 
 exploit (intern_incr_meminj_preserves_globals ge); eauto; try split; eauto.
 eapply match_genv_meminj_preserves_extern_iff_all; eauto.
 intros D; destruct D as [? isGlobal_frgn]; auto.
 
-(* external function *)
-
-(*  exploit match_stacks_globalenvs; eauto. intros [bound MG].
-  (*exploit external_call_mem_inject; eauto.
-    eapply match_globalenvs_preserves_globals; eauto.
-    Check external_call.
-    Print extcall_sem. 
-  intros [F1 [v1 [m1' [A [B [C [D [E [J K]]]]]]]]].*)
-  simpl in FD. inv FD. 
-  left; econstructor; split.
-  eapply core_semantics_lemmas.plus_one. eapply exec_function_external; eauto. 
-    eapply external_call_symbols_preserved; eauto. 
-    exact symbols_preserved. exact varinfo_preserved.
-  econstructor.
-    eapply match_stacks_bound with (Mem.nextblock m'0).
-    eapply match_stacks_extcall with (F1 := F) (F2 := F1) (m1 := m) (m1' := m'0); eauto.
-    intros; eapply external_call_max_perm; eauto. 
-    intros; eapply external_call_max_perm; eauto.
-    xomega.
-    eapply external_call_nextblock; eauto. 
-    auto. auto.*)
-
- {admit. (*TODO: external call of i64helper cunction*) }
+ { (* nonobservable external call *)
+      rename MINJ into MINJR.
+      destruct H as [RC [PG [Glob [SMV [WD MINJ]]]]].
+      assert (PGR: meminj_preserves_globals ge (restrict (as_inj mu) (vis mu))).
+        rewrite <- restrict_sm_all.
+        eapply restrict_sm_preserves_globals; try eassumption.
+          unfold vis. intuition.
+      rewrite restrict_sm_all in *.
+      simpl in FD. inv FD. 
+      specialize (BuiltinEffects.EFhelpers _ _ OBS); intros.
+      exploit (BuiltinEffects.inlineable_extern_inject _ _ GDE_lemma);
+        try eapply H0; try eassumption.
+        apply symbols_preserved. 
+      intros [mu' [vres' [tm' [EC [RESINJ [MINJ' [UNMAPPED [OUTOFREACH 
+           [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
+      eexists; eexists. 
+      split. eexists.
+        split. left. 
+             eapply effstep_plus_one. 
+             eapply rtl_effstep_exec_function_external; eauto.
+        intros. eapply BuiltinEffects.BuiltinEffect_Propagate; eassumption.
+      exists mu'. intuition.
+      assert (ISEP: inject_separated (restrict (as_inj mu) (vis mu))
+                    (restrict (as_inj mu') (vis mu')) m1 m2).
+                red. intros ??? RAI RAI'.
+                destruct (restrictD_Some _ _ _ _ _ RAI')
+                  as [AI' VIS']; clear RAI'.
+                destruct (restrictD_None' _ _ _ RAI) 
+                    as [AI | [bb2 [dd [AI VIS]]]]; clear RAI.
+                  apply sm_inject_separated_mem in SEPARATED.
+                  apply (SEPARATED _ _ _ AI AI'). trivial. 
+                rewrite (intern_incr_vis_inv _ _ WD WD' 
+                    INCR _ _ _ AI VIS') in VIS; discriminate.
+      split. 
+      {  econstructor; try solve[rewrite restrict_sm_all; eassumption].
+        { (*eapply match_stacks_inside_set_reg.
+            apply restrict_sm_WD; trivial.  *)
+           eapply match_stacks_bound.
+             eapply match_stacks_extcall. 10: eapply MS0.
+              apply restrict_sm_WD; trivial.  
+              apply restrict_sm_WD; trivial.  
+              intros; eapply external_call_max_perm; eauto. 
+              intros; eapply external_call_max_perm; eauto.
+              rewrite restrict_sm_all. apply OUTOFREACH.
+              rewrite restrict_sm_all. apply MINJR.
+              apply restrict_sm_intern_incr; trivial. 
+              repeat rewrite restrict_sm_all; trivial.
+              clear - SMV. destruct SMV.
+                split; intros.
+                 rewrite restrict_sm_DOM in H1. apply (H _ H1).
+                 rewrite restrict_sm_RNG in H1. apply (H0 _ H1). 
+              xomega.
+           eapply forward_nextblock. 
+             eapply external_call_mem_forward; eassumption. }
+        rewrite restrict_sm_all. apply inject_restrict; assumption.
+      }
+      intuition.
+      eapply meminj_preserves_incr_sep. eapply PG. eassumption. 
+             apply intern_incr_as_inj; trivial.
+             apply sm_inject_separated_mem; eassumption.
+      assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
+          rewrite <- FRG. apply Glob; assumption. }
 
 (* return fron noninlined function *)
 inv MS0.
