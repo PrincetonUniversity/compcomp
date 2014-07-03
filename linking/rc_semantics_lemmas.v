@@ -68,6 +68,11 @@ split=> //.
 split=> //.
 split=> //.
 by exists U2. }
+{ move=> cd0 mu c1 m1 c2 m2 v1 M; rewrite /= /RC.halted.
+  case hlt1: (halted _ _)=> //.
+  case def1: (vals_def _)=> //; case=> <-.
+  case: (halt _ _ _ _ _ _ _ M hlt1)=> v2 []? []? ?.
+  exists v2; split=> //. }                                         
 { move=> cd0 mu c1 m1 c2 m2 e0 vals1 ef_sig mtch' at1.
 have at1': at_external eff_S (RC.core c1) = Some (e0, ef_sig, vals1).
 { move: at1; rewrite /= /RC.at_external.

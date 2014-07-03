@@ -63,7 +63,7 @@ Variable fun_tbl : ident -> option 'I_N.
 
 Let linker := effsem N cores fun_tbl.
 
-Definition sig_of (c : Core.t cores) :=
+Definition sig_of (c : Core.t cores) := 
   match at_external (cores c.(Core.i)).(sem) c.(Core.c) with
     | None => None 
     | Some (ef,sg,args) => Some (ef_sig ef)
@@ -71,14 +71,12 @@ Definition sig_of (c : Core.t cores) :=
 
 Fixpoint tys_agree_rec (sg : signature) (s : seq.seq (Core.t cores)) :=
   if s is [:: c & s'] then 
-    if sig_of c is Some sg' then [/\ sg=sg' & tys_agree_rec sg' s']
+    if sig_of c is Some sg' then [/\ sg=sg' & tys_agree_rec c.(Core.sg) s']
     else False
   else True.
 
 Definition tys_agree (s : seq.seq (Core.t cores)) :=
-  if s is [:: c & s'] then 
-    if sig_of c is Some sg then tys_agree_rec sg s'
-    else False
+  if s is [:: c & s'] then tys_agree_rec c.(Core.sg) s'
   else True.
 
 End typingInv.
@@ -1529,7 +1527,9 @@ Record R (data : sig_data N (fun ix : 'I_N => (sims ix).(core_data)))
 
     (* main invariant *)
   ; R_inv : 
-    exists (pf : c.(Core.i)=d.(Core.i)) (mu_top : Inj.t) mus, 
+    exists (pf : c.(Core.i)=d.(Core.i)) 
+           (pf_sig : c.(Core.sg)=d.(Core.sg)) 
+           (mu_top : Inj.t) mus, 
     [/\ mu = mu_top
       , exists pf2 : projT1 data = c.(Core.i),
           @head_inv c d pf (cast_ty (lift_eq _ pf2) (projT2 data)) 
@@ -1563,7 +1563,7 @@ Lemma peek_match :
   (Core.c (peekCore x1)) m1 
   (cast'' peek_ieq (Core.c (peekCore x2))) m2.
 Proof.
-move: (R_inv pf)=> []A []mu_top []mus []eq []pf2.
+move: (R_inv pf)=> []A []pf_sig []mu_top []mus []eq []pf2.
 move/head_match=> MATCH ?.
 have ->: (cast'' peek_ieq (Core.c (peekCore x2)) 
          = cast'' A (Core.c (peekCore x2)))
@@ -1631,7 +1631,7 @@ Proof. by rewrite /inContext /callStackSize R_len_callStack. Qed.
 
 Lemma R_wd : SM_wd mu.
 Proof.
-case: (R_inv pf)=> pf2 []mu_top []mus []eq []pf3 [].
+case: (R_inv pf)=> pf2 []pf_sig []mu_top []mus []eq []pf3 [].
 by move/match_sm_wd=> wd _ _ _ _ _; rewrite eq.
 Qed.
 

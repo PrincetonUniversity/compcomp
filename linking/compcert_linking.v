@@ -444,13 +444,6 @@ Arguments at_external0 !l.
 
 Require Import val_casted. (*for val_has_type_func*)
 
-Definition oval_has_type_func (mv: option val) (mt: option typ) :=
-  match mv, mt with
-    | None, None => true
-    | Some v, Some t => val_has_type_func v t
-    | _,_ => false
-  end.
-
 Definition halted0 (l: linker N my_cores) :=
   let: c   := peekCore l in
   let: ix  := c.(Core.i) in
@@ -459,7 +452,7 @@ Definition halted0 (l: linker N my_cores) :=
   let: F   := (my_cores ix).(Modsem.F) in
   let: V   := (my_cores ix).(Modsem.V) in
   if @halted (Genv.t F V) _ _ sem (Core.c c) is Some v then
-    if oval_has_type_func (Some v) (sig_res sg) then Some v
+    if val_casted.val_has_type_func v (proj_sig_res sg) then Some v
     else None 
   else None.
 
@@ -610,7 +603,7 @@ Inductive Corestep (ge : ge_ty) : linker N my_cores -> mem
   let: d_sem := Modsem.sem (my_cores d_ix) in
 
   core_semantics.halted c_sem (Core.c c) = Some rv -> 
-  oval_has_type_func (Some rv) (sig_res c_sg)=true -> 
+  val_has_type_func rv (proj_sig_res c_sg)=true -> 
   core_semantics.after_external d_sem (Some rv) (Core.c d) = Some d' -> 
   Corestep ge l m (updCore l'' (Core.upd d d')) m.
 
@@ -677,7 +670,7 @@ move: aft; rewrite /after_external.
 case aft: (core_semantics.after_external _ _ _)=> [c''|//]. 
 rewrite /halted0 in hlt; move: hlt.
 case hlt: (core_semantics.halted _ _)=> //. 
-case oval: (oval_has_type_func _ _)=> //; case=> Heq. subst. case=> <-.
+case oval: (val_has_type_func _ _)=> //; case=> Heq. subst. case=> <-.
 by apply: (@Corestep_return _ _ _ _ rv c'').
 Qed.
 
@@ -746,7 +739,9 @@ Notation cast'' pf x := (cast (Modsem.C \o my_cores) (sym_eq pf) x).
 
 Lemma after_externalE rv c c' : 
   after_external rv c = Some c' -> 
-  exists fn_tbl hd hd' tl pf pf' (eq_pf : Core.i hd = Core.i hd'),
+  exists fn_tbl hd hd' tl pf pf' 
+         (eq_pf : Core.i hd = Core.i hd') 
+         (sig_pf : Core.sg hd = Core.sg hd'),
   [/\ c  = mkLinker fn_tbl (CallStack.mk [:: hd & tl] pf)
     , c' = mkLinker fn_tbl (CallStack.mk [:: hd' & tl]  pf')
     & core_semantics.after_external
@@ -757,7 +752,7 @@ case: c=> fntbl; case; case=> // hd stk pf aft; exists fntbl,hd.
 move: aft; rewrite /after_external /=.
 case e: (core_semantics.after_external _ _ _)=> // [hd']; case=> <-.
 exists (Core.mk N my_cores (Core.i hd) hd' (Core.sg hd)),stk,pf,pf.
-rewrite /=; exists refl_equal; split=> //; f_equal; f_equal.
+rewrite /=; exists refl_equal; exists refl_equal; split=> //; f_equal; f_equal.
 by apply: proof_irr.
 Qed.
 

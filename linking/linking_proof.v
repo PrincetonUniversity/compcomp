@@ -183,9 +183,9 @@ eapply Build_Wholeprog_simulation
 
   Arguments core_initial : default implicits.
 
-  move: init1; rewrite /initCore.
+  move: init1 g; rewrite /initCore.
   case g: (core_semantics.initial_core _ _ _ _)=> [c|//].
-  case=> eq1 H2. subst ix1.
+  move=> sig1; case=> eq1 H2. subst ix1.
   apply Eqdep_dec.inj_pair2_eq_dec in H2. subst c0.
 
   have valid_dec: forall m b, Mem.valid_block m b -> valid_block_dec m b.
@@ -226,10 +226,10 @@ eapply Build_Wholeprog_simulation
 
   { by apply: valid_dec'. }
 
-  move=> cd []c2 []init2 mtch12.
+  move=> cd []c2 []init2 mtch12 mainsig_sig1.
 
   exists (existT _ ix cd).
-  exists (mkLinker fun_tbl (CallStack.singl (Core.mk _ _ ix c2))).
+  exists (mkLinker fun_tbl (CallStack.singl (Core.mk _ _ ix c2 sig1))).
   
   split.
 
@@ -238,7 +238,7 @@ eapply Build_Wholeprog_simulation
 
   simpl in init2.
 
-  rewrite -main_eq init2; split=> //.
+  rewrite -main_eq init2 mainsig_sig1; split=> //.
 
   set mu_top0 := initial_SM dS dT fS fT j.
 
@@ -307,8 +307,8 @@ eapply Build_Wholeprog_simulation
     by move=> b1; rewrite /DOM /DomSrc; case/orP=> //=; apply: valid_dec'.
     by move=> b2; rewrite /RNG /DomTgt; case/orP=> //=; apply: valid_dec'. }
 
-  apply: Build_R=> /=.
-  exists erefl,mu_top,[::]=> /=; split=> //.
+  apply: Build_R=> //=.
+  exists erefl,erefl,mu_top,[::]=> /=; split=> //.
 
   exists erefl; apply: Build_head_inv=> //.
   apply: Build_vis_inv; rewrite /= /RC.roots /vis /mu_top0 /= /fS.
@@ -333,12 +333,8 @@ eapply Build_Wholeprog_simulation
   { by apply: (valid_genvs_domain_eq (my_ge_T ix) vgenv). }
 
   by apply: (Nuke_sem.wmd_initial _ vval vgenv_ix wd init2).
-  by [].
-
   by move=> ix'; move: vgenv; apply: valid_genvs_domain_eq.
-
   by apply: ord_dec. 
-
   by case: (Integers.Int.eq _ _).
   by case: (Integers.Int.eq _ _). }(*END [Case: core_initial]*)
     
@@ -381,7 +377,7 @@ have EFFSTEP:
 (* specialize core diagram at module (Core.i c1) *)
 move: (effcore_diagram _ _ _ _ (sims sims' (Core.i c1))).  
 move/(_ _ _ _ _ _ EFFSTEP).
-case: (R_inv INV)=> pf []mupkg []mus []mu_eq.
+case: (R_inv INV)=> pf []pf_sig []mupkg []mus []mu_eq.
 move=> []pf2 hdinv tlinv.
 
 move: (head_match hdinv)=> MATCH.
@@ -441,7 +437,10 @@ split.
 {(* Label: [re-establish invariant] *) 
  apply: Build_R. rewrite ST1'; rewrite /st2'.
 
- exists pf,mupkg',mus; split=> //.
+ have sgeq: Core.sg c1=Core.sg c2.
+ { by move: pf_sig; rewrite /c /d /c1 /c2 /= => <-. }
+
+ exists pf,sgeq,mupkg',mus; split=> //.
 
  (* head_inv *)
  { case: tlinv=> allrel frameall.
@@ -473,6 +472,17 @@ split.
  (* valid_genv *)
  { move=> ix; move: (R_ge INV); move/(_ ix)=> vgenv. 
    by apply: (Nuke_sem.valid_genv_fwd vgenv). }
+
+ unfold c1 in *; rewrite ST1'; move: (R_tys1 INV). 
+ rewrite /s1 => tys; clear -tys; case st1_eq: st1 tys c1'=> // [fntbl stack]. 
+ case stack_eq: stack=> [stack0 WF]; rewrite /= => tys _.
+ by case stack0_eq: stack0 WF stack_eq tys.
+
+ unfold c2 in *; rewrite /st2'; move: (R_tys2 INV); rewrite /s2=> tys.
+ clear -tys; case st2_eq: st2 tys c2' c2''=> // [fntbl stack]. 
+ case stack_eq: stack=> [stack0 WF]; rewrite /= => tys _.
+ by case stack0_eq: stack0 WF stack_eq tys.
+
  } (*end [re-establish invariant]*)
  
  {(* Label: [matching execution] *) 
@@ -554,7 +564,7 @@ have mu_wd: SM_wd mu.
 have INV': R data (Inj.mk mu_wd) st1 m1 st2 m2.
 { by apply: INV. }
 
-case: (aft2 my_ge_S HLT1 POP1 AFT1 INV')=> 
+case: (aft2 my_ge_S HLT1 POP1 INV' AFT1)=> 
   rv2 []st2'' []st2' []cd' []mu' []HLT2 CTX2 POP2 AFT2 INV''.
 exists st2',m2,cd',mu'.
 split=> //; first by rewrite eq1.
@@ -587,7 +597,7 @@ move=> cd mu c1 m1 c2 m2 v1 inv hlt1.
 have mu_wd: SM_wd mu by apply: R_wd inv.
 have inv': R cd (Inj.mk mu_wd) c1 m1 c2 m2 by [].
 case: (toplevel_hlt2 hlt1 inv')=> v2 hlt2.
-case: (R_inv inv')=> pf []mupkg []mus []mu_eq.
+case: (R_inv inv')=> pf []pf_sig []mupkg []mus []mu_eq.
 move=> []pf2 hdinv tlinv; move: (head_match hdinv)=> mtch0.
 
 have hlt10: 
@@ -596,7 +606,10 @@ have hlt10:
 { move: hlt1; rewrite /= /LinkerSem.halted.
   case inCtx1: (inContext c1)=> //=.
   case hlt10: (LinkerSem.halted0 c1)=> [v1'|//]; case=> <-.
-  by move: hlt10; rewrite /LinkerSem.halted0 /c /= /RC.halted=> ->. }
+  move: hlt10; rewrite /LinkerSem.halted0 /c /= /RC.halted.
+  case hlt100: (halted _ _)=> //.
+  case defs: (vals_def _)=> //.
+  case hasty: (val_casted.val_has_type_func _ _)=> //. }
 
 case: (core_halted (sims sims' (Core.i (c inv'))) _ _ _ _ _ _ mtch0 hlt10).
 move=> v2' []inj []vinj hlt2'.
@@ -616,6 +629,11 @@ move: hlt2; rewrite /LinkerSem.halted.
 case e: (~~ inContext c2)=> //.
 case f: (LinkerSem.halted0 c2)=> [rv|//]; case=> <-.
 rewrite /LinkerSem.halted0 /= /RC.halted in f hlt2'.
+have f': halted (sem (cores_T (Core.i (peekCore c2)))) (Core.c (peekCore c2))
+       = Some rv.
+{ move: f.
+  case: (halted _ _)=> //v.
+  case: (val_casted.val_has_type_func _ _)=> //. }
 have g: halted (sem (cores_T (Core.i (c inv'))))
                (cast'' pf (Core.c (d inv')))  
       = Some rv.
@@ -624,7 +642,7 @@ have g: halted (sem (cores_T (Core.i (c inv'))))
              halted (sem (cores_T ix)) x  
            = Some rv.
   change (P (Core.i (c inv')) (cast T (sym_eq pf) (Core.c (d inv')))).
-  by apply: cast_indnatdep; rewrite /P; rewrite -f. }
+  by apply: cast_indnatdep; rewrite /P; rewrite -f'. }
 by rewrite -g. }(*END Case: halted*)
 
 Qed.
