@@ -214,7 +214,14 @@ Proof.
        exists id; trivial.
      rewrite symbols_preserved in Hid.
        exists id; trivial.
-    rewrite varinfo_preserved. intuition.
+    split. intros. rewrite varinfo_preserved. intuition.
+    intros. unfold tge. split. 
+      intros [f H]. 
+        eapply function_ptr_translated in H.
+        destruct H as [tf [? ?]]. exists tf; auto.
+      intros [f H]. inv TRANSF. unfold transf_program in H1.
+        eapply Genv.find_funct_ptr_rev_transf_partial in H1; eauto.
+        destruct H1 as [f0 [? ?]]; exists f0; auto.
 Qed.
 
 (** Matching between environments before and after *)
@@ -2183,60 +2190,6 @@ Proof.
   intros [P Q]. subst delta. eapply free_blocks_of_env_perm_1 with (m := m); eauto.
   omega. 
 Qed.
-(*WAS: 
-Theorem match_envs_free_blocks:
-  forall j cenv e le m lo hi te tle tlo thi m' tm,
-  match_envs j cenv e le m lo hi te tle tlo thi ->
-  Mem.inject j m tm ->
-  Mem.free_list m (blocks_of_env e) = Some m' ->
-  exists tm',
-     Mem.free_list tm (blocks_of_env te) = Some tm'
-  /\ Mem.inject j m' tm'.
-Proof.
-  intros. 
-  assert (exists tm', Mem.free_list tm (blocks_of_env te) = Some tm').
-    apply can_free_list.
-    intros. unfold blocks_of_env in H2.
-    exploit list_in_map_inv; eauto. intros [[id [b' ty]] [EQ IN]].
-    simpl in EQ; inv EQ. 
-    exploit me_mapped; eauto. eapply PTree.elements_complete; eauto. 
-    intros [b [A B]]. 
-    change 0 with (0 + 0). replace (sizeof ty) with (sizeof ty + 0) by omega.
-    eapply Mem.range_perm_inject; eauto. 
-    eapply free_blocks_of_env_perm_2; eauto.
-    (* no repetitions *)
-    set (F := fun id => match te!id with Some(b, ty) => b | None => xH end).
-    replace (map (fun b_lo_hi : block * Z * Z => fst (fst b_lo_hi)) (blocks_of_env te))
-       with (map F (map (fun x => fst x) (PTree.elements te))).
-    apply list_map_norepet. apply PTree.elements_keys_norepet. 
-    intros. 
-    exploit list_in_map_inv. eexact H2. intros [[id1 [b1' ty1]] [EQ1 IN1]].
-    exploit list_in_map_inv. eexact H3. intros [[id2 [b2' ty2]] [EQ2 IN2]].
-    simpl in *. subst x y.
-    assert (te!id1 = Some(b1', ty1)) by (apply PTree.elements_complete; auto).
-    assert (te!id2 = Some(b2', ty2)) by (apply PTree.elements_complete; auto).
-    exploit me_mapped. eauto. eexact H5. intros [b1 [P1 Q1]].
-    exploit me_mapped. eauto. eexact H6. intros [b2 [P2 Q2]].
-    assert (b1 <> b2) by (eapply me_inj; eauto). 
-    exploit Mem.mi_no_overlap; eauto. 
-    instantiate (1 := 0). apply Mem.perm_cur_max. apply Mem.perm_implies with Freeable; auto with mem.
-    eapply free_blocks_of_env_perm_2; eauto. generalize (sizeof_pos ty1); omega.
-    instantiate (1 := 0). apply Mem.perm_cur_max. apply Mem.perm_implies with Freeable; auto with mem.
-    eapply free_blocks_of_env_perm_2; eauto. generalize (sizeof_pos ty2); omega.
-    intros [A | A]; try omegaContradiction. 
-    unfold F. rewrite H5; rewrite H6. auto.
-    unfold blocks_of_env. repeat rewrite list_map_compose. apply list_map_exten; intros. 
-    unfold F. destruct x as [id [b ty]]. simpl. erewrite PTree.elements_complete; eauto. auto.
-  destruct H2 as [tm' FREE].
-  exists tm'; split; auto.
-  eapply free_list_right_inject; eauto. 
-  eapply Mem.free_list_left_inject; eauto. 
-  intros. unfold blocks_of_env in H3. exploit list_in_map_inv; eauto. 
-  intros [[id [b' ty]] [EQ IN]]. simpl in EQ. inv EQ.
-  exploit me_flat; eauto. apply PTree.elements_complete; eauto. 
-  intros [P Q]. subst delta. eapply free_blocks_of_env_perm_1 with (m := m); eauto.
-  omega. 
-Qed.*)
 
 (** Matching global environments *)
 
@@ -2538,114 +2491,7 @@ Proof.
   intros; apply INJ1. inv H0; xomega.
   intros; eapply INJ2; eauto. inv H0; xomega.
 Qed.
-(*
-Lemma match_cont_extern_invariantPriv2:
-  forall mu' m' mu cenv k tk m bound tbound,
-  match_cont mu cenv k tk m bound tbound ->
-  (forall b chunk v,
-    privBlocksSrc mu b = true -> Plt b bound -> Mem.load chunk m b 0 = Some v -> Mem.load chunk m' b 0 = Some v) ->
-  extern_incr mu mu' ->
-  (forall b, Plt b bound -> as_inj mu' b = as_inj mu b) ->
-  (forall b b' delta, as_inj mu' b = Some(b', delta) -> Plt b' tbound -> as_inj mu' b = as_inj mu b) ->
-  forall (WD: SM_wd mu) (WD': SM_wd mu') FS FT
-  (HFS: forall b, frgnBlocksSrc mu' b = true -> FS b = true),
-  match_cont (replace_externs mu' FS FT) cenv k tk m' bound tbound.
-Proof.
-  induction 1; intros LOAD INCR SEP INJ1 INJ2; econstructor; eauto.
-(* globalenvs *)
-  inv H. constructor; intros; eauto.
-    specialize (DOMAIN _ H).
-    rewrite replace_externs_vis.
-    exploit extern_incr_restrict; try eassumption. intros.
-    rewrite replace_externs_as_inj. 
-    destruct (restrictD_Some _ _ _ _ _ H2); clear H2.
-    apply restrictI_Some; trivial.
-    apply orb_true_iff in H4; destruct H4; intuition.
-  rewrite replace_externs_as_inj, replace_externs_vis in H. 
-    destruct (restrictD_Some _ _ _ _ _ H); clear H.
-    rewrite (INJ2 _ _ _ H3) in H3.
-    assert (restrict (as_inj mu) (vis mu) b1 = Some (b2, delta)).
-      apply restrictI_Some; trivial.
-      red in SEP. assert (locBlocksSrc mu = locBlocksSrc mu') by eapply INCR.
-        unfold vis. rewrite H.
-        remember (locBlocksSrc mu' b1) as d. 
-        destruct d; simpl in *; trivial.
-        specialize (DOMAIN _ H2).
-        destruct (restrictD_Some _ _ _ _ _ DOMAIN). 
-  eapply IMAGE; eauto.
-(* call *)
-  eapply match_envs_extern_invariantPriv; eauto. 
-  intros. apply LOAD; auto. xomega.
-  intros. apply INJ1; auto; xomega.
-  intros. eapply INJ2; eauto; xomega.
 
-  eapply IHmatch_cont; eauto. 
-  intros; apply LOAD; auto. inv H0; xomega.
-  intros; apply INJ1. inv H0; xomega.
-  intros; eapply INJ2; eauto. inv H0; xomega.
-Qed.
-*)
-(*Probably useless
-Lemma match_cont_extern_invariant:
-  forall mu' m' mu cenv k tk m bound tbound,
-  match_cont mu cenv k tk m bound tbound ->
-  (forall b chunk v,
-    as_inj mu b = None -> Plt b bound -> Mem.load chunk m b 0 = Some v -> Mem.load chunk m' b 0 = Some v) ->
-  extern_incr mu mu' ->
-  (forall b, Plt b bound -> as_inj mu' b = as_inj mu b) ->
-  (forall b b' delta, as_inj mu' b = Some(b', delta) -> Plt b' tbound -> as_inj mu' b = as_inj mu b) ->
-  forall (WD: SM_wd mu) (WD': SM_wd mu'),
-  match_cont mu' cenv k tk m' bound tbound.
-Proof.
-  induction 1; intros LOAD INCR INJ1 INJ2; econstructor; eauto.
-(* globalenvs *)
-  inv H. constructor; intros; eauto.
-    specialize (DOMAIN _ H).
-    eapply extern_incr_restrict; try eassumption.
-  assert (restrict (as_inj mu) (vis mu) b1 = Some (b2, delta)). 
-    destruct (restrictD_Some _ _ _ _ _ H); clear H.
-    rewrite (INJ2 _ _ _ H3) in H3.
-     rewrite (extern_incr_vis _ _ INCR).
-     apply restrictI_Some; trivial. xomega.
-  eapply IMAGE; eauto.
-(* call *)
-  eapply match_envs_extern_invariant; eauto. 
-  intros. apply LOAD; auto. xomega.
-  intros. apply INJ1; auto; xomega.
-  intros. eapply INJ2; eauto; xomega.
-  eapply IHmatch_cont; eauto. 
-  intros; apply LOAD; auto. inv H0; xomega.
-  intros; apply INJ1. inv H0; xomega.
-  intros; eapply INJ2; eauto. inv H0; xomega.
-Qed.
-*)
-(*WAS:
-Lemma match_cont_invariant:
-  forall f' m' f cenv k tk m bound tbound,
-  match_cont mu cenv k tk m bound tbound ->
-  (forall b chunk v,
-    as_inj mu b = None -> Plt b bound -> Mem.load chunk m b 0 = Some v -> Mem.load chunk m' b 0 = Some v) ->
-  inject_incr f f' ->
-  (forall b, Plt b bound -> f' b = f b) ->
-  (forall b b' delta, f' b = Some(b', delta) -> Plt b' tbound -> f' b = f b) ->
-  match_cont f' cenv k tk m' bound tbound.
-Proof.
-  induction 1; intros LOAD INCR INJ1 INJ2; econstructor; eauto.
-(* globalenvs *)
-  inv H. constructor; intros; eauto.
-  assert (f b1 = Some (b2, delta)). rewrite <- H; symmetry; eapply INJ2; eauto. xomega.
-  eapply IMAGE; eauto.
-(* call *)
-  eapply match_envs_invariant; eauto. 
-  intros. apply LOAD; auto. xomega.
-  intros. apply INJ1; auto; xomega.
-  intros. eapply INJ2; eauto; xomega.
-  eapply IHmatch_cont; eauto. 
-  intros; apply LOAD; auto. inv H0; xomega.
-  intros; apply INJ1. inv H0; xomega.
-  intros; eapply INJ2; eauto. inv H0; xomega.
-Qed.
-*)
 (** Invariance by assignment to location "above" *)
 
 Lemma match_cont_intern_assign_loc:
@@ -2663,21 +2509,6 @@ Proof.
   (* block copy *)
   eapply Mem.load_storebytes_other; eauto. left. unfold block; xomega.  
 Qed.
-(*WAS
-Lemma match_cont_assign_loc:
-  forall f cenv k tk m bound tbound ty loc ofs v m',
-  match_cont f cenv k tk m bound tbound ->
-  assign_loc ty m loc ofs v m' ->
-  Ple bound loc ->
-  match_cont f cenv k tk m' bound tbound.
-Proof.
-  intros. eapply match_cont_invariant; eauto.
-  intros. rewrite <- H4. inv H0.
-  (* scalar *)
-  simpl in H6. eapply Mem.load_store_other; eauto. left. unfold block; xomega. 
-  (* block copy *)
-  eapply Mem.load_storebytes_other; eauto. left. unfold block; xomega.
-Qed.*)
 
 (** Invariance by external calls *)
 
@@ -2707,80 +2538,6 @@ Proof.
     exploit H2; eauto. intros [A B].  
     unfold Mem.valid_block in H2Tgt. specialize (H2Tgt _  B T'). xomegaContradiction.
 Qed.
-(*
-Lemma match_cont_extcallPriv2:
-  forall mu cenv k tk m bound tbound tm mu' m',
-  match_cont mu cenv k tk m bound tbound ->
-  Mem.unchanged_on (fun b ofs => privBlocksSrc mu b = true) m m' ->
-  extern_incr mu mu' ->
-  sm_inject_separated mu mu' m tm ->
-  Ple bound (Mem.nextblock m) -> Ple tbound (Mem.nextblock tm) ->
-  forall (WD: SM_wd mu) (WD': SM_wd mu') (SMV: sm_valid mu m tm) FS FT,
-  match_cont (replace_externs mu' FS FT) cenv k tk m' bound tbound.
-Proof.
-  intros. destruct H2 as [H2 [H2Dom H2Tgt]].
-  eapply match_cont_extern_invariantPriv; eauto. 
-  intros. eapply Mem.load_unchanged_on; eauto. 
-  intros. destruct (as_inj mu b) as [[b' delta] | ] eqn:?.
-     eapply extern_incr_as_inj; eassumption.
-  destruct SMV as [SMVD _].
-    destruct (as_inj mu' b) as [[b' delta] | ] eqn:?; auto.
-    exploit as_inj_DomRng; try eassumption. intros [D' T'] .
-    exploit H2; eauto. unfold Mem.valid_block in H2Dom. intros [A B]. 
-      specialize (H2Dom _ A D'). xomegaContradiction.
-  intros. destruct (as_inj mu b) as [[b'' delta''] | ] eqn:?.
-      eapply extern_incr_as_inj; eassumption.
-    exploit as_inj_DomRng; try eassumption. intros [D' T'].
-    exploit H2; eauto. intros [A B].  
-    unfold Mem.valid_block in H2Tgt. specialize (H2Tgt _  B T'). xomegaContradiction.
-Qed.
-*)
-(*probably useless:
-Lemma match_cont_extcall:
-  forall mu cenv k tk m bound tbound tm mu' m',
-  match_cont mu cenv k tk m bound tbound ->
-  Mem.unchanged_on (loc_unmapped (as_inj mu)) m m' ->
-  extern_incr mu mu' ->
-  sm_inject_separated mu mu' m tm ->
-  Ple bound (Mem.nextblock m) -> Ple tbound (Mem.nextblock tm) ->
-  forall (WD: SM_wd mu) (WD': SM_wd mu') (SMV: sm_valid mu m tm),
-  match_cont mu' cenv k tk m' bound tbound.
-Proof.
-  intros. destruct H2 as [H2 [H2Dom H2Tgt]].
-  eapply match_cont_extern_invariant; eauto. 
-  intros. eapply Mem.load_unchanged_on; eauto. 
-  intros. destruct (as_inj mu b) as [[b' delta] | ] eqn:?.
-     eapply extern_incr_as_inj; eassumption.
-  destruct SMV as [SMVD _].
-    destruct (as_inj mu' b) as [[b' delta] | ] eqn:?; auto.
-    exploit as_inj_DomRng; try eassumption. intros [D' T'] .
-    exploit H2; eauto. unfold Mem.valid_block in H2Dom. intros [A B]. 
-      specialize (H2Dom _ A D'). xomegaContradiction.
-  intros. destruct (as_inj mu b) as [[b'' delta''] | ] eqn:?.
-      eapply extern_incr_as_inj; eassumption.
-    exploit as_inj_DomRng; try eassumption. intros [D' T'].
-    exploit H2; eauto. intros [A B].  
-    unfold Mem.valid_block in H2Tgt. specialize (H2Tgt _  B T'). xomegaContradiction.
-Qed.*)
-
-(*WAS:
-Lemma match_cont_extcall:
-  forall f cenv k tk m bound tbound tm f' m',
-  match_cont f cenv k tk m bound tbound ->
-  Mem.unchanged_on (loc_unmapped f) m m' ->
-  inject_incr f f' ->
-  inject_separated f f' m tm ->
-  Ple bound (Mem.nextblock m) -> Ple tbound (Mem.nextblock tm) ->
-  match_cont f' cenv k tk m' bound tbound.
-Proof.
-  intros. eapply match_cont_invariant; eauto. 
-  intros. eapply Mem.load_unchanged_on; eauto. 
-  red in H2. intros. destruct (f b) as [[b' delta] | ] eqn:?. auto. 
-  destruct (f' b) as [[b' delta] | ] eqn:?; auto. 
-  exploit H2; eauto. unfold Mem.valid_block. intros [A B]. xomegaContradiction.
-  red in H2. intros. destruct (f b) as [[b'' delta''] | ] eqn:?. auto. 
-  exploit H2; eauto. unfold Mem.valid_block. intros [A B]. xomegaContradiction.
-Qed.*)
 
 (** Invariance by change of bounds *)
 
@@ -3123,14 +2880,6 @@ Proof. intros.
     rewrite vis_restrict_sm, restrict_sm_all, restrict_nest; eassumption.
     eapply match_envs_restrict; eassumption.
 Qed.
-(*
-Lemma replace_externs_shared mu FS FT: 
-      inject_incr (shared_of (replace_externs mu FS FT) = shared_of mu.
-Proof. 
-  intros. rewrite rewrite sharedSrc_iff_frgnpub in H; trivial.
-  specialize (pubBlocksLocalSrc _ H0); intros. unfold vis.
-  destruct (frgnBlocksSrc mu b); intuition.
-Qed.*)
 
 Lemma match_states_restrict mu c1 m1 c2 m2: forall
         (MS:match_states mu c1 m1 c2 m2) X
@@ -3150,20 +2899,12 @@ Proof. intros. inv MS.
      rewrite restrict_sm_all.
        eapply inject_restrict; try eassumption.
      rewrite restrict_sm_all, vis_restrict_sm, restrict_nest; assumption.
-     (*rewrite restrict_sm_all, restrict_nest, restrict_sm_sharedSrc_vis_X; try assumption. 
-       rewrite restrict_sm_sharedSrc_vis_X; try assumption.
-       rewrite sharedSrc_iff_frgnpub; trivial. 
-       intros. apply HX. unfold vis. destruct (frgnBlocksSrc mu b); simpl in *. intuition.
-           rewrite (pubBlocksLocalSrc _ WD _ H). trivial.*)
    econstructor; eauto.
      intros. specialize (MCONT cenv). 
        eapply match_cont_restrict; try eassumption.
      rewrite restrict_sm_all.
        eapply inject_restrict; try eassumption.
      rewrite restrict_sm_all, vis_restrict_sm, restrict_nest; assumption.
-     (*rewrite restrict_sm_all, restrict_nest, restrict_sm_sharedSrc_vis_X; try assumption. 
-       rewrite restrict_sm_sharedSrc_vis_X; try assumption.
-       intros. apply sharedSrc_vis in H; eauto. *)
 Qed.
 
 Lemma MATCH_restrict: forall d mu c1 m1 c2 m2 X
@@ -3368,107 +3109,11 @@ Proof.
   intros E. simpl; rewrite E. eapply IHls; eauto with compat.
 Qed.
 
-(*
-Lemma simpl_find_label:
-  forall s k ts tk,
-  simpl_stmt cenv s = OK ts ->
-  match_cont f cenv k tk m bound tbound ->
-  compat_cenv (addr_taken_stmt s) cenv ->
-  match find_label lbl s k with
-  | None =>
-      find_label lbl ts tk = None
-  | Some(s', k') =>
-      exists ts', exists tk', 
-         find_label lbl ts tk = Some(ts', tk')
-      /\ compat_cenv (addr_taken_stmt s') cenv
-      /\ simpl_stmt cenv s' = OK ts'
-      /\ match_cont f cenv k' tk' m bound tbound
-  end
-
-with simpl_find_label_ls:
-  forall ls k tls tk,
-  simpl_lblstmt cenv ls = OK tls ->
-  match_cont f cenv k tk m bound tbound ->
-  compat_cenv (addr_taken_lblstmt ls) cenv ->
-  match find_label_ls lbl ls k with
-  | None =>
-      find_label_ls lbl tls tk = None
-  | Some(s', k') =>
-      exists ts', exists tk', 
-         find_label_ls lbl tls tk = Some(ts', tk')
-      /\ compat_cenv (addr_taken_stmt s') cenv
-      /\ simpl_stmt cenv s' = OK ts'
-      /\ match_cont f cenv k' tk' m bound tbound
-  end.
-
-Proof.
-  induction s; simpl; intros until tk; intros TS MC COMPAT; auto.
-  (* skip *)
-  monadInv TS; auto.
-  (* var *)
-  destruct (is_liftable_var cenv e); monadInv TS; auto. 
-  (* set *)
-  monadInv TS; auto.
-  (* call *)
-  monadInv TS; auto.
-  (* builtin *)
-  monadInv TS; auto.
-  (* seq *)
-  monadInv TS.
-  exploit (IHs1 (Kseq s2 k) x (Kseq x0 tk)); eauto with compat. 
-    constructor; eauto with compat.
-  destruct (find_label lbl s1 (Kseq s2 k)) as [[s' k']|]. 
-  intros [ts' [tk' [P [Q [R S]]]]]. exists ts'; exists tk'. simpl. rewrite P. auto.
-  intros E. simpl. rewrite E. eapply IHs2; eauto with compat.
-  (* ifthenelse *)
-  monadInv TS.
-  exploit (IHs1 k x tk); eauto with compat. 
-  destruct (find_label lbl s1 k) as [[s' k']|]. 
-  intros [ts' [tk' [P [Q [R S]]]]]. exists ts'; exists tk'. simpl. rewrite P. auto. 
-  intros E. simpl. rewrite E. eapply IHs2; eauto with compat.
-  (* loop *)
-  monadInv TS.
-  exploit (IHs1 (Kloop1 s1 s2 k) x (Kloop1 x x0 tk)); eauto with compat.
-    constructor; eauto with compat.
-  destruct (find_label lbl s1 (Kloop1 s1 s2 k)) as [[s' k']|]. 
-  intros [ts' [tk' [P [Q [R S]]]]]. exists ts'; exists tk'. simpl; rewrite P. auto. 
-  intros E. simpl; rewrite E. eapply IHs2; eauto with compat. econstructor; eauto with compat.
-  (* break *)
-  monadInv TS; auto.
-  (* continue *)
-  monadInv TS; auto.
-  (* return *)
-  monadInv TS; auto.
-  (* switch *)
-  monadInv TS. simpl.
-  eapply simpl_find_label_ls; eauto with compat. constructor; auto.
-  (* label *)
-  monadInv TS. simpl.
-  destruct (ident_eq lbl l).
-  exists x; exists tk; auto.
-  eapply IHs; eauto.
-  (* goto *)
-  monadInv TS; auto.
-
-  induction ls; simpl; intros.
-  (* default *)
-  monadInv H. apply simpl_find_label; auto. 
-  (* case *)
-  monadInv H.
-  exploit (simpl_find_label s (Kseq (seq_of_labeled_statement ls) k)).
-    eauto. constructor. eapply simpl_seq_of_labeled_statement; eauto. eauto.
-    rewrite addr_taken_seq_of_labeled_statement. eauto with compat.
-    eauto with compat. 
-  destruct (find_label lbl s (Kseq (seq_of_labeled_statement ls) k)) as [[s' k']|].
-  intros [ts' [tk' [P [Q [R S]]]]]. exists ts'; exists tk'; split. simpl; rewrite P. auto. auto.
-  intros E. simpl; rewrite E. eapply IHls; eauto with compat.
-Qed.
-*)
 Lemma find_label_store_params:
   forall lbl s k params, find_label lbl (store_params cenv params s) k = find_label lbl s k.
 Proof.
-  induction params; simpl. auto. 
-  destruct a as [id ty]. destruct (VSet.mem id cenv); auto. 
+  induction params; simpl. auto.
+  destruct a as [id ty]. destruct (VSet.mem id cenv); auto.
 Qed.
 
 End FIND_LABEL.  
@@ -3712,14 +3357,6 @@ assert (RR1: REACH_closed m1'
            destruct (mappedD_true _ _ RC') as [[? ?] ?].
            eapply as_inj_DomRng; eassumption.
     eapply REACH_cons; try eassumption.
-(*assert (RRR: REACH_closed m1' (exportedSrc nu' (ret1 :: nil))).
-    intros b Hb. apply REACHAX in Hb.
-       destruct Hb as [L HL].
-       generalize dependent b.
-       induction L ; simpl; intros; inv HL; trivial.
-       specialize (IHL _ H1); clear H1.
-       unfold exportedSrc.
-       eapply REACH_cons; eassumption.*)
     
 assert (RRC: REACH_closed m1' (fun b : Values.block =>
                          mapped (as_inj nu') b &&
@@ -3796,7 +3433,6 @@ destruct (eff_after_check2 _ _ _ _ _ MemInjNu' RValInjNu'
 intuition.
 Qed.
 
-
 Lemma match_globalenvs_init':
   forall (R: list_norepet (map fst (prog_defs prog)))
   m j,
@@ -3804,9 +3440,9 @@ Lemma match_globalenvs_init':
   meminj_preserves_globals ge j ->
   match_globalenvs j (Mem.nextblock m).
 Proof.
-  intros. 
+  intros.
   destruct H0 as [A [B C]].
-  constructor. 
+  constructor.
   intros b D. (*intros [[id E]|[[gv E]|[fptr E]]]; eauto.*)
   cut (exists id, Genv.find_symbol (Genv.globalenv prog) id = Some b).
   intros [id ID].
@@ -3815,7 +3451,7 @@ Proof.
   intros. symmetry. solve [eapply (C _ _ _ _ GV); eauto].
   intros. eapply Genv.find_symbol_not_fresh; eauto.
   intros. eapply Genv.find_funct_ptr_not_fresh ; eauto.
-  intros. eapply Genv.find_var_info_not_fresh; eauto. 
+  intros. eapply Genv.find_var_info_not_fresh; eauto.
 Qed.
 
 Lemma type_of_transf_function f tf : 
@@ -3840,7 +3476,7 @@ simpl. revert H1. case_eq (transf_function f); simpl. inversion 2; subst; simpl.
 apply type_of_transf_function; auto. intros; congruence. intros; congruence.
 Qed.
 
-Lemma MATCH_init_core: forall v 
+Lemma MATCH_init_core: forall v
   (vals1 : list val) c1 (m1 : mem) (j : meminj)
   (vals2 : list val) (m2 : mem) (DomS DomT : Values.block -> bool)
   (CSM_Ini :initial_core (CL_eff_sem1 hf) ge v vals1 = Some c1)
@@ -3848,13 +3484,13 @@ Lemma MATCH_init_core: forall v
   (VInj: Forall2 (val_inject j) vals1 vals2)
   (PG: meminj_preserves_globals ge j)
   (R : list_norepet (map fst (prog_defs prog)))
-  (J: forall b1 b2 d, j b1 = Some (b2, d) -> 
+  (J: forall b1 b2 d, j b1 = Some (b2, d) ->
                       DomS b1 = true /\ DomT b2 = true)
   (RCH: forall b, REACH m2
         (fun b' : Values.block => isGlobalBlock tge b' || getBlocks vals2 b') b =
          true -> DomT b = true)
-  (InitMem : exists m0 : mem, Genv.init_mem prog = Some m0 
-      /\ Ple (Mem.nextblock m0) (Mem.nextblock m1) 
+  (InitMem : exists m0 : mem, Genv.init_mem prog = Some m0
+      /\ Ple (Mem.nextblock m0) (Mem.nextblock m1)
       /\ Ple (Mem.nextblock m0) (Mem.nextblock m2))
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
@@ -3866,13 +3502,13 @@ exists c2,
           (fun b : Values.block => isGlobalBlock ge b || getBlocks vals1 b))
        (REACH m2
           (fun b : Values.block => isGlobalBlock tge b || getBlocks vals2 b))
-       j) c1 m1 c2 m2. 
+       j) c1 m1 c2 m2.
 Proof. intros.
   inversion CSM_Ini.
   unfold CL_initial_core in H0. unfold ge in *. unfold tge in *.
   destruct v; inv H0.
   remember (Int.eq_dec i Int.zero) as z; destruct z; inv H1. clear Heqz.
-  remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz; inv H0. 
+  remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz; inv H0.
     apply eq_sym in Heqzz.
   destruct f; try discriminate.
   revert H1. case_eq (type_of_fundef (Internal f)); try solve[intros; congruence].
@@ -3882,39 +3518,39 @@ Proof. intros.
   case_eq (vals_defined vals1); try solve[simpl; intros; congruence].
   intros DEF TNV VALCAST; inversion 1; subst.
 
-  simpl; revert H1; case_eq 
+  simpl; revert H1; case_eq
     (zlt (match match Zlength vals1 with 0%Z => 0%Z
                       | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
                      end
                with 0%Z => 0%Z
                  | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
                end) Int.max_unsigned).
-  intros l _. 
+  intros l _.
   2: simpl; solve[inversion 2].
   simpl. inversion 1.
 
   exploit function_ptr_translated; eauto. intros [tf [FIND TR]].
   exists (CL_Callstate tf vals2 Kstop).
   split. simpl.
-  subst. inv Heqzz. unfold tge in FIND. 
+  subst. inv Heqzz. unfold tge in FIND.
     inv FIND. simpl. rewrite H3.
   case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
   rewrite <-(type_of_transf_fundef _ _ TR), tyof.
   assert (Hlen: Zlength vals2 = Zlength vals1).
-  { apply forall_inject_val_list_inject in VInj. clear - VInj. 
+  { apply forall_inject_val_list_inject in VInj. clear - VInj.
     induction VInj; auto. rewrite !Zlength_cons, IHVInj; auto. }
   rewrite Hlen.
-  assert (H: val_casted_list vals2 targs). 
+  assert (H: val_casted_list vals2 targs).
   { cut (val_casted_list vals1 targs).
     cut (val_list_inject j vals1 vals2).
     apply val_casted_list_inj; auto.
     apply forall_inject_val_list_inject; auto.
     apply val_casted_list_funcP; auto. }
   assert (vals_defined vals2=true) as ->.
-  { eapply vals_inject_defined; eauto. 
+  { eapply vals_inject_defined; eauto.
     eapply forall_inject_val_list_inject; eauto. }
-  monadInv TR. rename x into tf. 
-  simpl; revert H0; case_eq 
+  monadInv TR. rename x into tf.
+  simpl; revert H0; case_eq
     (zlt (match match Zlength vals1 with 0%Z => 0%Z
                       | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
                      end
@@ -3926,19 +3562,19 @@ Proof. intros.
   intros CONTRA. solve[elimtype False; auto].
   destruct InitMem as [m0 [INIT_MEM [A B]]].
   split. econstructor; try rewrite initial_SM_as_inj; try eassumption.
-          intros. econstructor. 
+          intros. econstructor.
             eapply match_globalenvs_init'. assumption. eassumption.
-              eapply restrict_preserves_globals. rewrite initial_SM_as_inj. assumption. 
-          unfold vis, initial_SM; simpl; intros. 
+              eapply restrict_preserves_globals. rewrite initial_SM_as_inj. assumption.
+          unfold vis, initial_SM; simpl; intros.
              apply REACH_nil. unfold ge in H. rewrite H. intuition.
           assumption.
           assumption.
-          unfold vis, initial_SM; simpl. 
+          unfold vis, initial_SM; simpl.
             apply forall_inject_val_list_inject.
             eapply restrict_forall_vals_inject; try eassumption.
-            intros. apply REACH_nil. rewrite H; intuition. 
+            intros. apply REACH_nil. rewrite H; intuition.
           apply val_casted_list_funcP; auto.
-destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
+destruct (core_initial_wd ge tge _ _ _ _ _ _ _ Inj
     VInj J RCH PG GDE_lemma HDomS HDomT _ (eq_refl _))
    as [AA [BB [CC [DD [EE [FF GG]]]]]].
 intuition. rewrite initial_SM_as_inj. assumption.
@@ -4849,7 +4485,7 @@ SM_simulation.SM_simulation_inject
 Proof.
 intros.
 assert (GDE: genvs_domain_eq ge tge).
-  apply GDE_lemma.
+  solve[apply GDE_lemma].
  eapply effect_simulations_lemmas.inj_simulation_plus with
   (match_states:=MATCH)(measure:= fun _ => O).
 (*genvs_dom_eq*)
