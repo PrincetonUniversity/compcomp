@@ -4058,56 +4058,7 @@ Qed.
 End EXTERNAL_ARGUMENTS.
 
 (** Preservation of the arguments to an annotation. *)
-
-Section ANNOT_ARGUMENTS.
-
-Variable f: Linear.function.
-Let b := function_bounds f.
-Let fe := make_env b.
-Variable j: meminj.
-Variables m m': mem.
-Variables ls ls0: locset.
-Variable rs: regset.
-Variables sp sp': block.
-Variables parent retaddr: val.
-Hypothesis AGR: agree_regs j ls rs.
-Hypothesis AGF: agree_frame f j ls ls0 m sp m' sp' parent retaddr.
-
-Lemma transl_annot_param_correct:
-  forall l,
-  loc_valid f l = true ->
-  match l with S sl ofs ty => slot_within_bounds b sl ofs ty | _ => True end ->
-  exists v, annot_arg rs m' (Vptr sp' Int.zero) (transl_annot_param fe l) v
-         /\ val_inject j (ls l) v.
-Proof.
-  intros. destruct l; simpl in H.
-(* reg *)
-  exists (rs r); split. constructor. auto.
-(* stack *) 
-  destruct sl; try discriminate. 
-  exploit agree_locals; eauto. intros [v [A B]]. inv A. 
-  exists v; split. constructor. rewrite Zplus_0_l. auto. auto.
-Qed.
-
-Lemma transl_annot_params_correct:
-  forall ll,
-  forallb (loc_valid f) ll = true ->
-  (forall sl ofs ty, In (S sl ofs ty) ll -> slot_within_bounds b sl ofs ty) ->
-  exists vl,
-     annot_arguments rs m' (Vptr sp' Int.zero) (map (transl_annot_param fe) ll) vl
-  /\ val_list_inject j (map ls ll) vl.
-Proof.
-  induction ll; simpl; intros. 
-  exists (@nil val); split; constructor.
-  InvBooleans. 
-  exploit (transl_annot_param_correct a). auto. destruct a; auto. 
-  intros [v1 [A B]].
-  exploit IHll. auto. auto. 
-  intros [vl [C D]].
-  exists (v1 :: vl); split; constructor; auto.
-Qed.
-
-End ANNOT_ARGUMENTS.
+(* Section disappears as annotations are handled by atExternal*)
 
 (** The proof of semantic preservation relies on simulation diagrams
   of the following form:

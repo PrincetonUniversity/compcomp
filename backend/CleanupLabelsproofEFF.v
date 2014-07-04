@@ -1743,13 +1743,7 @@ Proof. intros.
   intros.
     eapply BuiltinEffect_Propagate; try eassumption. }
 
-(* Lannot not supported
-  eexists; eexists; eexists; split.
-    left; eapply effstep_plus_one.
-  left; econstructor; split.
-  econstructor; eauto. eapply external_call_symbols_preserved'; eauto.
-  exact symbols_preserved.  exact varinfo_preserved.
-  econstructor; eauto with coqlib.*)
+(* annotations are observable, so now handled by atExternal*)
 
 { (* Llabel *)
   case_eq (Labelset.mem lbl (labels_branched_to (fn_code f))); intros.

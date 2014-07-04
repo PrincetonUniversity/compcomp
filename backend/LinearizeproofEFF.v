@@ -2041,13 +2041,7 @@ Proof. intros.
   intros.
     eapply BuiltinEffect_Propagate; try eassumption. }
 
-  (* Lannot 
-  eexists; eexists; split. 
-  left; econstructor; split. simpl.
-  apply plus_one. eapply exec_Lannot; eauto.
-  eapply external_call_symbols_preserved'; eauto.
-  exact symbols_preserved. exact varinfo_preserved.
-  econstructor; eauto.*)
+(* annotations are observable, so now handled by atExternal*)
 
 { (* Lbranch *)
   eexists; eexists; eexists; split. 

@@ -75,7 +75,7 @@ Inductive ltl_effstep (g:genv):  (block -> Z -> bool) ->
          (LTL_Block s f sp (Lbuiltin ef args res :: bb) rs retty) m
          (LTL_Block s f sp bb rs' retty) m'
 
-(* WE DO NOT TREAT ANNOTS YET
+(* annotations are observable, so now handled by atExternal
   | ltl_effstep_Lannot: forall s f sp ef args bb rs m t vl m',
       external_call' ef g (map rs args) m t vl m' ->
       ltl_effstep g (BuiltinEffect g (ef_sig ef) (decode_longs (sig_args (ef_sig ef)) (map rs args)) m)
@@ -186,7 +186,6 @@ intros. unfold corestep, coopsem in H; simpl in H.
     eexists. eapply ltl_effstep_Lcall; try eassumption; trivial.  
     eexists. eapply ltl_effstep_Ltailcall; try eassumption; trivial. 
     eexists. eapply ltl_effstep_Lbuiltin; try eassumption; trivial. 
-(*    eexists. eapply ltl_effstep_Lannot; eassumption.*)
     eexists. eapply ltl_effstep_Lbranch; eassumption.
     eexists. eapply ltl_effstep_Lcond; try eassumption; trivial.
     eexists. eapply ltl_effstep_Ljumptable; try eassumption; trivial.

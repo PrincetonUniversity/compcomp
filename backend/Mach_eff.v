@@ -147,13 +147,15 @@ Inductive mach_effstep (ge:genv): (block -> Z -> bool) ->
       mach_effstep ge (BuiltinEffect ge ef (decode_longs (sig_args (ef_sig ef)) (rs##args)) m)
          (Mach_State s f sp (Mbuiltin ef args res :: b) rs lf) m
          (Mach_State s f sp b rs' lf) m'
-(*NO SUPPORT FOR ANNOT YET
+
+(* annotations are observable, so now handled by atExternal
   | Mach_effexec_Mannot:
       forall s f sp rs m ef args b vargs t v m',
       annot_arguments rs m sp args vargs ->
       external_call' ef ge vargs m t v m' ->
       mach_effstep (Mach_State s f sp (Mannot ef args :: b) rs) m
          t (Mach_State s f sp b rs) m'*)
+
   | Mach_effexec_Mgoto:
       forall s fb f sp lbl c rs m c' lf,
       Genv.find_funct_ptr ge fb = Some (Internal f) ->

@@ -130,12 +130,14 @@ Inductive Linear_step (ge:genv): Linear_core -> mem -> Linear_core -> mem -> Pro
       rs' = Locmap.setlist (map R res) vl (undef_regs (destroyed_by_builtin ef) rs) ->
       Linear_step ge (Linear_State s f sp (Lbuiltin ef args res :: b) rs lf) m
          (Linear_State s f sp b rs' lf) m'
-(*NO ANNOTS YET
+
+(* annotations are observable, so now handled by atExternal
   | lin_exec_Lannot:
       forall s f sp rs m ef args b t v m',
       external_call' ef ge (map rs args) m t v m' ->
       Linear_step (Linear_State s f sp (Lannot ef args :: b) rs) m
          (Linear_State s f sp b rs) m'*)
+
   | lin_exec_Llabel:
       forall s f sp lbl b rs m lf,
       Linear_step ge (Linear_State s f sp (Llabel lbl :: b) rs lf) m

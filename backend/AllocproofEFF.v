@@ -4063,7 +4063,8 @@ induction CS;
     destruct H3 as [[EFF VB] _].
     eapply BuiltinEffect_Propagate; eassumption. }
 
-{ (* annot *) simpl in *. elimtype False; apply H1; auto. }
+{ (* annotations are observable, so now handled by atExternal*)
+   elim H1. simpl. trivial. }
 
 { (* cond *)
   exploit (Eff_exec_moves mv); eauto. intros [ls1 [A1 B1]].

@@ -84,12 +84,14 @@ Inductive linear_effstep (ge:genv): (block -> Z -> bool) -> Linear_core -> mem -
       linear_effstep ge (BuiltinEffect ge ef (decode_longs (sig_args (ef_sig ef)) (reglist rs args)) m)
          (Linear_State s f sp (Lbuiltin ef args res :: b) rs lf) m
          (Linear_State s f sp b rs' lf) m'
-(*NO ANNOTS YET
+
+(* annotations are observable, so now handled by atExternal
   | lin_effexec_Lannot:
       forall s f sp rs m ef args b t v m',
       external_call' ef ge (map rs args) m t v m' ->
       linear_effstep (Linear_State s f sp (Lannot ef args :: b) rs lf) m
          (Linear_State s f sp b rs lf) m'*)
+
   | lin_effexec_Llabel:
       forall s f sp lbl b rs m lf,
       linear_effstep ge EmptyEffect 

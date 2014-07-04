@@ -134,7 +134,7 @@ Inductive ltl_corestep (ge:genv): LTL_core -> mem -> LTL_core -> mem -> Prop :=
       rs' = Locmap.setlist (map R res) vl (undef_regs (destroyed_by_builtin ef) rs) ->
       ltl_corestep ge (LTL_Block s f sp (Lbuiltin ef args res :: bb) rs retty) m
          (LTL_Block s f sp bb rs' retty) m'
-(* WE DON'T SUPPORT ANNOT YET
+(* annotations are observable, so now handled by atExternal
   | ltl_exec_Lannot: forall s f sp ef args bb rs m t vl m',
       external_call' ef ge (map rs args) m t vl m' ->
       ltl_corestep (LTL_Block s f sp (Lannot ef args :: bb) rs) m

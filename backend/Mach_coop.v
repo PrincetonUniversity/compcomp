@@ -210,7 +210,7 @@ Inductive mach_step (ge:genv): Mach_core -> mem -> Mach_core -> mem -> Prop :=
       mach_step ge (Mach_State s f sp (Mbuiltin ef args res :: b) rs lf) m
                 (Mach_State s f sp b rs' lf) m'
 
-(*NO SUPPORT FOR ANNOT YET
+(* annotations are observable, so now handled by atExternal
   | Mach_exec_Mannot:
       forall s f sp rs m ef args b vargs t v m',
       annot_arguments rs m sp args vargs ->
