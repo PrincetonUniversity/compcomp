@@ -105,21 +105,6 @@ Proof.
   congruence.
 Qed.
 
-(*NEW, GFP as in selectionproofEFF*)
-Definition globalfunction_ptr_inject (j:meminj):=
-  forall b f, Genv.find_funct_ptr ge b = Some f -> 
-              j b = Some(b,0) /\ isGlobalBlock ge b = true.  
-
-Lemma restrict_preserves_globalfun_ptr: forall j X
-  (PG : globalfunction_ptr_inject j)
-  (Glob : forall b, isGlobalBlock ge b = true -> X b = true),
-globalfunction_ptr_inject (restrict j X).
-Proof. intros.
-  red; intros. 
-  destruct (PG _ _ H). split; trivial.
-  apply restrictI_Some; try eassumption.
-  apply (Glob _ H1).
-Qed.
 
 Lemma GDE_lemma: genvs_domain_eq ge tge.
 Proof.
@@ -135,33 +120,6 @@ Proof.
       exists id; assumption.
      rewrite varinfo_preserved in Hid.
       exists id; assumption.
-Qed.
-
-Lemma restrict_GFP_vis: forall mu
-  (GFP : globalfunction_ptr_inject (as_inj mu))
-  (Glob : forall b, isGlobalBlock ge b = true -> 
-                    frgnBlocksSrc mu b = true),
-  globalfunction_ptr_inject (restrict (as_inj mu) (vis mu)).
-Proof. intros.
-  unfold vis. 
-  eapply restrict_preserves_globalfun_ptr. eassumption.
-  intuition.
-Qed.
-
-(*From Cminorgenproof*)
-Remark val_inject_function_pointer:
-  forall v fd j tv,
-  Genv.find_funct ge v = Some fd ->
-  globalfunction_ptr_inject j ->
-  val_inject j v tv ->
-  tv = v.
-Proof.
-  intros. exploit Genv.find_funct_inv; eauto. intros [b EQ]. subst v.
-  inv H1.
-  rewrite Genv.find_funct_find_funct_ptr in H.
-  destruct (H0 _ _ H).
-  rewrite H1 in H4; inv H4.
-  rewrite Int.add_zero. trivial.
 Qed.
 
 (** Correctness of [labels_branched_to]. *)
