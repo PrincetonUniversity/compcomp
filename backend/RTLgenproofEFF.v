@@ -474,8 +474,9 @@ Qed.
 
 Lemma varinfo_preserved:
   forall b, Genv.find_var_info tge b = Genv.find_var_info ge b.
-Proof
-  (Genv.find_var_info_transf_partial transl_fundef _ TRANSL).
+Proof.
+  apply (Genv.find_var_info_transf_partial transl_fundef _ TRANSL).
+Qed.
 
 Lemma GDE_lemma: genvs_domain_eq ge tge.
 Proof.
@@ -486,7 +487,14 @@ Proof.
        exists id; trivial.
      rewrite symbols_preserved in Hid.
        exists id; trivial.
-    rewrite varinfo_preserved. intuition.
+    split. intros. rewrite varinfo_preserved. intuition.
+    intros. unfold tge. split. 
+      intros [f H]. 
+        eapply function_ptr_translated in H.
+        destruct H as [tf [? ?]]. exists tf; auto.
+      intros [f H]. inv TRANSL. unfold transl_program in H1.
+        eapply Genv.find_funct_ptr_rev_transf_partial in H1; eauto.
+        destruct H1 as [f0 [? ?]]; exists f0; auto.
 Qed.
 
 (*LENB: GFP as in selectionproofEFF*)

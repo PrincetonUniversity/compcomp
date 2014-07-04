@@ -52,7 +52,8 @@ Section Eff_INJ_SIMU_DIAGRAMS.
           meminj_preserves_globals ge1 (extern_of mu) /\
           (forall b, isGlobalBlock ge1 b = true -> frgnBlocksSrc mu b = true).
 
-   Hypothesis inj_initial_cores: forall v vals1 c1 m1 j vals2 m2 DomS DomT,
+   Hypothesis inj_initial_cores: forall v vals1 c1 m1 j vals2 m2 DomS DomT
+          (GPI: globalfunction_ptr_inject ge1 j),
           initial_core Sem1 ge1 v vals1 = Some c1 ->
           Mem.inject j m1 m2 -> 
           Forall2 (val_inject j) vals1 vals2 ->
@@ -198,7 +199,7 @@ clear - match_restrict. intros. destruct H; subst. eauto.
 clear - match_validblocks. intros.
     destruct H; subst. eauto.
 clear - inj_initial_cores. intros.
-    destruct (inj_initial_cores _ _ _ _ _ _ _ _ _ H
+    destruct (inj_initial_cores _ _ _ _ _ _ _ _ _ GPI H
          H0 H1 H2 H3 H4 H5 H6)
     as [c2 [INI MS]].
   exists c1, c2. intuition. 
@@ -330,7 +331,7 @@ clear - match_restrict. intros. destruct H; subst. eauto.
 clear - match_validblocks. intros.
     destruct H; subst. eauto.
 clear - inj_initial_cores. intros.
-    destruct (inj_initial_cores _ _ _ _ _ _ _ _ _ H H0 H1 H2 H3 H4 H5 H6)
+    destruct (inj_initial_cores _ _ _ _ _ _ _ _ _ GPI H H0 H1 H2 H3 H4 H5 H6)
     as [c2 [INI MS]].
   exists c1, c2. intuition. 
 clear - inj_effcore_diagram. 

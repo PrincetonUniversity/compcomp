@@ -61,7 +61,8 @@ Record SM_simulation_inject :=
 
 
 ; core_initial : 
-    forall v vals1 c1 m1 j vals2 m2 DomS DomT,
+    forall v vals1 c1 m1 j vals2 m2 DomS DomT
+           (GPI: globalfunction_ptr_inject ge1 j),
     initial_core Sem1 ge1 v vals1 = Some c1 ->
     Mem.inject j m1 m2 -> 
     Forall2 (val_inject j) vals1 vals2 ->

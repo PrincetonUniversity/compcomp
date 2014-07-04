@@ -365,8 +365,15 @@ Proof. intros.
           destruct const; inv H0.
           destruct p.
           remember (Genv.find_symbol ge i4) as u. 
-          destruct u; inv H1. destruct GENV as [GE ?].
-          apply eq_sym in Hequ. apply (GE _ _ Hequ).
+          destruct u; inv H1. destruct GENV as [GE _].
+          apply eq_sym in Hequ. 
+          assert (isGlob: isGlobalBlock ge b=true).
+          { apply Genv.find_invert_symbol in Hequ.
+            unfold isGlobalBlock.
+            rewrite orb_true_iff. left.
+            unfold genv2blocksBool; simpl.
+            rewrite Hequ; auto. }
+          apply (GE _ isGlob).
         destruct const; inv H0.
           unfold Val.mul in Heqq.
           destruct (Int.eq i2 Int.one).
@@ -380,8 +387,16 @@ Proof. intros.
       { unfold Vzero in EA; simpl in *.
          destruct const; try discriminate. destruct p.
          remember (Genv.find_symbol ge i1) as u. 
-         destruct u; inv EA. destruct GENV as [GE ?].
-         apply eq_sym in Hequ. apply (GE _ _ Hequ). }
+         destruct u; inv EA. destruct GENV as [GE _].
+         apply eq_sym in Hequ. 
+          assert (isGlob: isGlobalBlock ge b=true).
+          { apply Genv.find_invert_symbol in Hequ.
+            unfold isGlobalBlock.
+            rewrite orb_true_iff. left.
+            unfold genv2blocksBool; simpl.
+            rewrite Hequ; auto. }
+          apply (GE _ isGlob). }
+
       { destruct ofs0; simpl in *. 
          destruct p.
          remember (if Int.eq i2 Int.one then rs i1 
@@ -409,8 +424,15 @@ Proof. intros.
      destruct const; inv H1; trivial. 
      { destruct p. 
        remember (Genv.find_symbol ge i2) as u. 
-       destruct u; inv H0. destruct GENV as [GE ?].
-         apply eq_sym in Hequ. apply (GE _ _ Hequ). }
+       destruct u; inv H0. destruct GENV as [GE _].
+         apply eq_sym in Hequ. 
+          assert (isGlob: isGlobalBlock ge b=true).
+          { apply Genv.find_invert_symbol in Hequ.
+            unfold isGlobalBlock.
+            rewrite orb_true_iff. left.
+            unfold genv2blocksBool; simpl.
+            rewrite Hequ; auto. }
+          apply (GE _ isGlob). }
      { destruct const; inv H1; trivial. 
        unfold Val.mul in Heqq. 
        destruct (Int.eq i0 Int.one); inv Heqq.
@@ -423,8 +445,15 @@ Proof. intros.
      destruct const; inv H0; trivial. 
      { destruct p. 
        remember (Genv.find_symbol ge i) as u. 
-       destruct u; inv H1. destruct GENV as [GE ?].
-         apply eq_sym in Hequ. apply (GE _ _ Hequ). } } 
+       destruct u; inv H1. destruct GENV as [GE _].
+         apply eq_sym in Hequ. 
+          assert (isGlob: isGlobalBlock ge b=true).
+          { apply Genv.find_invert_symbol in Hequ.
+            unfold isGlobalBlock.
+            rewrite orb_true_iff. left.
+            unfold genv2blocksBool; simpl.
+            rewrite Hequ; auto. }
+          apply (GE _ isGlob). } } 
 Qed. 
 
 Lemma extcall_arguments_valid rs m: regmap_valid m rs ->
@@ -729,9 +758,10 @@ econstructor. instantiate (1:= Inv).
    destruct w; try discriminate.
    inv H2; simpl.
    split. trivial. 
-   split. unfold valid_genv in H0. 
+   split. 
      apply eq_sym in Heqq.
-       admit. (* eapply H0. clear Heqw. instantiate (1:=f). specialize @Genv.find_funct_ptr_inversion. in Heqq.*)
+     destruct H0.
+     eapply v0; eauto.
    apply H. }
 { intros ? ? ? ? ? CS GENV INV.
   inv CS; simpl in *.
@@ -758,7 +788,8 @@ econstructor. instantiate (1:= Inv).
       remember (Genv.find_symbol ge id) as v. 
       destruct v; simpl in *; trivial. 
       apply eq_sym in Heqv. destruct GENV as [GE _].
-        apply (GE _ _ Heqv).
+        apply GE. unfold isGlobalBlock, genv2blocksBool; simpl. 
+        solve[apply Genv.find_invert_symbol in Heqv; rewrite Heqv; auto].
 
    unfold exec_load in H4.
    remember (Mem.loadv Mint32 m (eval_addrmode ge a rs)) as q.
@@ -1391,7 +1422,9 @@ econstructor. instantiate (1:= Inv).
       unfold  symbol_offset in Heqq.
       remember (Genv.find_symbol ge symb) as w. 
       destruct w; inv Heqq. apply eq_sym in Heqw.
-      destruct GENV as [GE _]. apply (GE _ _ Heqw).
+      destruct GENV as [GE _]. 
+        apply GE. unfold isGlobalBlock, genv2blocksBool; simpl. 
+        solve[apply Genv.find_invert_symbol in Heqw; rewrite Heqw; auto].
 
     split; trivial.
       split; trivial.
@@ -1454,7 +1487,9 @@ econstructor. instantiate (1:= Inv).
       unfold symbol_offset.
       remember (Genv.find_symbol ge symb) as w. 
       destruct w; simpl; trivial. apply eq_sym in Heqw.
-      destruct GENV as [GE _]. apply (GE _ _ Heqw).
+      destruct GENV as [GE _]. 
+        apply GE. unfold isGlobalBlock, genv2blocksBool; simpl. 
+        solve[apply Genv.find_invert_symbol in Heqw; rewrite Heqw; auto].
 
     split; trivial.
       split; trivial.

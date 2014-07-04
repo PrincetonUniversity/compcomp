@@ -843,7 +843,9 @@ Qed.
 Definition genvs_domain_eq {F1 F2 V1 V2: Type} 
   (ge1: Genv.t F1 V1) (ge2: Genv.t F2 V2) :=
     (forall b, fst (genv2blocks ge1) b <-> fst (genv2blocks ge2) b) /\
-    (forall b, snd (genv2blocks ge1) b <-> snd (genv2blocks ge2) b).
+    (forall b, snd (genv2blocks ge1) b <-> snd (genv2blocks ge2) b) /\ 
+    (forall b, (exists f, Genv.find_funct_ptr ge1 b = Some f)
+           <-> (exists f, Genv.find_funct_ptr ge2 b = Some f)).
 
 Lemma genvs_domain_eq_preserves:
   forall {F1 F2 V1 V2: Type} (ge1: Genv.t F1 V1) (ge2: Genv.t F2 V2) j,
@@ -887,14 +889,21 @@ Lemma genvs_domain_eq_sym:
 Proof.
 intros until ge2.
 unfold genvs_domain_eq; intros [H1 H2].
-split; intro b; split; intro H3; 
- solve[destruct (H1 b); auto|destruct (H2 b); auto].
+split. intros b. split; intro H3; solve[destruct (H1 b); auto].
+split. intros b. split; intro H3. 
+  destruct H2; eapply H; eauto.
+  destruct H2; eapply H; eauto.
+intros b. split. 
+  intros [ef F]. destruct H2 as [H2 H3]. rewrite H3; eauto.
+  intros [ef F]. destruct H2 as [H2 H3]. rewrite <-H3; eauto.
 Qed.
 
 Lemma genvs_domain_eq_refl: 
   forall F V (ge: Genv.t F V), genvs_domain_eq ge ge.
 Proof. 
-solve[intros F V ge; unfold genvs_domain_eq; split; intro b; split; auto]. 
+intros F V ge; unfold genvs_domain_eq; split; try solve[intro b; split; auto].
+split. intro b; split; auto.
+intros b; split; auto.
 Qed.
 
 Lemma genvs_domain_eq_trans: forall {F1 F2 F3 V1 V2 V3: Type} 
@@ -902,8 +911,11 @@ Lemma genvs_domain_eq_trans: forall {F1 F2 F3 V1 V2 V3: Type}
   genvs_domain_eq ge1 ge2 -> genvs_domain_eq ge2 ge3 -> genvs_domain_eq ge1 ge3.
 Proof. intros F1 F2 F3 V1 V2 V3 ge1 ge2 ge3; unfold genvs_domain_eq.
   intros. destruct H; destruct H0.
-  split; intro b. rewrite H. apply H0.
-  rewrite H1. apply H2.
+  split. intros b. rewrite H. apply H0.
+  split. intros b. destruct H1 as [H1 _]. rewrite H1. 
+    destruct H2 as [H2 _]. apply H2.
+  intros b. destruct H2 as [H2 H3]. destruct H1 as [H1 H4]. 
+    rewrite <-H3. rewrite H4. split; auto.
 Qed.
 
 Lemma genvs_domain_eq_match_genvs: forall {F1 V1 F2 V2:Type} 
