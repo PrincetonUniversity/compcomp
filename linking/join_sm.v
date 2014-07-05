@@ -1373,7 +1373,7 @@ Lemma join_all_restrict_sep
 Proof.
 move=> A B C D val incr E loc_alloc mu_tot mu_tot' F tot'_wd tot_wd.
 have Cut: sm_inject_separated mu_tot mu_tot' m1 m2.
-  by apply: (join_all_sm_inject_separated (m1':=m1')).
+  by eapply (join_all_sm_inject_separated (m1':=m1')); eauto.
 set mu_tot2 := Inj.mk tot_wd. 
 change (sm_inject_separated 
          (restrict_sm mu_tot2 (vis mu_tot2))
