@@ -141,15 +141,13 @@ Import Wholeprog_simulation.
 
 Lemma context_equiv 
     (main : val)  
-    (source_det : corestep_fun linker_S)  
     (target_det : corestep_fun linker_T) 
     cd mu l1 m1 l2 m2 
     (source_safe : forall n, safeN linker_S ge_top n l1 m1) 
     (match12 : match_state (lifted_sim main) cd mu l1 m1 l2 m2) :
   (terminates linker_S ge_top l1 m1 <-> terminates linker_T ge_top l2 m2).
 Proof.
-by apply: (equitermination _ _ 
-   source_det target_det _ _ _ _ _ _ source_safe match12).
+by apply: (equitermination _ _ target_det _ _ _ _ _ _ source_safe match12).
 Qed.
 
 End ContextEquiv.

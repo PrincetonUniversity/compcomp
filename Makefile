@@ -130,9 +130,10 @@ CORE=Extensionality.v base.v eq_dec.v Address.v \
   FiniteMaps.v mem_interpolation_defs.v mem_interpolation_II.v \
   effect_interpolation_II.v effect_interpolants.v effect_interpolation_proofs.v \
   arguments.v compcert.v \
-  closed_safety.v trace_semantics.v\
+  closed_safety.v closed_safety_weak.v trace_semantics.v\
   nucular_semantics.v \
-  wholeprog_simulations.v wholeprog_lemmas.v barebones_simulations.v \
+  wholeprog_simulations.v wholeprog_lemmas.v wholeprog_lemmas_weak.v \
+  barebones_simulations.v \
   val_casted.v
 
 # Linking files

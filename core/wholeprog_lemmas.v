@@ -44,8 +44,6 @@ Context  {F V TF TV C D Z data : Type}
   (P : val -> mem -> Prop)
   (P_good : forall j v tv m tm, val_inject j v tv -> Mem.inject j m tm -> P v m -> P tv tm)
 
-  (SRC_DET : corestep_fun source)
-
   (TGT_DET : corestep_fun target)
   
   (source_safe : forall n, safeN source geS n c m)
@@ -115,7 +113,8 @@ right.
 generalize H0 as SAFE; intro.
 specialize (H0 (S O)); simpl in H0.
 rewrite HALTED_NONE in H0.
-destruct H0 as [c2 [m2 [STEP _]]].
+destruct H0 as [H0 HALL].
+destruct H0 as [c2 [m2 STEP]].
 generalize STEP as STEP'; intro.
 eapply core_diagram in STEP; eauto.
 destruct STEP as [d2 [tm2 [cd2 [j2 [? H2]]]]].
@@ -343,8 +342,6 @@ Context  {F V TF TV C D Z data : Type}
 
   (sim : Wholeprog_simulation source target geS geT main)
 
-  (SRC_DET : corestep_fun source)
-
   (TGT_DET : corestep_fun target)
 .
 
@@ -387,7 +384,7 @@ destruct (lt_dec n2 n) as [pf|pf].
     exists b; split; auto. omega. }
   destruct TSTEPN' as [n2' [ltpf TSTEPN']].
   assert (safe': forall n, safeN source geS n c2 m2). 
-  { destruct STEPN as [q STEPN]. 
+  { destruct STEPN as [q STEPN].
     intros n0; eapply safe_corestepN_forward; eauto. }
   destruct (IH n2' ltpf c2 m2 d2 tm2 cd' j' d' tm' hv' safe' MTCH2 TSTEPN' HLT2)
     as [c0 [m0 [[q STEPN1] [hv0 HLT1]]]].
@@ -418,108 +415,3 @@ destruct A as [n A]; eapply termination_reflection; eauto.
 Qed.
 
 End equitermination.
-
-(** ** Safety preservationn *)
-
-Section safety_preservation.
-Variables F V TF TV C D : Type.
-Variable source : @EffectSem (Genv.t F V) C.
-Variable target : @EffectSem (Genv.t TF TV) D.
-Variable geS : Genv.t F V.
-Variable geT : (Genv.t TF TV).
-Variable SRC_DET : corestep_fun source.
-Variable TGT_DET : corestep_fun target.
-Variable main : val.
- 
-Lemma safety_preservation:
-  forall
-  (sim : Wholeprog_simulation source target geS geT main)
-  (c : C)
-  (d : D)
-  (m : mem)
-  (tm: mem)
-  (MATCH : exists cd j, match_state sim cd j c m d tm)
-  (source_safe : forall n, safeN source geS n c m),
-  (forall n, safeN target geT n d tm).
-Proof.
-intros until n.
-destruct MATCH as [cd [j MATCH2]].
-revert cd j c m d tm MATCH2 source_safe.
-induction n; simpl; auto.
-intros.
-apply (corestep_ord' main sim c d m tm) in MATCH2; auto.
-destruct MATCH2 as [H|H].
-destruct H as [rv [rv' [H1 H2]]].
-rewrite H2; auto.
-destruct H as [cd' [j' [c' [m' [STEPN [[H1 H2]|H]]]]]].
-destruct H2 as [rv [rv' [A1 A2]]].
-rewrite A2; auto.
-destruct H as [d' [tm' [TSTEPN MATCH']]].
-destruct TSTEPN as [n0 TSTEPN].
-cut (halted target d = None). intros ->.
-simpl in TSTEPN.
-destruct TSTEPN as [d2 [tm2 [TSTEP TSTEPN]]].
-exists d2, tm2.
-split; auto.
-cut (safeN target geT (n - n0) d' tm'). intro SAFE.
-apply (@safe_corestepN_backward _ _ _ _ _ _ _ _ _ _ _ TSTEPN SAFE).
-cut (safeN target geT n d' tm'). intro.
-apply safe_downward with (n' := (n - n0)%nat) in H.
-apply H. omega.
-apply (IHn _ _ _ _ _ _ MATCH').
-intros n1.
-destruct STEPN as [n2 STEPN].
-specialize (source_safe (n1 + S (S n2))%nat).
-generalize @safe_corestepN_forward. intro FORW.
-solve[apply (FORW _ _ _ _ _ _ _ _ _ _ _ SRC_DET STEPN source_safe)].
-simpl in TSTEPN.
-destruct TSTEPN as [d2 [tm2 [STEP ?]]].
-solve[apply corestep_not_halted in STEP; auto].
-Qed.
-
-Lemma halted_safe: 
-  forall c m c' m' rv,
-  corestep_star source geS c m c' m' -> 
-  halted source c' = Some rv -> 
-  (forall n, safeN source geS n c m).
-Proof.
-intros.
-destruct H as [n0 H].
-revert c m H H0.
-induction n0.
-simpl. intros. inv H.
-destruct n; simpl; auto.
-solve[rewrite H0; auto].
-simpl.
-intros c0 m0 [c2 [m2 [STEP STEPN]]] HALTED.
-apply (safe_corestep_backward STEP).
-generalize (IHn0 _ _ STEPN HALTED); intros SAFEN.
-solve[apply (safe_downward (n := n)); auto; omega].
-Qed.
-
-Lemma halted_same_num_steps d tm d' tm' d'' tm'' rv rv' n n' :
-  corestepN target geT n d tm d' tm' -> 
-  corestepN target geT n' d tm d'' tm'' -> 
-  halted target d' = Some rv -> 
-  halted target d'' = Some rv' -> 
-  n=n'.
-Proof.
-revert d tm n'; induction n.
-intros d tm. simpl. inversion 1; subst. 
-destruct n'. simpl. inversion 1; subst; auto.
-simpl. intros [d2 [m2 [STEP STEP']]] HALT HALT'.
-apply corestep_not_halted in STEP.
-rewrite HALT in STEP; congruence.
-intros.
-destruct H as [d2 [tm2 [H H']]].
-destruct n'.
-simpl in H0. inv H0. 
-apply corestep_not_halted in H.
-rewrite H2 in H; congruence.
-erewrite IHn; eauto.
-destruct H0 as [d2' [tm2' [? ?]]].
-generalize (TGT_DET _ _ _ _ _ _ _ H H0).
-inversion 1; subst; auto.
-Qed.
-
-End safety_preservation.
