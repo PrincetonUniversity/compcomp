@@ -772,3 +772,54 @@ Proof. intros.
   unfold BuiltinEffect. extensionality m. 
   destruct ef; trivial.
 Qed.
+
+Section EC_DET.
+
+Context (hf : helper_functions) 
+        {F V : Type} (ge : Genv.t F V) (t1 t2: trace) (m m1 m2:mem).
+
+Definition is_I64_helper' hf ef :=
+  match ef with
+    | EF_external nm sg => is_I64_helper hf nm sg
+    | EF_builtin nm sg => is_I64_helper hf nm sg
+    | _ => False
+  end.
+
+Lemma is_I64_helper'_dec ef : {is_I64_helper' hf ef}+{~is_I64_helper' hf ef}.
+Proof.
+destruct ef; simpl; auto.
+destruct (is_I64_helper_dec hf name sg); auto.
+destruct (is_I64_helper_dec hf name sg); auto.
+Qed.
+
+Lemma EC'_determ: forall ef args res1 res2,  
+      external_call' ef ge args m t1 res1 m1 ->
+      external_call' ef ge args m t2 res2 m2 ->
+      ~ is_I64_helper' hf ef -> 
+      ~ observableEF hf ef -> t1=t2.
+Proof. intros.
+destruct ef; simpl in H2; intuition.
+(*EF_malloc*)
+inv H; inv H0. simpl in *. destruct args. inv H; inv H2.
+    inv H; inv H3. trivial.
+(*EF_free*)
+inv H; inv H0. simpl in *. destruct args. inv H; inv H2.
+    inv H; inv H3. trivial.
+(*EF_memcpy*)
+inv H; inv H0. simpl in *. destruct args. inv H; inv H2.
+   destruct args. inv H; inv H2. inv H; inv H3. trivial.
+Qed.
+
+(** i64_helpers_correct axiomatizes the helpers with empty trace (E0).
+  Elsewhere in standard CompCert, these functions are give the
+  Event_syscall trace (by extcall_io_sem). Here, we just impose
+  determinism on the traces (which is consistent with the E0
+  axiomatization used, e.g., in Selectlongproof.v). *)
+
+Axiom EC'_i64_helper_determ: forall ef args res1 res2,  (*SEE NOTE ABOVE*)
+      external_call' ef ge args m t1 res1 m1 ->
+      external_call' ef ge args m t2 res2 m2 ->
+      is_I64_helper' hf ef -> 
+      ~ observableEF hf ef -> t1=t2.
+
+End EC_DET.

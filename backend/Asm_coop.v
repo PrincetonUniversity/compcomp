@@ -106,17 +106,6 @@ Inductive asm_step: state -> mem -> state -> mem -> Prop :=
       asm_step (Asm_CallstateIn fb args tys retty) m 
                (State rs0 (mk_load_frame stk retty)) m2.
 
-Lemma external_call_trace_eq ef args m0 t v m t' v' m' :
-  external_call ef ge args m0 t v m -> 
-  external_call ef ge args m0 t' v' m' ->
-  t=t'.  
-Proof.
-unfold external_call.
-destruct ef.
-intros H H2; inv H; inv H2; auto.
-Admitted. (*TODO: must remove [trace] argument from extcall_sem; 
-           The [t] is totally unconstrained in the above semantics.*)
-
 Lemma asm_step_det c m c' m' c'' m'' :
   asm_step c m c' m' ->   
   asm_step c m c'' m'' -> 
@@ -134,15 +123,25 @@ Ltac Equalities :=
   split. constructor. auto.
   discriminate.
   discriminate.
-  inv H10. 
-  destruct H4.
-  assert (t=t0) by (eapply external_call_trace_eq in H0; eauto). subst t0.
+  case_eq (is_I64_helper'_dec hf ef0); intros X _.
+  assert (t=t0).
+  { eapply EC'_i64_helper_determ in H4; eauto. } subst t0.
+  inv H4; inv H10.
+  eapply external_call_deterministic in H; eauto. destruct H; subst. split; auto.
+  assert (t=t0).
+  { eapply EC'_determ in H10; eauto. }
+  inv H10; inv H4.
   eapply external_call_deterministic in H0; eauto. destruct H0; subst. auto. split; auto.
   eapply extcall_arguments_determ in H3; eauto. subst. auto.
-  assert (t=t0). 
-  { destruct H3; destruct H12.
-    eapply external_call_trace_eq in H2; eauto. } subst t0.
-  eapply external_call_deterministic' in H3; eauto. destruct H3; subst. auto.
+  case_eq (is_I64_helper'_dec hf callee); intros X _.
+  assert (t=t0).
+  { eapply EC'_i64_helper_determ in H3; eauto. eapply EFhelpers; eauto. } subst t0.
+  inv H3; inv H12.
+  eapply external_call_deterministic in H; eauto. destruct H; subst. split; auto.
+  assert (t=t0).
+  { eapply EC'_determ in H12; eauto. } subst t0.
+  inv H3; inv H12.
+  eapply external_call_deterministic in H; eauto. destruct H; subst. auto. 
   rewrite H11 in H2; inversion H2. subst m2. inversion H2. rewrite H0 in H12.
   rewrite H12 in H3; inversion H3. subst m''. split; auto. 
   f_equal; auto.
