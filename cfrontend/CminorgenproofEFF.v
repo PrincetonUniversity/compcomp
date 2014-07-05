@@ -84,13 +84,23 @@ Proof.
      split; intros; destruct H as [id Hid].
       rewrite <- (symbols_preserved _ _ TRANSL) in Hid.
       exists id; assumption.
-     rewrite (symbols_preserved _ _ TRANSL) in Hid.
+      rewrite (symbols_preserved _ _ TRANSL) in Hid.
       exists id; assumption.
-     split; intros; destruct H as [id Hid].
-      rewrite <- (varinfo_preserved _ _ TRANSL) in Hid.
-      exists id; assumption.
-     rewrite (varinfo_preserved _ _ TRANSL) in Hid.
-      exists id; assumption.
+     split; intros b. 
+       split; intros; destruct H as [id Hid].
+       rewrite <- (varinfo_preserved _ _ TRANSL) in Hid.
+       exists id; assumption.
+       rewrite (varinfo_preserved _ _ TRANSL) in Hid.
+       exists id; assumption.
+    intros. split.
+      intros [f H].
+        apply (function_ptr_translated _ _ TRANSL) in H. 
+        destruct H as [? [? ?]].
+        eexists; eassumption.
+     intros [f H]. unfold transl_program in TRANSL. 
+         apply (@Genv.find_funct_ptr_rev_transf_partial
+           _ _ _ transl_fundef prog _ TRANSL) in H. 
+         destruct H as [? [? _]]. eexists; eassumption.
 Qed.
 
 Let core_data := CSharpMin_core.

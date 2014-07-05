@@ -4790,16 +4790,8 @@ SM_simulation.SM_simulation_inject (cminsel_eff_sem hf)
    (rtl_eff_sem hf) ge tge.
 Proof.
 intros.
-assert (GDE: genvs_domain_eq ge tge).
-    unfold genvs_domain_eq, genv2blocks.
-    simpl; split; intros. 
-     split; intros; destruct H as [id Hid].
-       rewrite <- symbols_preserved in Hid.
-       exists id; trivial.
-     rewrite symbols_preserved in Hid.
-       exists id; trivial.
-    rewrite varinfo_preserved. intuition. 
- apply effect_simulations_lemmas.inj_simulation_star_wf with
+assert (GDE:=GDE_lemma).
+apply effect_simulations_lemmas.inj_simulation_star_wf with
   (match_states:=MATCH) (order :=lt_state).
 (*genvs_dom_eq*)
   assumption.

@@ -3908,18 +3908,23 @@ Qed.
 Lemma GDE_lemma: genvs_domain_eq ge tge.
 Proof.
     unfold genvs_domain_eq, genv2blocks.
-    simpl; split; intros.
+    simpl; split; intros. 
      split; intros; destruct H as [id Hid].
-      rewrite <- symbols_preserved in Hid.
-      exists id; assumption.
+       rewrite <- symbols_preserved in Hid.
+       exists id; trivial.
      rewrite symbols_preserved in Hid.
-      exists id; assumption.
-     split; intros; destruct H as [id Hid].
-      rewrite <- varinfo_preserved in Hid.
-      exists id; assumption.
-     rewrite varinfo_preserved in Hid.
-      exists id; assumption.
-Qed.
+       exists id; trivial.
+    split. intros. rewrite varinfo_preserved. intuition.
+    intros. split.
+      intros [f H].
+        apply function_ptr_translated in H. 
+        destruct H as [? [? _]]. 
+        eexists; eassumption.
+     intros [f H]. 
+         apply (@Genv.find_funct_ptr_rev_transf_partial
+           _ _ _ transf_fundef prog _ TRANSF) in H.
+         destruct H as [? [? _]]. eexists; eassumption.
+Qed. 
 
 (** Preservation of the arguments to an external call. *)
 

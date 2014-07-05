@@ -105,7 +105,6 @@ Proof.
   congruence.
 Qed.
 
-
 Lemma GDE_lemma: genvs_domain_eq ge tge.
 Proof.
     unfold genvs_domain_eq, genv2blocks.
@@ -115,11 +114,20 @@ Proof.
       exists id; assumption.
      rewrite symbols_preserved in Hid.
       exists id; assumption.
-     split; intros; destruct H as [id Hid].
-      rewrite <- varinfo_preserved in Hid.
-      exists id; assumption.
-     rewrite varinfo_preserved in Hid.
-      exists id; assumption.
+     split; intros b. 
+       split; intros; destruct H as [id Hid].
+       rewrite <- varinfo_preserved in Hid.
+       exists id; assumption.
+       rewrite varinfo_preserved in Hid.
+       exists id; assumption.
+    intros. split.
+      intros [f H].
+        apply function_ptr_translated in H. 
+        eexists; eassumption.
+     intros [f H].
+         apply (@Genv.find_funct_ptr_rev_transf
+           _ _ _ transf_fundef prog) in H.
+         destruct H as [? [? _]]. eexists; eassumption.
 Qed.
 
 (** Correctness of [labels_branched_to]. *)
@@ -248,7 +256,7 @@ Qed.
 Lemma agree_find_function_translated:
   forall j ros ls1 ls2 f,
   meminj_preserves_globals ge j ->
-  globalfunction_ptr_inject j ->
+  globalfunction_ptr_inject ge j ->
   agree_regs j ls1 ls2 ->
   find_function ge ros ls1 = Some f ->
   find_function tge ros ls2 = Some (transf_fundef f).
@@ -547,7 +555,7 @@ Definition MATCH mu c1 m1 c2 m2:Prop :=
   match_states (restrict_sm mu (vis mu)) c1 m1 c2 m2 /\
   REACH_closed m1 (vis mu) /\
   meminj_preserves_globals ge (as_inj mu) /\
-  globalfunction_ptr_inject (as_inj mu) /\
+  globalfunction_ptr_inject ge (as_inj mu) /\
   (forall b, isGlobalBlock ge b = true -> frgnBlocksSrc mu b = true) /\
   sm_valid mu m1 m2 /\ SM_wd mu /\ Mem.inject (as_inj mu) m1 m2.
 

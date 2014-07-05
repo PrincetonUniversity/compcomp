@@ -2432,8 +2432,10 @@ Lemma MATCH_initial: forall v
       (RCH: forall b, REACH m2 
           (fun b' : block => isGlobalBlock tge b' || getBlocks vals2 b') b = true ->
           DomT b = true) 
+      (InitMem : exists m0 : mem, Genv.init_mem prog = Some m0 
+           /\ Ple (Mem.nextblock m0) (Mem.nextblock m1) 
+           /\ Ple (Mem.nextblock m0) (Mem.nextblock m2))
       (GDE: genvs_domain_eq ge tge)
-      (GFP: globalfunction_ptr_inject ge j)
       (HDomS: forall b : block, DomS b = true -> Mem.valid_block m1 b)
       (HDomT: forall b : block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
@@ -2585,10 +2587,15 @@ Proof. intros.
       assumption.
       apply BB.
       apply EE.
-    rewrite initial_SM_as_inj.
-    red; intros. 
-    destruct PG as [X [Y Z]].
-    solve[eapply GFP; eauto].
+  rewrite initial_SM_as_inj.
+      red; intros. specialize (Genv.find_funct_ptr_not_fresh prog). intros FFP.
+         destruct InitMem as [m0 [INIT_MEM [? ?]]].
+         specialize (FFP _ _ _ INIT_MEM H). 
+         destruct (valid_init_is_global _ R _ INIT_MEM _ FFP) as [id Hid]. 
+           destruct PG as [PGa [PGb PGc]]. split. eapply PGa; eassumption.
+         unfold isGlobalBlock. 
+          apply orb_true_iff. left. apply genv2blocksBool_char1.
+            simpl. exists id; eassumption.
     rewrite initial_SM_as_inj. assumption. 
 Qed.
 
