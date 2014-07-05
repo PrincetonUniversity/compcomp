@@ -102,13 +102,23 @@ Proof.
       exists id; assumption.
      rewrite symbols_preserved in Hid.
       exists id; assumption.
-     split; intros; destruct H as [id Hid].
-      rewrite <- varinfo_preserved in Hid.
-      exists id; assumption.
-     rewrite varinfo_preserved in Hid.
-      exists id; assumption.
+     split; intros b. 
+       split; intros; destruct H as [id Hid].
+       rewrite <- varinfo_preserved in Hid.
+       exists id; assumption.
+       rewrite varinfo_preserved in Hid.
+       exists id; assumption.
+    intros. split.
+      intros [f H].
+        apply functions_translated in H. 
+        destruct H as [? [? _]].
+        eexists; eassumption.
+     intros [f H].
+         apply (@Genv.find_funct_ptr_rev_transf_partial
+           _ _ _ transf_fundef prog _ TRANSF) in H.
+         destruct H as [? [? _]]. eexists; eassumption.
 Qed.
-
+ 
 (** * Properties of control flow *)
 
 Lemma transf_function_no_overflow:
@@ -737,27 +747,11 @@ Proof. intros. inv MS.
        rewrite vis_restrict_sm, restrict_sm_local, restrict_nest; auto. }
 Qed.
 
-(*NEW, GFP as in selectionproofEFF*)
-Definition globalfunction_ptr_inject (j:meminj):=
-  forall b f, Genv.find_funct_ptr ge b = Some f -> 
-              j b = Some(b,0) /\ isGlobalBlock ge b = true.  
-
-Lemma restrict_preserves_globalfun_ptr: forall j X
-  (PG : globalfunction_ptr_inject j)
-  (Glob : forall b, isGlobalBlock ge b = true -> X b = true),
-globalfunction_ptr_inject (restrict j X).
-Proof. intros.
-  red; intros. 
-  destruct (PG _ _ H). split; trivial.
-  apply restrictI_Some; try eassumption.
-  apply (Glob _ H1).
-Qed.
-
 Definition MATCH (d:Mach_core) mu c1 m1 c2 m2:Prop :=
   match_states mu c1 m1 c2 m2 /\ 
   REACH_closed m1 (vis mu) /\
   meminj_preserves_globals ge (as_inj mu) /\
-  globalfunction_ptr_inject (as_inj mu) /\
+  globalfunction_ptr_inject ge (as_inj mu) /\
   (forall b, isGlobalBlock ge b = true -> frgnBlocksSrc mu b = true) /\
   sm_valid mu m1 m2 /\ SM_wd mu.
 
@@ -1490,140 +1484,6 @@ intuition.
   red; intros. destruct (GFP _ _ H3). split; trivial.
   eapply extern_incr_as_inj; try eassumption.
   rewrite replace_locals_as_inj. assumption.
-Qed.
-
-Lemma CASE_BUILTIN: forall s f sp rs m ef args res b t vl
-  m' lf mu m2 ep rs0 f0 tf tc sp1 tsp0 args0 tys retty
-  (H : external_call' ef ge rs ## args m t vl m')
-  (H0 : ~ observableEF hf ef)
-  (PRE : REACH_closed m (vis mu) /\
-        meminj_preserves_globals ge (as_inj mu) /\
-        globalfunction_ptr_inject (as_inj mu) /\
-        (forall b : block,
-         isGlobalBlock ge b = true -> frgnBlocksSrc mu b = true) /\
-        sm_valid mu m m2 /\ SM_wd mu)
-  (tlf := mk_load_frame tsp0 retty : load_frame)
-  (STACKS : match_stack ge (restrict_sm mu (vis mu)) s)
-  (FIND : Genv.find_funct_ptr ge f = Some (Internal f0))
-  (MEXT : Mem.inject (as_inj mu) m m2)
-  (AT : transl_code_at_pc ge (rs0 PC) f f0 (Mbuiltin ef args res :: b) ep tf
-         tc)
-  (AG : agree (restrict_sm mu (vis mu)) rs sp rs0)
-  (DXP : ep = true ->
-        val_inject (as_inj (restrict_sm mu (vis mu))) 
-          (parent_sp0 sp1 s) (rs0 EDX))
-  (SPlocal : sp_spec mu sp)
-  (MLF : match_load_frames mu (Mach_coop.mk_load_frame sp1 args0 tys retty) m
-          tlf m2)
-  (H8 : Mach_coop.mk_load_frame sp1 args0 tys retty = lf),
- exists (st2' : state) (m2' : mem) (U2 : block -> Z -> bool),
-     (effstep_plus (Asm_eff_sem hf) tge U2 (State rs0 tlf) m2 st2' m2' \/
-      (measure
-         (Mach_State s f sp b
-            (Mach.set_regs res vl
-               (Mach.undef_regs (destroyed_by_builtin ef) rs))
-            (Mach_coop.mk_load_frame sp1 args0 tys retty)) <
-       measure
-         (Mach_State s f sp (Mbuiltin ef args res :: b) rs
-            (Mach_coop.mk_load_frame sp1 args0 tys retty)))%nat /\
-      effstep_star (Asm_eff_sem hf) tge U2 (State rs0 tlf) m2 st2' m2') /\
-     (exists mu' : SM_Injection,
-        intern_incr mu mu' /\
-        sm_inject_separated mu mu' m m2 /\
-        sm_locally_allocated mu mu' m m2 m' m2' /\
-        MATCH
-          (Mach_State s f sp b
-             (Mach.set_regs res vl
-                (Mach.undef_regs (destroyed_by_builtin ef) rs))
-             (Mach_coop.mk_load_frame sp1 args0 tys retty)) mu'
-          (Mach_State s f sp b
-             (Mach.set_regs res vl
-                (Mach.undef_regs (destroyed_by_builtin ef) rs))
-             (Mach_coop.mk_load_frame sp1 args0 tys retty)) m' st2' m2' /\
-        ((forall (b0 : block) (ofs : Z),
-          BuiltinEffect ge ef
-            (decode_longs (sig_args (ef_sig ef)) rs ## args) m b0 ofs = true ->
-          vis mu b0 = true) ->
-         forall (b0 : block) (ofs : Z),
-         U2 b0 ofs = true ->
-         visTgt mu b0 = true /\
-         (locBlocksTgt mu b0 = false ->
-          exists (b1 : block) (delta1 : Z),
-            foreign_of mu b1 = Some (b0, delta1) /\
-            BuiltinEffect ge ef
-              (decode_longs (sig_args (ef_sig ef)) rs ## args) m b1
-              (ofs - delta1) = true /\
-            Mem.perm m b1 (ofs - delta1) Max Nonempty))).
-Proof.
-intros.
-  destruct PRE as [RC [PG [GFP [Glob [SMV WD]]]]].
-      assert (PGR: meminj_preserves_globals ge (restrict (as_inj mu) (vis mu))).
-        rewrite <- restrict_sm_all.
-        eapply restrict_sm_preserves_globals; try eassumption.
-          unfold vis. intuition.
-  inv H. inv AT. monadInv H4. 
-  exploit functions_transl; eauto. intro FN.
-  generalize (transf_function_no_overflow _ _ H3); intro NOOV.
-  exploit (inlineable_extern_inject _ _ GDE_lemma); eauto.
-    unfold ge, tge. 
-    eapply Genv.find_symbol_transf_partial; eauto.
-    rewrite <- restrict_sm_all. eapply decode_longs_inject.
-    eapply preg_vals; eauto.
-  intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
-           [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
-  eexists; eexists; eexists. 
-  split. left. eapply effstep_plus_one.
-           eapply asm_effexec_step_builtin. eauto. eauto.
-            eapply find_instr_tail; eauto.
-           econstructor. eassumption.
-            reflexivity. auto. eauto.
-  exists mu'.
-  split; trivial. 
-  split; trivial. 
-  split; trivial. 
-  split.
-    split. econstructor; eauto.
-      eapply match_stack_intern_incr; try eassumption.
-        eapply restrict_sm_intern_incr; eassumption. 
-      instantiate (1 := x).
-      unfold nextinstr_nf, nextinstr. rewrite Pregmap.gss.
-      rewrite undef_regs_other. rewrite set_pregs_other_2. rewrite undef_regs_other_2.
-      rewrite <- H. simpl. econstructor; eauto.
-      eapply code_tail_next_int; eauto.
-      rewrite preg_notin_charact. intros. auto with asmgen.
-      rewrite preg_notin_charact. intros. auto with asmgen.
-      auto with asmgen.
-      simpl; intros. intuition congruence.
-      apply agree_nextinstr_nf. eapply agree_set_mregs; auto.
-      eapply agree_intern_incr.
-         Focus 3. eapply restrict_sm_intern_incr; eassumption.
-         apply restrict_sm_WD; trivial.
-       eapply agree_undef_regs; eauto.
-       intros; eapply undef_regs_other_2; eauto. 
-      eapply encode_long_inject. rewrite restrict_sm_all; eassumption. 
-      congruence.
-
-      eapply sp_spec_intern_incr; eassumption.
-      inv MLF; constructor. 
-      generalize INCR as INCR'; intro.
-      apply intern_incr_local in INCR.
-      apply restrictD_Some in SP. destruct SP as [X Y].
-      apply restrictI_Some. 
-      apply INCR; auto.
-      solve[eapply intern_incr_vis in INCR'; eauto].
-    intuition. 
-    eapply meminj_preserves_incr_sep. eapply PG. eassumption. 
-             apply intern_incr_as_inj; trivial.
-             apply sm_inject_separated_mem; eassumption.
-    red; intros bb fbb Hbb. destruct (GFP _ _ Hbb).
-          split; trivial.
-          eapply intern_incr_as_inj; eassumption.    
-    assert (FRG: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INCR.
-          rewrite <- FRG. eapply (Glob _ H4).
-  { intros. 
-    eapply BuiltinEffect_Propagate with (tge0:=tge); try eassumption.
-      eapply decode_longs_inject. rewrite <- restrict_sm_all.
-        eapply preg_vals; apply AG. }
 Qed.
 
 Lemma MATCH_effcore_diagram: forall st1 m1 st1' m1' (U1 : block -> Z -> bool)

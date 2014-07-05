@@ -127,23 +127,11 @@ Lemma valid_genvs_domain_eq F1 F2 V1 V2
   valid_genv ge1 m -> 
   valid_genv ge2 m.
 Proof.
-move=> H1 []H2 H3; split.
-move=> id b fnd. 
-have isGlob: isGlobalBlock ge2 b.
-{ rewrite /isGlobalBlock /=; apply/orP; left.
-  by move: fnd; move/Genv.find_invert_symbol=> ->. }
+move=> H1 []H2 H3; constructor=> b isGlob. 
 move: (genvs_domain_eq_isGlobal _ _ H1)=> A; rewrite -A in isGlob.
-have [[id' fnd']|[id' fnd']]: 
-   (exists id, Genv.find_symbol ge1 id = Some b)
-\/ (exists gv, Genv.find_var_info ge1 b = Some gv).
-{ case: (orP isGlob)=> /=.
-  case e: (Genv.invert_symbol _ _)=> [id'|//]=> _.
-  by left; exists id'; apply: Genv.invert_find_symbol.
-  by case e: (Genv.find_var_info _ _)=> [gv|//]=> _; right; exists gv. }
-by apply: (H2 _ _ fnd').
-by apply: (H3 _ _ fnd').
-move=> gv b; case: H1=> _; move/(_ b)=> /= []A B C; case: B; first by exists gv.
-by move=> x fnd; apply: (H3 _ _ fnd).
+by apply (H2 _ isGlob).
+case: H1=> _ []_; case/(_ b)=> X Y Z; case: Y; first by exists isGlob.
+by move=> x FND; apply: (H3 _ _ FND).
 Qed.
 
 Lemma link (main : val) : Wholeprog_simulation linker_S linker_T my_ge my_ge main.
@@ -648,8 +636,6 @@ by rewrite -g. }(*END Case: halted*)
 Qed.
 
 End linkingSimulation.
-
-Print Assumptions link.
 
 Require Import linking_spec.
 

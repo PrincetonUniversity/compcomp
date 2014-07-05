@@ -16,7 +16,7 @@ Require Import StructuredInjections.
 
 Definition vis mu := fun b => locBlocksSrc mu b || frgnBlocksSrc mu b.
 Definition visTgt mu := fun b => locBlocksTgt mu b || frgnBlocksTgt mu b.
-  
+
 Inductive reach (m:mem) (B:block -> Prop): list (block * Z) -> block -> Prop :=
   reach_nil: forall b, B b -> reach m B nil b
 | reach_cons: forall b L b' z off n,
@@ -1045,6 +1045,7 @@ Proof. intros F1 V1 F2 V2 ge1 ge2.
         destruct H2. eexists; eassumption.
         apply Genv.find_invert_symbol in H.
         rewrite H in Heqd. discriminate.
+   destruct H0 as [H0 X].
    destruct (H0 b); clear H0.
      remember (Genv.find_var_info ge1 b) as d.
        destruct d; apply eq_sym in Heqd.
@@ -1394,7 +1395,6 @@ Proof. intros.
     rewrite (locBlocksSrc_false_local_None _ _ WD Heql); trivial.
 Qed.
 
-
 Definition restrict_sm mu (X:block -> bool) :=
 match mu with
   Build_SM_Injection locBSrc locBTgt pSrc pTgt local extBSrc extBTgt fSrc fTgt extern =>
@@ -1637,36 +1637,6 @@ Proof. intros.
   f_equal; trivial.
 Qed.
 
-(* DEPRECATED
-   Lemma mkinitial_SM_ok: forall {F1 V1 F2 V2:Type} 
-        (g1: Genv.t F1 V1) (g2: Genv.t F2 V2) (G:genvs_domain_eq g1 g2)
-        mu (WD: SM_wd mu) 
-        (PG: meminj_preserves_globals g1 (as_inj mu))
-        vals1 vals2 (VALS: Forall2 (val_inject (as_inj mu)) vals1 vals2)
-        m1 m2 (SMV: sm_valid mu m1 m2) (INJ: Mem.inject (as_inj mu) m1 m2)
-        (RchSrc: forall b, 
-                   REACH m1 (fun b' => isGlobalBlock g1 b' 
-                                    || getBlocks vals1 b') b = true -> DomSrc mu b = true) 
-        (RchTgt: forall b, 
-                   REACH m2 (fun b' => isGlobalBlock g2 b' 
-                                    || getBlocks vals2 b') b = true -> DomTgt mu b = true) 
-        nu (NU: nu = mkinitial_SM mu 
-                         (REACH m1 (fun b => isGlobalBlock g1 b || getBlocks vals1 b))
-                         (REACH m2 (fun b => isGlobalBlock g2 b || getBlocks vals2 b))),
-  SM_wd nu /\ sm_valid nu m1 m2 /\ 
-       meminj_preserves_globals g1 (extern_of nu) /\
-       (forall b, isGlobalBlock g1 b = true -> frgnBlocksSrc nu b = true) /\
-       REACH_closed m1 (vis nu) /\
-       REACH_closed m1 (mapped (as_inj nu)).
-Proof. intros. rewrite mkinitial_SM_equals_initial_SM in NU.
-  destruct (@core_initial_wd _ _ _ _ g1 g2 vals1 m1 (as_inj mu) vals2 m2 (DomSrc mu) (DomTgt mu))
-     with (mu0:=nu)
-  as [_ A]; trivial.
-  intros. eapply (as_inj_DomRng); eassumption.
-    intros. eapply SMV. apply H.
-    intros. eapply SMV. apply H.
-Qed. *)
-
 Lemma vals_def_inject_getBlock j b2: forall vals1 vals2
     (INJ: val_list_inject j vals1 vals2)
     (DEF : vals_def vals1 = true)
@@ -1819,3 +1789,50 @@ intros. induction Inj. constructor.
 constructor; trivial. apply val_inject_incr with (f1 := as_inj mu); auto.
 apply extern_incr_as_inj; auto.
 Qed.
+
+Section globalfunction_ptr_inject.
+
+Context {F V : Type} (ge : Genv.t F V).
+
+Definition globalfunction_ptr_inject (j:meminj):=
+  forall b f, Genv.find_funct_ptr ge b = Some f -> 
+              j b = Some(b,0) /\ isGlobalBlock ge b = true.  
+
+Lemma restrict_preserves_globalfun_ptr: forall j X
+  (PG : globalfunction_ptr_inject j)
+  (Glob : forall b, isGlobalBlock ge b = true -> X b = true),
+globalfunction_ptr_inject (restrict j X).
+Proof. intros.
+  red; intros. 
+  destruct (PG _ _ H). split; trivial.
+  apply restrictI_Some; try eassumption.
+  apply (Glob _ H1).
+Qed.
+
+Lemma restrict_GFP_vis: forall mu
+  (GFP : globalfunction_ptr_inject (as_inj mu))
+  (Glob : forall b, isGlobalBlock ge b = true -> 
+                    frgnBlocksSrc mu b = true),
+  globalfunction_ptr_inject (restrict (as_inj mu) (vis mu)).
+Proof. intros.
+  unfold vis. 
+  eapply restrict_preserves_globalfun_ptr. eassumption.
+  intuition.
+Qed.
+
+Remark val_inject_function_pointer:
+  forall v fd j tv,
+  Genv.find_funct ge v = Some fd ->
+  globalfunction_ptr_inject j ->
+  val_inject j v tv ->
+  tv = v.
+Proof.
+  intros. exploit Genv.find_funct_inv; eauto. intros [b EQ]. subst v.
+  inv H1.
+  rewrite Genv.find_funct_find_funct_ptr in H.
+  destruct (H0 _ _ H).
+  rewrite H1 in H4; inv H4.
+  rewrite Int.add_zero. trivial.
+Qed.
+
+End globalfunction_ptr_inject.

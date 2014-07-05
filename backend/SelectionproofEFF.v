@@ -1273,72 +1273,19 @@ Proof.
   exact (Genv.find_funct_ptr_transf (sel_fundef hf ge) _ _ H).
 Qed.
 
-Definition globalfunction_ptr_inject (j:meminj):=
-  forall b f, Genv.find_funct_ptr ge b = Some f -> 
-              j b = Some(b,0) /\ isGlobalBlock ge b = true.  
-
-Lemma restrict_preserves_globalfun_ptr: forall j X
-  (PG : globalfunction_ptr_inject j)
-  (Glob : forall b, isGlobalBlock ge b = true -> X b = true),
-globalfunction_ptr_inject (restrict j X).
-Proof. intros.
-  red; intros. 
-  destruct (PG _ _ H). split; trivial.
-  apply restrictI_Some; try eassumption.
-  apply (Glob _ H1).
-Qed.
-
-Lemma restrict_GFP_vis: forall mu
-  (GFP : globalfunction_ptr_inject (as_inj mu))
-  (Glob : forall b, isGlobalBlock ge b = true -> 
-                    frgnBlocksSrc mu b = true),
-  globalfunction_ptr_inject (restrict (as_inj mu) (vis mu)).
-Proof. intros.
-  unfold vis. 
-  eapply restrict_preserves_globalfun_ptr. eassumption.
-  intuition.
-Qed.
-
-(*From Cminorgenproof*)
-Remark val_inject_function_pointer:
-  forall v fd j tv,
-  Genv.find_funct ge v = Some fd ->
-  globalfunction_ptr_inject j ->
-  val_inject j v tv ->
-  tv = v.
-Proof.
-  intros. exploit Genv.find_funct_inv; eauto. intros [b EQ]. subst v.
-  inv H1.
-  rewrite Genv.find_funct_find_funct_ptr in H.
-  destruct (H0 _ _ H).
-  rewrite H1 in H4; inv H4.
-  rewrite Int.add_zero. trivial.
-Qed.
-
-(*
-Lemma functions_translated:
-  forall (v v': val) (f: Cminor.fundef),
-  Genv.find_funct ge v = Some f ->
-  Val.lessdef v v' ->
-  Genv.find_funct tge v' = Some (sel_fundef hf ge f).
-Proof.  
-  intros. inv H0.
-  exact (Genv.find_funct_transf (sel_fundef hf ge) _ _ H).
-  simpl in H. discriminate.
-Qed.
-*)
-
 Lemma functions_translated:
   forall (v v': val) (f: Cminor.fundef) j,
   Genv.find_funct ge v = Some f ->
   val_inject j v v' ->
-  globalfunction_ptr_inject j ->
+  globalfunction_ptr_inject ge j ->
   Genv.find_funct tge v' = Some (sel_fundef hf ge f).
 Proof.  
   intros. 
-  exploit val_inject_function_pointer; eauto.
-  intros; subst. 
-  exact (Genv.find_funct_transf (sel_fundef hf ge) _ _ H).
+  generalize H as H'; intro.
+  eapply val_inject_function_pointer in H; eauto.
+  subst v'.
+  unfold tge.
+  exact (Genv.find_funct_transf (sel_fundef hf ge) _ _ H').
 Qed.
 
 Lemma sig_function_translated:
@@ -1364,7 +1311,11 @@ Proof.
        exists id; trivial.
      rewrite symbols_preserved in Hid.
        exists id; trivial.
-    rewrite varinfo_preserved. intuition.
+    split. intros. rewrite varinfo_preserved. intuition.
+    intros. unfold tge. split. 
+      intros [f H]. eexists. eapply Genv.find_funct_ptr_transf in H; eauto.
+      intros [f H]. eapply Genv.find_funct_ptr_rev_transf in H; eauto.
+        destruct H as [f0 [? ?]]; exists f0; auto.
 Qed.
 
 Lemma builtin_implements_preserved:
@@ -1393,15 +1344,6 @@ Proof.
   trivial.
 Qed.
 
-(*
-Lemma helpers_correct_preserved:
-  forall h, i64_helpers_correct ge h -> i64_helpers_correct tge h.
-Proof.
-  unfold i64_helpers_correct; intros.
-  repeat (match goal with [ H: _ /\ _ |- _ /\ _ ] => destruct H; split end);
-  intros; try (eapply helper_implements_preserved; eauto);
-  try (eapply builtin_implements_preserved; eauto).
-Qed.*)
 Lemma helpers_correct_preserved:
   i64_helpers_correct tge hf.
 Proof.
@@ -1635,16 +1577,6 @@ Ltac TrivialExists :=
   | _ => idtac
   end.
 
-(*Lemma eval_unop_lessdef:
-  forall op v1 v1' v,
-  eval_unop op v1 = Some v -> Val.lessdef v1 v1' ->
-  exists v', eval_unop op v1' = Some v' /\ Val.lessdef v v'.
-Proof.
-  intros until v; intros EV LD. inv LD. 
-  exists v; auto.
-  destruct op; simpl in *; inv EV; TrivialExists.
-Qed.*)
-
 (** Lenb: replace eval_unop_lessdef with eval_unop from
     Cminorgenproof; this requires the addition of 
     Require Import Float above*)
@@ -1684,26 +1616,6 @@ Proof.
   inv H0; simpl in H; inv H. simpl. TrivialExists.
   inv H0; simpl in H; inv H. simpl. TrivialExists.
 Qed.
-
-(*Lemma eval_binop_lessdef:
-  forall op v1 v1' v2 v2' v m m',
-  eval_binop op v1 v2 m = Some v -> 
-  Val.lessdef v1 v1' -> Val.lessdef v2 v2' -> Mem.extends m m' ->
-  exists v', eval_binop op v1' v2' m' = Some v' /\ Val.lessdef v v'.
-Proof.
-  intros until m'; intros EV LD1 LD2 ME.
-  assert (exists v', eval_binop op v1' v2' m = Some v' /\ Val.lessdef v v').
-  inv LD1. inv LD2. exists v; auto. 
-  destruct op; destruct v1'; simpl in *; inv EV; TrivialExists.
-  destruct op; simpl in *; inv EV; TrivialExists.
-  destruct op; try (exact H). 
-  simpl in *. TrivialExists. inv EV. apply Val.of_optbool_lessdef. 
-  intros. apply Val.cmpu_bool_lessdef with (Mem.valid_pointer m) v1 v2; auto.
-  intros; eapply Mem.valid_pointer_extends; eauto.
-Qed.
-*)
-(** Lenb: same for binops
-    Compatibility of [eval_binop] with respect to [val_inject]. *)
 
 (*Lenb: fom Cminorgenproof: *)
 Remark val_inject_val_of_bool:
@@ -1818,23 +1730,10 @@ Qed.
 (** * Semantic preservation for instruction selection. *)
 
 (** Relationship between the local environments. *)
-(*
-Definition env_lessdef (e1 e2: env) : Prop :=
-  forall id v1, e1!id = Some v1 -> exists v2, e2!id = Some v2 /\ Val.lessdef v1 v2.
-*)
+
 Definition env_inject j (e1 e2: env) : Prop :=
   forall id v1, e1!id = Some v1 -> exists v2, e2!id = Some v2 /\ val_inject j v1 v2.
-(*
-Lemma set_var_lessdef:
-  forall e1 e2 id v1 v2,
-  env_lessdef e1 e2 -> Val.lessdef v1 v2 ->
-  env_lessdef (PTree.set id v1 e1) (PTree.set id v2 e2).
-Proof.
-  intros; red; intros. rewrite PTree.gsspec in *. destruct (peq id0 id).
-  exists v2; split; congruence.
-  auto.
-Qed.
-*)
+
 Lemma set_var_inject:
   forall j e1 e2 id v1 v2,
   env_inject j e1 e2 -> val_inject j v1 v2 ->
@@ -1844,17 +1743,7 @@ Proof.
   exists v2; split; congruence.
   auto.
 Qed.
-(*
-Lemma set_params_lessdef:
-  forall il vl1 vl2, 
-  Val.lessdef_list vl1 vl2 ->
-  env_lessdef (set_params vl1 il) (set_params vl2 il).
-Proof.
-  induction il; simpl; intros.
-  red; intros. rewrite PTree.gempty in H0; congruence.
-  inv H; apply set_var_lessdef; auto.
-Qed.
-*)
+
 Lemma set_params_inject:
   forall j il vl1 vl2, 
   val_list_inject j vl1 vl2 ->
@@ -1864,13 +1753,7 @@ Proof.
   red; intros. rewrite PTree.gempty in H0; congruence.
   inv H; apply set_var_inject; auto.
 Qed.
-(*
-Lemma set_locals_lessdef:
-  forall e1 e2, env_lessdef e1 e2 ->
-  forall il, env_lessdef (set_locals il e1) (set_locals il e2).
-Proof.
-  induction il; simpl. auto. apply set_var_lessdef; auto.
-Qed.*)
+
 Lemma set_locals_inject:
   forall j e1 e2, env_inject j e1 e2 ->
   forall il, env_inject j (set_locals il e1) (set_locals il e2).
@@ -1891,18 +1774,7 @@ Proof. intros.
   apply Hv. rewrite getBlocks_char. exists i; left. reflexivity.
   apply eq_sym. apply Int.add_zero. 
 Qed.
-(*
-Lemma inject_lessdef: forall v j
-   (Hv: forall b1, getBlocks (v::nil) b1 = true -> 
-                   j b1 = Some(b1,0))
-   v' (INJ: val_inject j v v'), Val.lessdef v v'.
-Proof. intros.
-  inv INJ; try econstructor.
-  rewrite (Hv b1) in H. inv H.
-    rewrite Int.add_zero. constructor.
-  rewrite getBlocks_char. exists ofs1; left. reflexivity.
-Qed.
-*)
+
 (** Semantic preservation for expressions. *)
 
 (*NEW*)
@@ -2096,7 +1968,7 @@ Definition MATCH (d:CMin_core) mu c1 m1 c2 m2:Prop :=
   match_states (restrict (as_inj mu) (vis mu)) c1 m1 c2 m2 /\
   REACH_closed m1 (vis mu) /\
   meminj_preserves_globals ge (as_inj mu) /\
-  globalfunction_ptr_inject (as_inj mu) /\
+  globalfunction_ptr_inject ge (as_inj mu) /\
   (forall b, isGlobalBlock ge b = true -> frgnBlocksSrc mu b = true) /\
   sm_valid mu m1 m2 /\ SM_wd mu /\ Mem.inject (as_inj mu) m1 m2.
 
@@ -2408,8 +2280,8 @@ Lemma MATCH_init_cores: forall v
         (fun b' : Values.block => isGlobalBlock tge b' || getBlocks vals2 b') b =
          true -> DomT b = true)
   (InitMem : exists m0 : mem, Genv.init_mem prog = Some m0 
-      /\ Ple (Mem.nextblock m0) (Mem.nextblock m1) 
-      /\ Ple (Mem.nextblock m0) (Mem.nextblock m2))
+               /\ Ple (Mem.nextblock m0) (Mem.nextblock m1) 
+               /\ Ple (Mem.nextblock m0) (Mem.nextblock m2))
   (GDE: genvs_domain_eq ge tge)
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
@@ -2481,9 +2353,8 @@ Proof. intros.
   solve[simpl; auto].
   intros CONTRA. solve[elimtype False; auto].
   intros CONTRA. solve[elimtype False; auto].
-  destruct InitMem as [m0 [INIT_MEM [A B]]].
 
-destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
+  destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
     VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
    as [AA [BB [CC [DD [EE [FF GG]]]]]].
   intuition.
@@ -2510,14 +2381,15 @@ destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
     apply BB.
     apply EE.
     rewrite initial_SM_as_inj.
-    red; intros. specialize (Genv.find_funct_ptr_not_fresh prog). intros.
-         specialize (H0 _ _ _ INIT_MEM H). 
-         destruct (valid_init_is_global _ R _ INIT_MEM _ H0) as [id Hid]. 
+      red; intros. specialize (Genv.find_funct_ptr_not_fresh prog). intros FFP.
+         destruct InitMem as [m0 [InitMem [? ?]]].
+         specialize (FFP _ _ _ InitMem H). 
+         destruct (valid_init_is_global _ R _ InitMem _ FFP) as [id Hid]. 
            destruct PG as [PGa [PGb PGc]]. split. eapply PGa; eassumption.
          unfold isGlobalBlock. 
           apply orb_true_iff. left. apply genv2blocksBool_char1.
             simpl. exists id; eassumption.
-    rewrite initial_SM_as_inj. assumption. 
+    rewrite initial_SM_as_inj; assumption.
 Qed.
 
 Lemma MATCH_AfterExternal: 
@@ -2715,14 +2587,6 @@ assert (RR1: REACH_closed m1'
            destruct (mappedD_true _ _ RC') as [[? ?] ?].
            eapply as_inj_DomRng; eassumption.
     eapply REACH_cons; try eassumption.
-(*assert (RRR: REACH_closed m1' (exportedSrc nu' (ret1 :: nil))).
-    intros b Hb. apply REACHAX in Hb.
-       destruct Hb as [L HL].
-       generalize dependent b.
-       induction L ; simpl; intros; inv HL; trivial.
-       specialize (IHL _ H1); clear H1.
-       unfold exportedSrc.
-       eapply REACH_cons; eassumption.*)
     
 assert (RRC: REACH_closed m1' (fun b : Values.block =>
                          mapped (as_inj nu') b &&
@@ -3073,7 +2937,7 @@ Proof.
         rewrite <- restrict_sm_all.
         eapply restrict_sm_preserves_globals; try eassumption.
           unfold vis. intuition.
-      assert (GFPR: globalfunction_ptr_inject (restrict (as_inj mu) (vis mu))). 
+      assert (GFPR: globalfunction_ptr_inject ge (restrict (as_inj mu) (vis mu))). 
             eapply restrict_GFP_vis; eassumption.
       exploit sel_expr_inject; eauto. intros [vf' [A B]].
       exploit sel_exprlist_inject; eauto. intros [vargs' [C D]].
@@ -3566,16 +3430,8 @@ SM_simulation.SM_simulation_inject (cmin_eff_sem hf)
    (cminsel_eff_sem hf) ge tge.
 Proof.
 intros.
-assert (GDE: genvs_domain_eq ge tge).
-    unfold genvs_domain_eq, genv2blocks.
-    simpl; split; intros. 
-     split; intros; destruct H as [id Hid].
-       rewrite <- symbols_preserved in Hid.
-       exists id; trivial.
-     rewrite symbols_preserved in Hid.
-       exists id; trivial.
-    rewrite varinfo_preserved. split; intros; trivial.
- eapply effect_simulations_lemmas.inj_simulation_star with
+assert (GDE: genvs_domain_eq ge tge) by apply GDE_lemma.
+eapply effect_simulations_lemmas.inj_simulation_star with
   (match_states:=MATCH) (measure:=measure).
 (*genvs_dom_eq*)
   assumption.
@@ -3647,7 +3503,7 @@ assert (GDE: genvs_domain_eq ge tge).
 (* after_external*)
   { apply MATCH_AfterExternal. }
 (* effcore_diagram*)
-  { intros. exploit MATCH_effcore_diagram; eauto. 
+  { intros. exploit MATCH_effcore_diagram; eauto.  
     intros [st2' [m2' [U2 [CS2 [mu' [? [? [? [? [? [? ?]]]]]]]]]]].
     exists st2', m2', mu'.
     repeat (split; try assumption).

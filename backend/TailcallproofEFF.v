@@ -286,13 +286,26 @@ Qed.
 Lemma GDE_lemma: genvs_domain_eq ge tge.
 Proof.
     unfold genvs_domain_eq, genv2blocks.
-    simpl; split; intros. 
+    simpl; split; intros.
      split; intros; destruct H as [id Hid].
-       rewrite <- symbols_preserved in Hid.
-       exists id; trivial.
+      rewrite <- symbols_preserved in Hid.
+      exists id; assumption.
      rewrite symbols_preserved in Hid.
-       exists id; trivial.
-    rewrite varinfo_preserved. intuition.
+      exists id; assumption.
+     split; intros b. 
+       split; intros; destruct H as [id Hid].
+       rewrite <- varinfo_preserved in Hid.
+       exists id; assumption.
+       rewrite varinfo_preserved in Hid.
+       exists id; assumption.
+    intros. split.
+      intros [f H].
+        apply funct_ptr_translated in H. 
+        eexists; eassumption.
+     intros [f H].
+         apply (@Genv.find_funct_ptr_rev_transf
+           _ _ _ transf_fundef prog) in H.
+         destruct H as [? [? _]]. eexists; eassumption.
 Qed.
 
 Lemma stacksize_preserved:
@@ -302,54 +315,11 @@ Proof.
   destruct (zeq (fn_stacksize f) 0 && eliminate_tailcalls tt); auto.
 Qed.
 
-(*LENB: GFP as in selectionproofEFF*)
-Definition globalfunction_ptr_inject (j:meminj):=
-  forall b f, Genv.find_funct_ptr ge b = Some f -> 
-              j b = Some(b,0) /\ isGlobalBlock ge b = true.  
-
-Lemma restrict_preserves_globalfun_ptr: forall j X
-  (PG : globalfunction_ptr_inject j)
-  (Glob : forall b, isGlobalBlock ge b = true -> X b = true),
-globalfunction_ptr_inject (restrict j X).
-Proof. intros.
-  red; intros. 
-  destruct (PG _ _ H). split; trivial.
-  apply restrictI_Some; try eassumption.
-  apply (Glob _ H1).
-Qed.
-
-Lemma restrict_GFP_vis: forall mu
-  (GFP : globalfunction_ptr_inject (as_inj mu))
-  (Glob : forall b, isGlobalBlock ge b = true -> 
-                    frgnBlocksSrc mu b = true),
-  globalfunction_ptr_inject (restrict (as_inj mu) (vis mu)).
-Proof. intros.
-  unfold vis. 
-  eapply restrict_preserves_globalfun_ptr. eassumption.
-  intuition.
-Qed.
-
-(*From Cminorgenproof*)
-Remark val_inject_function_pointer:
-  forall v fd j tv,
-  Genv.find_funct ge v = Some fd ->
-  globalfunction_ptr_inject j ->
-  val_inject j v tv ->
-  tv = v.
-Proof.
-  intros. exploit Genv.find_funct_inv; eauto. intros [b EQ]. subst v.
-  inv H1.
-  rewrite Genv.find_funct_find_funct_ptr in H.
-  destruct (H0 _ _ H).
-  rewrite H1 in H4; inv H4.
-  rewrite Int.add_zero. trivial.
-Qed.
-
 Lemma find_function_translated j:
   forall ros rs rs' f,
   find_function ge ros rs = Some f ->
   regset_inject j rs rs' ->
-  globalfunction_ptr_inject j ->
+  globalfunction_ptr_inject ge j ->
   find_function tge ros rs' = Some (transf_fundef f).
 Proof.
   intros until f; destruct ros; simpl.
@@ -501,7 +471,7 @@ Definition MATCH (d:RTL_core) mu c1 m1 c2 m2:Prop :=
   match_states mu c1 m1 c2 m2 /\ 
   REACH_closed m1 (vis mu) /\
   meminj_preserves_globals ge (as_inj mu) /\
-  globalfunction_ptr_inject (as_inj mu) /\
+  globalfunction_ptr_inject ge (as_inj mu) /\
   (forall b, isGlobalBlock ge b = true -> frgnBlocksSrc mu b = true) /\
   sm_valid mu m1 m2 /\ SM_wd mu.
 

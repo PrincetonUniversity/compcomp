@@ -233,10 +233,10 @@ Lemma findVar_findSymS ix inf b :
   exists inf', Genv.find_var_info (ge (cores_S ix)) b = Some inf'.
 Proof.
 case: (my_ge_S ix)=> H1 H2.
-rewrite /genv2blocks /= in H2.
-case: {H2}(H2 b)=> H2 H3 H4.
+rewrite /genv2blocks /= in H2; case: H2=> H2 H3.
+case: {H2}(H2 b)=> H2 H4 H5.
 case: H2; first by exists inf.
-by move=> x H5; exists x.
+by move=> x H6; exists x.
 Qed.
 
 Lemma findVar_findSymT ix inf b :
@@ -244,10 +244,10 @@ Lemma findVar_findSymT ix inf b :
   exists inf', Genv.find_var_info (ge (cores_T ix)) b = Some inf'.
 Proof.
 case: (my_ge_T ix)=> H1 H2.
-rewrite /genv2blocks /= in H2.
-case: {H2}(H2 b)=> H2 H3 H4.
+rewrite /genv2blocks /= in H2; case: H2=> H2 H3.
+case: {H2}(H2 b)=> H2 H4 H5.
 case: H2; first by exists inf.
-by move=> x H5; exists x.
+by move=> x H6; exists x.
 Qed.
 
 Lemma findVar_findSymS_None ix b :
@@ -255,11 +255,11 @@ Lemma findVar_findSymS_None ix b :
   Genv.find_var_info (ge (cores_S ix)) b = None.
 Proof.
 case: (my_ge_S ix)=> H1 H2.
-rewrite /genv2blocks /= in H2.
-case: {H2}(H2 b)=> H2 H3 H4.
+rewrite /genv2blocks /= in H2; case: H2=> H2 H3.
+case: {H2}(H2 b)=> H2 H4 H5.
 case g: (Genv.find_var_info _ _)=> //[gv].
-case: H3; first by exists gv.
-by move=> x; rewrite H4.
+case: H4; first by exists gv.
+by move=> x; rewrite H5.
 Qed.
 
 Lemma findVar_findSymT_None ix b :
@@ -267,11 +267,11 @@ Lemma findVar_findSymT_None ix b :
   Genv.find_var_info (ge (cores_T ix)) b = None.
 Proof.
 case: (my_ge_T ix)=> H1 H2.
-rewrite /genv2blocks /= in H2.
-case: {H2}(H2 b)=> H2 H3 H4.
+rewrite /genv2blocks /= in H2; case: H2=> H2 H3.
+case: {H2}(H2 b)=> H2 H4 H5.
 case g: (Genv.find_var_info _ _)=> //[gv].
-case: H3; first by exists gv.
-by move=> x; rewrite H4.
+case: H4; first by exists gv.
+by move=> x; rewrite H5.
 Qed.
 
 Lemma isGlob_iffS ix b : 
