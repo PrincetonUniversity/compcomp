@@ -767,6 +767,34 @@ Definition coresem : CoreSemantics ge_ty (linker N my_cores) Mem.mem :=
     corestep_not_halted 
     at_external_halted_excl.
 
+Lemma linking_det 
+  (dets : forall ix : 'I_N, corestep_fun (Modsem.sem (my_cores ix))) :
+  corestep_fun coresem.
+Proof.
+move=> ge m c m' c' m'' c''.
+move/(CorestepP ge)=> H1; move/(CorestepP ge)=> H2. 
+inversion H2; subst.
+{ inversion H1; subst; first by case: (dets _ _ _ _ _ _ _ _ H H0)=> -> ->.
+  by apply core_semantics.corestep_not_at_external in H; rewrite H in H0.
+  by apply core_semantics.corestep_not_halted in H; rewrite H in H4. }
+{ inversion H1; subst.
+  by apply core_semantics.corestep_not_at_external in H5; rewrite H5 in H.
+  move: H0 H6 H3 H7; rewrite H5 in H; case: H=> <- _ eq0 ->; case=> eq1; subst.
+  move=> ->; case=> Heq; subst; rewrite H8 in H4; case: H4=> ->. 
+  by f_equal; f_equal; apply: proof_irr.
+  case: (core_semantics.at_external_halted_excl 
+          (Modsem.sem (my_cores (Core.i (peekCore c)))) (Core.c (peekCore c))).
+  by rewrite H. by rewrite H7. }
+{ inversion H1; subst.
+  by apply core_semantics.corestep_not_halted in H6; rewrite H6 in H3. 
+  case: (core_semantics.at_external_halted_excl 
+          (Modsem.sem (my_cores (Core.i (peekCore c)))) (Core.c (peekCore c))).
+  by rewrite H6. by rewrite H3. 
+  rewrite H8 in H3; case: H3=> eq1; subst. 
+  rewrite H0 in H7; case: H7=> eq2; subst.
+  by rewrite H5 in H10; case: H10=> <-. }
+Qed.
+
 End linkerSem. End LinkerSem.
 
 (* Specialize to effect semantics *)
