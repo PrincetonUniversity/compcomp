@@ -141,7 +141,7 @@ Definition effect_instr (ge:genv) (c: code) (i: instruction) (rs: regset) (m: me
   | Pbuiltin ef args res =>
      (BuiltinEffect ge ef (decode_longs (sig_args (ef_sig ef)) (map rs args)) m)
   | Pannot ef args =>
-      EmptyEffect (*FOR NOW*)
+      EmptyEffect 
   end.
 
 Variable ge: genv.
@@ -165,7 +165,8 @@ Inductive asm_effstep: (block -> Z -> bool) ->
       rs' = nextinstr_nf 
              (set_regs res vl
                (undef_regs (map preg_of (destroyed_by_builtin ef)) rs)) ->
-      asm_effstep (effect_instr ge (fn_code f) (Pbuiltin ef args res) rs m) (State rs lf) m (State rs' lf) m'
+      asm_effstep (effect_instr ge (fn_code f) (Pbuiltin ef args res) rs m) 
+                  (State rs lf) m (State rs' lf) m'
   | asm_effexec_step_to_external:
       forall b ef args rs m lf,
       rs PC = Vptr b Int.zero ->
@@ -411,6 +412,16 @@ apply asmstep_effax1.
 apply asmstep_effax2.
 apply asm_effstep_valid. 
 Defined.
+
+Require Import core_semantics_lemmas.
+
+Lemma Asm_eff_sem_det : corestep_fun Asm_eff_sem.
+Proof.
+intros m m' m'' ge c c' c'' step1 step2.
+simpl in step1, step2.
+eapply asm_step_det in step1; eauto.
+destruct step1; subst; auto.
+Qed.
 
 End ASM_EFFSEM.
 
