@@ -91,15 +91,15 @@ Proof. by rewrite /N /= plus_comm. Qed.
 Lemma leq_SN0_N : ssrnat.leq (S N0) N.
 Proof. by rewrite /N /= plus_comm. Qed.
 
-Let plt (id : ident) := 
+Definition plt (id : ident) := 
   match plt0 id with
     | None => Some (Ordinal leq_SN0_N)
     | Some ix => Some (widen_ord leq_N0_N ix)
   end.
 
-Let linker_S := effsem N sems_S' plt.
+Definition linker_S := effsem N sems_S' plt.
 
-Let linker_T := effsem N sems_T plt.
+Definition linker_T := effsem N sems_T plt.
 
 Lemma nucular_T (ix : 'I_N) : Nuke_sem.t (sem (sems_T ix)).
 Proof.
@@ -154,8 +154,5 @@ End ContextEquiv.
 
 End ContextEquiv.
 
-
-
-  
 
 
