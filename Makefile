@@ -146,7 +146,7 @@ LINKING=cast.v pos.v stack.v seq_lemmas.v pred_lemmas.v core_semantics_tcs.v \
 
 # Putting everything together (in driver/)
 
-DRIVER=CompositionalCompiler.v Compiler.v Complements.v
+DRIVER=CompositionalCompiler.v Compiler.v CompositionalComplements.v Complements.v
 
 # All source files
 
