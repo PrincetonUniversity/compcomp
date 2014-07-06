@@ -171,6 +171,84 @@ Proof.
   intros. destruct x; simpl. rewrite print_identity. auto. auto. 
 Qed.
 
+
+Lemma fst_transform_globdef_eq A B V (f : A -> B) (gv : ident*globdef A V) :
+  fst (transform_program_globdef f gv) = fst gv.
+Proof.
+destruct gv; destruct g; auto.
+Qed.
+
+Lemma map_fst_transform_globdef_eq A B V (f : A -> B) (l : list (ident*globdef A V)) :
+  map fst (map (transform_program_globdef f) l) = map fst l.
+Proof.
+induction l; auto.
+simpl; rewrite fst_transform_globdef_eq, IHl; auto.
+Qed.
+
+Lemma map_fst_transf_globdefs_eq A B V W (f : A -> res B) (g : V -> res W) 
+            p (l : list (ident*globdef B W)) :
+  transf_globdefs f g (prog_defs p) = OK l ->
+  map fst (prog_defs p) = map fst l.
+Proof.
+generalize (prog_defs p); intros l0.
+revert l0 l.
+induction l0; inversion 1; subst; auto.
+simpl in *.
+destruct a.
+destruct g0.
+destruct (f f0); try solve[inv H].
+monadInv H.
+monadInv H1.
+simpl in *.
+f_equal.
+solve[rewrite <-IHl0; auto].
+destruct (transf_globvar g v); try solve[inv H].
+monadInv H.
+monadInv H1.
+simpl.
+f_equal.
+solve[rewrite <-IHl0; auto].
+Qed.
+
+Lemma list_norepet_transform F V (p : AST.program F V) G (f : F -> G) :
+  list_norepet (map fst (prog_defs p)) <-> 
+  list_norepet (map fst (prog_defs (transform_program f p))).
+Proof.
+unfold transform_program; simpl.
+rewrite map_fst_transform_globdef_eq; split; auto.
+Qed.
+
+Lemma list_norepet_transform_partial F V (p : AST.program F V) G (f : F -> res G) p' :
+  transform_partial_program f p = OK p' ->
+  list_norepet (map fst (prog_defs p)) ->
+  list_norepet (map fst (prog_defs p')).
+Proof.
+unfold transform_partial_program, transform_partial_program2, bind.
+case_eq (transf_globdefs f (fun v : V => OK v) (prog_defs p)); try inversion 2.
+erewrite map_fst_transf_globdefs_eq; eauto.
+Qed.
+
+Lemma TransformLNR_partial: forall {A B V} f p q
+ (LNR: list_norepet (map fst (prog_defs p)))
+ (TPP: @transform_partial_program A B V f p = OK q),
+ list_norepet (map fst (prog_defs q)).
+Proof. intros; eapply list_norepet_transform_partial; eauto. Qed.
+
+Lemma TransformLNR_partial2: forall {A B V W} f g p q
+ (LNR: list_norepet (map fst (prog_defs p)))
+ (TPP: @transform_partial_program2 A B V W f g p = OK q),
+ list_norepet (map fst (prog_defs q)).
+Proof. 
+unfold transform_partial_program2, bind; intros; revert TPP.
+case_eq (transf_globdefs f g (prog_defs p)); inversion 2; subst; simpl.
+apply map_fst_transf_globdefs_eq in H; rewrite H in LNR; auto.
+Qed.
+
+Lemma TransformLNR: forall {A B V} f p 
+ (LNR: list_norepet (map fst (prog_defs p))),
+ list_norepet (map fst (prog_defs (@transform_program A B V f p))).
+Proof. intros; erewrite <-list_norepet_transform; eauto. Qed.
+
 (** * Semantic preservation *)
 
 (** We prove that the [transf_program] translations preserve semantics
@@ -184,72 +262,6 @@ Qed.
   (composition of two backward simulations).
 
 These results establish the correctness of the whole compiler! *)
-Remark list_norepet_map_inv:
-  forall (A B: Type) (f: A -> B) 
-   (Finj: forall a b, f a = f b -> a=b) (l: list A),
-  list_norepet l -> list_norepet (List.map f l).
-Proof.
-  induction l; simpl; intros.
-  constructor.
-  inv H. constructor; auto. red; intros; elim H2. specialize (IHl H3). 
-  apply in_map_iff in H. destruct H as [? [? ?]]. apply Finj in H.
-  subst; trivial.
-Qed.
-
-Remark list_norepet_map_invProd:
-  forall (A B C: Type) (f: C*A -> C*B) 
-   (Hf: forall c a, exists b, f (c,a) = (c,b))
-   (l:list (C*A)),
-   list_norepet (map fst l) ->
-   list_norepet (map fst (List.map f l)).
-Proof.
-  induction l; simpl; intros.
-  constructor.
-  inv H. constructor; auto. red; intros; elim H2. specialize (IHl H3).
-  apply in_map_iff in H. destruct H as [? [? ?]]. clear H2. 
-  destruct x; simpl in *. subst; simpl in *.
-  destruct a. simpl in *. destruct (Hf c a). rewrite H in *. clear H. 
-  simpl in H0. apply in_map_iff in H0. destruct H0 as [? [? ?]].
-  destruct x0. destruct (Hf c0 a0). rewrite H1 in H. inv H.
-  apply in_map_iff. exists (c,a0); auto.
-Qed.
-
-Lemma TransformLNR_partial: forall {A B V} f p q
- (LNR: list_norepet (map fst (prog_defs p)))
- (TPP: @transform_partial_program A B V f p = OK q),
- list_norepet (map fst (prog_defs q)).
-Proof. intros.  destruct p. simpl in *. 
-unfold transform_partial_program, transform_partial_program2 in TPP. 
-monadInv TPP. (* destruct x; simpl in *. constructor.*)
-generalize dependent x. (*generalize dependent p.*)
-induction prog_defs; simpl in *; intros.
-  inv EQ. constructor.
-inv LNR. destruct a.
-  destruct g.
-    remember (f f0) as d.
-    destruct d; inv EQ. monadInv H0.
-    specialize (IHprog_defs H2 _ EQ).
-    constructor; eauto.
-    simpl in *. intros N. apply H1. clear H1.
-    apply in_map_iff. 
-Admitted. 
-
-Lemma TransformLNR_partial2: forall {A B V W} f g p q
- (LNR: list_norepet (map fst (prog_defs p)))
- (TPP: @transform_partial_program2 A B V W f g p = OK q),
- list_norepet (map fst (prog_defs q)).
-Admitted.
-
-Lemma TransformLNR: forall {A B V} f p 
- (LNR: list_norepet (map fst (prog_defs p))),
- list_norepet (map fst (prog_defs (@transform_program A B V f p))).
-Proof. intros.  destruct p. simpl in *. clear prog_main.
-eapply list_norepet_map_invProd; trivial.
-intros. unfold transform_program_globdef.
-destruct a.
- eexists; reflexivity.
- eexists; reflexivity. 
-Qed.
 
 Require Import effect_simulations.
 Require Import effect_simulations_trans.
@@ -259,8 +271,14 @@ Require Import Clight_eff.
 Require Import RTL_eff.
 Require Import Asm_eff.
 
-Variable hf : I64Helpers.helper_functions.
+(* See CompCert's Selectionproof.v, in which the same assumption is made: *)
+
+Parameter hf : I64Helpers.helper_functions.
 Axiom HelpersOK: I64Helpers.get_helpers = OK hf.
+
+(* We pull it out to the top-level because all of our language semantics 
+   are now parameterized by [hf], in order to properly classify I64 helper
+   functions as nonobservable. *)
 
 Theorem transf_rtl_program_correct:
   forall p tp m0 (INIT: Genv.init_mem p = Some m0)
@@ -395,7 +413,7 @@ Proof.
     exists m0; eassumption.
  
   eapply Genv.init_mem_transf_partial2 in INIT. Focus 2. eapply Heqr0. 
-  eapply TransformLNR_partial2 in LNR. 2: eauto.
+  eapply TransformLNR_partial2 in LNR; eauto.
    
   eapply eff_sim_trans.
     eapply CminorgenproofEFF.transl_program_correct. 
