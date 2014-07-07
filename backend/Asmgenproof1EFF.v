@@ -110,31 +110,8 @@ Section CONSTRUCTORS.
 Variable ge: genv.
 (*Variable fn: code.*)
 Variable fn: function.
-(** Smart constructor for moves. *)
 
-Lemma mk_mov_correct:
-  forall rd rs k c rs1 m,
-  mk_mov rd rs k = OK c ->
-  exists rs2,
-     exec_straight ge fn c rs1 m k rs2 m
-  /\ rs2#rd = rs1#rs
-  /\ forall r, data_preg r = true -> r <> ST0 -> r <> rd -> rs2#r = rs1#r.
-Proof.
-  unfold mk_mov; intros. 
-  destruct rd; try (monadInv H); destruct rs; monadInv H.
-(* mov *)
-  econstructor. split. apply exec_straight_one. simpl. eauto. auto. 
-  split. Simplifs. intros; Simplifs. 
-(* movd *)
-  econstructor. split. apply exec_straight_one. simpl. eauto. auto. 
-  split. Simplifs. intros; Simplifs.
-(* getfp0 *)
-  econstructor. split. apply exec_straight_one. simpl. eauto. auto. 
-  split. Simplifs. intros; Simplifs.
-(* setfp0 *)
-  econstructor. split. apply exec_straight_one. simpl. eauto. auto. 
-  split. Simplifs. intros; Simplifs.
-Qed.
+(** Smart constructor for moves. *)
 
 Lemma mk_mov_correct_eff:
   forall rd rs k c rs1 m,
@@ -191,7 +168,7 @@ Proof.
 Qed.
 
 (** Smart constructor for [shrx] *)
-
+(*
 Lemma mk_shrximm_correct:
   forall n k c (rs1: regset) v m,
   mk_shrximm n k = OK c ->
@@ -234,7 +211,7 @@ Proof.
     rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
     trivial. 
 Qed.
-
+*) 
 Lemma mk_shrximm_correct_eff:
   forall n k c (rs1: regset) v m,
   mk_shrximm n k = OK c ->
@@ -284,25 +261,6 @@ Proof.
 Qed.
 
 (** Smart constructor for integer conversions *)
-
-Lemma mk_intconv_correct:
-  forall mk sem rd rs k c rs1 m,
-  mk_intconv mk rd rs k = OK c ->
-  (forall c rd rs r m,
-   exec_instr ge c (mk rd rs) r m = Next (nextinstr (r#rd <- (sem r#rs))) m) ->
-  exists rs2,
-     exec_straight ge fn c rs1 m k rs2 m
-  /\ rs2#rd = sem rs1#rs
-  /\ forall r, data_preg r = true -> r <> rd -> r <> EAX -> rs2#r = rs1#r.
-Proof.
-  unfold mk_intconv; intros. destruct (low_ireg rs); monadInv H.
-  econstructor. split. apply exec_straight_one. rewrite H0. eauto. auto. 
-  split. Simplifs. intros. Simplifs.
-  econstructor. split. eapply exec_straight_two. 
-  simpl. eauto. apply H0. auto. auto. 
-  split. Simplifs. intros. Simplifs.  
-Qed.
-
 Lemma mk_intconv_correct_eff:
   forall mk sem rd rs k c rs1 m,
   mk_intconv mk rd rs k = OK c ->
@@ -341,55 +299,6 @@ Proof.
   destruct a. intros. destruct (orb_false_elim _ _ H). unfold proj_sumbool in *.
   decEq. destruct base; auto. apply AG. destruct (ireg_eq r i); congruence.
   decEq. destruct ofs as [[r' sc] | ]; auto. rewrite AG; auto. destruct (ireg_eq r r'); congruence.
-Qed.
-
-Lemma mk_smallstore_correct:
-  forall chunk sto addr r k c rs1 m1 m2,
-  mk_smallstore sto addr r k = OK c ->
-  Mem.storev chunk m1 (eval_addrmode ge addr rs1) (rs1 r) = Some m2 ->
-  (forall c r addr rs m,
-   exec_instr ge c (sto addr r) rs m = exec_store ge chunk m addr rs r nil) ->
-  exists rs2,
-     exec_straight ge fn c rs1 m1 k rs2 m2
-  /\ forall r, data_preg r = true -> r <> EAX /\ r <> ECX -> rs2#r = rs1#r.
-Proof.
-  unfold mk_smallstore; intros. 
-  remember (low_ireg r) as low. destruct low.
-(* low reg *)
-  monadInv H. econstructor; split. apply exec_straight_one. rewrite H1. 
-  unfold exec_store. rewrite H0. eauto. auto.
-  intros; Simplifs.
-(* high reg *)
-   remember (addressing_mentions addr EAX) as mentions. destruct mentions; monadInv H.
-(* EAX is mentioned. *)
-  assert (r <> ECX). red; intros; subst r; discriminate. 
-  set (rs2 := nextinstr (rs1#ECX <- (eval_addrmode ge addr rs1))).
-  set (rs3 := nextinstr (rs2#EAX <- (rs1 r))).
-  econstructor; split.
-  apply exec_straight_three with rs2 m1 rs3 m1. 
-  simpl. auto. 
-  simpl. replace (rs2 r) with (rs1 r). auto. symmetry. unfold rs2; Simplifs. 
-  rewrite H1. unfold exec_store. simpl. rewrite Int.add_zero. 
-  change (rs3 EAX) with (rs1 r).
-  change (rs3 ECX) with (eval_addrmode ge addr rs1).
-  replace (Val.add (eval_addrmode ge addr rs1) (Vint Int.zero))
-     with (eval_addrmode ge addr rs1).
-  rewrite H0. eauto.
-  destruct (eval_addrmode ge addr rs1); simpl in H0; try discriminate.
-  simpl. rewrite Int.add_zero; auto. 
-  auto. auto. auto. 
-  intros. destruct H3. Simplifs. unfold rs3; Simplifs. unfold rs2; Simplifs. 
-(* EAX is not mentioned *)
-  set (rs2 := nextinstr (rs1#EAX <- (rs1 r))).
-  econstructor; split.
-  apply exec_straight_two with rs2 m1.
-  simpl. auto.
-  rewrite H1. unfold exec_store. 
-  rewrite (addressing_mentions_correct addr EAX rs2 rs1); auto.
-  change (rs2 EAX) with (rs1 r). rewrite H0. eauto. 
-  intros. unfold rs2; Simplifs.
-  auto. auto.
-  intros. destruct H2. simpl. Simplifs. unfold rs2; Simplifs.
 Qed.
 
 Lemma mk_smallstore_correct_eff:
@@ -481,43 +390,6 @@ Proof.
 Qed.
 
 (** Accessing slots in the stack frame *)
-
-Lemma loadind_correct:
-  forall (base: ireg) ofs ty dst k (rs: regset) c m v,
-  loadind base ofs ty dst k = OK c ->
-  Mem.loadv (chunk_of_type ty) m (Val.add rs#base (Vint ofs)) = Some v ->
-  exists rs',
-     exec_straight ge fn c rs m k rs' m
-  /\ rs'#(preg_of dst) = v
-  /\ forall r, data_preg r = true -> r <> preg_of dst -> rs'#r = rs#r.
-Proof.
-  unfold loadind; intros.
-  set (addr := Addrmode (Some base) None (inl (ident * int) ofs)) in *.
-  assert (eval_addrmode ge addr rs = Val.add rs#base (Vint ofs)).
-    unfold addr. simpl. rewrite Int.add_commut; rewrite Int.add_zero; auto. 
-  destruct ty; simpl in H0.
-  (* int *)
-  monadInv H.
-  rewrite (ireg_of_eq _ _ EQ). econstructor.
-  split. apply exec_straight_one. simpl. unfold exec_load. rewrite H1. rewrite H0.
-  eauto. auto.
-  intuition Simplifs.
-  (* float *)
-  exists (nextinstr_nf (rs#(preg_of dst) <- v)).
-  split. destruct (preg_of dst); inv H; apply exec_straight_one; simpl; auto.
-  unfold exec_load. rewrite H1; rewrite H0; auto. 
-  unfold exec_load. rewrite H1; rewrite H0; auto.
-  intuition Simplifs.
-  (* long *)
-  inv H.
-  (* single *)
-  monadInv H.
-  rewrite (freg_of_eq _ _ EQ). econstructor.
-  split. apply exec_straight_one. simpl. unfold exec_load. rewrite H1. rewrite H0.
-  eauto. auto.
-  intuition Simplifs.
-Qed.
-
 Lemma loadind_correct_eff:
   forall (base: ireg) ofs ty dst k (rs: regset) c m v,
   loadind base ofs ty dst k = OK c ->
@@ -554,43 +426,6 @@ Proof.
   eauto. auto.
   simpl. reflexivity.
   intuition Simplifs.
-Qed.
-
-Lemma storeind_correct:
-  forall (base: ireg) ofs ty src k (rs: regset) c m m',
-  storeind src base ofs ty k = OK c ->
-  Mem.storev (chunk_of_type ty) m (Val.add rs#base (Vint ofs)) (rs#(preg_of src)) = Some m' ->
-  exists rs',
-     exec_straight ge fn c rs m k rs' m'
-  /\ forall r, data_preg r = true -> preg_notin r (destroyed_by_setstack ty) -> rs'#r = rs#r.
-Proof.
-  unfold storeind; intros.
-  set (addr := Addrmode (Some base) None (inl (ident * int) ofs)) in *.
-  assert (eval_addrmode ge addr rs = Val.add rs#base (Vint ofs)).
-    unfold addr. simpl. rewrite Int.add_commut; rewrite Int.add_zero; auto. 
-  destruct ty; simpl in H0.
-  (* int *)
-  monadInv H.
-  rewrite (ireg_of_eq _ _ EQ) in H0. econstructor.
-  split. apply exec_straight_one. simpl. unfold exec_store. rewrite H1. rewrite H0.
-  eauto. auto. 
-  intros; Simplifs.
-  (* float *)
-  destruct (preg_of src); inv H.
-  econstructor; split. apply exec_straight_one.
-  simpl. unfold exec_store. rewrite H1; rewrite H0. eauto. auto.
-  intros. apply nextinstr_nf_inv1; auto.
-  econstructor; split. apply exec_straight_one.
-  simpl. unfold exec_store. rewrite H1; rewrite H0. eauto. auto.
-  intros. simpl. Simplifs.
-  (* long *)
-  inv H.
-  (* single *)
-  monadInv H.
-  rewrite (freg_of_eq _ _ EQ) in H0. econstructor.
-  split. apply exec_straight_one. simpl. unfold exec_store. rewrite H1. rewrite H0.
-  simpl. eauto. auto.
-  intros. destruct H2. Simplifs.
 Qed.
 
 Lemma storeind_correct_eff:
@@ -983,123 +818,6 @@ Proof.
   unfold compare_floats; destruct vx; destruct vy; auto. Simplifs. 
 Qed.  
 
-Lemma transl_cond_correct:
-  forall cond args k c rs m,
-  transl_cond cond args k = OK c ->
-  exists rs',
-     exec_straight ge fn c rs m k rs' m
-  /\ match eval_condition cond (map rs (map preg_of args)) m with
-     | None => True
-     | Some b => eval_extcond (testcond_for_condition cond) rs' = Some b
-     end
-  /\ forall r, data_preg r = true -> rs'#r = rs r.
-Proof.
-  unfold transl_cond; intros. 
-  destruct cond; repeat (destruct args; try discriminate); monadInv H.
-(* comp *)
-  simpl. rewrite (ireg_of_eq _ _ EQ). rewrite (ireg_of_eq _ _ EQ1).
-  econstructor. split. apply exec_straight_one. simpl. eauto. auto.
-  split. destruct (Val.cmp_bool c0 (rs x) (rs x0)) eqn:?; auto.
-  eapply testcond_for_signed_comparison_correct; eauto. 
-  intros. unfold compare_ints. Simplifs.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    trivial.
-(* compu *)
-  simpl. rewrite (ireg_of_eq _ _ EQ). rewrite (ireg_of_eq _ _ EQ1).
-  econstructor. split. apply exec_straight_one. simpl. eauto. auto.
-  split. destruct (Val.cmpu_bool (Mem.valid_pointer m) c0 (rs x) (rs x0)) eqn:?; auto.
-  eapply testcond_for_unsigned_comparison_correct; eauto. 
-  intros. unfold compare_ints. Simplifs.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    trivial.
-(* compimm *)
-  simpl. rewrite (ireg_of_eq _ _ EQ). destruct (Int.eq_dec i Int.zero).
-  econstructor; split. apply exec_straight_one. simpl; eauto. auto. 
-  split. destruct (rs x); simpl; auto. subst. rewrite Int.and_idem.
-  eapply testcond_for_signed_comparison_correct; eauto. 
-  intros. unfold compare_ints. Simplifs.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    trivial.
-  econstructor; split. apply exec_straight_one. simpl; eauto. auto. 
-  split. destruct (Val.cmp_bool c0 (rs x) (Vint i)) eqn:?; auto.
-  eapply testcond_for_signed_comparison_correct; eauto. 
-  intros. unfold compare_ints. Simplifs.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    trivial.
-(* compuimm *)
-  simpl. rewrite (ireg_of_eq _ _ EQ).
-  econstructor. split. apply exec_straight_one. simpl. eauto. auto.
-  split. destruct (Val.cmpu_bool (Mem.valid_pointer m) c0 (rs x) (Vint i)) eqn:?; auto.
-  eapply testcond_for_unsigned_comparison_correct; eauto. 
-  intros. unfold compare_ints. Simplifs.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    trivial.
-(* compf *)
-  simpl. rewrite (freg_of_eq _ _ EQ). rewrite (freg_of_eq _ _ EQ1).
-  exists (nextinstr (compare_floats (swap_floats c0 (rs x) (rs x0)) (swap_floats c0 (rs x0) (rs x)) rs)).
-  split. apply exec_straight_one. 
-  destruct c0; simpl; auto.
-  unfold nextinstr. rewrite Pregmap.gss. rewrite compare_floats_inv; auto with asmgen. 
-  split. destruct (rs x); destruct (rs x0); simpl; auto.
-  repeat rewrite swap_floats_commut. apply testcond_for_float_comparison_correct.
-  intros. Simplifs. apply compare_floats_inv; try solve [intros N; subst; discriminate]. (*auto with asmgen. *)
-(* notcompf *)
-  simpl. rewrite (freg_of_eq _ _ EQ). rewrite (freg_of_eq _ _ EQ1).
-  exists (nextinstr (compare_floats (swap_floats c0 (rs x) (rs x0)) (swap_floats c0 (rs x0) (rs x)) rs)).
-  split. apply exec_straight_one. 
-  destruct c0; simpl; auto.
-  unfold nextinstr. rewrite Pregmap.gss. rewrite compare_floats_inv; auto with asmgen. 
-  split. destruct (rs x); destruct (rs x0); simpl; auto.
-  repeat rewrite swap_floats_commut. apply testcond_for_neg_float_comparison_correct.
-  intros. Simplifs. apply compare_floats_inv; try solve [intros N; subst; discriminate]. (*auto with asmgen. *)
-(* maskzero *)
-  simpl. rewrite (ireg_of_eq _ _ EQ).
-  econstructor. split. apply exec_straight_one. simpl; eauto. auto.
-  split. destruct (rs x); simpl; auto. 
-  generalize (compare_ints_spec rs (Vint (Int.and i0 i)) Vzero m).
-  intros [A B]. rewrite A. unfold Val.cmpu; simpl. destruct (Int.eq (Int.and i0 i) Int.zero); auto.
-  intros. unfold compare_ints. Simplifs.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    trivial.
-(* masknotzero *)
-  simpl. rewrite (ireg_of_eq _ _ EQ).
-  econstructor. split. apply exec_straight_one. simpl; eauto. auto.
-  split. destruct (rs x); simpl; auto. 
-  generalize (compare_ints_spec rs (Vint (Int.and i0 i)) Vzero m).
-  intros [A B]. rewrite A. unfold Val.cmpu; simpl. destruct (Int.eq (Int.and i0 i) Int.zero); auto.
-  intros. unfold compare_ints. Simplifs.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate. 
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    rewrite Pregmap.gso. Focus 2. intros N; subst. discriminate.
-    trivial.
-Qed.
-
 Lemma transl_cond_correct_eff:
   forall cond args k c rs m,
   transl_cond cond args k = OK c ->
@@ -1238,86 +956,6 @@ Proof.
   intros. unfold eval_testcond. repeat rewrite Pregmap.gso; auto with asmgen.
 Qed.
 
-Lemma mk_setcc_base_correct:
-  forall cond rd k rs1 m,
-  exists rs2,
-  exec_straight ge fn (mk_setcc_base cond rd k) rs1 m k rs2 m
-  /\ rs2#rd = Val.of_optbool(eval_extcond cond rs1)
-  /\ forall r, data_preg r = true -> r <> EAX /\ r <> ECX -> r <> rd -> rs2#r = rs1#r.
-Proof.
-  intros. destruct cond; simpl in *.
-- (* base *)
-  econstructor; split.
-  apply exec_straight_one. simpl; eauto. auto. 
-  split. Simplifs. intros; Simplifs. 
-- (* or *)
-  assert (Val.of_optbool
-    match eval_testcond c1 rs1 with
-    | Some b1 =>
-        match eval_testcond c2 rs1 with
-        | Some b2 => Some (b1 || b2)
-        | None => None
-        end
-    | None => None
-    end =
-    Val.or (Val.of_optbool (eval_testcond c1 rs1)) (Val.of_optbool (eval_testcond c2 rs1))).
-  destruct (eval_testcond c1 rs1). destruct (eval_testcond c2 rs1). 
-  destruct b; destruct b0; auto.
-  destruct b; auto.
-  auto.
-  rewrite H; clear H.
-  destruct (ireg_eq rd EAX).
-  subst rd. econstructor; split.
-  eapply exec_straight_three.
-  simpl; eauto.
-  simpl. rewrite eval_testcond_nextinstr. repeat rewrite eval_testcond_set_ireg. eauto.
-  simpl; eauto.
-  auto. auto. auto.
-  intuition Simplifs.
-  econstructor; split.
-  eapply exec_straight_three.
-  simpl; eauto.
-  simpl. rewrite eval_testcond_nextinstr. repeat rewrite eval_testcond_set_ireg. eauto. 
-  simpl. eauto. 
-  auto. auto. auto.
-  split. Simplifs. rewrite Val.or_commut. decEq; Simplifs.
-  intros. destruct H0; Simplifs. 
-- (* and *)
-  assert (Val.of_optbool
-    match eval_testcond c1 rs1 with
-    | Some b1 =>
-        match eval_testcond c2 rs1 with
-        | Some b2 => Some (b1 && b2)
-        | None => None
-        end
-    | None => None
-    end =
-    Val.and (Val.of_optbool (eval_testcond c1 rs1)) (Val.of_optbool (eval_testcond c2 rs1))).
-  {
-    destruct (eval_testcond c1 rs1). destruct (eval_testcond c2 rs1). 
-    destruct b; destruct b0; auto.
-    destruct b; auto.
-    auto.
-  }
-  rewrite H; clear H.
-  destruct (ireg_eq rd EAX).
-  subst rd. econstructor; split.
-  eapply exec_straight_three.
-  simpl; eauto.
-  simpl. rewrite eval_testcond_nextinstr. repeat rewrite eval_testcond_set_ireg. eauto.
-  simpl; eauto.
-  auto. auto. auto.
-  intuition Simplifs.
-  econstructor; split.
-  eapply exec_straight_three.
-  simpl; eauto.
-  simpl. rewrite eval_testcond_nextinstr. repeat rewrite eval_testcond_set_ireg. eauto. 
-  simpl. eauto. 
-  auto. auto. auto.
-  split. Simplifs. rewrite Val.and_commut. decEq; Simplifs.
-  intros. destruct H0; Simplifs. 
-Qed.
-
 Lemma mk_setcc_base_correct_eff:
   forall cond rd k rs1 m,
   exists rs2,
@@ -1403,21 +1041,6 @@ Proof.
   intros. destruct H0; Simplifs. 
 Qed.
 
-Lemma mk_setcc_correct:
-  forall cond rd k rs1 m,
-  exists rs2,
-  exec_straight ge fn (mk_setcc cond rd k) rs1 m k rs2 m
-  /\ rs2#rd = Val.of_optbool(eval_extcond cond rs1)
-  /\ forall r, data_preg r = true -> r <> EAX /\ r <> ECX -> r <> rd -> rs2#r = rs1#r.
-Proof.
-  intros. unfold mk_setcc. destruct (low_ireg rd).
-- apply mk_setcc_base_correct.
-- exploit mk_setcc_base_correct. intros [rs2 [A [B C]]].
-  econstructor; split. eapply exec_straight_trans. eexact A. apply exec_straight_one. 
-    simpl. eauto. simpl. auto.
-  intuition Simplifs. 
-Qed. 
-
 Lemma mk_setcc_correct_eff:
   forall cond rd k rs1 m,
   exists rs2,
@@ -1447,103 +1070,6 @@ Ltac ArgsInv :=
   | [ H: freg_of _ = OK _ |- _ ] => simpl in *; rewrite (freg_of_eq _ _ H) in *; clear H; ArgsInv
   | _ => idtac
   end.
-
-Ltac TranslOp :=
-  econstructor; split;
-  [ apply exec_straight_one; [ simpl; eauto | auto ] 
-  | split; [ Simplifs | intros; Simplifs ]].
-
-Lemma transl_op_correct:
-  forall op args res k c (rs: regset) m v,
-  transl_op op args res k = OK c ->
-  eval_operation ge (rs#ESP) op (map rs (map preg_of args)) m = Some v ->
-  exists rs',
-     exec_straight ge fn c rs m k rs' m
-  /\ Val.lessdef v rs'#(preg_of res)
-  /\ forall r, data_preg r = true -> r <> preg_of res -> preg_notin r (destroyed_by_op op) -> rs' r = rs r.
-Proof.
-Transparent destroyed_by_op.
-  intros until v; intros TR EV.
-  assert (SAME:
-  (exists rs',
-     exec_straight ge fn c rs m k rs' m
-  /\ rs'#(preg_of res) = v
-  /\ forall r, data_preg r = true -> r <> preg_of res -> preg_notin r (destroyed_by_op op) -> rs' r = rs r) ->
-  exists rs',
-     exec_straight ge fn c rs m k rs' m
-  /\ Val.lessdef v rs'#(preg_of res)
-  /\ forall r, data_preg r = true -> r <> preg_of res -> preg_notin r (destroyed_by_op op) -> rs' r = rs r).
-  {
-    intros [rs' [A [B C]]]. subst v. exists rs'; auto.
-  } 
-
-  destruct op; simpl in TR; ArgsInv; simpl in EV; try (inv EV); try (apply SAME; TranslOp; fail).
-(* move *)
-  exploit mk_mov_correct; eauto. intros [rs2 [A [B C]]]. 
-  apply SAME. exists rs2. split. eauto. split. simpl. auto. intros. destruct H; auto.
-(* intconst *)
-  apply SAME. destruct (Int.eq_dec i Int.zero). subst i. TranslOp. TranslOp.
-(* floatconst *)
-  apply SAME. destruct (Float.eq_dec f Float.zero). subst f. TranslOp. TranslOp.
-(* cast8signed *)
-  apply SAME. eapply mk_intconv_correct; eauto.
-(* cast8unsigned *)
-  apply SAME. eapply mk_intconv_correct; eauto. 
-(* cast16signed *)
-  apply SAME. eapply mk_intconv_correct; eauto.
-(* cast16unsigned *)
-  apply SAME. eapply mk_intconv_correct; eauto.
-(* mulhs *)
-  apply SAME. TranslOp. destruct H1. Simplifs. 
-(* mulhu *)
-  apply SAME. TranslOp. destruct H1. Simplifs. 
-(* div *)
-  apply SAME.
-  specialize (divs_mods_exist (rs EAX) (rs ECX)). rewrite H0. 
-  destruct (Val.mods (rs EAX) (rs ECX)) as [vr|] eqn:?; intros; try contradiction.
-  TranslOp. change (rs#EDX<-Vundef ECX) with (rs#ECX). rewrite H0; rewrite Heqo. eauto.
-  auto. auto.
-  simpl in H3. destruct H3; Simplifs.
-(* divu *)
-  apply SAME.
-  specialize (divu_modu_exist (rs EAX) (rs ECX)). rewrite H0. 
-  destruct (Val.modu (rs EAX) (rs ECX)) as [vr|] eqn:?; intros; try contradiction.
-  TranslOp. change (rs#EDX<-Vundef ECX) with (rs#ECX). rewrite H0; rewrite Heqo. eauto.
-  auto. auto.
-  simpl in H3. destruct H3; Simplifs.
-(* mod *)
-  apply SAME.
-  specialize (divs_mods_exist (rs EAX) (rs ECX)). rewrite H0. 
-  destruct (Val.divs (rs EAX) (rs ECX)) as [vr|] eqn:?; intros; try contradiction.
-  TranslOp. change (rs#EDX<-Vundef ECX) with (rs#ECX). rewrite H0; rewrite Heqo. eauto.
-  auto. auto.
-  simpl in H3. destruct H3; Simplifs.
-(* modu *)
-  apply SAME.
-  specialize (divu_modu_exist (rs EAX) (rs ECX)). rewrite H0. 
-  destruct (Val.divu (rs EAX) (rs ECX)) as [vr|] eqn:?; intros; try contradiction.
-  TranslOp. change (rs#EDX<-Vundef ECX) with (rs#ECX). rewrite H0; rewrite Heqo. eauto.
-  auto. auto.
-  simpl in H3. destruct H3; Simplifs.
-(* shrximm *)
-  apply SAME. eapply mk_shrximm_correct; eauto.
-(* lea *)
-  exploit transl_addressing_mode_correct; eauto. intros EA.
-  TranslOp. rewrite nextinstr_inv; auto with asmgen. rewrite Pregmap.gss; auto.
-(* intoffloat *)
-  apply SAME. TranslOp. rewrite H0; auto.
-(* floatofint *)
-  apply SAME. TranslOp. rewrite H0; auto.
-(* condition *)
-  exploit transl_cond_correct; eauto. intros [rs2 [P [Q R]]].
-  exploit mk_setcc_correct; eauto. intros [rs3 [S [T U]]].
-  exists rs3.
-  split. eapply exec_straight_trans. eexact P. eexact S.
-  split. rewrite T. destruct (eval_condition c0 rs ## (preg_of ## args) m).
-  rewrite Q. auto.
-  simpl; auto.
-  intros. transitivity (rs2 r); auto.
-Qed.
 
 Ltac TranslOpEff :=
   econstructor; split;
@@ -1643,36 +1169,6 @@ Transparent destroyed_by_op.
 Qed.
 
 (** Translation of memory loads. *)
-
-Lemma transl_load_correct:
-  forall chunk addr args dest k c (rs: regset) m a v,
-  transl_load chunk addr args dest k = OK c ->
-  eval_addressing ge (rs#ESP) addr (map rs (map preg_of args)) = Some a ->
-  Mem.loadv chunk m a = Some v ->
-  exists rs',
-     exec_straight ge fn c rs m k rs' m
-  /\ rs'#(preg_of dest) = v
-  /\ forall r, data_preg r = true -> r <> preg_of dest -> rs'#r = rs#r.
-Proof.
-  unfold transl_load; intros. monadInv H. 
-  exploit transl_addressing_mode_correct; eauto. intro EA.
-  assert (EA': eval_addrmode ge x rs = a). destruct a; simpl in H1; try discriminate; inv EA; auto.
-  set (rs2 := nextinstr_nf (rs#(preg_of dest) <- v)).
-  assert (exec_load ge chunk m x rs (preg_of dest) = Next rs2 m).
-    unfold exec_load. rewrite EA'. rewrite H1. auto.
-  assert (rs2 PC = Val.add (rs PC) Vone).
-    transitivity (Val.add ((rs#(preg_of dest) <- v) PC) Vone).
-    auto. decEq. apply Pregmap.gso; auto with asmgen.
-  exists rs2. split. 
-  destruct chunk; ArgsInv; apply exec_straight_one; auto.
-  (* Mfloat64 -> Mfloat64al32 *)
-  rewrite <- H. simpl. unfold exec_load. rewrite H1.
-  destruct (eval_addrmode ge x rs); simpl in *; try discriminate.
-  erewrite Mem.load_float64al32; eauto. 
-  split. unfold rs2. rewrite nextinstr_nf_inv1. Simplifs. apply preg_of_data.
-  intros. unfold rs2. Simplifs. 
-Qed.
-
 Lemma transl_load_correct_eff:
   forall chunk addr args dest k c (rs: regset) m a v,
   transl_load chunk addr args dest k = OK c ->
@@ -1700,56 +1196,6 @@ Proof.
   erewrite Mem.load_float64al32; eauto. 
   split. unfold rs2. rewrite nextinstr_nf_inv1. Simplifs. apply preg_of_data.
   intros. unfold rs2. Simplifs. 
-Qed.
-
-Lemma transl_store_correct:
-  forall chunk addr args src k c (rs: regset) m a m',
-  transl_store chunk addr args src k = OK c ->
-  eval_addressing ge (rs#ESP) addr (map rs (map preg_of args)) = Some a ->
-  Mem.storev chunk m a (rs (preg_of src)) = Some m' ->
-  exists rs',
-     exec_straight ge fn c rs m k rs' m'
-  /\ forall r, data_preg r = true -> preg_notin r (destroyed_by_store chunk addr) -> rs'#r = rs#r.
-Proof.
-  unfold transl_store; intros. monadInv H. 
-  exploit transl_addressing_mode_correct; eauto. intro EA.
-  assert (EA': eval_addrmode ge x rs = a). destruct a; simpl in H1; try discriminate; inv EA; auto.
-  rewrite <- EA' in H1. destruct chunk; ArgsInv.
-(* int8signed *)
-  eapply mk_smallstore_correct; eauto.
-  intros. simpl. unfold exec_store.
-  destruct (eval_addrmode ge addr0 rs0); simpl; auto. rewrite Mem.store_signed_unsigned_8; auto.
-(* int8unsigned *)
-  eapply mk_smallstore_correct; eauto.
-(* int16signed *)
-  econstructor; split.
-  apply exec_straight_one. simpl. unfold exec_store. 
-  replace (Mem.storev Mint16unsigned m (eval_addrmode ge x rs) (rs x0))
-     with (Mem.storev Mint16signed m (eval_addrmode ge x rs) (rs x0)).
-  rewrite H1. eauto.
-  destruct (eval_addrmode ge x rs); simpl; auto. rewrite Mem.store_signed_unsigned_16; auto.
-  auto.
-  intros. Simplifs.
-(* int16unsigned *)
-  econstructor; split.
-  apply exec_straight_one. simpl. unfold exec_store. rewrite H1. eauto. auto.
-  intros. Simplifs.
-(* int32 *)
-  econstructor; split.
-  apply exec_straight_one. simpl. unfold exec_store. rewrite H1. eauto. auto.
-  intros. Simplifs.
-(* float32 *)
-  econstructor; split.
-  apply exec_straight_one. simpl. unfold exec_store. rewrite H1. eauto. auto.
-  intros. Transparent destroyed_by_store. simpl in H2. simpl. Simplifs.
-(* float64 *)
-  econstructor; split.
-  apply exec_straight_one. simpl. unfold exec_store. erewrite Mem.storev_float64al32; eauto. auto.
-  intros. Simplifs.
-(* float64al32 *)
-  econstructor; split.
-  apply exec_straight_one. simpl. unfold exec_store. rewrite H1. eauto. auto.
-  intros. Simplifs.
 Qed.
 
 Lemma transl_store_correct_eff:

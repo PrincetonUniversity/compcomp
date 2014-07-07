@@ -250,7 +250,7 @@ Definition tunneled_block (f: function) (b: bblock) :=
 Definition tunneled_code (f: function) :=
   PTree.map1 (tunneled_block f) (fn_code f).
 
-(********** Lenb: new, but similar to what's there in linearize **)
+(********** NEW: definitions similar to what's in linearize **)
 
 Definition agree_regs (j: meminj) (ls1 ls2: locset): Prop :=
   (forall r, val_inject j (ls1 (R r)) (ls2 (R r))) /\
@@ -450,7 +450,7 @@ Proof. intros.
 Qed.
 (*****************************************************************)
 
-(*Lenb: added parameter mu, and add clause needed for switch to injection*)
+(*NEW added parameter mu, and added clause needed for switch to injections*)
 Inductive match_stackframes mu: stackframe -> stackframe -> Prop :=
   | match_stackframes_intro:
       forall f sp ls bb (*NEW:*) sp' ls',
@@ -538,7 +538,6 @@ Inductive match_states mu: LTL_core -> mem -> LTL_core-> mem -> Prop :=
   We use the following [measure] function over source states,
   which decreases strictly in the "zero transition" case. *)
 
-(*Lenb: converted to LTL_core*)
 Definition measure (st: LTL_core) : nat :=
   match st with
   | LTL_State s f sp pc ls retty => (count_gotos f pc * 2)%nat
@@ -558,7 +557,6 @@ Proof. unfold lt_state. apply wf_inverse_image with (f := measure).
     apply lt_wf. 
 Qed.
 
-(*Lenb: as in LinearizeproofEFF.v*)
 Definition MATCH mu c1 m1 c2 m2:Prop :=
   match_states (restrict_sm mu (vis mu)) c1 m1 c2 m2 /\
   REACH_closed m1 (vis mu) /\
@@ -567,17 +565,14 @@ Definition MATCH mu c1 m1 c2 m2:Prop :=
   (forall b, isGlobalBlock ge b = true -> frgnBlocksSrc mu b = true) /\
   sm_valid mu m1 m2 /\ SM_wd mu /\ Mem.inject (as_inj mu) m1 m2.
 
-(*Lenb: as in LinearizeproofEFF.v*)
 Lemma MATCH_wd: forall mu c1 m1 c2 m2 
   (MC: MATCH mu c1 m1 c2 m2), SM_wd mu.
 Proof. intros. eapply MC. Qed.
 
-(*Lenb: as in LinearizeproofEFF.v*)
 Lemma MATCH_RC: forall mu c1 m1 c2 m2 
   (MC: MATCH mu c1 m1 c2 m2), REACH_closed m1 (vis mu).
 Proof. intros. eapply MC. Qed.
 
-(*Lenb: as in LinearizeproofEFF.v*)
 Lemma MATCH_restrict: forall mu c1 m1 c2 m2 X
   (MC: MATCH mu c1 m1 c2 m2)
   (HX: forall b : block, vis mu b = true -> X b = true) 
@@ -613,12 +608,10 @@ split. assumption.
   eapply inject_restrict; eassumption.
 Qed.
 
-(*Lenb: as in LinearizeproofEFF.v*)
 Lemma MATCH_valid: forall mu c1 m1 c2 m2 
   (MC: MATCH mu c1 m1 c2 m2), sm_valid mu m1 m2.
 Proof. intros. eapply MC. Qed.
 
-(*Lenb: as in LinearizeproofEFF.v*)
 Lemma MATCH_PG: forall mu c1 m1 c2 m2 
   (MC: MATCH mu c1 m1 c2 m2),
   meminj_preserves_globals ge (extern_of mu) /\
@@ -632,7 +625,6 @@ Proof.
     apply MC. apply MC.
 Qed.
 
-(*Lenb: as in LinearizeproofEFF.v*)
 Lemma replace_locals_stackframes mu pubSrc' pubTgt': forall a b,
       match_stackframes (restrict_sm mu (vis mu)) a b->
       match_stackframes (restrict_sm (replace_locals mu pubSrc' pubTgt') (vis mu)) a b.
@@ -650,7 +642,6 @@ induction H; econstructor; eauto.
     eapply H1. reflexivity.
 Qed.
 
-(*Lenb: as in LinearizeproofEFF.v*)
 Lemma replace_locals_forall_stackframes mu pubSrc' pubTgt': forall s ts,
       list_forall2 (match_stackframes (restrict_sm mu (vis mu))) s ts ->
       list_forall2 (match_stackframes (restrict_sm (replace_locals mu pubSrc' pubTgt') (vis mu))) s ts.
@@ -1036,14 +1027,6 @@ assert (RR1: REACH_closed m1'
            destruct (mappedD_true _ _ RC') as [[? ?] ?].
            eapply as_inj_DomRng; eassumption.
     eapply REACH_cons; try eassumption.
-(*assert (RRR: REACH_closed m1' (exportedSrc nu' (ret1 :: nil))).
-    intros b Hb. apply REACHAX in Hb.
-       destruct Hb as [L HL].
-       generalize dependent b.
-       induction L ; simpl; intros; inv HL; trivial.
-       specialize (IHL _ H1); clear H1.
-       unfold exportedSrc.
-       eapply REACH_cons; eassumption.*)
     
 assert (RRC: REACH_closed m1' (fun b : Values.block =>
                          mapped (as_inj nu') b &&

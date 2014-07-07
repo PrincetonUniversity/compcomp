@@ -294,7 +294,6 @@ Inductive match_states (*NEW*) mu: RTL_core -> mem -> RTL_core -> mem -> Prop :=
       match_states mu (RTL_Returnstate stk v) m
                       (RTL_Returnstate stk' tv) tm.
 
-(*Lenb: as in LinearizeproofEFF.v*)
 Definition MATCH mu c1 m1 c2 m2:Prop :=
   match_states (restrict_sm mu (vis mu)) c1 m1 c2 m2 /\
   REACH_closed m1 (vis mu) /\
@@ -303,17 +302,14 @@ Definition MATCH mu c1 m1 c2 m2:Prop :=
   (forall b, isGlobalBlock ge b = true -> frgnBlocksSrc mu b = true) /\
   sm_valid mu m1 m2 /\ SM_wd mu /\ Mem.inject (as_inj mu) m1 m2.
 
-(*Lenb: as in LinearizeproofEFF.v*)
 Lemma MATCH_wd: forall mu c1 m1 c2 m2 
   (MC: MATCH mu c1 m1 c2 m2), SM_wd mu.
 Proof. intros. eapply MC. Qed.
 
-(*Lenb: as in LinearizeproofEFF.v*)
 Lemma MATCH_RC: forall mu c1 m1 c2 m2 
   (MC: MATCH mu c1 m1 c2 m2), REACH_closed m1 (vis mu).
 Proof. intros. eapply MC. Qed.
 
-(*Lenb: as in LinearizeproofEFF.v*)
 Lemma MATCH_restrict: forall mu c1 m1 c2 m2 X
   (MC: MATCH mu c1 m1 c2 m2)
   (HX: forall b : block, vis mu b = true -> X b = true) 
@@ -349,12 +345,10 @@ split. assumption.
   eapply inject_restrict; eassumption.
 Qed.
 
-(*Lenb: as in LinearizeproofEFF.v*)
 Lemma MATCH_valid: forall mu c1 m1 c2 m2 
   (MC: MATCH mu c1 m1 c2 m2), sm_valid mu m1 m2.
 Proof. intros. eapply MC. Qed.
 
-(*Lenb: as in LinearizeproofEFF.v*)
 Lemma MATCH_PG: forall mu c1 m1 c2 m2 
   (MC: MATCH mu c1 m1 c2 m2),
   meminj_preserves_globals ge (extern_of mu) /\
@@ -368,7 +362,6 @@ Proof.
     apply MC. apply MC.
 Qed.
 
-(*Lenb: as in LinearizeproofEFF.v*)
 Lemma replace_locals_frames mu pubSrc' pubTgt': forall a b,
       match_frames (restrict_sm mu (vis mu)) a b->
       match_frames (restrict_sm (replace_locals mu pubSrc' pubTgt') (vis mu)) a b.
@@ -386,7 +379,6 @@ induction H; econstructor; eauto.
     eapply H0. reflexivity.
 Qed.
 
-(*Lenb: as in LinearizeproofEFF.v*)
 Lemma replace_locals_forall_frames mu pubSrc' pubTgt': forall s ts,
       list_forall2 (match_frames (restrict_sm mu (vis mu))) s ts ->
       list_forall2 (match_frames (restrict_sm (replace_locals mu pubSrc' pubTgt') (vis mu))) s ts.
@@ -1198,14 +1190,6 @@ assert (RR1: REACH_closed m1'
            destruct (mappedD_true _ _ RC') as [[? ?] ?].
            eapply as_inj_DomRng; eassumption.
     eapply REACH_cons; try eassumption.
-(*assert (RRR: REACH_closed m1' (exportedSrc nu' (ret1 :: nil))).
-    intros b Hb. apply REACHAX in Hb.
-       destruct Hb as [L HL].
-       generalize dependent b.
-       induction L ; simpl; intros; inv HL; trivial.
-       specialize (IHL _ H1); clear H1.
-       unfold exportedSrc.
-       eapply REACH_cons; eassumption.*)
     
 assert (RRC: REACH_closed m1' (fun b : Values.block =>
                          mapped (as_inj nu') b &&

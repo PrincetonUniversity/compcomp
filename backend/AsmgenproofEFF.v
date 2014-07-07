@@ -128,19 +128,7 @@ Proof.
   intros. monadInv H. destruct (zlt (list_length_z x) Int.max_unsigned); monadInv EQ0.
   simpl. rewrite list_length_z_cons. omega. 
 Qed.
-(*DELETE
-Lemma exec_straight_exec:
-  forall fb f c ep tf tc c' rs m rs' m' lf,
-  transl_code_at_pc ge (rs PC) fb f c ep tf tc ->
-  exec_straight tge tf tc rs m c' rs' m' ->
-  corestep_plus (Asm_eff_sem hf) tge (State rs lf) m (State rs' lf) m'.
-Proof.
-  intros. inv H.
-  eapply exec_straight_steps_1; eauto.
-  eapply transf_function_no_overflow; eauto.
-  eapply functions_transl; eauto. 
-Qed.
-*)
+
 Lemma eff_exec_straight_exec:
   forall fb f c ep tf tc c' rs m rs' m' lf U,
   transl_code_at_pc ge (rs PC) fb f c ep tf tc ->
@@ -151,21 +139,6 @@ Proof.
   eapply eff_exec_straight_steps_1; eauto.
   eapply transf_function_no_overflow; eauto.
   eapply functions_transl; eauto. 
-Qed.
-
-Lemma exec_straight_at:
-  forall fb f c ep tf tc c' ep' tc' rs m rs' m',
-  transl_code_at_pc ge (rs PC) fb f c ep tf tc ->
-  transl_code f c' ep' = OK tc' ->
-  exec_straight tge tf tc rs m tc' rs' m' ->
-  transl_code_at_pc ge (rs' PC) fb f c' ep' tf tc'.
-Proof.
-  intros. inv H. 
-  exploit exec_straight_steps_2; eauto. 
-  eapply transf_function_no_overflow; eauto.
-  eapply functions_transl; eauto.
-  intros [ofs' [PC' CT']].
-  rewrite PC'. constructor; auto.
 Qed.
 
 Lemma eff_exec_straight_at:
@@ -488,7 +461,7 @@ Inductive match_states mu: Mach_core -> mem -> Asm_coop.state -> mem -> Prop :=
       match_states mu (Mach_CallstateIn fb args tys retty) m
                       (Asm_CallstateIn fb args' tys retty) m'
 
-(*Lenb: new: distinguish internal and external calls*)
+(*NEW: distinguish internal and external calls*)
   | match_states_call_internal:
       forall s fb ms m m' rs sp0 tsp0 args tys retty
         (STACKS: match_stack ge (restrict_sm mu (vis mu)) s)
@@ -531,35 +504,7 @@ Inductive match_states mu: Mach_core -> mem -> Asm_coop.state -> mem -> Prop :=
         (MLF: match_load_frames mu lf m tlf m'),
       match_states mu (Mach_Returnstate s retty ms lf) m
                       (State rs tlf) m'.
-(*DELETE
-Lemma exec_straight_steps:
-  forall mu s fb f rs1 i c ep tf tc m1' m2 m2' sp ms2 sp0 tsp0 args tys retty,
-  let lf := Mach_coop.mk_load_frame sp0 args tys retty in
-  let tlf := Asm_coop.mk_load_frame tsp0 retty in 
-  match_stack ge (restrict_sm mu (vis mu)) s ->
-  Mem.inject (as_inj mu) m2 m2' -> (*Mem.extends m2 m2' ->*)
-  Genv.find_funct_ptr ge fb = Some (Internal f) ->
-  transl_code_at_pc ge (rs1 PC) fb f (i :: c) ep tf tc ->
-  (forall k c (TR: transl_instr f i ep k = OK c),
-   exists rs2,
-       exec_straight tge tf c rs1 m1' k rs2 m2'
-    /\ agree (restrict_sm mu (vis mu)) ms2 sp rs2
-    /\ (it1_is_parent ep i = true ->
-        val_inject (as_inj (restrict_sm mu (vis mu))) (parent_sp0 sp0 s) (rs2#EDX))) ->
-  (*NEW*) forall 
-  (SPlocal: sp_spec mu sp)
-  (MLF: match_load_frames mu lf m2 tlf m2'),
-  exists st',
-  corestep_plus (Asm_eff_sem hf) tge (State rs1 tlf) m1' st' m2' /\
-  match_states mu (Mach_State s fb sp c ms2 lf) m2 st' m2'.
-Proof.
-  intros. inversion H2. subst. monadInv H7. 
-  exploit H3; eauto. intros [rs2 [A [B C]]]. 
-  exists (State rs2 tlf); split.
-  eapply exec_straight_exec; eauto. 
-  econstructor; eauto. eapply exec_straight_at; eauto.
-Qed.
-*)
+
 
 Lemma eff_exec_straight_steps:
   forall mu s fb f rs1 i c ep tf tc m1' m2 m2' sp ms2 U sp0 tsp0 args tys retty,
@@ -588,50 +533,7 @@ Proof.
   eapply eff_exec_straight_exec; eauto. 
   econstructor; eauto. eapply eff_exec_straight_at; eauto.
 Qed.
-(*DELTE
-Lemma exec_straight_steps_goto:
-  forall mu s fb f rs1 i c ep tf tc m1' m2 m2' sp ms2 lbl c' sp0 tsp0 args tys retty,
-  let lf := Mach_coop.mk_load_frame sp0 args tys retty in
-  let tlf := Asm_coop.mk_load_frame tsp0 retty in 
-  match_stack ge (restrict_sm mu (vis mu)) s ->
-  Mem.inject (as_inj mu) m2 m2' -> 
-  Genv.find_funct_ptr ge fb = Some (Internal f) ->
-  Mach.find_label lbl f.(Mach.fn_code) = Some c' ->
-  transl_code_at_pc ge (rs1 PC) fb f (i :: c) ep tf tc ->
-  it1_is_parent ep i = false ->
-  (forall k c (TR: transl_instr f i ep k = OK c),
-   exists jmp, exists k', exists rs2,
-       exec_straight tge tf c rs1 m1' (jmp :: k') rs2 m2'
-    /\ agree (restrict_sm mu (vis mu)) ms2 sp rs2
-    /\ exec_instr tge (fn_code tf) jmp rs2 m2' = goto_label (fn_code tf) lbl rs2 m2') ->
-  (*NEW*) forall 
-  (SPlocal: sp_spec mu sp)
-  (MLF: match_load_frames mu lf m2 tlf m2'),
-  exists st',
-  corestep_plus (Asm_eff_sem hf) tge (State rs1 tlf) m1' st' m2' /\
-  match_states mu (Mach_State s fb sp c' ms2 lf) m2 st' m2'.
-Proof.
-  intros. inversion H3. subst. monadInv H9.
-  exploit H5; eauto. intros [jmp [k' [rs2 [A [B C]]]]].
-  generalize (functions_transl _ _ _ H7 H8); intro FN.
-  generalize (transf_function_no_overflow _ _ H8); intro NOOV.
-  exploit exec_straight_steps_2; eauto. 
-  intros [ofs' [PC2 CT2]].
-  exploit find_label_goto_label; eauto. 
-  intros [tc' [rs3 [GOTO [AT' OTH]]]].
-  exists (State rs3 tlf); split.
-  eapply corestep_plus_trans.
-    eapply exec_straight_steps_1; eauto.  
-    eapply corestep_plus_one. 
-      econstructor; eauto.
-        eapply find_instr_tail. eauto. 
-        rewrite C. eexact GOTO.
-  econstructor; eauto.
-  apply agree_exten with rs2; auto with asmgen.
-     intros. apply OTH. intros N; subst; discriminate.
-  congruence.
-Qed.
-*)
+
 Lemma eff_exec_straight_steps_goto:
   forall mu s fb f rs1 i c ep tf tc m1' m2 m2' sp ms2 lbl c' sp0 tsp0 args tys retty,
   let lf := Mach_coop.mk_load_frame sp0 args tys retty in

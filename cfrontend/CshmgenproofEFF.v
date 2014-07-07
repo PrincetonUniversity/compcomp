@@ -298,34 +298,6 @@ Proof.
   (* union *)
   destruct (ident_eq id1 id2 && fieldlist_eq fld1 fld2); inv H2; auto.
 Qed.
-(*Replaced by make_boolean_inject below
-Lemma make_boolean_correct:
- forall e le m a v ty b,
-  eval_expr ge e le m a v ->
-  bool_val v ty = Some b ->
-  exists vb,
-    eval_expr ge e le m (make_boolean a ty) vb
-    /\ Val.bool_of_val vb b.
-Proof.
-  intros. unfold make_boolean. unfold bool_val in H0. 
-  destruct (classify_bool ty); destruct v; inv H0.
-(* int *)
-  econstructor; split. apply make_cmp_ne_zero_correct with (n := i); auto. 
-  destruct (Int.eq i Int.zero); simpl; constructor. 
-(* float *)
-  econstructor; split. econstructor; eauto with cshm. simpl. eauto. 
-  unfold Val.cmpf, Val.cmpf_bool. simpl. rewrite <- Float.cmp_ne_eq. 
-  destruct (Float.cmp Cne f Float.zero); constructor. 
-(* pointer *)
-  econstructor; split. econstructor; eauto with cshm. simpl. eauto. 
-  unfold Val.cmpu, Val.cmpu_bool. simpl.
-  destruct (Int.eq i Int.zero); simpl; constructor.
-  exists Vtrue; split. econstructor; eauto with cshm. constructor.
-(* long *)
-  econstructor; split. econstructor; eauto with cshm. simpl. unfold Val.cmpl. simpl. eauto. 
-  destruct (Int64.eq i Int64.zero); simpl; constructor. 
-Qed.
-*)
 
 Lemma make_neg_correct:
   forall a tya c va v e le m,
@@ -656,45 +628,6 @@ Proof.
   (* by copy *)
   rewrite H in MKLOAD. inv MKLOAD. auto.
 Qed.
-(*
-Lemma make_memcpy_correct:
-  forall f dst src ty k e le m b ofs v m',
-  eval_expr ge e le m dst (Vptr b ofs) ->
-  eval_expr ge e le m src v ->
-  assign_loc ty m b ofs v m' ->
-  access_mode ty = By_copy ->
-  step ge (State f (make_memcpy dst src ty) k e le m) E0 (State f Sskip k e le m').
-Proof.
-  intros. inv H1; try congruence. 
-  unfold make_memcpy. change le with (set_optvar None Vundef le) at 2. 
-  econstructor.
-  econstructor. eauto. econstructor. eauto. constructor. 
-  econstructor; eauto. 
-  apply alignof_blockcopy_1248.
-  apply sizeof_pos. 
-  eapply Zdivide_trans. apply alignof_blockcopy_divides. apply sizeof_alignof_compat.
-Qed.*)
-
-(*Will be needed for builtin:*)
-Lemma make_memcpy_correct:
-  forall f dst src ty k e le m b ofs v m',
-  eval_expr ge e le m dst (Vptr b ofs) ->
-  eval_expr ge e le m src v ->
-  assign_loc ty m b ofs v m' ->
-  access_mode ty = By_copy ->
-  CSharpMin_corestep hf ge (CSharpMin_State f (make_memcpy dst src ty) k e le) m
-          (CSharpMin_State f Sskip k e le) m'.
-Proof.
-  intros. inv H1; try congruence. 
-  unfold make_memcpy. change le with (set_optvar None Vundef le) at 2. 
-  econstructor.
-  econstructor. eauto. econstructor. eauto. constructor. 
-  econstructor; eauto. 
-  apply alignof_blockcopy_1248.
-  apply sizeof_pos. 
-  eapply Zdivide_trans. apply alignof_blockcopy_divides. apply sizeof_alignof_compat.
-  simpl. auto.
-Qed.
 
 Lemma make_memcpy_correct_BuiltinEffect:
      forall f dst src ty k e le m b ofs v m',
@@ -719,96 +652,6 @@ Proof.
   apply sizeof_pos. 
   eapply Zdivide_trans. apply alignof_blockcopy_divides. apply sizeof_alignof_compat.
   simpl. auto. 
-Qed.
-(*
-Lemma make_memcpy_correct_BuiltinEffect:
-     forall f dst src ty k e le m b ofs v m',
-       eval_expr ge e le m dst (Vptr b ofs) ->
-       eval_expr ge e le m src v ->
-       assign_loc ty m b ofs v m' ->
-       access_mode ty = By_copy ->
-  exists b' ofs', v = Vptr b' ofs' /\
-  effstep (csharpmin_eff_sem hf) ge
-          (BuiltinEffect ge (ef_sig (EF_memcpy (sizeof ty) (alignof_blockcopy ty)))
-                            (Vptr b ofs :: Vptr b' ofs' :: nil) m)
-          (CSharpMin_State f (make_memcpy dst src ty) k e le) m
-          (CSharpMin_State f Sskip k e le) m'.
-Proof.
-  intros. inv H1; try congruence. 
-  unfold make_memcpy. change le with (set_optvar None Vundef le) at 2. 
-  exists b', ofs'. split; trivial.
-  econstructor.
-  econstructor. eauto. econstructor. eauto. constructor. 
-  econstructor; eauto. 
-  apply alignof_blockcopy_1248.
-  apply sizeof_pos. 
-  eapply Zdivide_trans. apply alignof_blockcopy_divides. apply sizeof_alignof_compat.  
-Qed.
-*)
-(*WILL be needed for builtin
-Lemma make_memcpy_correct_assignlocEffect:
-     forall f dst src ty k e le m b ofs v m',
-       eval_expr ge e le m dst (Vptr b ofs) ->
-       eval_expr ge e le m src v ->
-       assign_loc ty m b ofs v m' ->
-       access_mode ty = By_copy ->
-  exists b' ofs', v = Vptr b' ofs' /\
-  effstep (csharpmin_eff_sem hf) ge
-          (assign_loc_Effect ty b ofs v)
-          (CSharpMin_State f (make_memcpy dst src ty) k e le) m
-          (CSharpMin_State f Sskip k e le) m'.
-Proof.
-  intros. inv H1; try congruence. 
-  unfold make_memcpy. change le with (set_optvar None Vundef le) at 2. 
-  exists b', ofs'. split; trivial.
-  eapply csharpmin_effstep_sub_val.
-  Focus 2. econstructor.
-           econstructor. eauto. econstructor. eauto. constructor.  
-           econstructor; eauto.  
-           apply alignof_blockcopy_1248.
-           apply sizeof_pos.  
-           eapply Zdivide_trans. apply alignof_blockcopy_divides.
-           apply sizeof_alignof_compat.
-  intros.
- is related to builtins: need to define the builtin-effect 
-              of memcpy to equal/imply the assign_loc effect*)
-(*
-Lemma make_store_correct:
-  forall addr ty rhs code e le m b ofs v m' f k,
-  make_store addr ty rhs = OK code ->
-  eval_expr ge e le m addr (Vptr b ofs) ->
-  eval_expr ge e le m rhs v ->
-  assign_loc ty m b ofs v m' ->
-  step ge (State f code k e le m) E0 (State f Sskip k e le m').
-Proof.
-  unfold make_store. intros until k; intros MKSTORE EV1 EV2 ASSIGN.
-  inversion ASSIGN; subst.
-  (* nonvolatile scalar *)
-  rewrite H in MKSTORE; inv MKSTORE.
-  econstructor; eauto. 
-  (* by copy *)
-  rewrite H in MKSTORE; inv MKSTORE. 
-  eapply make_memcpy_correct; eauto. 
-Qed.*)
-
-Lemma make_store_correct:
-  forall addr ty rhs code e le m b ofs v m' f k,
-  make_store addr ty rhs = OK code ->
-  eval_expr ge e le m addr (Vptr b ofs) ->
-  eval_expr ge e le m rhs v ->
-  assign_loc ty m b ofs v m' ->
-  CSharpMin_corestep hf ge (CSharpMin_State f code k e le) m
-                        (CSharpMin_State f Sskip k e le) m'.
-Proof.
-  unfold make_store. intros until k; intros MKSTORE EV1 EV2 ASSIGN.
-  inversion ASSIGN; subst.
-  (* nonvolatile scalar *)
-  rewrite H in MKSTORE; inv MKSTORE.
-  econstructor; eauto. 
-  (* by copy *)
-  rewrite H in MKSTORE; inv MKSTORE.
-  (* We do not yet support external builtin [memcpy] *)
-  eapply make_memcpy_correct; eauto. 
 Qed.
 
 Lemma make_store_correct_StoreEffect:
@@ -951,34 +794,6 @@ Proof.
   intros. destruct (te!id) as [[b sz] | ] eqn:?; auto.
   exploit me_local_inv; eauto. intros [b' [ty [J EQ]]]. congruence.
 Qed.
-(*
-Lemma match_env_same_blocks:
-  forall j e te,
-  match_env j e te ->
-  blocks_of_env te = Clight.blocks_of_env e.
-Proof.
-  intros.
-  set (R := fun (x: (block * type)) (y: (block * Z)) =>
-         match x, y with
-         | (b1, ty), (b2, sz) => b2 = b1 /\ sz = sizeof ty
-         end).
-  assert (list_forall2 
-            (fun i_x i_y => fst i_x = fst i_y /\ R (snd i_x) (snd i_y))
-            (PTree.elements e) (PTree.elements te)).
-  apply PTree.elements_canonical_order.
-  intros id [b ty] GET. exists (b, sizeof ty); split. eapply me_local; eauto. red; auto.
-  intros id [b sz] GET. exploit me_local_inv; eauto. intros [ty EQ].
-  exploit me_local; eauto. intros EQ1. 
-  exists (b, ty); split. auto. red; split; congruence.
-
-  unfold blocks_of_env, Clight.blocks_of_env.
-  generalize H0. induction 1. auto. 
-  simpl. f_equal; auto.
-  unfold block_of_binding, Clight.block_of_binding. 
-  destruct a1 as [id1 [blk1 ty1]]. destruct b1 as [id2 [blk2 sz2]].
-  simpl in *. destruct H1 as [A [B C]]. congruence.
-Qed.
-*)
 
 Lemma match_env_same_blocks: forall j e te 
       (ENV: match_env j e te),
@@ -1124,16 +939,7 @@ Proof.
   intros until ty. repeat rewrite PTree.gempty. congruence.
   intros until sz. rewrite PTree.gempty. congruence.
 Qed.
-(*
-Lemma match_env_empty:
-  match_env Clight.empty_env Csharpminor.empty_env.
-Proof.
-  unfold Clight.empty_env, Csharpminor.empty_env.
-  constructor.
-  intros until ty. repeat rewrite PTree.gempty. congruence.
-  intros until sz. rewrite PTree.gempty. congruence.
-Qed.
-*)
+
 (** The following lemmas establish the [match_env] invariant at
   the beginning of a function invocation, after allocation of
   local variables and initialization of the parameters. *)
@@ -1212,29 +1018,6 @@ Proof. intros vars.
       eapply alloc_forward; eassumption.
       eapply alloc_variables_forward; try eassumption.
 Qed.
-(*
-Lemma match_env_alloc_variables:
-  forall e1 m1 vars e2 m2,
-  Clight.alloc_variables e1 m1 vars e2 m2 ->
-  forall te1,
-  match_env e1 te1 ->
-  exists te2,
-  Csharpminor.alloc_variables te1 m1 (map transl_var vars) te2 m2
-  /\ match_env e2 te2.
-Proof.
-  induction 1; intros; simpl.
-  exists te1; split. constructor. auto.
-  exploit (IHalloc_variables (PTree.set id (b1, sizeof ty) te1)).
-  constructor.
-    (* me_local *)
-    intros until ty0. repeat rewrite PTree.gsspec.
-    destruct (peq id0 id); intros. congruence. eapply me_local; eauto. 
-    (* me_local_inv *)
-    intros until sz. repeat rewrite PTree.gsspec. 
-    destruct (peq id0 id); intros. exists ty; congruence. eapply me_local_inv; eauto. 
-  intros [te2 [ALLOC MENV]].
-  exists te2; split. econstructor; eauto. auto.
-Qed. *)
 
 Definition match_tempenv (j:meminj) (le: temp_env) (tle: Csharpminor.temp_env) :=
   forall id v, le!id = Some v ->
@@ -1400,14 +1183,16 @@ Section EXPR.
 Variable e: Clight.env.
 Variable le: temp_env.
 Variable m: mem.
-Variable tm: mem. (*Lenb: NEW*)
+
+(*NEW: *)
+Variable tm: mem. 
 Variable te: Csharpminor.env.
-Variable tle: Csharpminor.temp_env. (*Lenb: NEW*)
-Variable j: meminj. (*Lenb: NEW*)
+Variable tle: Csharpminor.temp_env.
+Variable j: meminj. 
 Hypothesis MENV: match_env j e te.
-Hypothesis LENV: match_tempenv j le tle. (*Lenb: NEW*)
-Hypothesis MINJ: Mem.inject j m tm. (*Lenb: NEW*)
-Hypothesis PG: meminj_preserves_globals ge j. (*Lenb: NEW*)
+Hypothesis LENV: match_tempenv j le tle. 
+Hypothesis MINJ: Mem.inject j m tm. 
+Hypothesis PG: meminj_preserves_globals ge j. 
 
 Lemma deref_loc_inject: forall ty b ofs v 
         (D:deref_loc ty m b ofs v) tb delta
@@ -1512,63 +1297,6 @@ Proof.
 (* field union *)
   simpl in TR. rewrite H1 in TR. eauto.
 Qed.
-(*
-Lemma transl_expr_lvalue_correct:
-  (forall a v,
-   Clight.eval_expr ge e le m a v ->
-   forall ta (TR: transl_expr a = OK ta)
-          tv (TV: val_inject j v tv),
-   Csharpminor.eval_expr tge te tle tm ta tv)
-/\(forall a b ofs,
-   Clight.eval_lvalue ge e le m a b ofs ->
-   forall ta (TR: transl_lvalue a = OK ta)
-          tv (TV: val_inject j (Vptr b ofs) tv),
-   Csharpminor.eval_expr tge te le m ta tv).
-Proof.
-  apply eval_expr_lvalue_ind; intros; try (monadInv TR).
-(* const int *)
-  inv TV.
-  apply make_intconst_correct.
-(* const float *)
-  inv TV.
-  apply make_floatconst_correct.
-(* const long *)
-  inv TV.
-  apply make_longconst_correct.
-(* temp var *)
-  constructor; auto.  assumption.
-(* temp var *)
-  constructor; auto.
-(* addrof *)
-  destruct (MENV _ _ H). 
-  simpl in TR. auto. 
-(* unop *)
-  eapply transl_unop_correct; eauto.
-(* binop *)
-  eapply transl_binop_correct; eauto.
-(* cast *)
-  eapply make_cast_correct; eauto.
-(* rvalue out of lvalue *)
-  exploit transl_expr_lvalue; eauto. intros [tb [TRLVAL MKLOAD]].
-  eapply make_load_correct; eauto.  
-(* var local *)
-  exploit (me_local _ _ MENV); eauto. intros EQ.
-  econstructor. eapply eval_var_addr_local. eauto.
-(* var global *)
-  econstructor. eapply eval_var_addr_global. 
-  eapply match_env_globals; eauto.
-  rewrite symbols_preserved. auto.
-(* deref *)
-  simpl in TR. eauto. 
-(* field struct *)
-  simpl in TR. rewrite H1 in TR. monadInv TR.
-  eapply eval_Ebinop; eauto.
-  apply make_intconst_correct. 
-  simpl. congruence.
-(* field union *)
-  simpl in TR. rewrite H1 in TR. eauto.
-Qed.
-*)
 
 Lemma transl_expr_correct: forall a v,
        Clight.eval_expr ge e le m a v ->
@@ -1576,13 +1304,6 @@ Lemma transl_expr_correct: forall a v,
        exists tv, val_inject j v tv /\ 
             eval_expr tge te tle tm ta tv.
 Proof (proj1 transl_expr_lvalue_correct).
-(*
-Lemma transl_expr_correct: forall a v,
-   Clight.eval_expr ge e le m a v ->
-   forall ta, transl_expr a = OK ta ->
-   Csharpminor.eval_expr tge te le m ta v.
-Proof (proj1 transl_expr_lvalue_correct).
-*)
 
 Lemma transl_lvalue_correct:
    forall a b ofs, 
@@ -1591,14 +1312,7 @@ Lemma transl_lvalue_correct:
        exists tv, val_inject j (Vptr b ofs) tv /\
                    eval_expr tge te tle tm ta tv.
 Proof (proj2 transl_expr_lvalue_correct).
-(*
-Lemma transl_lvalue_correct:
-   forall a b ofs,
-   Clight.eval_lvalue ge e le m a b ofs ->
-   forall ta, transl_lvalue a = OK ta ->
-   Csharpminor.eval_expr tge te le m ta (Vptr b ofs).
-Proof (proj2 transl_expr_lvalue_correct).
-*)
+
 Lemma transl_arglist_correct:
   forall al tyl vl,
   Clight.eval_exprlist ge e le m al tyl vl ->
@@ -1616,19 +1330,6 @@ Proof.
   eexists; split. econstructor; eassumption.
   econstructor; eassumption.  
 Qed.
-(*
-Lemma transl_arglist_correct:
-  forall al tyl vl,
-  Clight.eval_exprlist ge e le m al tyl vl ->
-  forall tal, transl_arglist al tyl = OK tal ->
-  Csharpminor.eval_exprlist tge te le m tal vl.
-Proof.
-  induction 1; intros.
-  monadInv H. constructor.
-  monadInv H2. constructor. 
-  eapply make_cast_correct; eauto. eapply transl_expr_correct; eauto. auto. 
-Qed.
-*)
 
 Lemma make_boolean_inject:
  forall a v ty b,

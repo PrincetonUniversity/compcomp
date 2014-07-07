@@ -2197,9 +2197,9 @@ Inductive match_globalenvs (f: meminj) (bound: block): Prop :=
   | mk_match_globalenvs
       (DOMAIN: forall b, Plt b bound -> f b = Some(b, 0))
 
-      (*Lenb: added assumption Genv.find_var_info -I seem to have done this in Cminorgen and Stacking, too, and 
-           it seems to be needed
-           here in prove MatchAfterExternal, just as in Stacking*)
+      (*NEW: added assumption Genv.find_var_info. This is also done
+          in Cminorgen and Stacking,  seems to be needed
+          to prove MatchAfterExternal, just as in Stacking*)
       (IMAGE: forall b1 b2 delta gv (GV: Genv.find_var_info ge b2 = Some gv),
                f b1 = Some(b2, delta) -> Plt b2 bound -> b1 = b2)
       (*WAS: (IMAGE: forall b1 b2 delta, f b1 = Some(b2, delta) -> Plt b2 bound -> b1 = b2)*)

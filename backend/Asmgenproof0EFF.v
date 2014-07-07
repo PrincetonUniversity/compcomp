@@ -200,7 +200,7 @@ destruct ZLOC as [b [ofs [tb [SP LOC]]]]; subst.
     exists b, ofs, tb; split; trivial.
 Qed.
 
-(*Lenb: added parameter j:meminj and changed lessdef into val_inject*)
+(*NEW: added parameter j:meminj and changed lessdef into val_inject*)
 Record agree mu (ms: Mach.regset) (sp: val) (rs: AsmEFF.regset) : Prop := mkagree {
   (*Modified*) agree_sp_local: val_inject (local_of mu) sp (rs#SP);
   agree_mregs: forall r: mreg, val_inject (as_inj mu) (ms r) (rs#(preg_of r))
@@ -752,131 +752,6 @@ Ltac TailNoLabel :=
 (** * Execution of straight-line code *)
 
 Section STRAIGHTLINE.
-Variable hf : I64Helpers.helper_functions.
-
-Variable ge: genv.
-Variable fn: function.
-
-(** Straight-line code is composed of processor instructions that execute
-  in sequence (no branches, no function calls and returns).
-  The following inductive predicate relates the machine states
-  before and after executing a straight-line sequence of instructions.
-  Instructions are taken from the first list instead of being fetched
-  from memory. *)
-
-Inductive exec_straight: code -> regset -> mem -> 
-                         code -> regset -> mem -> Prop :=
-  | exec_straight_one:
-      forall i1 c rs1 m1 rs2 m2,
-      exec_instr ge (fn_code fn) i1 rs1 m1 = Next rs2 m2 ->
-      rs2#PC = Val.add rs1#PC Vone ->
-      exec_straight (i1 :: c) rs1 m1 c rs2 m2
-  | exec_straight_step:
-      forall i c rs1 m1 rs2 m2 c' rs3 m3,
-      exec_instr ge (fn_code fn) i rs1 m1 = Next rs2 m2 ->
-      rs2#PC = Val.add rs1#PC Vone ->
-      exec_straight c rs2 m2 c' rs3 m3 ->
-      exec_straight (i :: c) rs1 m1 c' rs3 m3.
-
-Lemma exec_straight_trans:
-  forall c1 rs1 m1 c2 rs2 m2 c3 rs3 m3,
-  exec_straight c1 rs1 m1 c2 rs2 m2 ->
-  exec_straight c2 rs2 m2 c3 rs3 m3 ->
-  exec_straight c1 rs1 m1 c3 rs3 m3.
-Proof.
-  induction 1; intros.
-  apply exec_straight_step with rs2 m2; auto.
-  apply exec_straight_step with rs2 m2; auto.
-Qed.
-
-Lemma exec_straight_two:
-  forall i1 i2 c rs1 m1 rs2 m2 rs3 m3,
-  exec_instr ge (fn_code fn) i1 rs1 m1 = Next rs2 m2 ->
-  exec_instr ge (fn_code fn) i2 rs2 m2 = Next rs3 m3 ->
-  rs2#PC = Val.add rs1#PC Vone ->
-  rs3#PC = Val.add rs2#PC Vone ->
-  exec_straight (i1 :: i2 :: c) rs1 m1 c rs3 m3.
-Proof.
-  intros. apply exec_straight_step with rs2 m2; auto.
-  apply exec_straight_one; auto.
-Qed.
-
-Lemma exec_straight_three:
-  forall i1 i2 i3 c rs1 m1 rs2 m2 rs3 m3 rs4 m4,
-  exec_instr ge (fn_code fn) i1 rs1 m1 = Next rs2 m2 ->
-  exec_instr ge (fn_code fn) i2 rs2 m2 = Next rs3 m3 ->
-  exec_instr ge (fn_code fn) i3 rs3 m3 = Next rs4 m4 ->
-  rs2#PC = Val.add rs1#PC Vone ->
-  rs3#PC = Val.add rs2#PC Vone ->
-  rs4#PC = Val.add rs3#PC Vone ->
-  exec_straight (i1 :: i2 :: i3 :: c) rs1 m1 c rs4 m4.
-Proof.
-  intros. apply exec_straight_step with rs2 m2; auto.
-  eapply exec_straight_two; eauto.
-Qed.
-
-(** The following lemmas show that straight-line executions
-  (predicate [exec_straight]) correspond to correct Asm executions. *)
-
-Lemma exec_straight_steps_1:
-  forall c rs m c' rs' m' lf,
-  exec_straight c rs m c' rs' m' ->
-  list_length_z (fn_code fn) <= Int.max_unsigned ->
-  forall b ofs,
-  rs#PC = Vptr b ofs ->
-  Genv.find_funct_ptr ge b = Some (Internal fn) ->
-  code_tail (Int.unsigned ofs) (fn_code fn) c ->
-  corestep_plus (Asm_eff_sem hf) ge (State rs lf) m (State rs' lf) m'.
-Proof.
-  induction 1; intros.
-  apply corestep_plus_one.
-  econstructor; eauto. 
-  eapply find_instr_tail. eauto.
-  eapply corestep_star_plus_trans.
-    eapply corestep_star_one.
-      econstructor; eauto. 
-        eapply find_instr_tail. eauto.
-    apply IHexec_straight with b (Int.add ofs Int.one). 
-      auto.
-      rewrite H0. rewrite H3. reflexivity.
-      auto. 
-      apply code_tail_next_int with i; auto.
-Qed.
-    
-Lemma exec_straight_steps_2:
-  forall c rs m c' rs' m',
-  exec_straight c rs m c' rs' m' ->
-  list_length_z (fn_code fn) <= Int.max_unsigned ->
-  forall b ofs,
-  rs#PC = Vptr b ofs ->
-  Genv.find_funct_ptr ge b = Some (Internal fn) ->
-  code_tail (Int.unsigned ofs) (fn_code fn) c ->
-  exists ofs',
-     rs'#PC = Vptr b ofs'
-  /\ code_tail (Int.unsigned ofs') (fn_code fn) c'.
-Proof.
-  induction 1; intros.
-  exists (Int.add ofs Int.one). split.
-  rewrite H0. rewrite H2. auto.
-  apply code_tail_next_int with i1; auto.
-  apply IHexec_straight with (Int.add ofs Int.one).
-  auto. rewrite H0. rewrite H3. reflexivity. auto. 
-  apply code_tail_next_int with i; auto.
-Qed.
-
-(*NEW*)
-Lemma exec_straight_forward:  forall c1 rs1 m1 c2 rs2 m2,
-  exec_straight c1 rs1 m1 c2 rs2 m2 -> mem_forward m1 m2.
-Proof. intros.
-  induction H.
-   eapply exec_instr_forward; eassumption.
-   apply exec_instr_forward in H.
-     eapply mem_forward_trans; eassumption.
-Qed.
-End STRAIGHTLINE.
-
-(*Lenb: the same for effectfull executions*)
-Section EFFSTRAIGHTLINE.
 Variable hf: I64Helpers.helper_functions.
 
 Variable ge: genv.
@@ -889,6 +764,7 @@ Variable fn: function.
   Instructions are taken from the first list instead of being fetched
   from memory. *)
 
+(*NEW: added effects*)
 Inductive eff_exec_straight: (block -> Z -> bool) ->
                          code -> regset -> mem -> 
                          code -> regset -> mem -> Prop :=
@@ -915,51 +791,6 @@ Proof. intros.
    eapply exec_instr_forward; eassumption.
    apply exec_instr_forward in H.
      eapply mem_forward_trans; eassumption.
-Qed.
-
-Lemma eff_exec_straight_ax1: forall M c1 rs1 m1 c2 rs2 m2,
-       eff_exec_straight M c1 rs1 m1 c2 rs2 m2 ->
-            exec_straight ge fn c1 rs1 m1 c2 rs2 m2
-         /\ Mem.unchanged_on (fun b ofs => M b ofs = false) m1 m2.
-Proof. intros.
-  induction H.
-  split; subst.
-    econstructor; eassumption.
-    eapply exec_instr_unchanged_on; eassumption.
-  destruct IHeff_exec_straight. 
-   split. econstructor; try eassumption.
-   specialize (exec_instr_forward _ _ _ _ _ _ _ H); intros Fwd1.
-   apply exec_instr_unchanged_on in H.
-   apply exec_straight_forward in H3. clear H1.
-   subst.
-   split; intros.
-     apply orb_false_iff in H1. destruct H1.
-     apply andb_false_iff in H5.
-     destruct H5. Focus 2. destruct (valid_block_dec m1 b). inv H5. congruence.
-     split; intros.
-       eapply H4. trivial.
-       apply Fwd1. assumption.
-       apply H; assumption.
-     apply H; try eassumption.
-       apply H4; try eassumption. apply Fwd1; assumption.
-   apply orb_false_iff in H1. destruct H1.
-     apply andb_false_iff in H5.
-     destruct H5. Focus 2. destruct (valid_block_dec m1 b). inv H5.
-       elim n. eapply Mem.perm_valid_block; eassumption.
-     destruct H4 as [_ H4]. rewrite H4; try eassumption.
-       eapply H; assumption.
-     apply H; try eassumption.
-       eapply Mem.perm_valid_block; eassumption. 
-Qed. 
-
-Lemma eff_exec_straight_ax2: forall c1 rs1 m1 c2 rs2 m2,
-       exec_straight ge fn c1 rs1 m1 c2 rs2 m2 ->
-       exists M, eff_exec_straight M c1 rs1 m1 c2 rs2 m2.
-Proof. intros.
-  induction H.
-    eexists. eapply eff_exec_straight_one; try eassumption. reflexivity. 
-  destruct IHexec_straight. 
-    eexists. eapply eff_exec_straight_step; try eassumption. reflexivity.
 Qed.
 
 Lemma eff_exec_straight_valid: forall M c1 rs1 m1 c2 rs2 m2,
@@ -1101,7 +932,7 @@ Proof.
   apply code_tail_next_int with i; auto.
 Qed.
 
-End EFFSTRAIGHTLINE.
+End STRAIGHTLINE.
 
 (** * Properties of the Mach call stack *)
 

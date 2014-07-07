@@ -1577,7 +1577,7 @@ Ltac TrivialExists :=
   | _ => idtac
   end.
 
-(** Lenb: replace eval_unop_lessdef with eval_unop from
+(** NEW replace eval_unop_lessdef with eval_unop from
     Cminorgenproof; this requires the addition of 
     Require Import Float above*)
 (* Compatibility of [eval_unop] with respect to [val_inject]. *)
@@ -1617,21 +1617,21 @@ Proof.
   inv H0; simpl in H; inv H. simpl. TrivialExists.
 Qed.
 
-(*Lenb: fom Cminorgenproof: *)
+(*NEW fom Cminorgenproof: *)
 Remark val_inject_val_of_bool:
   forall f b, val_inject f (Val.of_bool b) (Val.of_bool b).
 Proof.
   intros; destruct b; constructor.
 Qed.
 
-(*Lenb: fom Cminorgenproof: *)
+(*NEW: fom Cminorgenproof: *)
 Remark val_inject_val_of_optbool:
   forall f ob, val_inject f (Val.of_optbool ob) (Val.of_optbool ob).
 Proof.
   intros; destruct ob; simpl. destruct b; constructor. constructor.
 Qed.
 
-(*Lenb: fom Cminorgenproof: *)
+(*NEW fom Cminorgenproof: *)
 Ltac TrivialExistsCMINORGEN :=
   match goal with
   | [ |- exists y, Some ?x = Some y /\ val_inject _ _ _ ] =>
@@ -1786,9 +1786,9 @@ Lemma sel_expr_inject:
   forall sp e m a v,
   Cminor.eval_expr ge sp e m a v ->
   forall j e' le m',
-  (*Lenb: these conditions are modified*)
+  (*NEW: these conditions are modified*)
   env_inject j e e' -> Mem.inject j m m' ->
-  (*Lenb: these conditions are new here*)
+  (*NEW: these conditions are new here*)
   forall (PG: meminj_preserves_globals ge j)
      (GD: genvs_domain_eq ge tge)
      (NoRepet: list_norepet (map fst (prog_defs prog)))
@@ -1846,50 +1846,14 @@ Proof.
   (*WAS:exploit Mem.loadv_extends; eauto. intros [v' [C D]].*)
   exists v'; split; auto. eapply eval_load; eauto.
 Qed.
-(*
-Lemma sel_expr_correct:
-  forall sp e m a v,
-  Cminor.eval_expr ge sp e m a v ->
-  forall e' le m',
-  env_lessdef e e' -> Mem.extends m m' ->
-  exists v', eval_expr tge sp e' m' le (sel_expr hf a) v' /\ Val.lessdef v v'.
-Proof.
-  induction 1; intros; simpl.
-  (* Evar *)
-  exploit H0; eauto. intros [v' [A B]]. exists v'; split; auto. constructor; auto.
-  (* Econst *)
-  destruct cst; simpl in *; inv H. 
-  exists (Vint i); split; auto. econstructor. constructor. auto. 
-  exists (Vfloat f); split; auto. econstructor. constructor. auto.
-  exists (Val.longofwords (Vint (Int64.hiword i)) (Vint (Int64.loword i))); split.
-  eapply eval_Eop. constructor. EvalOp. simpl; eauto. constructor. EvalOp. simpl; eauto. constructor. auto.
-  simpl. rewrite Int64.ofwords_recompose. auto.
-  rewrite <- symbols_preserved. fold (symbol_address tge i i0). apply eval_addrsymbol.
-  apply eval_addrstack.
-  (* Eunop *)
-  exploit IHeval_expr; eauto. intros [v1' [A B]].
-  exploit eval_unop_lessdef; eauto. intros [v' [C D]].
-  exploit eval_sel_unop; eauto. intros [v'' [E F]].
-  exists v''; split; eauto. eapply Val.lessdef_trans; eauto. 
-  (* Ebinop *)
-  exploit IHeval_expr1; eauto. intros [v1' [A B]].
-  exploit IHeval_expr2; eauto. intros [v2' [C D]].
-  exploit eval_binop_lessdef; eauto. intros [v' [E F]].
-  exploit eval_sel_binop. eexact A. eexact C. eauto. intros [v'' [P Q]].
-  exists v''; split; eauto. eapply Val.lessdef_trans; eauto. 
-  (* Eload *)
-  exploit IHeval_expr; eauto. intros [vaddr' [A B]].
-  exploit Mem.loadv_extends; eauto. intros [v' [C D]].
-  exists v'; split; auto. eapply eval_load; eauto.
-Qed.
-*)
+
 Lemma sel_exprlist_inject:
   forall sp e m a v,
   Cminor.eval_exprlist ge sp e m a v ->
   forall j e' le m',
-  (*Lenb: these conditions are modified*)
+  (*NEW: these conditions are modified*)
   env_inject j e e' -> Mem.inject j m m' ->
-  (*Lenb: these conditions are new here*)
+  (*NEW: these conditions are new here*)
   forall (PG: meminj_preserves_globals ge j)
      (GD: genvs_domain_eq ge tge)
      (NoRepet: list_norepet (map fst (prog_defs prog)))
@@ -2031,9 +1995,6 @@ Proof.
   destruct (ident_eq lbl l). auto. apply IHs; auto.
 Qed.
 
-(*Lenb: changed type of s from Cminor.state to CMin_core, 
-  adapted the constructor names,
-  and removed one _ in each clause*)
 Definition measure (s: CMin_core) : nat :=
   match s with
   | CMin_Callstate _ _ _ => 0%nat

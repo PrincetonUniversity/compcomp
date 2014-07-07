@@ -176,9 +176,11 @@ Let core_data := CSharpMin_core.
 
 (*NEW*) Variable hf : I64Helpers.helper_functions.
 
-(*Lenb -- meminj_preserves_globals is new, and needed since this property is now
-    required by the simulation realtions, rather than only at/efterexternal clauses*)
-Inductive match_cores: core_data -> meminj -> CSharpMin_core -> mem -> CMin_core -> mem -> Prop :=
+(*NEW: added meminj_preserves_globals, since this property is now
+    required by the simulation relation MATCH, 
+    rather than only at/efterexternal clauses*)
+Inductive match_cores: core_data -> meminj -> CSharpMin_core -> mem -> 
+                       CMin_core -> mem -> Prop :=
   | MC_states:
       forall d fn s k e le m tfn ts tk sp te tm cenv xenv j lo hi cs sz
       (TRF: transl_funbody cenv sz fn = OK tfn)
@@ -224,33 +226,6 @@ Inductive match_cores: core_data -> meminj -> CSharpMin_core -> mem -> CMin_core
       (PG: meminj_preserves_globals ge j),
       match_cores d j (CSharpMin_Returnstate v k) m
                    (CMin_Returnstate tv tk) tm.
-
-(*Lenb -- lemma is new, and needed for the proof of
-Theorem transl_program_correct at the end of this file*)
-Lemma match_cores_valid: 
-forall d j c1 m1 c2 m2,  match_cores d j c1 m1 c2 m2 -> 
-          forall b1 b2 ofs, j b1 = Some(b2,ofs) -> 
-               (Mem.valid_block m1 b1 /\ Mem.valid_block m2 b2).
-Proof.
-intros.
-inv H.
-  split. eapply Mem.valid_block_inject_1; eassumption.
-         eapply Mem.valid_block_inject_2; eassumption.
-  split. eapply Mem.valid_block_inject_1; eassumption.
-         eapply Mem.valid_block_inject_2; eassumption.
-  split. eapply Mem.valid_block_inject_1; eassumption.
-         eapply Mem.valid_block_inject_2; eassumption.
-  split. eapply Mem.valid_block_inject_1; eassumption.
-         eapply Mem.valid_block_inject_2; eassumption.
-Qed.
-
-Lemma match_cores_genvs: 
-forall d j c1 m1 c2 m2,  match_cores d j c1 m1 c2 m2 -> 
-          meminj_preserves_globals ge j. 
-Proof.
-intros.
-inv H; trivial.
-Qed.
 
 (*-----A variant of CminorgenproofRestructured.match_globalenvs_init,
    used for init_cores---*)

@@ -1545,7 +1545,7 @@ Proof.
   intros EQ. exploit H1. eauto. eauto. intros [A B]. contradiction.
 Qed.
 
-(*Lenb: in Lemma agree_frame_inject_inc above, the condition
+(*NEW : in Lemma agree_frame_inject_inc above, the condition
     inject_separated is a bit too strong -- really only
   entries  mapping into sp' matter. One way to express this
   is the following variant*)
@@ -3247,9 +3247,8 @@ Inductive match_globalenvs (j: meminj) (bound: block) : Prop :=
   | match_globalenvs_intro
       (DOMAIN: forall b, Plt b bound -> j b = Some(b, 0))
 
-      (*Lenb: added assumttion Genv.find_var_info 
-        -I seem to have done this in Cminorgen, too, and it seems to be needed
-         here in prove MacthAfterEtxernal*)
+      (*NEW: added assumption Genv.find_var_info. The same is done 
+        Cminorgen, and is needed to prove MatchAfterEtxernal*)
       (IMAGE: forall b1 b2 delta gv (GV: Genv.find_var_info ge b2 = Some gv),
                j b1 = Some(b2, delta) -> Plt b2 bound -> b1 = b2)
 
@@ -3257,7 +3256,7 @@ Inductive match_globalenvs (j: meminj) (bound: block) : Prop :=
       (FUNCTIONS: forall b fd, Genv.find_funct_ptr ge b = Some fd -> Plt b bound)
       (VARINFOS: forall b gv, Genv.find_var_info ge b = Some gv -> Plt b bound).
 
-(*Lenb: replaced (j:meminj) by mu, to enable the addition of (SPlocal:
+(*NEW: replaced (j:meminj) by mu, to enable the addition of (SPlocal:
   locBlocksTgt mu sp = true)*)
 
 Inductive match_stacks mu (m m': mem) (sp0: block) (ls0: locset) : 
@@ -4087,11 +4086,11 @@ End EXTERNAL_ARGUMENTS.
 - Well-typedness of [f].
 *)
 
-(* Lenb: added parameter mu, and removed MINJ clauses (they're in MATCH now)
+(* NEW: added parameter mu, and removed MINJ clauses (they're in MATCH now)
    Adapted type from Linear.state -> Mach.state -> Prop to
    Linear_core -> mem -> Mach_core -> mem -> Prop *)
 
-(* We distinguish between internal and external calls (cf. introduction
+(* NEW: We distinguish between internal and external calls (cf. introduction
    of constructor Mach_CallstateOut). *)
 
 Inductive match_states mu: Linear_core -> mem -> Mach_core -> mem -> Prop:=
