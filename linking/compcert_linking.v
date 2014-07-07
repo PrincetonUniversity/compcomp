@@ -368,6 +368,8 @@ Variable my_fn_tbl: ident -> option 'I_N.
 
 Section handle.
 
+Variable (ge : ge_ty).
+
 Variables (sg: signature) (id: ident) (l: linker N my_cores) (args: list val).
 
 Import CallStack.
@@ -378,9 +380,10 @@ Definition handle :=
                -> option (linker N my_cores)) with
     | true => fun pf => 
         if l.(fn_tbl) id is Some ix then
-        if initCore my_cores sg ix (Vptr id Int.zero) args is Some c 
+        if Genv.find_symbol ge id is Some bf then
+        if initCore my_cores sg ix (Vptr bf Int.zero) args is Some c 
           then Some (pushCore l c pf)
-        else None else None
+        else None else None else None
     | false => fun _ => None
   end) erefl.
 
@@ -390,11 +393,12 @@ Section handle_lems.
 
 Import CallStack.
 
-Lemma handleP sg id l args l' :
-  handle sg id l args = Some l' <-> 
-  (exists (pf : all (atExternal my_cores) l.(stack).(callStack)) ix c,
+Lemma handleP ge sg id l args l' :
+  handle ge sg id l args = Some l' <-> 
+  (exists (pf : all (atExternal my_cores) l.(stack).(callStack)) ix bf c,
      [/\ l.(fn_tbl) id = Some ix 
-       , initCore my_cores sg ix (Vptr id Int.zero) args = Some c
+       , Genv.find_symbol ge id = Some bf
+       , initCore my_cores sg ix (Vptr bf Int.zero) args = Some c
        & l' = pushCore l c pf]).
 Proof.
 rewrite/handle.
@@ -404,16 +408,19 @@ pattern (all (atExternal my_cores) (CallStack.callStack (stack l)))
  at 1 2 3 4 5 6 7 8.
 case f: (all _ _); move=> pf.
 case g: (fn_tbl l id)=> [ix|].
+case fnd: (Genv.find_symbol _ _)=> [bf|].
 case h: (initCore _ _ _)=> [c|].
 split=> H.
-exists (erefl true),ix,c; split=> //; first by case: H=> <-.
-case: H=> pf0 []ix0 []c0 []; case=> <- H -> /=.
+exists (erefl true),ix,bf,c; split=> //; first by case: H=> <-.
+case: H=> pf0 []ix0 []bf0 []c0 []; case=> <-; case=> <- H -> /=.
 by rewrite h in H; case: H=> ->; repeat f_equal; apply: proof_irr.
 split=> //.
-by case=> pf0 []ix0 []c0 []; case=> <-; rewrite h; discriminate.
-by split=> //; case=> pf0 []ix0 []c0 []; discriminate.
+by case=> pf0 []ix0 []bf0 []c0 []; case=> <-; case=> <-; rewrite h; discriminate.
+by split=> //; case=> pf0 []ix0 []bf0 []c0 []; discriminate.
 split=> //.
-by case=> pf0 []ix0 []c0 []; discriminate.
+by case=> pf0 []ix0 []bf0 []c0 []; discriminate.
+split=> //.
+by case=> pf0 []ix0 []bf0 []c0 []; discriminate.
 Qed.
 
 End handle_lems.
@@ -486,7 +493,7 @@ Definition fun_id (ef: external_function) : option ident :=
 Definition at_external (l: linker N my_cores) :=
   if at_external0 l is Some (ef, dep_sig, args) 
     then if fun_id ef is Some id then
-         if handle (ef_sig ef) id l args is None then Some (ef, dep_sig, args) else None
+         if fn_tbl l id is None then Some (ef, dep_sig, args) else None
          else None
   else at_external0 l.
 
@@ -540,7 +547,7 @@ Definition corestep
 
       if at_external0 l is Some (ef, dep_sig, args) then
       if fun_id ef is Some id then
-      if handle (ef_sig ef) id l args is Some l'' then l'=l'' else False else False
+      if handle ge (ef_sig ef) id l args is Some l'' then l'=l'' else False else False
       else 
 
       (** 4- or halted, in which case we pop the halted core from the call stack
@@ -566,7 +573,7 @@ Inductive Corestep (ge : ge_ty) : linker N my_cores -> mem
     Corestep ge l m (updCore l (Core.upd (peekCore l) c')) m'
 
 | Corestep_call :
-  forall (l : linker N my_cores) m ef dep_sig args id d_ix d
+  forall (l : linker N my_cores) m ef dep_sig args id bf d_ix d
          (pf : all (atExternal my_cores) (CallStack.callStack l)),
 
   let: c := peekCore l in
@@ -577,11 +584,12 @@ Inductive Corestep (ge : ge_ty) : linker N my_cores -> mem
   core_semantics.at_external c_sem (Core.c c) = Some (ef,dep_sig,args) -> 
   fun_id ef = Some id -> 
   fn_tbl l id = Some d_ix -> 
+  Genv.find_symbol ge id = Some bf -> 
 
   let: d_ge  := Modsem.ge (my_cores d_ix) in
   let: d_sem := Modsem.sem (my_cores d_ix) in
 
-  core_semantics.initial_core d_sem d_ge (Vptr id Int.zero) args = Some d -> 
+  core_semantics.initial_core d_sem d_ge (Vptr bf Int.zero) args = Some d -> 
   Corestep ge l m (pushCore l (Core.mk _ _ _ d (ef_sig ef)) pf) m
 
 | Corestep_return : 
@@ -619,16 +627,17 @@ rewrite /corestep0=> [][]c' []step.
 by rewrite (corestep_not_at_external _ _ _ _ _ _ step) in A.
 rewrite /inContext /at_external0 A H1.
 case e: (handle _ _ _)=> //[l'|].
-move: e; case/handleP=> pf' []ix' []c []C D ->.
+move: e; case/handleP=> pf' []ix' []bf' []c []C G D ->.
 move: D; rewrite /initCore.
 rewrite H2 in C; case: C=> eq; subst ix'.
-by rewrite H3; case=> <-; f_equal; apply: proof_irr.
+rewrite G in H3; case: H3=> ->.
+by rewrite H4; case=> <-; f_equal; apply: proof_irr.
 move: e; rewrite/handle /pushCore.
 generalize (stack_push_wf l).
 pattern (all (atExternal my_cores) (CallStack.callStack (stack l))) 
  at 1 2 3 4 5 6.
 case f: (all _ _)=> pf'.
-rewrite H2 /initCore H3; discriminate.
+rewrite H2 H3 /initCore H4; discriminate.
 by rewrite pf in f.
 right; split=> //.
 split=> //.
@@ -657,8 +666,8 @@ case=> <-.
 case=> nstep.
 case atext: (at_external0 _)=> [[[ef dep_sig] args]|//].
 case funid: (fun_id ef)=> [id|//].
-case hdl:   (handle (ef_sig ef) id l args)=> [l''|//] ->.
-move: hdl; case/handleP=> pf []ix []c []fntbl init ->.
+case hdl:   (handle ge (ef_sig ef) id l args)=> [l''|//] ->.
+move: hdl; case/handleP=> pf []ix []bf []c []fntbl genv init ->.
 move: init; rewrite /initCore.
 case init: (core_semantics.initial_core _ _ _ _)=> [c'|//]; case=> <-. 
 by apply: (@Corestep_call _ _ _ ef dep_sig args id).
@@ -705,7 +714,9 @@ rewrite/corestep/at_external.
 move=> [H|[_ [_ H]]]; first by move: H; move/corestep_not_at_external0=> /= ->.
 move: H; case Heq: (at_external0 c)=>[[[ef sig] args]|//].
 move: Heq; case: (at_external_halted_excl0 c)=> [H|H]; first by rewrite H.
-by move=> H2; case: (fun_id ef)=>// id; case: (handle _ _ _).
+move=> H2; case: (fun_id ef)=>// id; case hdl: (handle _ _ _)=> [a|].
+by move: hdl; case/handleP=> ? []? []? []? []->.
+by [].
 Qed.
 
 Lemma at_external0_not_halted c x :
@@ -778,13 +789,14 @@ inversion H2; subst.
   by apply core_semantics.corestep_not_at_external in H; rewrite H in H0.
   by apply core_semantics.corestep_not_halted in H; rewrite H in H4. }
 { inversion H1; subst.
-  by apply core_semantics.corestep_not_at_external in H5; rewrite H5 in H.
-  move: H0 H6 H3 H7; rewrite H5 in H; case: H=> <- _ eq0 ->; case=> eq1; subst.
-  move=> ->; case=> Heq; subst; rewrite H8 in H4; case: H4=> ->. 
+  by apply core_semantics.corestep_not_at_external in H6; rewrite H6 in H.
+  move: H0 H7 H3 H8; rewrite H6 in H; case: H=> <- _ eq0 ->; case=> eq1; subst.
+  rewrite H4 in H9; case: H9; move=> ?; subst.
+  move=> ->; case=> Heq; subst; rewrite H10 in H5; case: H5=> ->. 
   by f_equal; f_equal; apply: proof_irr.
   case: (core_semantics.at_external_halted_excl 
           (Modsem.sem (my_cores (Core.i (peekCore c)))) (Core.c (peekCore c))).
-  by rewrite H. by rewrite H7. }
+  by rewrite H. by rewrite H8. }
 { inversion H1; subst.
   by apply core_semantics.corestep_not_halted in H6; rewrite H6 in H3. 
   case: (core_semantics.at_external_halted_excl 

@@ -85,7 +85,7 @@ Context
 (valid : sm_valid mu m1 m2)
 (fid : LinkerSem.fun_id ef = Some id)
 (atext1 : LinkerSem.at_external0 st1 = Some (ef,sig,args1))
-(hdl1 : LinkerSem.handle (ef_sig ef) id st1 args1 = Some st1')
+(hdl1 : LinkerSem.handle my_ge (ef_sig ef) id st1 args1 = Some st1')
 (inv : R cd mu st1 m1 st2 m2).
 
 Lemma atext2 : 
@@ -135,13 +135,13 @@ Require Import mem_wd.
 Lemma hdl2 args2 : 
   LinkerSem.at_external0 st2 = Some (ef,sig,args2) -> 
   exists cd' st2' mu',
-    LinkerSem.handle (ef_sig ef) id st2 args2 = Some st2'
+    LinkerSem.handle my_ge (ef_sig ef) id st2 args2 = Some st2'
     /\ R cd' mu' st1' m1 st2' m2.
 Proof.
 move=> A.
 case: (R_inv inv)=> pf []pf_sig []mu_top []mus []mu_eq.
 move=> []pf2 hdinv tlinv; move: hdl1; rewrite LinkerSem.handleP.
-move=> []all_at1 []ix []c1 []fntbl1 init1 st1'_eq.
+move=> []all_at1 []ix []bf []c1 []fntbl1 genv init1 st1'_eq.
 
 have atext1': 
   at_external (sem (cores_S (Core.i (c inv)))) (Core.c (c inv)) 
@@ -316,7 +316,7 @@ have [cd_new [c2 [pf_new [init2 mtch12]]]]:
   exists (cd_new : core_data (sims sims' (Core.i c1))) 
          (c2 : Core.t cores_T)
          (pf : Core.i c1 = Core.i c2),
-    [/\ initCore cores_T (ef_sig ef) ix (Vptr id Integers.Int.zero) args2 = Some c2
+    [/\ initCore cores_T (ef_sig ef) ix (Vptr bf Integers.Int.zero) args2 = Some c2
       & match_state (sims sims' (Core.i c1)) cd_new
         (initial_SM domS domT frgnS frgnT j) 
         (Core.c c1) m1 (cast'' pf (Core.c c2)) m2].
@@ -456,14 +456,14 @@ have hdinv_new:
   { by case: (Nuke_sem.wmd_at_external (ge (cores_T (Core.i (d inv)))) 
                (head_nukeI hdinv) my_atext2). }
   have init: initial_core (cores_T (Core.i c2)).(sem) 
-               (ge (cores_T (Core.i c2))) (Vptr id Int.zero) args2 
+               (ge (cores_T (Core.i c2))) (Vptr bf Int.zero) args2 
            = Some c2.(Core.c).
   { clear - init2; move: init2; rewrite /initCore.
     by case e: (initial_core _ _ _ _)=> [c|//]; case=> <- /=. }
   by apply: (Nuke_sem.wmd_initial (nucular_T (Core.i c2)) vval vgenv2 wmd init). }
 
 exists (existT _ (Core.i c1) cd_new),st2',mu_new'; split.
-rewrite LinkerSem.handleP; exists all_at2,ix,c2; split=> //.
+rewrite LinkerSem.handleP; exists all_at2,ix,bf,c2; split=> //.
 by move: fntbl1; rewrite (R_fntbl inv).
 
 have valid_new: sm_valid mu_new' m1 m2. 
