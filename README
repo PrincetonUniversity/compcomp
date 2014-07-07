@@ -1,3 +1,84 @@
+                    Compositional CompCert
+                    ======================
+
+OVERVIEW: 
+
+This directory contains files accompanying the POPL submission
+
+                    Compositional CompCert.
+
+The files are distributed as a modification of standard CompCert 2.1:
+The compiler files are the same but there are two sets of proofs, one
+for standard CompCert and the second for Compositional CompCert.  Both
+sets of proofs are buildable.
+
+In general, files suffixed with *_coop, *_eff, or *EFF are the
+compositional versions of the standard CompCert proofs. The
+compositional proofs can typically be found in the same directory as
+their standard CompCert counterparts.
+
+
+BUILDING:
+
+Compositional CompCert builds under Coq 8.4pl4+Ssreflect 1.5. If you
+do not have Ssreflect, you will be able to build everything but the
+files in the linking/ subdirectory (horizontal composition/proofs) 
+and driver/CompilerComplements.v, which depends on linking/.
+
+To build, unzip the .tgz file, go to the root directory, and type:
+  ./configure [build-target, e.g., ia32-cygwin]
+  touch .depend
+  make depend
+  make proof
+
+
+FILES:
+
+The files and directories most relevant to the paper are:
+
+cfrontend/ 
+  C frontend compiler phases and proofs (SimplLocals, Cshmgen,
+  Cminorgen). Files suffixed *_eff.v and *_coop.v gives 
+  language definitions. Files suffixed *EFF.v are the compositional 
+  compiler phase proofs.
+
+backend/ 
+  Backend compiler phases and proofs (Selection, RTLgen, Tailcall,
+  Renumbering, Allocation, Tunneling, Linearize, CleanupLabels,
+  Stacking, Asmgen). Files suffixed *_eff.v and *_coop.v gives language
+  definitions. Files suffixed *EFF.v are the compositional compiler
+  phase proofs.
+
+core/
+  core_semantics.v: defines interaction semantics, Sec. 2 
+  StructuredInjections.v: structured injections, Sec. 4
+  effect_simulations.v: structured simulations, Sec. 4
+  effect_simulations_trans.v: Theorem 1 (transitivity), Sec. 5
+  
+linking/
+  compcert_linking.v: defines linking semantics, Sec. 3
+  linking_spec.v: states Theorem 2, Sec. 5
+  linking_proof.v: proves Theorem 2, Sec. 5
+  context_equiv.v: defines reach-closed contextual equivalence and
+    proves Corollary 1, Sec. 5
+
+driver/
+  CompositionalCompiler.v: proves Theorem 3, Sec. 6
+  CompositionalComplements.v: proves Corollary 2, Sec. 6
+
+scripts/
+  Contains the shell scripts used to calculate the line counts in
+  Sec. 6. In general, we calculate lines of spec. vs. proof 
+  by first classifying whole files as either spec. or proof, 
+  and then just using wc. The coqwc tool is an alternative, but 
+  it often seems to undercount proof lines and overcount 
+  spec. lines.
+
+
+
+BELOW is the README distributed with CompCert 2.1, including copyright
+notices:
+
                 The CompCert C verified compiler
 
 OVERVIEW:

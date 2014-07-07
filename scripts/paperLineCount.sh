@@ -80,11 +80,11 @@ echo "\hline"
 echo "\emph{Theories:} & & & & \\\\"
 
 STRUCTUREDINJ_PROOF_FILES="../core/StructuredInjections.v"
-count-nocompcert "Structured Injs. (\S\ref{sec:ssdetails})" "55" "$STRUCTUREDINJ_PROOF_FILES" 
+count-nocompcert "Structured Injs. (\S\ref{sec:ss})" "55" "$STRUCTUREDINJ_PROOF_FILES" 
 
 STRUCTUREDSIM_SPEC_FILES="../core/effect_simulations.v ../core/effect_semantics.v"
 STRUCTUREDSIM_PROOF_FILES="../core/effect_properties.v ../core/effect_simulations_lemmas.v ../core/reach.v ../core/rg_lemmas.v ../core/StructuredInjections.v"
-count-nocompcert "Structured Sims. (\S\ref{sec:ssdetails})" "$STRUCTUREDSIM_SPEC_FILES" "$STRUCTUREDSIM_PROOF_FILES" 
+count-nocompcert "Structured Sims. (\S\ref{sec:ss})" "$STRUCTUREDSIM_SPEC_FILES" "$STRUCTUREDSIM_PROOF_FILES" 
 
 VERTICALCOMP_SPEC_FILES="../core/effect_interpolants.v"
 VERTICALCOMP_PROOF_FILES="../core/effect_corediagram_trans.v ../core/effect_interpolation_II.v ../core/effect_interpolation_proofs.v ../core/effect_simulations_trans.v"
