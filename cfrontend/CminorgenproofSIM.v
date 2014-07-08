@@ -1304,7 +1304,7 @@ Lemma MS_match_callstack_alloc_variables_rec:
       (Frame cenv tf e2 le te sp lo (Mem.nextblock m2) :: cs)
       (Mem.nextblock m2) (Mem.nextblock tm)
   /\ Mem.inject f2 m2 tm
-  /\ (*LENB: THIS IS NEW*) inject_incr f1 f2
+  /\ (*NEW: THIS IS NEW*) inject_incr f1 f2
 (****************The following three conditions are new******************)
   /\ (forall b, Mem.valid_block m1 b -> f2 b = f1 b)
   /\ (forall b b' d', f1 b = None -> f2 b = Some (b',d') -> b' = sp)
@@ -1390,7 +1390,7 @@ Lemma MS_match_callstack_alloc_variables_aux:
     match_callstack prog f2 m2 tm2 (Frame cenv fn e le te sp (Mem.nextblock m1) (Mem.nextblock m2) :: cs)
                     (Mem.nextblock m2) (Mem.nextblock tm2)
   /\ Mem.inject f2 m2 tm2
-  /\ (*LENB: THIS IS NEW*) inject_incr f1 f2
+  /\ (*NEW: THIS IS NEW*) inject_incr f1 f2
 (****************The following three conditions are new******************)
 (* In the third clause, we now stepfrom  m' to m, and also from f' to f and from tm' to tm******************)
   /\ (forall b, Mem.valid_block m1 b -> f2 b = f1 b)
@@ -1450,8 +1450,8 @@ Lemma MS_match_callstack_alloc_variables:
     match_callstack prog f2 m2 tm2 (Frame cenv fn e le te sp (Mem.nextblock m1) (Mem.nextblock m2) :: cs)
                     (Mem.nextblock m2) (Mem.nextblock tm2)
   /\ Mem.inject f2 m2 tm2
-  /\ (*LENB: THIS IS NEW*) inject_incr f1 f2
-  /\ (*LENB this clause in new in coop-sim proof*) inject_separated f1 f2 m1 tm1.
+  /\ (*NEW: THIS IS NEW*) inject_incr f1 f2
+  /\ (*NEW this clause in new in coop-sim proof*) inject_separated f1 f2 m1 tm1.
 Proof.
   intros.
   destruct (MS_match_callstack_alloc_variables_aux
@@ -1491,8 +1491,8 @@ Theorem MS_match_callstack_function_entry:
                      (Frame cenv tf e le te sp (Mem.nextblock m) (Mem.nextblock m') :: cs)
                      (Mem.nextblock m') (Mem.nextblock tm')
   /\ Mem.inject f' m' tm' 
-  /\ (*LENB: this clause is new in Restructured Proof*) inject_incr f f'
-  /\ (*LENB this clause in new in coop-sim proof*) inject_separated f f' m tm.
+  /\ (*NEW: this clause is new in Restructured Proof*) inject_incr f f'
+  /\ (*NEW this clause in new in coop-sim proof*) inject_separated f f' m tm.
 Proof.
   intros.
   exploit build_compilenv_sound; eauto. intros [C1 C2].

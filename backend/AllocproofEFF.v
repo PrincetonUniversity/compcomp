@@ -378,7 +378,7 @@ Definition sel_val (k: equation_kind) (v: val) : val :=
   is less defined than [ls l] (the value of [l] in the LTL code). *)
 
 
-(*LENB: added parameter j:meminj and adapted lemmas accordingly*)
+(*NEW: added parameter j:meminj and adapted lemmas accordingly*)
 (*Definition satisf (rs: regset) (ls: locset) (e: eqs) : Prop :=
   forall q, EqSet.In q e -> Val.lessdef (sel_val (ekind q) rs#(ereg q)) (ls (eloc q)).*)
 Definition satisf (j:meminj) (rs: regset) (ls: locset) (e: eqs) : Prop :=
@@ -1837,7 +1837,7 @@ Proof.
   unfold RTL.find_function, LTL.find_function; intros.
   destruct ros as [r|id]; destruct ros' as [r'|id']; simpl in H0; MonadInv.
   (* two regs *)
-  (*LENB old proof:
+  (*NEW old proof:
   exploit add_equation_lessdef; eauto. intros LD. inv LD.
   eapply functions_translated; eauto.
   rewrite <- H2 in H. simpl in H. congruence.*)
@@ -1997,7 +1997,7 @@ Proof.
 Qed.
 
 (* The simulation relation *)
-(*LENB: added parameter j:meminj,
+(*NEW: added parameter j:meminj,
         replaced lessdefs's by val_inject's,
         replaced step by corestep LTL_eff_sem
         added sp' and SP
@@ -2060,18 +2060,11 @@ Proof.
      eapply inject_incr_trans; eassumption.
 Qed.  
 
-(*LENB: added parameter (j:meminj), 
+(*NEW: added parameter (j:meminj), 
         changed type from RTL.state -> LTL.state -> Prop to  
            RTL_core -> mem -> LTL_core -> mem -> Prop,
         eliminated Mem.extends ( Mem.inject is enfoirced in MATCH below)
         added sp' and SP *)
-
-(* HERE: 
-   NEW INVARIANT: 
-
-       if stack is empty, then
-         either tf is tailcallable, or retty=sig_res (fn_sig tf)
- *)
 
 Fixpoint last_frame (s: list RTL.stackframe) := 
   match s with 

@@ -11,7 +11,7 @@ Require Import Locations.
 Require Import Stacklayout.
 Require Import Conventions.
 
-(*LENB: again, we import the modified Asm*)
+(*NEW: again, we import the modified Asm*)
 Require Import AsmEFF. 
 Require Import Asm_coop. 
 

@@ -164,7 +164,7 @@ Qed.
   the CminorSel environments is identical to the value of the
   corresponding pseudo-register in the RTL register environment. *)
 
-(*LENB: replaced extension by injection. In particular, added paranmeter j:meminj
+(*NEW: replaced extension by injection. In particular, added paranmeter j:meminj
   and replaced lessdefs by val_injects*)
 
 Record match_env (j:meminj)
@@ -591,7 +591,7 @@ Qed.
 
 (** ** Semantic preservation for the translation of expressions *)
 
-(*LENB: translation of sp. Contrary to selection phase,
+(*NEW: translation of sp. Contrary to selection phase,
   the use of eval_operation (and the existing lemmas about
   eval_operation_inject) here suggests that we
   require sp=Vptr b Int.zero and sp' = Vptr b' Int.zero instead
@@ -1470,7 +1470,7 @@ Proof
 
 End CORRECTNESS_EXPR.
 
-(*LENB: The same for effect-steps*)
+(*NEW: The same for effect-steps*)
 Section CORRECTNESS_EXPR_EFF.
 
 Lemma Efftr_move_correct:
@@ -2448,7 +2448,7 @@ Inductive tr_fun (tf: function) (map: mapping) (f: CminorSel.function)
       tf.(fn_stacksize) = f.(fn_stackspace) ->
       tr_fun tf map f ngoto nret rret.
 
-(*LENB: new: meminj parameter mu*)
+(*NEW: new: meminj parameter mu*)
 Inductive tr_cont mu: RTL.code -> mapping -> 
                    CminorSel.cont -> node -> list node -> labelmap -> node -> option reg ->
                    list RTL.stackframe -> Prop :=

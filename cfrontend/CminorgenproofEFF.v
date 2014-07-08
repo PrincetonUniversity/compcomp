@@ -131,7 +131,7 @@ Record match_env (f: meminj) (cenv: compilenv)
       exists id, exists sz, PTree.get id e = Some(b, sz)
 
 
-(*LENB: MOVED TO structured_match_callstack below
+(*NEW: MOVED TO structured_match_callstack below
     me_incr:
       forall b tb delta,
       f b = Some(tb, delta) -> Plt b lo -> Plt tb sp*)
@@ -274,7 +274,7 @@ Inductive structured_match_callstack mu (m: mem) (tm: mem):
         (PERM: padding_freeable (restrict (as_inj mu) (vis mu)) e tm sp tf.(fn_stackspace))
         (SPlocal: locBlocksTgt mu sp = true) (*NEW*)
 
-        (*LENB: Here is the condition me_incr from match_env above,
+        (*NEW: Here is the condition me_incr from match_env above,
            but we assert it on the entire as_inj mu*)
         (ME_INCR: forall b tb delta,
                (as_inj mu) b = Some(tb, delta) -> Plt b lo -> Plt tb sp)
@@ -645,7 +645,7 @@ induction cs; intros bound HBound tbound MCS HTbound.
       xomega.
 Qed.
 
-(*LENB: We omit the clauses INJ and PG, since they are required for the 
+(*NEW: We omit the clauses INJ and PG, since they are required for the 
   enitre mu, not just restrict mu (vis mu), and hence better enforced 
   uniformly in definition MatchCore below*)
 Inductive structured_match_cores: core_data -> SM_Injection -> CSharpMin_core -> mem -> CMin_core -> mem -> Prop :=
@@ -1577,7 +1577,7 @@ Lemma MS_structured_match_callstack_alloc_variables_rec:
       (Frame cenv tf e2 lenv te sp lo (Mem.nextblock m2) :: cs)
       (Mem.nextblock m2) (Mem.nextblock tm)
   /\ Mem.inject (as_inj mu2) m2 tm
-  /\ (*LENB: THIS IS NEW*) intern_incr mu mu2
+  /\ (*NEW: THIS IS NEW*) intern_incr mu mu2
 (****************The following three conditions are new******************)
   /\ (forall b, Mem.valid_block m1 b -> as_inj mu2 b = as_inj mu b)
   /\ (forall b b' d', as_inj mu b = None -> as_inj mu2 b = Some (b',d') -> b' = sp)
@@ -1664,7 +1664,7 @@ Proof.
       intros N. eapply CC; try eassumption.
 Qed.
 
-(*LENB: Lemma is modified - we need to put sp into locBlocksTgt mu*)
+(*NEW: Lemma is modified - we need to put sp into locBlocksTgt mu*)
 Lemma structured_match_callstack_alloc_right:
   forall mu cenv m tm cs tf tm' sp le te (WD: SM_wd mu) (SMV: sm_valid mu m tm),
   structured_match_callstack mu m tm cs (Mem.nextblock m) (Mem.nextblock tm) ->

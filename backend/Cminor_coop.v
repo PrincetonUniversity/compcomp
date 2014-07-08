@@ -249,7 +249,7 @@ Lemma CMin_corestep_not_at_external:
        forall ge m q m' q', CMin_corestep ge q m q' m' -> CMin_at_external q = None.
   Proof. intros. inv H; reflexivity. Qed.
 
-(*LENB: Cminor.v requires v to be Vint i -should we keep this condition?*)
+(*NEW: Cminor.v requires v to be Vint i -should we keep this condition?*)
 Definition CMin_halted (q : CMin_core): option val :=
     match q with 
        CMin_Returnstate v Kstop => Some v

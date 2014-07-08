@@ -204,17 +204,17 @@ Definition code := list instruction.
 
 
 (*Definition function := code.*)
-(*LENB: we add the sigature*)
+(*NEW: we add the sigature*)
 Record function: Type := mkfunction
   { fn_sig: signature;
     fn_code: code}. 
-(*LENB: superfluous: Definition fn_code (f: function) : code := f.*)
-(*LENB: out of date: Definition fundef := AST.fundef code.*)
-(*LENB:*) Definition fundef := AST.fundef function.
+(*NEW: superfluous: Definition fn_code (f: function) : code := f.*)
+(*NEW: out of date: Definition fundef := AST.fundef code.*)
+(*NEW:*) Definition fundef := AST.fundef function.
 
 Definition program := AST.program fundef unit.
 
-(*LENB: add this definition -- same as in Mach.v*)
+(*NEW: add this definition -- same as in Mach.v*)
 Definition funsig (fd: fundef) :=
   match fd with
   | Internal f => fn_sig f
@@ -823,7 +823,7 @@ Inductive initial_state (p: program): state -> Prop :=
         # PC <- (symbol_offset ge p.(prog_main) Int.zero)
         # RA <- Vzero
         # ESP <- Vzero in
-      (*LENB: In CompCert, main takes no arguments and return type int*)
+      (*NEW: In CompCert, main takes no arguments and return type int*)
       let sg:= (mksignature nil (Some Tint)) in
       initial_state p (State sg rs0 m0).
 

@@ -828,7 +828,7 @@ Lemma match_callstack_alloc_variables_rec:
       (Frame cenv tf e2 le te sp lo (Mem.nextblock m2) :: cs)
       (Mem.nextblock m2) (Mem.nextblock tm)
   /\ Mem.inject f2 m2 tm
-  /\ (*LENB: THIS IS NEW*) inject_incr f1 f2.
+  /\ (*NEW: THIS IS NEW*) inject_incr f1 f2.
 Proof.
   intros until cs; intros VALID REPRES STKSIZE STKPERMS.
   induction 1; intros f1 NOREPET COMPAT SEP1 SEP2 UNBOUND MCS MINJ.
@@ -886,7 +886,7 @@ Lemma match_callstack_alloc_variables:
     match_callstack f2 m2 tm2 (Frame cenv fn e le te sp (Mem.nextblock m1) (Mem.nextblock m2) :: cs)
                     (Mem.nextblock m2) (Mem.nextblock tm2)
   /\ Mem.inject f2 m2 tm2
-  /\ (*LENB: THIS IS NEW*) inject_incr f1 f2.
+  /\ (*NEW: THIS IS NEW*) inject_incr f1 f2.
 Proof.
   intros.
   eapply match_callstack_alloc_variables_rec; eauto.
@@ -1261,7 +1261,7 @@ Theorem match_callstack_function_entry:
                      (Frame cenv tf e le te sp (Mem.nextblock m) (Mem.nextblock m') :: cs)
                      (Mem.nextblock m') (Mem.nextblock tm')
   /\ Mem.inject f' m' tm' 
-  /\ (*LENB: this clause is new*) inject_incr f f'.
+  /\ (*NEW: this clause is new*) inject_incr f f'.
 Proof.
   intros.
   exploit build_compilenv_sound; eauto. intros [C1 C2].
@@ -2497,7 +2497,7 @@ Definition measure (S: Csharpminor.state) : nat :=
   | _ => O
   end.
 
-(*LENB: Refactoring of original proof:
+(*NEW: Refactoring of original proof:
   1. isolate lemmas for individual cases
   2. Have individual cases be more specific about
      which of the 2 disjuncts they imply

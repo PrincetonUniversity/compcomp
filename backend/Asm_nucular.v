@@ -24,7 +24,7 @@ Require Import mem_lemmas.
 Require Import reach.
 Require Import nucular_semantics.
 
-(*LENB: We don't import CompCert's original Asm.v, but the modified one*)
+(*NEW: We don't import CompCert's original Asm.v, but the modified one*)
 Require Import AsmEFF.
 Require Import Asm_coop.  
 Notation SP := ESP (only parsing).

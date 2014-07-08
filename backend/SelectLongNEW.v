@@ -358,7 +358,7 @@ Definition mull_base (e1 e2: expr) :=
              (mul (lift h1) (lift l2)))
         (Eop Olowlong (Eletvar O ::: Enil)))).
 
-(*LENB: original CompCert has ignature sig_ii -- 
+(*NEW: original CompCert has ignature sig_ii -- 
 but has sig_ll in get_helpers!
 Definition mull_base (e1 e2: expr) :=
   splitlong2 e1 e2 (fun h1 l1 h2 l2 =>

@@ -1438,7 +1438,7 @@ Qed.
 
 (** A variant of the latter, for use with external calls *)
 
-(*LENB: converted to strcutural injections*)
+(*NEW: converted to strcutural injections*)
 Lemma agree_frame_extcall_invariant:
   forall mu ls ls0 m sp m' sp' parent retaddr m1 m1',
   agree_frame (as_inj mu) ls ls0 m sp m' sp' parent retaddr ->
@@ -1446,7 +1446,7 @@ Lemma agree_frame_extcall_invariant:
   (forall ofs p, Mem.perm m1 sp ofs Max p -> Mem.perm m sp ofs Max p) ->
   (Mem.valid_block m' sp' -> Mem.valid_block m1' sp') ->
   Mem.unchanged_on (local_out_of_reach mu m) m' m1' ->
-  (*LENB: New conditions :*)
+  (*NEW: New conditions :*)
   forall (WD: SM_wd mu) (SP: locBlocksTgt mu sp' = true),
   agree_frame (as_inj mu) ls ls0 m1 sp m1' sp' parent retaddr.
 Proof.
@@ -1471,7 +1471,7 @@ Lemma agree_frame_extcall_invariant':
   (forall ofs p, Mem.perm m1 sp ofs Max p -> Mem.perm m sp ofs Max p) ->
   (Mem.valid_block m' sp' -> Mem.valid_block m1' sp') ->
   Mem.unchanged_on (loc_out_of_reach (as_inj (restrict_sm mu (vis mu))) m) m' m1' ->
-  (*LENB: New conditions :*)
+  (*NEW: New conditions :*)
   forall (WD: SM_wd mu) (SP: locBlocksTgt mu sp' = true),
   agree_frame (as_inj mu) ls ls0 m1 sp m1' sp' parent retaddr.
 Proof.
@@ -3352,7 +3352,7 @@ Lemma match_stacks_change_mem_extcall:
   (forall b ofs p, Plt b bound -> Mem.perm m2 b ofs Max p -> Mem.perm m1 b ofs Max p) ->
   (forall b, Plt b bound' -> Mem.valid_block m1' b -> Mem.valid_block m2' b) ->
   Mem.unchanged_on (local_out_of_reach mu m1) m1' m2' ->
-  (*LENB: added:*) SM_wd mu ->
+  (*NEW: added:*) SM_wd mu ->
   match_stacks mu m2 m2' sp0 ls0 cs cs' sg bound bound'.
 Proof.
   induction 1; intros.
@@ -3390,7 +3390,7 @@ Lemma match_stacks_change_mem_extcall':
   (forall b ofs p, Plt b bound -> Mem.perm m2 b ofs Max p -> Mem.perm m1 b ofs Max p) ->
   (forall b, Plt b bound' -> Mem.valid_block m1' b -> Mem.valid_block m2' b) ->
   Mem.unchanged_on (loc_out_of_reach (restrict (as_inj mu) (vis mu)) m1) m1' m2' ->
-  (*LENB: added:*) SM_wd mu ->
+  (*NEW: added:*) SM_wd mu ->
   match_stacks mu m2 m2' sp0 ls0 cs cs' sg bound bound'.
 Proof.
   induction 1; intros.
