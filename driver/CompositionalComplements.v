@@ -5,6 +5,7 @@ Require Import context_equiv.
 Require Import effect_simulations.
 Require Import nucular_semantics.
 Require Import wholeprog_lemmas.
+Require Import Asm_coop.
 Require Import Asm_nucular.
 Require Import CompositionalCompiler.
 
@@ -17,6 +18,7 @@ Unset Printing Implicit Defensive.
 
 (** Apply the contextual equivalence functor from
    linking/context_equiv.v to to linking/linking_proof.v.*)
+
 Module CE := ContextEquiv LinkingSimulation.
 
 Section CompositionalComplements.
@@ -30,6 +32,8 @@ Variable N : pos.
 Variable source_modules : 'I_N -> Clight_module.
 Variable target_modules : 'I_N -> Asm_module.
 Variable plt : ident -> option 'I_N.
+
+(** Wrap the program interaction semantics as module semantics. *)
 
 Definition mk_src_sem (p : Clight_module) :=
   let ge := Genv.globalenv p in 
@@ -49,7 +53,9 @@ Variable ge_top : ge_ty.
 Variable domeq_S : forall ix : 'I_N, genvs_domain_eq ge_top (sems_S ix).(Modsem.ge).
 Variable domeq_T : forall ix : 'I_N, genvs_domain_eq ge_top (sems_T ix).(Modsem.ge). 
 
-(** The (deterministic) context [C]: *)
+(** The (deterministic) context [C]. [nuke_C] restricts contexts to 
+ those that store only valid blocks into memory (this holds of all 
+ assembly contexts; see backend/Asm_nucular.v). *)
 
 Variable C : Modsem.t.   
 Variable sim_C : 
@@ -57,7 +63,7 @@ Variable sim_C :
     C.(Modsem.sem) C.(Modsem.sem) C.(Modsem.ge) C.(Modsem.ge).
 Variable nuke_C : Nuke_sem.t (Modsem.sem C).
 Variable domeq_C : genvs_domain_eq ge_top C.(Modsem.ge).
-Variable det_C : corestep_fun (Modsem.sem C).
+Variable det_C : core_semantics_lemmas.corestep_fun (Modsem.sem C).
 
 (** [NOTE: RC] [CE.linker_S] ensures that both the context [C] the
   source modules [sems_S] are reach-closed. See file
@@ -101,17 +107,19 @@ Notation lifted_sim :=
 
 (** Starting from matching source--target states, the source/target
  programs equiterminate when linked with [C], assuming the source
- linked program is safe and reach-closed (see [NOTE: RC] above), and
- the target linked program is deterministic. *)
+ linked program is safe and reach-closed (see [NOTE: RC] above). *)
 
-Theorem context_equiv  
-  (target_det : core_semantics_lemmas.corestep_fun target_linked_semantics) 
-  cd mu l1 m1 l2 m2 
+Theorem context_equiv cd mu l1 m1 l2 m2 
   (source_safe : forall n, closed_safety.safeN source_linked_semantics ge_top n l1 m1) 
   (match12 : Wholeprog_simulation.match_state lifted_sim cd mu l1 m1 l2 m2) :
   (terminates source_linked_semantics ge_top l1 m1 
    <-> terminates target_linked_semantics ge_top l2 m2).
-Proof. eapply CE.context_equiv; eauto. Qed.
+Proof. 
+eapply CE.context_equiv; eauto.   
+unfold CE.extend_sems; intros ix; destruct (lt_dec ix N); auto.
+simpl; intros m m' m'' ge c c' c'' H H2. 
+simpl in H, H2; eapply asm_step_det; eauto.
+Qed.
 
 End CompositionalComplements.
   

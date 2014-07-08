@@ -779,11 +779,12 @@ Definition coresem : CoreSemantics ge_ty (linker N my_cores) Mem.mem :=
     at_external_halted_excl.
 
 Lemma linking_det 
-  (dets : forall ix : 'I_N, corestep_fun (Modsem.sem (my_cores ix))) :
-  corestep_fun coresem.
+  (dets : forall ix : 'I_N, 
+    core_semantics_lemmas.corestep_fun (Modsem.sem (my_cores ix))) :
+  core_semantics_lemmas.corestep_fun coresem.
 Proof.
 move=> ge m c m' c' m'' c''.
-move/(CorestepP ge)=> H1; move/(CorestepP ge)=> H2. 
+move/CorestepP=> H1; move/CorestepP=> H2. 
 inversion H2; subst.
 { inversion H1; subst; first by case: (dets _ _ _ _ _ _ _ _ H H0)=> -> ->.
   by apply core_semantics.corestep_not_at_external in H; rewrite H in H0.
@@ -792,15 +793,15 @@ inversion H2; subst.
   by apply core_semantics.corestep_not_at_external in H6; rewrite H6 in H.
   move: H0 H7 H3 H8; rewrite H6 in H; case: H=> <- _ eq0 ->; case=> eq1; subst.
   rewrite H4 in H9; case: H9; move=> ?; subst.
-  move=> ->; case=> Heq; subst; rewrite H10 in H5; case: H5=> ->. 
-  by f_equal; f_equal; apply: proof_irr.
+  move=> ->; case=> Heq; subst; rewrite H10 in H5; case: H5=> ->.
+  by split=> //; f_equal; f_equal; apply: proof_irr.
   case: (core_semantics.at_external_halted_excl 
-          (Modsem.sem (my_cores (Core.i (peekCore c)))) (Core.c (peekCore c))).
+          (Modsem.sem (my_cores (Core.i (peekCore c')))) (Core.c (peekCore c'))).
   by rewrite H. by rewrite H8. }
 { inversion H1; subst.
   by apply core_semantics.corestep_not_halted in H6; rewrite H6 in H3. 
   case: (core_semantics.at_external_halted_excl 
-          (Modsem.sem (my_cores (Core.i (peekCore c)))) (Core.c (peekCore c))).
+          (Modsem.sem (my_cores (Core.i (peekCore c')))) (Core.c (peekCore c'))).
   by rewrite H6. by rewrite H3. 
   rewrite H8 in H3; case: H3=> eq1; subst. 
   rewrite H0 in H7; case: H7=> eq2; subst.
@@ -890,6 +891,16 @@ Qed.
 Next Obligation. by apply: (LinkerSem.at_external_halted_excl). Qed.
 
 End csem.
+
+Lemma linking_det 
+  (dets : forall ix : 'I_N, 
+    core_semantics_lemmas.corestep_fun (Modsem.sem (my_cores ix))) :
+  core_semantics_lemmas.corestep_fun csem.
+Proof.
+move=> m m' m'' ge c c' c''; rewrite /= /inner_effstep => [][]H1 _ []H2 _.
+case: (@LinkerSem.linking_det N my_cores my_fun_tbl dets _ _ _ _ _ _ _ H1 H2).
+by move=> -> ->.
+Qed.
 
 Program Definition coopsem := Build_CoopCoreSem _ _ csem _.
 
