@@ -2628,7 +2628,7 @@ Lemma MATCH_afterExternal: forall
       (HasTy1 : Val.has_type ret1 (proj_sig_res (AST.ef_sig e)))
       (HasTy2 : Val.has_type ret2 (proj_sig_res (AST.ef_sig e')))
       (INC: extern_incr nu nu')
-      (SEP: sm_inject_separated nu nu' m1 m2)
+      (SEP : globals_separate tge nu nu')
       (WDnu': SM_wd nu')
       (SMvalNu': sm_valid nu' m1' m2')
       (MemInjNu': Mem.inject (as_inj nu') m1' m2')
@@ -2679,42 +2679,12 @@ simpl.
       apply restrict_incr. 
 assert (RC': REACH_closed m1' (mapped (as_inj nu'))).
         eapply inject_REACH_closed; eassumption.
-assert (PHnu': meminj_preserves_globals (Genv.globalenv prog) (as_inj nu')).
-    subst. clear - INC SEP PG Glob WDmu WDnu'.
-    apply meminj_preserves_genv2blocks in PG.
-    destruct PG as [PGa [PGb PGc]].
-    apply meminj_preserves_genv2blocks.
-    split; intros.
-      specialize (PGa _ H).
-      apply joinI; left. apply INC.
-      rewrite replace_locals_extern.
-      assert (GG: isGlobalBlock ge b = true).
-          unfold isGlobalBlock, ge. apply genv2blocksBool_char1 in H.
-          rewrite H. trivial.
-      destruct (frgnSrc _ WDmu _ (Glob _ GG)) as [bb2 [dd [FF FT2]]].
-      rewrite (foreign_in_all _ _ _ _ FF) in PGa. inv PGa.
-      apply foreign_in_extern; eassumption.
-    split; intros. specialize (PGb _ H).
-      apply joinI; left. apply INC.
-      rewrite replace_locals_extern.
-      assert (GG: isGlobalBlock ge b = true).
-          unfold isGlobalBlock, ge. apply genv2blocksBool_char2 in H.
-          rewrite H. intuition.
-      destruct (frgnSrc _ WDmu _ (Glob _ GG)) as [bb2 [dd [FF FT2]]].
-      rewrite (foreign_in_all _ _ _ _ FF) in PGb. inv PGb.
-      apply foreign_in_extern; eassumption.
-    eapply (PGc _ _ delta H). specialize (PGb _ H). clear PGa PGc.
-      remember (as_inj mu b1) as d.
-      destruct d; apply eq_sym in Heqd.
-        destruct p. 
-        apply extern_incr_as_inj in INC; trivial.
-        rewrite replace_locals_as_inj in INC.
-        rewrite (INC _ _ _ Heqd) in H0. trivial.
-      destruct SEP as [SEPa _].
-        rewrite replace_locals_as_inj, replace_locals_DomSrc, replace_locals_DomTgt in SEPa. 
-        destruct (SEPa _ _ _ Heqd H0).
-        destruct (as_inj_DomRng _ _ _ _ PGb WDmu).
-        congruence.
+assert (PGnu': meminj_preserves_globals (Genv.globalenv prog) (as_inj nu')). 
+  eapply meminj_preserves_globals_extern_incr_separate. eassumption.
+    rewrite replace_locals_as_inj. assumption.
+    assumption. 
+    specialize (genvs_domain_eq_isGlobal _ _ GDE_lemma). intros GL.
+    red. unfold ge in GL. rewrite GL. apply SEP.
 assert (RR1: REACH_closed m1'
   (fun b : Values.block =>
    locBlocksSrc nu' b
@@ -2825,7 +2795,7 @@ split.
   unfold vis in *. 
   rewrite replace_externs_as_inj, replace_externs_frgnBlocksSrc, replace_externs_locBlocksSrc in *.
   apply match_states_return; try eauto.
-      clear RRC RR1 RC' PHnu' INCvisNu' UnchLOOR UnchPrivSrc.
+      clear RRC RR1 RC' PGnu' INCvisNu' UnchLOOR UnchPrivSrc.
       destruct INC. rewrite replace_locals_extern in H.
         rewrite replace_locals_frgnBlocksTgt, replace_locals_frgnBlocksSrc,
                 replace_locals_pubBlocksTgt, replace_locals_pubBlocksSrc,
@@ -2895,8 +2865,7 @@ intuition.
 Qed.
 
 Lemma Match_effcore_diagram: 
-  forall (GDE : genvs_domain_eq ge tge)
-      st1 m1 st1' m1' (U1 : block -> Z -> bool)
+  forall st1 m1 st1' m1' (U1 : block -> Z -> bool)
       (CS: effstep (rtl_eff_sem hf) ge U1 st1 m1 st1' m1')
       st2 mu m2 
       (MTCH: MATCH mu st1 m1 st2 m2)
@@ -3960,7 +3929,7 @@ induction CS;
          (decode_longs (sig_args (ef_sig ef)) (map ls1 (map R args')))).
     eapply add_equations_args_inject; try eassumption.
       inv WTI. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto.     
-  exploit (inlineable_extern_inject ge tge); try eapply PRE; try eassumption.
+  exploit (inlineable_extern_inject ge tge); try eapply PRE; try eassumption; try apply GDE_lemma.
   intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].
   assert (E: map ls1 (map R args') = reglist ls1 args').
   { unfold reglist. rewrite list_map_compose. auto. }
@@ -4247,7 +4216,7 @@ induction CS;
 
 { (* external function : only nonobservables*)  
   specialize (EFhelpers _ _ OBS); intros OBS'.   
-  exploit (inlineable_extern_inject ge tge); try eapply PRE; try eassumption. 
+  exploit (inlineable_extern_inject ge tge); try eapply PRE; try eassumption; try apply GDE_lemma. 
   intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].
   simpl in FUN; inv FUN.
   eexists; exists m''; eexists; split.

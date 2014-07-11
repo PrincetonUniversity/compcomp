@@ -2369,3 +2369,49 @@ Proof. intros.
 destruct mu; simpl.
 f_equal.
 Qed.
+
+Lemma replace_locals_extern_incr_vis: forall mu nu pubS pubT
+      (Hnu: nu = replace_locals mu pubS pubT)
+      nu' (INC : extern_incr nu nu') (WDnu' : SM_wd nu') l m1'
+       b (VIS: vis mu b = true),
+    locBlocksSrc nu' b || DomSrc nu' b &&
+        (negb (locBlocksSrc nu' b) && REACH m1' (exportedSrc nu' l) b) = true.
+Proof. intros.
+    subst.
+        destruct INC as [EINC [LINC INC]]. 
+        rewrite replace_locals_extern in EINC.
+        rewrite replace_locals_local in LINC.
+        rewrite replace_locals_extBlocksSrc, replace_locals_extBlocksTgt,
+                replace_locals_locBlocksSrc, replace_locals_locBlocksTgt,
+                replace_locals_pubBlocksSrc, replace_locals_pubBlocksTgt,
+                replace_locals_frgnBlocksSrc, replace_locals_frgnBlocksTgt in INC.
+        destruct INC as [INC_ES [INC_ET [INC_LS [INC_LT [INC_PS [INC_PT [INC_FS INC_FT]]]]]]].
+        intros. unfold vis in VIS.
+        apply orb_true_iff in VIS.
+        destruct VIS.
+          rewrite <- INC_LS in *. rewrite H; trivial.
+          rewrite INC_FS in *. 
+        destruct (frgnSrc _ WDnu' _ H) as [b2 [dd [FOR FT]]]; clear H. 
+        destruct (foreign_DomRng _ WDnu' _ _ _ FOR) as [? [? [? [? [? [? [? [? [? ?]]]]]]]]].
+        rewrite H7, H1. simpl.
+        apply REACH_nil. unfold exportedSrc.
+             rewrite (sharedSrc_iff_frgnpub _ WDnu'). rewrite H3. intuition.
+Qed.
+
+Lemma as_inj_locTgt mu b1 b2 d: as_inj mu b1=Some(b2,d) ->
+        locBlocksTgt mu b2 = true -> SM_wd mu -> local_of mu b1=Some(b2,d).
+Proof. intros.
+destruct (joinD_Some _ _ _ _ _ H) as [EXT | [EXT LOC]]; trivial.
+assert (ZZ: locBlocksTgt mu b2 = false) by eapply (extern_DomRng' _ H1 _ _ _ EXT). 
+rewrite ZZ in H0; discriminate. 
+Qed.
+
+Lemma alloc_right_sm_local:
+  forall (mu : SM_Injection) (sp : positive),
+  local_of (alloc_right_sm mu sp) = local_of mu.
+Proof. unfold alloc_right_sm; simpl; trivial. Qed.
+
+Lemma alloc_right_sm_extern:
+  forall (mu : SM_Injection) (sp : positive),
+  extern_of (alloc_right_sm mu sp) = extern_of mu.
+Proof. unfold alloc_right_sm; simpl; trivial. Qed.

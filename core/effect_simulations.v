@@ -16,6 +16,56 @@ Require Import effect_semantics.
 Require Import StructuredInjections.
 Require Import reach.
 
+Definition globals_separate {F V:Type} (ge: Genv.t F V) mu nu :=
+    forall b1 b2 d, as_inj mu b1 = None ->
+            as_inj nu b1 =Some(b2,d) -> 
+            isGlobalBlock ge b2 = false.
+
+Lemma meminj_preserves_globals_extern_incr_separate {F V:Type} (ge: Genv.t F V) mu nu: 
+      forall (INC: extern_incr mu nu)
+             (PG: meminj_preserves_globals ge (as_inj mu))
+             (WDnu: SM_wd nu)
+             (GSep: globals_separate ge mu nu),
+      meminj_preserves_globals ge (as_inj nu).
+Proof. intros. destruct PG as [PGa [PGb PGc]].
+split; intros.
+  apply PGa in H. eapply extern_incr_as_inj; eassumption.
+split; intros.
+  apply PGb in H. eapply extern_incr_as_inj; eassumption.
+remember (as_inj mu b1) as q; apply eq_sym in Heqq.
+  destruct q.
+    destruct p.
+    rewrite (extern_incr_as_inj _ _ INC WDnu _ _ _ Heqq) in H0.
+    inv H0. apply (PGc _ _ _ _ H Heqq).
+  specialize (GSep _ _ _ Heqq H0).
+    rewrite (find_var_info_isGlobal _ _ _ H) in GSep; discriminate.
+Qed.
+
+Lemma intern_incr_globals_separate
+      {F V:Type} (ge: Genv.t F V) mu nu: 
+      forall (INC: intern_incr mu nu)
+             (PG: meminj_preserves_globals ge (as_inj mu))
+             (GF: forall b, isGlobalBlock ge b = true -> frgnBlocksSrc mu b = true)
+             (WD: SM_wd mu) (WDnu: SM_wd nu), 
+      globals_separate ge mu nu.
+Proof. intros. red; intros. 
+  remember (isGlobalBlock ge b2) as p; apply eq_sym in Heqp.
+  destruct p; simpl; trivial.
+  specialize (GF _ Heqp).
+  destruct (frgnSrcAx _ WD _ GF) as [? [? [? ?]]].
+  assert (EE: extern_of mu = extern_of nu) by eapply INC.
+  destruct (joinD_Some _ _ _ _ _ H0) as [EXT | [EXT LOC]]; clear H0.
+    rewrite <- EE in EXT. 
+    rewrite (extern_in_all _ _ _ _ EXT) in H; discriminate. 
+  destruct (local_DomRng _ WDnu _ _ _ LOC) as [lS lT].
+    assert (lT': locBlocksTgt nu b2 = false). 
+      apply (meminj_preserves_globals_isGlobalBlock _ _ PG) in Heqp.
+      rewrite (extern_in_all _ _ _ _ H1) in Heqp; inv Heqp.
+      rewrite EE in H1.
+      eapply extern_DomRng'; eassumption. 
+    rewrite lT' in lT; discriminate. 
+Qed.  
+
 Module SM_simulation. Section SharedMemory_simulation_inject. 
 
 Context 
@@ -93,7 +143,6 @@ Record SM_simulation_inject :=
     match_state cd mu st1 m1 st2 m2 ->
     exists st2', exists m2', exists cd', exists mu',
       intern_incr mu mu' 
-      /\ sm_inject_separated mu mu' m1 m2 
       /\ sm_locally_allocated mu mu' m1 m2 m1' m2' 
       /\ match_state cd' mu' st1' m1' st2' m2'
       /\ exists U2,              
@@ -174,8 +223,8 @@ Record SM_simulation_inject :=
       forall nu' ret1 m1' ret2 m2'
         (HasTy1: Val.has_type ret1 (proj_sig_res (AST.ef_sig e)))
         (HasTy2: Val.has_type ret2 (proj_sig_res (AST.ef_sig e')))
-        (INC: extern_incr nu nu')  
-        (SEP: sm_inject_separated nu nu' m1 m2)
+        (INC: extern_incr nu nu') 
+        (GSep: globals_separate ge2 nu nu') 
 
         (WDnu': SM_wd nu') (SMvalNu': sm_valid nu' m1' m2')
 
@@ -221,7 +270,6 @@ Lemma core_diagram (SMI: SM_simulation_inject):
         match_state SMI cd mu st1 m1 st2 m2 ->
         exists st2', exists m2', exists cd', exists mu',
           intern_incr mu mu' /\
-          sm_inject_separated mu mu' m1 m2 /\
           sm_locally_allocated mu mu' m1 m2 m1' m2' /\ 
           match_state SMI cd' mu' st1' m1' st2' m2' /\
           ((corestep_plus Sem2 ge2 st2 m2 st2' m2') \/
@@ -230,10 +278,9 @@ Lemma core_diagram (SMI: SM_simulation_inject):
 Proof. intros. 
 apply effax2 in H. destruct H as [U1 H]. 
 exploit (effcore_diagram SMI); eauto.
-intros [st2' [m2' [cd' [mu' [INC [SEP [LOCALLOC 
-  [MST [U2 [STEP _]]]]]]]]]].
+intros [st2' [m2' [cd' [mu' [INC [LOCALLOC 
+  [MST [U2 [STEP _]]]]]]]]].
 exists st2', m2', cd', mu'.
-split; try assumption.
 split; try assumption.
 split; try assumption.
 split; try assumption.
