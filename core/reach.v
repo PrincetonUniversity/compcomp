@@ -1115,6 +1115,27 @@ Qed.
 Definition isGlobalBlock {F V : Type} (ge : Genv.t F V) :=
   fun b => (fst (genv2blocksBool ge)) b || (snd (genv2blocksBool ge)) b.
 
+Lemma invert_symbol_isGlobal: forall {V F} (ge : Genv.t F V) b x,
+      Genv.invert_symbol ge b = Some x -> isGlobalBlock ge b = true.
+Proof. intros.
+  unfold isGlobalBlock, genv2blocksBool. simpl.
+  rewrite H; simpl; trivial. 
+Qed.
+
+Lemma find_symbol_isGlobal: forall {V F} (ge : Genv.t F V) x b
+       (Find: Genv.find_symbol ge x = Some b), isGlobalBlock ge b = true.
+Proof. intros.
+  eapply invert_symbol_isGlobal.
+  rewrite (Genv.find_invert_symbol _ _ Find). reflexivity.
+Qed.
+
+Lemma find_var_info_isGlobal: forall {V F} (ge : Genv.t F V) b x,
+      Genv.find_var_info ge b = Some x -> isGlobalBlock ge b = true.
+Proof. intros.
+  unfold isGlobalBlock, genv2blocksBool. simpl.
+  rewrite H, orb_true_r; trivial. 
+Qed.
+
 Lemma restrict_preserves_globals: forall {F V} (ge:Genv.t F V) j X
   (PG : meminj_preserves_globals ge j)
   (Glob : forall b, isGlobalBlock ge b = true -> X b = true),
@@ -1788,6 +1809,29 @@ Proof.
 intros. induction Inj. constructor.
 constructor; trivial. apply val_inject_incr with (f1 := as_inj mu); auto.
 apply extern_incr_as_inj; auto.
+Qed.
+
+Lemma local_of_vis mu: forall b1 b2 d
+   (LOC: local_of mu b1 = Some (b2,d))
+   (WD: SM_wd mu), vis mu b1 = true.
+Proof. intros. unfold vis.
+  destruct (local_DomRng _ WD _ _ _ LOC).
+  intuition.
+Qed.
+
+Lemma incr_local_restrictvis mu: SM_wd mu ->
+      inject_incr (local_of mu) (restrict (as_inj mu)(vis mu)).
+Proof. intros; red; intros.  
+  apply restrictI_Some.
+  apply local_in_all; assumption.
+  destruct (local_DomRng _ H _ _ _ H0) .
+  unfold vis; intuition.
+Qed.
+
+Lemma local_visTgt mu (WD: SM_wd mu) b1 b2 d:
+      local_of mu b1 = Some(b2,d) -> visTgt mu b2 = true.
+Proof. unfold visTgt. intros.
+  destruct (local_DomRng _ WD _ _ _ H); intuition.
 Qed.
 
 Section globalfunction_ptr_inject.

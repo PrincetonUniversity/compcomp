@@ -47,21 +47,6 @@ Require Import RTL_coop.
 Require Import BuiltinEffects.
 Require Import RTL_eff.
 
-Lemma incr_local_restrictvis mu: SM_wd mu ->
-      inject_incr (local_of mu) (restrict (as_inj mu)(vis mu)).
-Proof. intros; red; intros.  
-  apply restrictI_Some.
-  apply local_in_all; assumption.
-  destruct (local_DomRng _ H _ _ _ H0) .
-  unfold vis; intuition.
-Qed.
-
-Lemma local_visTgt mu (WD: SM_wd mu) b1 b2 d:
-      local_of mu b1 = Some(b2,d) -> visTgt mu b2 = true.
-Proof. unfold visTgt. intros.
-  destruct (local_DomRng _ WD _ _ _ H); intuition.
-Qed.
-
 Lemma FreeEffect_PropagateLeft':
   forall (m : mem) (sp : block) (lo hi : Z) (m' : mem),
   Mem.free m sp lo hi = Some m' ->

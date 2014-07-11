@@ -2088,15 +2088,6 @@ Proof. intros.
     rewrite Mem.nextblock_empty in VBEmpty. xomega.
 Qed.
 
-Lemma find_symbol_isGlobal: forall {V F} (ge : Genv.t F V) x b
-       (Find: Genv.find_symbol ge x = Some b),
-     isGlobalBlock ge b = true.
-Proof. intros.
-  unfold isGlobalBlock.
-  unfold genv2blocksBool. simpl.
-  rewrite (Genv.find_invert_symbol _ _ Find). reflexivity.
-Qed.
-
 (*New Lemma, based on (proof of) Mem.alloc_parallel_inject*)
 Theorem alloc_parallel_intern:
   forall mu m1 m2 lo1 hi1 m1' b1 lo2 hi2 

@@ -41,14 +41,6 @@ Require Import Asm_coop.
 Require Import Asm_eff.
 Require Import load_frame.
 
-Lemma local_of_vis mu: forall b1 b2 d
-   (LOC: local_of mu b1 = Some (b2,d))
-   (WD: SM_wd mu), vis mu b1 = true.
-Proof. intros. unfold vis.
-  destruct (local_DomRng _ WD _ _ _ LOC).
-  intuition.
-Qed.
-
 (** * Processor registers and register states *)
 
 Hint Extern 2 (_ <> _) => congruence: asmgen.

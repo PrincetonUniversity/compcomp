@@ -590,6 +590,36 @@ Definition intern_incr (mu mu': SM_Injection): Prop :=
    (extBlocksSrc mu = extBlocksSrc mu') /\
    (extBlocksTgt mu = extBlocksTgt mu').
 
+Lemma intern_incr_locBlocksSrc mu mu':
+  intern_incr mu mu' -> forall b,
+  locBlocksSrc mu b = true -> locBlocksSrc mu' b = true.
+Proof. intros H. eapply H. Qed.
+
+Lemma intern_incr_locBlocksTgt mu mu':
+  intern_incr mu mu' -> forall b,
+  locBlocksTgt mu b = true -> locBlocksTgt mu' b = true.
+Proof. intros H. eapply H. Qed.
+
+Lemma intern_incr_frgnBlocksSrc mu mu':
+  intern_incr mu mu' ->
+  frgnBlocksSrc mu = frgnBlocksSrc mu'.
+Proof. intros H. eapply H. Qed.
+
+Lemma intern_incr_frgnBlocksTgt mu mu':
+  intern_incr mu mu' ->
+  frgnBlocksTgt mu = frgnBlocksTgt mu'.
+Proof. intros H. eapply H. Qed.
+
+Lemma intern_incr_extBlocksSrc mu mu':
+  intern_incr mu mu' ->
+  extBlocksSrc mu = extBlocksSrc mu'.
+Proof. intros H. eapply H. Qed.
+
+Lemma intern_incr_extBlocksTgt mu mu':
+  intern_incr mu mu' ->
+  extBlocksTgt mu = extBlocksTgt mu'.
+Proof. intros H. eapply H. Qed.
+
 Lemma intern_incr_DomSrc: 
       forall mu mu' (Inc: intern_incr mu mu') b,
       DomSrc mu b = true -> DomSrc mu' b = true.
@@ -717,6 +747,27 @@ Definition extern_incr (mu mu': SM_Injection): Prop :=
    (frgnBlocksSrc mu = frgnBlocksSrc mu') /\
    (frgnBlocksTgt mu = frgnBlocksTgt mu').
 
+Lemma extern_incr_locBlocksSrc mu mu':
+  extern_incr mu mu' ->
+  locBlocksSrc mu = locBlocksSrc mu'.
+Proof. intros H. eapply H. Qed.
+
+Lemma extern_incr_locBlocksTgt mu mu':
+  extern_incr mu mu' -> 
+  locBlocksTgt mu = locBlocksTgt mu'.
+Proof. intros H. eapply H. Qed.
+
+
+Lemma extern_incr_frgnBlocksSrc mu mu':
+  extern_incr mu mu' ->
+  frgnBlocksSrc mu = frgnBlocksSrc mu'.
+Proof. intros H. eapply H. Qed.
+
+Lemma extern_incr_frgnBlocksTgt mu mu':
+  extern_incr mu mu' ->
+  frgnBlocksTgt mu = frgnBlocksTgt mu'.
+Proof. intros H. eapply H. Qed.
+
 Lemma extern_incr_DomSrc: 
       forall mu mu' (Inc: extern_incr mu mu') b,
       DomSrc mu b = true -> DomSrc mu' b = true.
@@ -757,16 +808,6 @@ Proof. intros.
   remember (fSrc' b) as q; destruct q; trivial.
   apply (H0 _ _ _ H).
 Qed.
-
-Lemma extern_incr_frgnBlocksSrc: forall 
-          mu nu (INC: extern_incr mu nu),
-       frgnBlocksSrc mu = frgnBlocksSrc nu.
-Proof. intros. eapply INC. Qed.
-
-Lemma extern_incr_frgnBlocksTgt: forall 
-          mu nu (INC: extern_incr mu nu),
-       frgnBlocksTgt mu = frgnBlocksTgt nu.
-Proof. intros. eapply INC. Qed.
 
 Lemma extern_incr_foreign_inc: forall mu mu' (INC: extern_incr mu mu'),
    inject_incr (foreign_of mu) (foreign_of mu').
@@ -2048,4 +2089,3 @@ Proof. intros.
       destruct (local_DomRng _ WD _ _ _ Heqq).
       rewrite H in L; discriminate.
 Qed.
-
