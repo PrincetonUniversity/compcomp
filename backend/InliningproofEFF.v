@@ -2208,7 +2208,6 @@ intros; eapply MATCH_initial_core; eauto.
     intros.
     unfold MATCH in MC; destruct MC as [H0 H1].
     inv H0; simpl in *; inv HALT. 
-    Print match_states.
     inv MS. 
     exists v'; split; try assumption. eapply H1.
 
@@ -2685,8 +2684,7 @@ Qed.
                            end.
   Ltac loc_alloc_solve := apply sm_locally_allocatedChar; repeat split; try extend_smart;
                           try rewrite_freshloc; intuition.
-  Print sm_locally_allocated.
-
+  
 (*
   Lemma step_simulation_noeffect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_core) (m1' : mem)
                                          (CS: corestep (rtl_eff_sem hf) ge st1 m1 st1' m1')
@@ -2880,7 +2878,6 @@ Qed.
     split; simpl.
     left.
     eapply core_semantics_lemmas.corestep_plus_one. eapply rtl_corestep_exec_Icall; eauto.
-    Print rtl_corestep_exec_Icall.
     eapply sig_function_translated; eauto.
     exists mu.
     intuition.
@@ -3673,7 +3670,6 @@ exists mu. intuition.
 apply sm_inject_separated_same_sminj.
 loc_alloc_solve.
 
-Print MATCH.
 
 unfold MATCH. intuition.
 eapply match_regular_states; eauto. 
@@ -4131,7 +4127,6 @@ exists (mu' : SM_Injection),
       destruct (valid_block_dec m b); try discriminate.
       destruct (eq_block b sp); simpl in *; try discriminate.
       destruct (zle lo ofs); simpl in *; try discriminate.
-      Locate "<=".
       unfold zlt.
       destruct (Z_lt_dec ofs hi); simpl; auto.
       destruct (zlt ofs hi'); simpl in *; try discriminate.
@@ -4144,7 +4139,6 @@ exists (mu' : SM_Injection),
     assert (fn_stacksize f <= fn_stacksize f').
     { unfold transf_fundef in B.
     destruct FB.
-    Locate "|".
     rewrite H18 in H21.
     rewrite DSTK in H21.
     simpl in H21.
@@ -4921,7 +4915,6 @@ exists mu. intuition.
 (*apply sm_inject_separated_same_sminj.*)
 loc_alloc_solve.
 
-Print MATCH.
 
 unfold MATCH. intuition.
 eapply match_regular_states; eauto. 
