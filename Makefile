@@ -87,7 +87,7 @@ BACKEND=\
   RTLgen.v RTLgenspec.v RTLgenproof.v RTLgenproofEFF.v \
   RTL2RTL_proofEFF.v \
   Tailcall.v Tailcallproof.v  TailcallproofEFF.v \
-  Inlining.v Inliningspec.v Inliningproof.v \
+  Inlining.v Inliningspec.v Inliningproof.v InliningproofEFF.v \
   Renumber.v Renumberproof.v RenumberproofEFF.v \
   RTLtyping.v \
   Kildall.v Liveness.v \
