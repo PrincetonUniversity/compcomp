@@ -4038,7 +4038,12 @@ exists (mu' : SM_Injection),
            eapply visPropagate; try eassumption.
     eapply FreeEffect_PropagateLeft; try eassumption.
     eapply as_inj_retrict; autorewrite with restrict; rewrite <- DSTK; eassumption.
-
+    
+    apply FreeEffectD in H13.
+           destruct H13 as [? [? ?]]; subst. 
+    rewrite restrict_sm_locBlocksTgt in *.
+    rewrite SL in H15. inversion H15.
+    (*
     Lemma FreeEffect_step: forall m lo hi hi' sp b ofs,
                              hi' <= hi ->
                              FreeEffect m lo hi' sp b ofs = true ->
@@ -4056,6 +4061,8 @@ exists (mu' : SM_Injection),
     Qed.
     
     eapply FreeEffect_step; eauto.
+    
+
     assert (fn_stacksize f <= fn_stacksize f').
     { unfold transf_fundef in B.
     destruct FB.
@@ -4066,7 +4073,7 @@ exists (mu' : SM_Injection),
     destruct (Zmax.Zmax_spec (fn_stacksize f) 0) as [H22 | H22]; destruct H22 as [H22 H23].
     rewrite H23 in H21; auto.
     omega. }
-    admit.
+    *)
     
     exists mu.
     intuition.
@@ -4357,7 +4364,11 @@ exists (mu' : SM_Injection),
            eapply visPropagate; try eassumption.
     eapply FreeEffect_PropagateLeft; try eassumption.
     eapply as_inj_retrict; autorewrite with restrict; rewrite <- DSTK; eassumption.
-    admit.
+    
+    apply FreeEffectD in H12.
+           destruct H12 as [? [? ?]]; subst. 
+    rewrite restrict_sm_locBlocksTgt in *.
+    rewrite SL in H14. inversion H14.
 
     exists mu.
     intuition.
@@ -4667,7 +4678,7 @@ apply Empty_Effect_implication.
 
 exists mu'; intuition.
 
-(*First admit SEP*)
+(*First SEP*)
 
 unfold MATCH; intuition.
 constructor; eauto.
