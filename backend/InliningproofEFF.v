@@ -668,6 +668,36 @@ Section MATCH_STACKS_replace_locals.
       rewrite replace_locals_locBlocksTgt; trivial. }
   Qed.
 
+  Lemma match_stacks_replace_locals_restrict:
+    forall stk stk' bound,
+      match_stacks (restrict_sm mu (vis mu)) m m' stk stk' bound ->
+      match_stacks (restrict_sm (replace_locals mu PS PT) (vis mu)) m m' stk stk' bound
+    with match_stacks_inside_replace_locals_restrict:
+     forall stk stk' f ctx sp rs', 
+      match_stacks_inside (restrict_sm mu (vis mu)) m m' stk stk' f ctx sp rs' ->  
+      match_stacks_inside (restrict_sm (replace_locals mu PS PT) (vis mu)) m m' stk stk' f ctx sp rs'.
+  Proof.
+    induction 1; eauto.
+    { econstructor; try eassumption.
+       destruct MG.
+       constructor; eauto. 
+       rewrite restrict_sm_frgnBlocksSrc, restrict_sm_all, replace_locals_frgnBlocksSrc, replace_locals_as_inj; rewrite restrict_sm_all, restrict_sm_frgnBlocksSrc in DOMAIN; assumption. 
+       rewrite restrict_sm_all, replace_locals_as_inj; rewrite restrict_sm_all in IMAGE; assumption. 
+    }
+
+    { econstructor; try rewrite restrict_sm_all, replace_locals_as_inj in *; eauto. 
+      rewrite restrict_sm_locBlocksTgt, replace_locals_locBlocksTgt in *; trivial. }
+    { econstructor; try rewrite restrict_sm_all, replace_locals_as_inj in *; eauto.
+      rewrite restrict_sm_locBlocksTgt, replace_locals_locBlocksTgt in *; trivial. }
+    induction 1; eauto.
+    { econstructor; eauto.
+      rewrite restrict_sm_locBlocksTgt, replace_locals_locBlocksTgt in *; trivial. }
+    { eapply match_stacks_inside_inlined; 
+        try rewrite restrict_sm_all, restrict_sm_local, replace_locals_as_inj in *; eauto.
+      rewrite restrict_sm_local, replace_locals_local in *; trivial.  
+      rewrite restrict_sm_locBlocksTgt, replace_locals_locBlocksTgt in *; trivial. }
+  Qed.
+
 End MATCH_STACKS_replace_locals.
 
 Lemma match_globalenvs_intern_incr mu mu' b: forall
@@ -1961,9 +1991,37 @@ Proof.
          unfold vis. destruct (local_DomRng _ WDmu _ _ _ LOC).
            rewrite H3; trivial.
          apply Mem.perm_valid_block in H1.
-         eapply (BV _ sp' delta VB).
-         unfold nuY in H3; rewrite restrict_sm_all in H3.
-         apply (restrictD_Some _ _ _ _ _ H3). }
+         assert (as_inj mu b = Some (sp', delta)).
+         {subst muV.
+          rewrite restrict_sm_local' in SP; eauto.
+          rewrite HAI in SP.
+          apply WDnu in SP. destruct SP as [locnusp Locnusp'].
+          assert (HH:= H3).
+          apply as_inj_locBlocks in H3.
+          unfold nuY in H3.
+          rewrite restrict_sm_locBlocksTgt, restrict_sm_locBlocksSrc in H3.
+          rewrite Locnusp' in H3.
+          unfold nuY in HH.
+          rewrite restrict_sm_all in HH.
+          unfold restrict in HH.
+          destruct (Y b); try discriminate.
+          rewrite locBlocksSrc_as_inj_local in HH; eauto.
+          rewrite <- HAI in HH.
+          unfold as_inj, join. 
+          assert (HH':=HH).
+          apply WDmu in HH'; destruct HH' as [locmub ?].
+          destruct WDmu as [disjoint_Src WDmu'].
+          destruct (disjoint_Src b); try congruence.
+          destruct (extern_of mu b) eqn:extern_of_b; auto.
+          destruct p.
+          eapply WDmu in extern_of_b; destruct extern_of_b as [? ?].
+          congruence.
+          unfold nuY.
+          apply restrict_sm_WD; eauto.
+         }
+         apply SMVmu.
+         unfold DOM.
+         eapply as_inj_DomRng; eauto. }
   Qed.
 End MS_RSI.
 
@@ -1978,18 +2036,8 @@ Theorem transl_program_correct:
   intros.
   (*eapply sepcomp.effect_simulations_lemmas.inj_simulation_star_wf.*)
   eapply effect_simulations_lemmas.inj_simulation_star with (match_states:= MATCH)(measure:= RTL_measure).
-
-  Lemma environment_equality: (exists m0:mem, Genv.init_mem SrcProg = Some m0) -> 
-                              genvs_domain_eq ge tge.
-    descend;
-    destruct H0 as [b0]; exists b0;
-    rewriter_back;
-    [rewrite symbols_preserved| rewrite <- symbols_preserved| rewrite varinfo_preserved| rewrite <- varinfo_preserved| | ]; try reflexivity.
-    rewrite H0.
-    admit.
-    admit.
-  Qed.
-  Hint Resolve environment_equality: trans_correct.
+  
+  Hint Resolve GDE_lemma: trans_correct.
   auto with trans_correct.
 
   Lemma MATCH_wd: forall (d : RTL_core) (mu : SM_Injection) (c1 : RTL_core) 
@@ -2099,8 +2147,6 @@ Theorem transl_program_correct:
   Qed.
   Hint Resolve Match_Halted: trans_correct.
   eauto with trans_correct.
-
-
   Lemma at_external_lemma: forall (mu : SM_Injection) 
                                   (c1 : RTL_core) (m1 : mem) 
                                   (c2 : RTL_core) (m2 : mem) 
@@ -2110,21 +2156,57 @@ Theorem transl_program_correct:
                                   (MC: MATCH c1 mu c1 m1 c2 m2) 
                                   (ATE: at_external (rtl_eff_sem hf) c1 = Some (e, ef_sig, vals1)),
                              Mem.inject (as_inj mu) m1 m2 /\ 
-                             (exists vals2 : list val, Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\ at_external (rtl_eff_sem hf) c2 = Some (e, ef_sig, vals2)).
+                             (exists vals2 : list val, Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\
+ at_external (rtl_eff_sem hf) c2 = Some (e, ef_sig, vals2) /\
+(forall pubSrc' pubTgt' : block -> bool,
+       pubSrc' =
+       (fun b : block =>
+        locBlocksSrc mu b && REACH m1 (exportedSrc mu vals1) b) ->
+       pubTgt' =
+       (fun b : block =>
+        locBlocksTgt mu b && REACH m2 (exportedTgt mu vals2) b) ->
+       forall nu : SM_Injection,
+       nu = replace_locals mu pubSrc' pubTgt' ->
+       MATCH c1 nu c1 m1 c2 m2 /\ Mem.inject (shared_of nu) m1 m2)).
     intros.
     split. inv MC; apply H0.
     inv MC; simpl in *. inv H; inv ATE.
+    destruct H0 as [RC [ MPG [GLOB_FRGN [ SMV [ SMWD MINJ']]]]].
     destruct fd; inv H1. inv FD; simpl in *. 
-    destruct (BuiltinEffects.observableEF_dec hf e0); inv H2.
+    destruct (BuiltinEffects.observableEF_dec hf e0); inv H0.
     exists args'.
     split. apply val_list_inject_forall_inject.
     autorewrite with restrict in VINJ; assumption.
+    split; intros.
     trivial.
+    specialize (val_list_inject_forall_inject _ _ _ VINJ); intros ValsInj.
+    autorewrite with restrict in ValsInj.
+    specialize (forall_vals_inject_restrictD _ _ _ _ ValsInj); intros.
+    exploit replace_locals_wd_AtExternal; try eassumption.
+    intros SMWD_replace_locals.
+    subst.
+    split; auto. split; auto. 
+    rewrite replace_locals_vis.
+    constructor; eauto.
+    apply match_stacks_replace_locals_restrict; auto.
+
+    rewrite restrict_sm_all, replace_locals_as_inj in *; auto.
+    rewrite restrict_sm_all, replace_locals_as_inj in *; auto.
+    
+    repeat open_Hyp.
+    split; auto.  solve[rewrite replace_locals_vis; auto ].
+    split; auto. solve[rewrite replace_locals_as_inj; auto].
+    split; auto. solve[rewrite replace_locals_frgnBlocksSrc; auto].
+    split. unfold sm_valid. rewrite replace_locals_DOM, replace_locals_RNG. assumption.
+    split; auto.
+    solve[rewrite replace_locals_as_inj; auto].
+    eapply inject_shared_replace_locals; eauto.
+    extensionality b; eauto.
+    extensionality b; eauto.
   Qed.
   Hint Resolve at_external_lemma: trans_correct.
   eauto with trans_correct.
-  admit.
-
+  
   Lemma Match_AfterExternal: 
     forall (mu : SM_Injection) (st1 : RTL_core) (st2 : RTL_core) (m1 : mem) (e : external_function) (vals1 : list val) (m2 : mem) (ef_sig : signature) (vals2 : list val) (e' : external_function) (ef_sig' : signature) 
            (MemInjMu : Mem.inject (as_inj mu) m1 m2)
@@ -2427,7 +2509,7 @@ econstructor; try rewrite restrict_sm_all; try eassumption.
            eapply match_stacks_bound. instantiate (1:=Mem.nextblock m2).
            2: eapply forward_nextblock; eassumption.
            eapply match_stacks_RSI.
-             18: eapply MS.
+             17: eapply MS.
              12: eapply UnchLOOR.
              assumption.  
              assumption.  
@@ -2492,24 +2574,7 @@ econstructor; try rewrite restrict_sm_all; try eassumption.
               rewrite replace_externs_local. 
                 red in INC. rewrite replace_locals_local in INC.
                 eapply INC.
-             assumption.
-
-             rewrite replace_externs_as_inj in *. intros.
-               red in SEP. rewrite replace_locals_as_inj in SEP. 
-                  (*destruct SEP as [SEPa [SEPb SEPc]].*)
-
-               remember (as_inj mu b1) as w; apply eq_sym in Heqw. 
-               destruct w.
-                 destruct p.
-                 
-
-                 apply VAL; try apply (as_inj_DomRng _ _ _ _ Heqw WDmu).
-                 (*Lets try:*)
-                 specialize (SEP _ _ _ Heqw H2).
-                 admit.
-             (*  destruct (SEPa _ _ _ Heqw H2).
-                 elim (SEPc _ H4). apply (as_inj_DomRng _ _ _ _ H2 WDnu'). trivial.
-         *)}
+             assumption. }
          rewrite replace_externs_as_inj, replace_externs_vis. 
           clear - RValInjNu' WDnu'.
           inv RValInjNu'; econstructor; eauto.
@@ -3365,7 +3430,7 @@ eapply core_semantics_lemmas.corestep_plus_one.
 eapply rtl_corestep_exec_Inop; eauto. 
 eapply P.
 assert (SEP: sm_inject_separated mu mu' m1 m2).
-  admit.
+  
 
 exists mu'; intuition.
 
@@ -3663,7 +3728,6 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
             Mem.perm m1 b1 (ofs - delta1) Max Nonempty))) /\
 exists (mu' : SM_Injection),
      intern_incr mu mu' /\
-     globals_separate tge mu mu' /\
      (*sm_inject_separated mu mu' m1 m2 /\*)
      sm_locally_allocated mu mu' m1 m2 m1' m2' /\
      MATCH st1' mu' st1' m1' st2' m2'.
@@ -3689,7 +3753,6 @@ exists (mu' : SM_Injection),
     Lemma globals_separate_refl: forall V F (ge: Genv.t F V) mu, globals_separate ge mu mu.
       unfold globals_separate; intros; congruence.
     Qed.
-    apply globals_separate_refl.
     (*apply sm_inject_separated_same_sminj.*)
     loc_alloc_solve.
     unfold MATCH.
@@ -3723,7 +3786,6 @@ exists (mu' : SM_Injection),
     split; auto.
     intuition.
     (*apply intern_incr_refl.*)
-    apply globals_separate_refl.
     (*apply sm_inject_separated_same_sminj.*)
     loc_alloc_solve.
     unfold MATCH.
@@ -3757,7 +3819,6 @@ exists (mu' : SM_Injection),
     exists mu.
     intuition.
     (*apply intern_incr_refl.*)
-    apply globals_separate_refl.
     (*apply sm_inject_separated_same_sminj.*)
     loc_alloc_solve.
     unfold MATCH;
@@ -3814,8 +3875,6 @@ exists (mu' : SM_Injection),
     exists mu.
     intuition.
     (*apply intern_incr_refl.*)
-    
-    apply globals_separate_refl.
     (*apply sm_inject_separated_same_sminj.*)
     loc_alloc_solve.
 
@@ -3885,7 +3944,6 @@ exists (mu' : SM_Injection),
     intuition.
     (*apply intern_incr_refl.*)
     
-    apply globals_separate_refl.
     (*apply sm_inject_separated_same_sminj.*)
     loc_alloc_solve.
 
@@ -3916,7 +3974,6 @@ exists (mu' : SM_Injection),
     intuition.
     (*apply intern_incr_refl.*)
     
-    apply globals_separate_refl.
     (*apply sm_inject_separated_same_sminj.*)
     loc_alloc_solve.
 
@@ -4015,7 +4072,6 @@ exists (mu' : SM_Injection),
     intuition.
     (*apply intern_incr_refl.*)
     
-    apply globals_separate_refl.
     (*apply sm_inject_separated_same_sminj.*)
     loc_alloc_solve.
     
@@ -4089,7 +4145,6 @@ exists (mu' : SM_Injection),
     intuition.
     (*apply intern_incr_refl.*)
     
-    apply globals_separate_refl.
     (*apply sm_inject_separated_same_sminj.*)
     loc_alloc_solve.
 
@@ -4130,7 +4185,6 @@ exists (mu' : SM_Injection),
     intuition.
     (*apply intern_incr_refl.*)
     
-    apply globals_separate_refl.
     (*apply sm_inject_separated_same_sminj.*)
     loc_alloc_solve.
 
@@ -4243,7 +4297,6 @@ exists (mu' : SM_Injection),
 
     exists mu. intuition.
     (*apply intern_incr_refl.*)
-    apply globals_separate_refl.
  (*   apply sm_inject_separated_same_sminj.*)
     loc_alloc_solve.
 
@@ -4268,7 +4321,6 @@ exists (mu' : SM_Injection),
     
     exists mu. intuition.
     (*apply intern_incr_refl.*)
-    apply globals_separate_refl.
 (*    apply sm_inject_separated_same_sminj.
  *)   loc_alloc_solve.
 
@@ -4309,9 +4361,9 @@ exists (mu' : SM_Injection),
 
     exists mu.
     intuition.
-    (* apply intern_incr_refl. *)
+    (* apply intern_incr_refl. *) (*
     apply sm_inject_separated_same_sminj.
-    loc_alloc_solve.
+*)    loc_alloc_solve.
 
     unfold MATCH;
       intuition.
@@ -4372,8 +4424,7 @@ exists (mu' : SM_Injection),
     exists mu.
     intuition.
     (*apply intern_incr_refl.*)
-
-    apply sm_inject_separated_same_sminj.
+(*    apply sm_inject_separated_same_sminj.*)
     loc_alloc_solve. 
     
     unfold MATCH;
@@ -4423,6 +4474,7 @@ exists (mu' : SM_Injection),
     intuition.
 
     unfold MATCH; intuition.
+    unfold globals_separate.
     rewrite H6.
     rewrite <- H5.
     
@@ -4615,7 +4667,7 @@ apply Empty_Effect_implication.
 
 exists mu'; intuition.
 
-admit. (*First admit SEP*)
+(*First admit SEP*)
 
 unfold MATCH; intuition.
 constructor; eauto.
@@ -4674,17 +4726,9 @@ eapply freshalloc_restricted_map; eauto.
 
 
 eapply injection_almost_equality_restrict; eauto.
+eapply intern_incr_meminj_preserves_globals_as_inj with (mu0:=mu); eauto.
 
-eapply meminj_preserves_incr_sep; eauto.
-apply intern_incr_as_inj; eauto.
-eapply sm_inject_separated_mem; eauto.
-
-admit. (*Second admit SEP*)
-
-exploit (intern_incr_meminj_preserves_globals ge); eauto; try split; eauto.
-eapply match_genv_meminj_preserves_extern_iff_all; eauto.
-
-intros D; destruct D as [? isGlobal_frgn]; auto.
+eapply intern_incr_meminj_preserves_globals_as_inj with (mu0:=mu); eauto.
 
  { (* nonobservable external call *)
       rename MINJ into MINJR.
@@ -4760,7 +4804,7 @@ eapply effstep_plus_one. eapply rtl_effstep_exec_return.
 apply Empty_Effect_implication.
 
 exists mu. intuition.
-apply sm_inject_separated_same_sminj.
+(*apply sm_inject_separated_same_sminj.*)
 loc_alloc_solve.
 
 unfold MATCH; intuition.
@@ -4785,7 +4829,7 @@ eapply effstep_plus_one. eapply rtl_effstep_exec_return.
 apply Empty_Effect_implication.
 
 exists mu. intuition.
-apply sm_inject_separated_same_sminj.
+(*apply sm_inject_separated_same_sminj.*)
 loc_alloc_solve.
 
 Print MATCH.
@@ -4799,7 +4843,26 @@ apply agree_set_reg; auto.
 (*This should be a lemma*)
 
 (*End lemma *)
-
+Lemma local_of_restrict_vis: forall mu sp sp' delta,  
+                               SM_wd mu -> 
+                               local_of (restrict_sm mu (vis mu)) sp = Some (sp', delta) -> 
+                               as_inj (restrict_sm mu (vis mu)) sp = Some (sp', delta).
+  intros mu sp sp' delta SMWD SP.
+  autorewrite with restrict.
+  unfold restrict.
+  rewrite restrict_sm_local in SP; auto.
+  unfold restrict in SP.
+  destruct (vis mu sp) eqn:vismusp; simpl in SP; try solve [inv SP].
+  unfold as_inj, join.
+  rewrite SP.
+  destruct (extern_of mu sp) eqn:extofmusp; simpl; auto. destruct p.
+  apply SMWD in extofmusp; apply SMWD in SP.
+  repeat open_Hyp.
+  destruct SMWD; specialize (disjoint_extern_local_Src sp);
+  destruct disjoint_extern_local_Src. 
+  rewrite H3 in H1; inv H1.
+  rewrite H3 in H; inv H.
+Qed.
 apply local_of_restrict_vis; auto.
 
 red; intros. destruct (zlt ofs (dstk ctx)). apply PAD; omega. apply PRIV; omega.
@@ -4838,7 +4901,7 @@ eapply rtl_effstep_exec_Iop; eauto. simpl. reflexivity.
 apply Empty_Effect_implication.
 
 exists mu. intuition.
-apply sm_inject_separated_same_sminj.
+(*apply sm_inject_separated_same_sminj.*)
 loc_alloc_solve.
 
 unfold MATCH; intuition.
@@ -4857,7 +4920,7 @@ eapply effstep_plus_one. eapply rtl_effstep_exec_Inop; eauto.
 apply Empty_Effect_implication.
 
 exists mu. intuition.
-apply sm_inject_separated_same_sminj.
+(*apply sm_inject_separated_same_sminj.*)
 apply sm_locally_allocatedChar.
 repeat split; extensionality b0;
 rewrite freshloc_irrefl;
