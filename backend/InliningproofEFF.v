@@ -37,7 +37,6 @@ Hint Rewrite restrict_sm_frgnBlocksSrc: restrict.
 
 Variable SrcProg: program.
 Variable TrgProg: program.
-About transf_program.
 Hypothesis TRANSF: transf_program SrcProg = OK TrgProg.
 Let ge : genv := Genv.globalenv SrcProg.
 Let tge : genv := Genv.globalenv TrgProg.
@@ -1573,27 +1572,27 @@ Proof.
   inv H0.
 Qed.
 Hint Resolve MATCH_halted: trans_correct.
-Lemma MATCH_atExternal: forall (mu : SM_Injection) 
-                               (c1 : RTL_core) (m1 : mem) 
-                               (c2 : RTL_core) (m2 : mem) 
-                               (e : external_function) 
-                               (vals1 : list val) 
-                               (ef_sig : signature)
-                               (MC: MATCH c1 mu c1 m1 c2 m2) 
-                               (ATE: at_external (rtl_eff_sem hf) c1 = Some (e, ef_sig, vals1)),
-                          Mem.inject (as_inj mu) m1 m2 /\ 
-                          (exists vals2 : list val, Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\
-                                                    at_external (rtl_eff_sem hf) c2 = Some (e, ef_sig, vals2) /\
-                                                    (forall pubSrc' pubTgt' : block -> bool,
-                                                       pubSrc' =
-                                                       (fun b : block =>
-                                                          locBlocksSrc mu b && REACH m1 (exportedSrc mu vals1) b) ->
-                                                       pubTgt' =
-                                                       (fun b : block =>
-                                                          locBlocksTgt mu b && REACH m2 (exportedTgt mu vals2) b) ->
-                                                       forall nu : SM_Injection,
-                                                         nu = replace_locals mu pubSrc' pubTgt' ->
-                                                         MATCH c1 nu c1 m1 c2 m2 /\ Mem.inject (shared_of nu) m1 m2)).
+Lemma MATCH_atExternal: 
+  forall (mu : SM_Injection) 
+         (c1 : RTL_core) (m1 : mem) 
+         (c2 : RTL_core) (m2 : mem) 
+         (e : external_function) 
+         (vals1 : list val) 
+         (ef_sig : signature)
+         (MC: MATCH c1 mu c1 m1 c2 m2) 
+         (ATE: at_external (rtl_eff_sem hf) c1 = Some (e, ef_sig, vals1)),
+    Mem.inject (as_inj mu) m1 m2 /\ 
+    (exists vals2 : list val, Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\ at_external (rtl_eff_sem hf) c2 = Some (e, ef_sig, vals2) /\
+                              (forall pubSrc' pubTgt' : block -> bool,
+                                 pubSrc' =
+                                 (fun b : block =>
+                                    locBlocksSrc mu b && REACH m1 (exportedSrc mu vals1) b) ->
+                                 pubTgt' =
+                                 (fun b : block =>
+                                    locBlocksTgt mu b && REACH m2 (exportedTgt mu vals2) b) ->
+                                 forall nu : SM_Injection,
+                                   nu = replace_locals mu pubSrc' pubTgt' ->
+                                   MATCH c1 nu c1 m1 c2 m2 /\ Mem.inject (shared_of nu) m1 m2)).
   intros.
   split. inv MC; apply H0.
   inv MC; simpl in *. inv H; inv ATE.
@@ -2501,7 +2500,6 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
   instantiate (2 := rs##args). instantiate (1 := rs'##(sregs ctx args)). eapply agree_val_regs; eauto.
   eauto.
   fold saddr. intros [a' [P Q]].
-  Check Mem.storev_mapped_inject. 
   exploit Mem.storev_mapped_inject. 
   eexact INJ.
   eassumption.
@@ -2550,7 +2548,6 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
   rewrite getBlocks_char in H5.
   destruct H5. 
   destruct H5.
-  Check agree_val_reg.
   assert (val_inject (as_inj (restrict_sm mu (vis mu))) rs # src rs' # (sreg ctx src)).
   eapply agree_val_reg; eauto.
   rewrite H5 in H6.
@@ -3107,7 +3104,6 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
 
   auto. auto. auto.
   rewrite H5. apply agree_regs_init_regs.
-  Check val_list_inject_incr.
   eapply val_list_inject_incr.
   autorewrite with restrict.
   eapply intern_incr_restrict; try (apply C); auto.
