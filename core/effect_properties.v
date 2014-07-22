@@ -2362,6 +2362,11 @@ Proof. intros. remember (as_inj mu1 b) as AI.
            elim (SEP3 _ H2). eapply as_inj_DomRng; eassumption. apply H0.
 Qed. 
 
+Lemma restrict_sm_replace_locals mu (X PS PT : block -> bool):
+       replace_locals (restrict_sm mu X) PS PT =
+       restrict_sm (replace_locals mu PS PT) X.
+Proof. destruct mu; trivial. Qed.
+
 Lemma restrict_sm_replace_externs mu X FS FT:
     replace_externs (restrict_sm mu X) FS FT =
     restrict_sm (replace_externs mu FS FT) X.

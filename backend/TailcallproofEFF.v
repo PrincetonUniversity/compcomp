@@ -1586,7 +1586,6 @@ Proof.
   exists mu'.
   split. trivial.
   split. trivial.
-  split. trivial.
   split.
     split. 
       econstructor; eauto.

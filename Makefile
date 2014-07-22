@@ -92,7 +92,7 @@ BACKEND=\
   RTLtyping.v \
   Kildall.v Liveness.v \
   ConstpropOp.v Constprop.v ConstpropOpproof.v Constpropproof.v \
-  CombineOp.v CSE.v CombineOpproof.v CSEproof.v \
+  CombineOp.v CSE.v CombineOpproof.v CSEproof.v CSEproofEFF.v\
   Machregs.v Locations.v Conventions1.v Conventions.v \
   LTL.v LTL_coop.v LTL_eff.v \
   Allocation.v Allocproof.v AllocproofEFF.v \
