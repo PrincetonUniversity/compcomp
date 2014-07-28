@@ -62,6 +62,11 @@ Variable N : pos.
 
 Variable cores_S' cores_T : 'I_N -> Modsem.t. 
 
+Variable find_symbol_ST : 
+  forall (i : 'I_N) id bf, 
+  Genv.find_symbol (ge (cores_S' i)) id = Some bf -> 
+  Genv.find_symbol (ge (cores_T i)) id = Some bf.
+
 Variable nucular_T : forall i : 'I_N, Nuke_sem.t (cores_T i).(sem).
 
 Variable fun_tbl : ident -> option 'I_N.
@@ -528,7 +533,8 @@ case HDL: (LinkerSem.handle _)=> [st1''|//] eq1 A.
 have wd: SM_wd mu by apply: (R_wd INV).
 have INV': R data (Inj.mk wd) st1 m1 st2 m2 by [].
 case: (atext2 AT1 INV')=> args2 AT2.
-case: (hdl2 my_ge_S my_ge_T AT1 HDL INV' AT2)=> cd' []st2' []mu' []HDL2 INV2.
+case: (hdl2 find_symbol_ST my_ge_S my_ge_T AT1 HDL INV' AT2)=> 
+  cd' []st2' []mu' []HDL2 INV2.
 exists st2',m2,cd',mu'; split=> //; first by rewrite eq1.
 set (empty_U := fun (_ : block) (_ : Z) => false); exists empty_U; split=> //.
 left; exists O=> /=; exists st2',m2,empty_U,empty_U; split=> //.
@@ -642,7 +648,11 @@ Require Import linking_spec.
 Module LinkingSimulation : LINKING_SIMULATION.
 
 Lemma link : 
-  forall (N : pos) (sems_S sems_T : 'I_N -> t),
+  forall (N : pos) (sems_S sems_T : 'I_N -> t)
+         (find_symbol_ST : 
+          forall (i : 'I_N) id bf, 
+          Genv.find_symbol (ge (sems_S i)) id = Some bf -> 
+          Genv.find_symbol (ge (sems_T i)) id = Some bf),
   (forall ix : 'I_N, Nuke_sem.t (sem (sems_T ix))) ->
   forall (plt : ident -> option 'I_N)
     (sims : forall ix : 'I_N,

@@ -88,6 +88,13 @@ Import Modsem.
 (*       A natural between [0..n-1] that maps this core back to the       *)
 (*       translation unit numbered [i] from which it was invoked.         *)
 (*                                                                        *)
+(*   c : (cores i).(C)                                                    *)
+(*                                                                        *)
+(*       Runtime states of module i.                                      *)
+(*                                                                        *)
+(* When we model the semantics of source languages, c is typically        *)
+(* specialized to reach-closed core states:                               *)
+(*                                                                        *)
 (*   c : RC.state (cores i).(C)                                           *)
 (*                                                                        *)
 (*      Runtime states. These comprise:                                   *)
@@ -105,7 +112,7 @@ Import Modsem.
 (*      ; locs : block -> bool                                            *)
 (*      }                                                                 *)
 (*                                                                        *)
-(*      Cf. rc_semantics.v for more details.                              *)              
+(* Cf. rc_semantics.v for more details.                                   *)
 
 Record t := mk
   { i  : 'I_N
@@ -205,7 +212,6 @@ End callStack. End CallStack.
 (*                                                                        *)
 (*    - [fn_tbl] maps external function id's to module id's               *)
 (*    - [stack] is used to maintain a stack of cores, at runtime.         *)
-
 
 Module Linker. Section linker.
 
@@ -368,8 +374,6 @@ Variable my_fn_tbl: ident -> option 'I_N.
 
 Section handle.
 
-Variable (ge : ge_ty).
-
 Variables (sg: signature) (id: ident) (l: linker N my_cores) (args: list val).
 
 Import CallStack.
@@ -380,7 +384,7 @@ Definition handle :=
                -> option (linker N my_cores)) with
     | true => fun pf => 
         if l.(fn_tbl) id is Some ix then
-        if Genv.find_symbol ge id is Some bf then
+        if Genv.find_symbol (my_cores ix).(Modsem.ge) id is Some bf then
         if initCore my_cores sg ix (Vptr bf Int.zero) args is Some c 
           then Some (pushCore l c pf)
         else None else None else None
@@ -393,11 +397,11 @@ Section handle_lems.
 
 Import CallStack.
 
-Lemma handleP ge sg id l args l' :
-  handle ge sg id l args = Some l' <-> 
+Lemma handleP sg id l args l' :
+  handle sg id l args = Some l' <-> 
   (exists (pf : all (atExternal my_cores) l.(stack).(callStack)) ix bf c,
      [/\ l.(fn_tbl) id = Some ix 
-       , Genv.find_symbol ge id = Some bf
+       , Genv.find_symbol (my_cores ix).(Modsem.ge) id = Some bf
        , initCore my_cores sg ix (Vptr bf Int.zero) args = Some c
        & l' = pushCore l c pf]).
 Proof.
@@ -412,11 +416,13 @@ case fnd: (Genv.find_symbol _ _)=> [bf|].
 case h: (initCore _ _ _)=> [c|].
 split=> H.
 exists (erefl true),ix,bf,c; split=> //; first by case: H=> <-.
-case: H=> pf0 []ix0 []bf0 []c0 []; case=> <-; case=> <- H -> /=.
-by rewrite h in H; case: H=> ->; repeat f_equal; apply: proof_irr.
-split=> //.
-by case=> pf0 []ix0 []bf0 []c0 []; case=> <-; case=> <-; rewrite h; discriminate.
-by split=> //; case=> pf0 []ix0 []bf0 []c0 []; discriminate.
+case: H=> pf0 []ix0 []bf0 []c0 []; case=> <-.
+rewrite fnd; case=> <-; rewrite h; case=> <- ->. 
+by repeat f_equal; apply: proof_irr.
+split=> //; case=> pf0 []ix0 []bf0 []c0 []. 
+by case=> <-; rewrite fnd; case=> <-; rewrite h.
+split=> //; case=> pf0 []ix0 []bf0 []c0 [].
+by case=> <-; rewrite fnd; discriminate.
 split=> //.
 by case=> pf0 []ix0 []bf0 []c0 []; discriminate.
 split=> //.
@@ -529,7 +535,6 @@ Definition retType0 (l: linker N my_cores) : option typ :=
 (* Corestep relation of linking semantics *)
 
 Definition corestep 
-  (ge: ge_ty) 
   (l: linker N my_cores) (m: Mem.mem)
   (l': linker N my_cores) (m': Mem.mem) := 
 
@@ -547,7 +552,7 @@ Definition corestep
 
       if at_external0 l is Some (ef, dep_sig, args) then
       if fun_id ef is Some id then
-      if handle ge (ef_sig ef) id l args is Some l'' then l'=l'' else False else False
+      if handle (ef_sig ef) id l args is Some l'' then l'=l'' else False else False
       else 
 
       (** 4- or halted, in which case we pop the halted core from the call stack
@@ -561,8 +566,8 @@ Definition corestep
 
      else False).
 
-Inductive Corestep (ge : ge_ty) : linker N my_cores -> mem 
-                               -> linker N my_cores -> mem -> Prop :=
+Inductive Corestep : linker N my_cores -> mem 
+                     -> linker N my_cores -> mem -> Prop :=
 | Corestep_step : 
   forall l m c' m',
   let: c     := peekCore l in
@@ -570,7 +575,7 @@ Inductive Corestep (ge : ge_ty) : linker N my_cores -> mem
   let: c_ge  := Modsem.ge (my_cores c_ix) in
   let: c_sem := Modsem.sem (my_cores c_ix) in
     core_semantics.corestep c_sem c_ge (Core.c c) m c' m' -> 
-    Corestep ge l m (updCore l (Core.upd (peekCore l) c')) m'
+    Corestep l m (updCore l (Core.upd (peekCore l) c')) m'
 
 | Corestep_call :
   forall (l : linker N my_cores) m ef dep_sig args id bf d_ix d
@@ -584,13 +589,13 @@ Inductive Corestep (ge : ge_ty) : linker N my_cores -> mem
   core_semantics.at_external c_sem (Core.c c) = Some (ef,dep_sig,args) -> 
   fun_id ef = Some id -> 
   fn_tbl l id = Some d_ix -> 
-  Genv.find_symbol ge id = Some bf -> 
+  Genv.find_symbol (my_cores d_ix).(Modsem.ge) id = Some bf -> 
 
   let: d_ge  := Modsem.ge (my_cores d_ix) in
   let: d_sem := Modsem.sem (my_cores d_ix) in
 
   core_semantics.initial_core d_sem d_ge (Vptr bf Int.zero) args = Some d -> 
-  Corestep ge l m (pushCore l (Core.mk _ _ _ d (ef_sig ef)) pf) m
+  Corestep l m (pushCore l (Core.mk _ _ _ d (ef_sig ef)) pf) m
 
 | Corestep_return : 
   forall (l : linker N my_cores) l'' m rv d',
@@ -613,11 +618,11 @@ Inductive Corestep (ge : ge_ty) : linker N my_cores -> mem
   core_semantics.halted c_sem (Core.c c) = Some rv -> 
   val_has_type_func rv (proj_sig_res c_sg)=true -> 
   core_semantics.after_external d_sem (Some rv) (Core.c d) = Some d' -> 
-  Corestep ge l m (updCore l'' (Core.upd d d')) m.
+  Corestep l m (updCore l'' (Core.upd d d')) m.
 
-Lemma CorestepE ge l m l' m' : 
-  Corestep ge l m l' m' -> 
-  corestep ge l m l' m'.
+Lemma CorestepE l m l' m' : 
+  Corestep l m l' m' -> 
+  corestep l m l' m'.
 Proof.
 inversion 1; subst; rename H0 into A; rename H into B.
 by left; exists c'; split.
@@ -655,9 +660,9 @@ rewrite /inContext A /at_external0 H1 at_ext.
 by rewrite /halted0 H2 /after_external H3 H4. 
 Qed.
 
-Lemma CorestepI ge l m l' m' : 
-  corestep ge l m l' m' -> 
-  Corestep ge l m l' m'.
+Lemma CorestepI l m l' m' : 
+  corestep l m l' m' -> 
+  Corestep l m l' m'.
 Proof.
 case.
 case=> c []step ->.
@@ -666,11 +671,11 @@ case=> <-.
 case=> nstep.
 case atext: (at_external0 _)=> [[[ef dep_sig] args]|//].
 case funid: (fun_id ef)=> [id|//].
-case hdl:   (handle ge (ef_sig ef) id l args)=> [l''|//] ->.
+case hdl:   (handle (ef_sig ef) id l args)=> [l''|//] ->.
 move: hdl; case/handleP=> pf []ix []bf []c []fntbl genv init ->.
 move: init; rewrite /initCore.
 case init: (core_semantics.initial_core _ _ _ _)=> [c'|//]; case=> <-. 
-by apply: (@Corestep_call _ _ _ ef dep_sig args id).
+by apply: (@Corestep_call _ _ ef dep_sig args id).
 case inCtx: (inContext _)=> //.
 case hlt: (halted0 _)=> [rv|//].
 case pop: (popCore _)=> [c|//].
@@ -680,11 +685,11 @@ case aft: (core_semantics.after_external _ _ _)=> [c''|//].
 rewrite /halted0 in hlt; move: hlt.
 case hlt: (core_semantics.halted _ _)=> //. 
 case oval: (val_has_type_func _ _)=> //; case=> Heq. subst. case=> <-.
-by apply: (@Corestep_return _ _ _ _ rv c'').
+by apply: (@Corestep_return _ _ _ rv c'').
 Qed.
 
-Lemma CorestepP ge l m l' m' : 
-  corestep ge l m l' m' <-> Corestep ge l m l' m'.
+Lemma CorestepP l m l' m' : 
+  corestep l m l' m' <-> Corestep l m l' m'.
 Proof. by split; [apply: CorestepI | apply: CorestepE]. Qed.
 
 Lemma corestep_not_at_external0 m c m' c' :
@@ -707,8 +712,8 @@ move: Hht; rewrite/halted0; apply corestep_not_halted in H1.
 by move: H1=> /= ->. 
 Qed.
 
-Lemma corestep_not_at_external ge m c m' c' : 
-  corestep ge c m c' m' -> at_external c = None.
+Lemma corestep_not_at_external (ge : ge_ty) m c m' c' : 
+  corestep c m c' m' -> at_external c = None.
 Proof.
 rewrite/corestep/at_external.
 move=> [H|[_ [_ H]]]; first by move: H; move/corestep_not_at_external0=> /= ->.
@@ -728,8 +733,8 @@ move=> H; case Heq: (peekCore c)=>//[a].
 by case Hcx: (~~ inContext _)=>//; rewrite H.
 Qed.
 
-Lemma corestep_not_halted ge m c m' c' :
-  corestep ge c m c' m' -> halted c = None.
+Lemma corestep_not_halted (ge : ge_ty) m c m' c' :
+  corestep c m c' m' -> halted c = None.
 Proof. 
 rewrite/corestep.
 move=> [H|[_ [_ H]]]; first by move: H; move/corestep_not_halted0.
@@ -773,7 +778,7 @@ Definition coresem : CoreSemantics ge_ty (linker N my_cores) Mem.mem :=
     at_external
     after_external
     halted 
-    corestep
+    (fun _ : ge_ty => corestep)
     corestep_not_at_external    
     corestep_not_halted 
     at_external_halted_excl.
@@ -792,8 +797,9 @@ inversion H2; subst.
 { inversion H1; subst.
   by apply core_semantics.corestep_not_at_external in H6; rewrite H6 in H.
   move: H0 H7 H3 H8; rewrite H6 in H; case: H=> <- _ eq0 ->; case=> eq1; subst.
+  move=> ->; case=> eq_ix; subst d_ix0.
   rewrite H4 in H9; case: H9; move=> ?; subst.
-  move=> ->; case=> Heq; subst; rewrite H10 in H5; case: H5=> ->.
+  rewrite H10 in H5; case: H5=> ->.
   by split=> //; f_equal; f_equal; apply: proof_irr.
   case: (core_semantics.at_external_halted_excl 
           (Modsem.sem (my_cores (Core.i (peekCore c')))) (Core.c (peekCore c'))).
@@ -856,12 +862,12 @@ Qed.
 
 Definition inner_effstep (ge: ge_ty)
   (l: linker N my_cores) m (l': linker N my_cores) m' := 
-  [/\ LinkerSem.corestep ge l m l' m' 
+  [/\ LinkerSem.corestep l m l' m' 
     & LinkerSem.corestep0 l m l' m' -> exists U, effstep0 U l m l' m'].
 
 Definition effstep (ge: ge_ty) V
   (l: linker N my_cores) m (l': linker N my_cores) m' := 
-  [/\ LinkerSem.corestep ge l m l' m' 
+  [/\ LinkerSem.corestep l m l' m' 
     , LinkerSem.corestep0 l m l' m' -> effstep0 V l m l' m'
     & ~LinkerSem.corestep0 l m l' m' -> forall b ofs, ~~ V b ofs].
 
@@ -880,12 +886,12 @@ Program Definition csem
 
 Next Obligation. 
 move: H; rewrite/inner_effstep=> [[H1] H2]. 
-by apply: (LinkerSem.corestep_not_at_external H1).
+by apply: (LinkerSem.corestep_not_at_external ge H1).
 Qed.
 
 Next Obligation.
 move: H; rewrite/inner_effstep=> [[H1] H2]. 
-by apply: (LinkerSem.corestep_not_halted H1).
+by apply: (LinkerSem.corestep_not_halted ge H1).
 Qed.
 
 Next Obligation. by apply: (LinkerSem.at_external_halted_excl). Qed.
@@ -899,6 +905,7 @@ Lemma linking_det
 Proof.
 move=> m m' m'' ge c c' c''; rewrite /= /inner_effstep => [][]H1 _ []H2 _.
 case: (@LinkerSem.linking_det N my_cores my_fun_tbl dets _ _ _ _ _ _ _ H1 H2).
+by refine ge. 
 by move=> -> ->.
 Qed.
 

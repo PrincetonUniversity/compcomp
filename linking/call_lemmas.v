@@ -56,6 +56,11 @@ Variable N : pos.
 
 Variable cores_S' cores_T : 'I_N -> Modsem.t. 
 
+Variable find_symbol_ST : 
+  forall (i : 'I_N) id bf, 
+  Genv.find_symbol (ge (cores_S' i)) id = Some bf -> 
+  Genv.find_symbol (ge (cores_T i)) id = Some bf.
+
 Variable nucular_T : forall i : 'I_N, Nuke_sem.t (cores_T i).(sem).
 
 Variable fun_tbl : ident -> option 'I_N.
@@ -85,7 +90,7 @@ Context
 (valid : sm_valid mu m1 m2)
 (fid : LinkerSem.fun_id ef = Some id)
 (atext1 : LinkerSem.at_external0 st1 = Some (ef,sig,args1))
-(hdl1 : LinkerSem.handle my_ge (ef_sig ef) id st1 args1 = Some st1')
+(hdl1 : LinkerSem.handle (ef_sig ef) id st1 args1 = Some st1')
 (inv : R cd mu st1 m1 st2 m2).
 
 Lemma atext2 : 
@@ -135,7 +140,7 @@ Require Import mem_wd.
 Lemma hdl2 args2 : 
   LinkerSem.at_external0 st2 = Some (ef,sig,args2) -> 
   exists cd' st2' mu',
-    LinkerSem.handle my_ge (ef_sig ef) id st2 args2 = Some st2'
+    LinkerSem.handle (ef_sig ef) id st2 args2 = Some st2'
     /\ R cd' mu' st1' m1 st2' m2.
 Proof.
 move=> A.
@@ -465,6 +470,7 @@ have hdinv_new:
 exists (existT _ (Core.i c1) cd_new),st2',mu_new'; split.
 rewrite LinkerSem.handleP; exists all_at2,ix,bf,c2; split=> //.
 by move: fntbl1; rewrite (R_fntbl inv).
+by apply: find_symbol_ST.
 
 have valid_new: sm_valid mu_new' m1 m2. 
 { move: (head_match hdinv)=> mtch; apply match_validblocks in mtch.

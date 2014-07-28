@@ -56,6 +56,10 @@ Module Type LINKING_SIMULATION.
 Axiom link : forall 
   (N : pos)
   (sems_S sems_T : 'I_N -> Modsem.t)
+  (find_symbol_ST : 
+     forall (i : 'I_N) id bf, 
+     Genv.find_symbol (ge (sems_S i)) id = Some bf -> 
+     Genv.find_symbol (ge (sems_T i)) id = Some bf)
   (nucular_T : forall ix : 'I_N, Nuke_sem.t (sems_T ix).(sem))
   (plt : ident -> option 'I_N)
   (sims : forall ix : 'I_N, 
