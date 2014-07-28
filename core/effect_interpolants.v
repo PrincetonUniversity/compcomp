@@ -26,7 +26,8 @@ Parameter effect_interp_II: forall m1 m2 nu12
                              (MemInjNu' : Mem.inject (as_inj nu') m1' m3')
                              
                              (ExtIncr: extern_incr (compose_sm nu12 nu23) nu')
-                             (SMInjSep: sm_inject_separated (compose_sm nu12 nu23) nu' m1 m3)
+                             (*(SMInjSep: sm_inject_separated (compose_sm nu12 nu23) nu' m1 m3)*)
+                             (*GSep: globals_separate *)
                              (SMV12: sm_valid nu12 m1 m2)
                              (SMV23: sm_valid nu23 m2 m3)
                              (UnchPrivSrc: Mem.unchanged_on (fun b ofs => locBlocksSrc (compose_sm nu12 nu23) b = true /\ 
@@ -46,8 +47,8 @@ Parameter effect_interp_II: forall m1 m2 nu12
                              extern_incr nu12 nu12' /\ extern_incr nu23 nu23' /\
                              Mem.inject (as_inj nu12') m1' m2' /\ mem_forward m2 m2' /\
                              Mem.inject (as_inj nu23') m2' m3' /\
-                             sm_inject_separated nu12 nu12' m1 m2 /\ 
-                             sm_inject_separated nu23 nu23' m2 m3 /\
+                             (*sm_inject_separated nu12 nu12' m1 m2 /\ 
+                             sm_inject_separated nu23 nu23' m2 m3 /\*)
                              sm_valid nu12' m1' m2' /\ sm_valid nu23' m2' m3' /\
                              (SM_wd nu12' /\ SM_wd nu23' /\
                               locBlocksTgt nu12' = locBlocksSrc nu23' /\
@@ -73,7 +74,7 @@ Parameter interpolate_II_strongHeqMKI: forall m1 m2 j12 (MInj12 : Mem.inject j12
                   (MInj23 : Mem.inject j23 m2 m3) m3' (Fwd3: mem_forward m3 m3')
                   j' (MInj13': Mem.inject j' m1' m3')
                   (InjIncr: inject_incr (compose_meminj j12 j23) j')
-                  (InjSep: inject_separated (compose_meminj j12 j23) j' m1 m3)
+                  (*(InjSep: inject_separated (compose_meminj j12 j23) j' m1 m3)*)
                   (Unch11': Mem.unchanged_on 
                             (loc_unmapped (compose_meminj j12 j23)) m1 m1')
                   (Unch33': Mem.unchanged_on

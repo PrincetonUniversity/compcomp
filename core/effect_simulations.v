@@ -66,6 +66,38 @@ Proof. intros. red; intros.
     rewrite lT' in lT; discriminate. 
 Qed.  
 
+Lemma exter_incr_globals_separate
+      {F V:Type} (ge: Genv.t F V) mu nu: 
+      forall (EE: extern_of mu = extern_of nu)
+             (PG: meminj_preserves_globals ge (as_inj mu))
+             (GF: forall b, isGlobalBlock ge b = true -> frgnBlocksSrc mu b = true)
+             (WD: SM_wd mu) (WDnu: SM_wd nu), 
+      globals_separate ge mu nu.
+Proof. intros. red; intros. 
+  remember (isGlobalBlock ge b1) as p1; apply eq_sym in Heqp1.
+  remember (isGlobalBlock ge b2) as p; apply eq_sym in Heqp.
+  destruct p; simpl; trivial.
+  destruct p1; simpl.
+  specialize (GF _ Heqp1).
+  destruct (frgnSrcAx _ WD _ GF) as [? [? [? ?]]].
+  unfold as_inj, join in H.
+  rewrite H1 in H; inversion H.
+  eapply meminj_preserves_globals_isGlobalBlock in Heqp; eauto.
+
+  specialize (GF _ Heqp).
+  destruct (frgnSrcAx _ WD _ GF) as [? [? [? ?]]].
+  destruct (joinD_Some _ _ _ _ _ H0) as [EXT | [EXT LOC]]; clear H0.
+    rewrite <- EE in EXT.
+    rewrite (extern_in_all _ _ _ _ EXT) in H. discriminate. 
+  destruct (local_DomRng _ WDnu _ _ _ LOC) as [lS lT].
+    assert (lT': locBlocksTgt nu b2 = false). 
+      apply (meminj_preserves_globals_isGlobalBlock _ _ PG) in Heqp.
+      rewrite (extern_in_all _ _ _ _ H1) in Heqp; inv Heqp.
+      rewrite EE in H1.
+      eapply extern_DomRng'; eassumption. 
+    rewrite lT' in lT; discriminate. 
+Qed.  
+
 Module SM_simulation. Section SharedMemory_simulation_inject. 
 
 Context 
