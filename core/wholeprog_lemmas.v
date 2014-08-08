@@ -34,12 +34,13 @@ Context  {G TG C D M TM Z data : Type}
          {target : @CoreSemantics TG D TM}
          {geS : G}
          {geT : TG}
+         {ge_inv : G -> TG -> Prop}
+         {init_inv : meminj -> G -> list val -> M -> TG -> list val -> TM -> Prop}
+         {halt_inv : StructuredInjections.SM_Injection ->
+                     G -> val -> M -> TG -> val -> TM -> Prop}
          (main : val)
 
-  (sim : Wholeprog_sim source target geS geT main 
-                       (fun _ _ => True)
-                       (fun _ _ _ _ _ _ _ => True)
-                       (fun _ _ _ _ _ _ _ => True))
+  (sim : Wholeprog_sim source target geS geT main ge_inv init_inv halt_inv)
   (c : C)
   (d : D)
   (m : M)
@@ -260,12 +261,13 @@ Context  {G TG C D M TM Z data : Type}
          {target : @CoreSemantics TG D TM}
          {geS : G}
          {geT : TG}
+         {ge_inv : G -> TG -> Prop}
+         {init_inv : meminj -> G -> list val -> M -> TG -> list val -> TM -> Prop}
+         {halt_inv : StructuredInjections.SM_Injection ->
+                     G -> val -> M -> TG -> val -> TM -> Prop}
          (main : val)
 
-  (sim : Wholeprog_sim source target geS geT main 
-                       (fun _ _ => True)
-                       (fun _ _ _ _ _ _ _ => True)
-                       (fun _ _ _ _ _ _ _ => True)).
+  (sim : Wholeprog_sim source target geS geT main ge_inv init_inv halt_inv).
 
 Lemma termination_preservation:
   forall cd c m d tm j c' m' rv1,
@@ -318,13 +320,13 @@ Context  {G TG C D M TM Z data : Type}
          {target : @CoreSemantics TG D TM}
          {geS : G}
          {geT : TG}
+         {ge_inv : G -> TG -> Prop}
+         {init_inv : meminj -> G -> list val -> M -> TG -> list val -> TM -> Prop}
+         {halt_inv : StructuredInjections.SM_Injection ->
+                     G -> val -> M -> TG -> val -> TM -> Prop}
          (main : val)
 
-  (sim : Wholeprog_sim source target geS geT main 
-                       (fun _ _ => True)
-                       (fun _ _ _ _ _ _ _ => True)
-                       (fun _ _ _ _ _ _ _ => True))
-
+  (sim : Wholeprog_sim source target geS geT main ge_inv init_inv halt_inv)
   (TGT_DET : corestep_fun target).
 
 Lemma termination_reflection:

@@ -101,9 +101,16 @@ Qed.
 
 Variable main : Values.val.
 
+Lemma find_syms :
+  forall (i : 'I_N) (id : ident) (bf : block),
+  Genv.find_symbol (Modsem.ge (sems_S i)) id = Some bf ->
+  Genv.find_symbol (Modsem.ge (sems_T i)) id = Some bf.
+Proof.
+Admitted. (*TODO*)
+
 Notation lifted_sim := 
   (CE.lifted_sim asm_modules_nucular plt modules_inject domeq_S domeq_T 
-     sim_C domeq_C nuke_C main).
+     find_syms sim_C domeq_C nuke_C main).
 
 (** Starting from matching source--target states, the source/target
  programs equiterminate when linked with [C], assuming the source
@@ -111,7 +118,7 @@ Notation lifted_sim :=
 
 Theorem context_equiv cd mu l1 m1 l2 m2 
   (source_safe : forall n, closed_safety.safeN source_linked_semantics ge_top n l1 m1) 
-  (match12 : Wholeprog_simulation.match_state lifted_sim cd mu l1 m1 l2 m2) :
+  (match12 : Wholeprog_sim.match_state lifted_sim cd mu l1 m1 l2 m2) :
   (terminates source_linked_semantics ge_top l1 m1 
    <-> terminates target_linked_semantics ge_top l2 m2).
 Proof. 

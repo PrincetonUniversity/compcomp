@@ -23,7 +23,7 @@ Require Import wholeprog_lemmas.
 Require Import closed_safety.
 Require Import core_semantics_lemmas.
 
-Import Wholeprog_simulation.
+Import Wholeprog_sim.
 Import SM_simulation.
 Import Linker. 
 Import Modsem.
@@ -53,6 +53,11 @@ Variable ge_top : ge_ty.
 Variable domeq_S0 : forall ix : 'I_N0, genvs_domain_eq ge_top (sems_S0 ix).(ge).
 Variable domeq_T0 : forall ix : 'I_N0, genvs_domain_eq ge_top (sems_T0 ix).(ge). 
 
+Variable find_symbol_ST : 
+  forall (i : 'I_N0) id bf, 
+  Genv.find_symbol (ge (sems_S0 i)) id = Some bf -> 
+  Genv.find_symbol (ge (sems_T0 i)) id = Some bf.
+
 Variable C : Modsem.t.   
 Variable sim_C : SM_simulation_inject C.(sem) C.(sem) C.(ge) C.(ge).
 Variable domeq_C : genvs_domain_eq ge_top C.(ge).
@@ -72,6 +77,15 @@ Definition extend_sems (f : 'I_N0 -> Modsem.t) (ix : 'I_N) : Modsem.t :=
 Let sems_S := extend_sems sems_S0.
 
 Let sems_T := extend_sems sems_T0.
+
+Lemma find_symbol_ST' : 
+  forall (i : 'I_N) id bf, 
+  Genv.find_symbol (ge (sems_S i)) id = Some bf -> 
+  Genv.find_symbol (ge (sems_T i)) id = Some bf.
+Proof.
+rewrite /sems_S /sems_T /extend_sems=> i id bf.
+by case: (lt_dec i N0)=> // pf; apply: find_symbol_ST.
+Qed.
 
 Lemma sims (ix : 'I_N) :
   let s := sems_S ix in
@@ -129,15 +143,17 @@ by apply: domeq_C.
 Qed.
 
 Lemma lifted_sim (main : val) :
-  Wholeprog_simulation linker_S linker_T ge_top ge_top main.
+  CompCert_wholeprog_sim linker_S linker_T ge_top ge_top main.
 Proof.
-apply: link=> //; first by apply: nucular_T.
+apply: link=> //. 
+by apply: find_symbol_ST'.
+by apply: nucular_T.
 by apply: sm_inject.
 by apply: genvs_domeq_S.
 by apply: genvs_domeq_T.
 Qed.
 
-Import Wholeprog_simulation.
+Import Wholeprog_sim.
 
 Lemma context_equiv 
     (main : val)  
@@ -148,7 +164,7 @@ Lemma context_equiv
   (terminates linker_S ge_top l1 m1 <-> terminates linker_T ge_top l2 m2).
 Proof.
 have target_det: corestep_fun linker_T by apply: linking_det.
-apply: (equitermination _ _ target_det _ _ _ _ _ _ source_safe match12).
+by apply (equitermination _ _ target_det _ _ _ _ _ _ source_safe match12).
 Qed.
 
 End ContextEquiv.
