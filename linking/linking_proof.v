@@ -51,7 +51,7 @@ Require Import nucular_semantics.
 (* linking/linking_spec.v for the specification of the theorem that's     *)
 (* proved).                                                               *)
 
-Import Wholeprog_simulation.
+Import Wholeprog_sim.
 Import SM_simulation.
 Import Linker. 
 Import Modsem.
@@ -139,9 +139,9 @@ case: H1=> _ []_; case/(_ b)=> X Y Z; case: Y; first by exists isGlob.
 by move=> x FND; apply: (H3 _ _ FND).
 Qed.
 
-Lemma link (main : val) : Wholeprog_simulation linker_S linker_T my_ge my_ge main.
+Lemma link (main : val) : CompCert_wholeprog_sim linker_S linker_T my_ge my_ge main.
 Proof.
-eapply Build_Wholeprog_simulation
+eapply Build_Wholeprog_sim
   with (core_data   := sig_data N (fun ix : 'I_N => (sims sims' ix).(core_data)))
        (core_ord    := sig_ord (fun ix : 'I_N => (sims sims' ix).(core_ord)))
        (match_state := R).
@@ -153,7 +153,8 @@ eapply Build_Wholeprog_simulation
 { by apply: genvs_domain_eq_refl. }
 
 {(* Case: [core_initial] *)
-  move=> j c1 vals1 m1 vals2 m2 init1 inj vinj pres reach wd vgenv vval.
+  move=> j c1 vals1 m1 vals2 m2 init1.
+  case=>inj []vinj []pres []reach []wd []vgenv vval.
   move: init1. 
   rewrite /= /LinkerSem.initial_core.
   case e: main=> [//|//|//|//|b ofs].
@@ -332,7 +333,7 @@ eapply Build_Wholeprog_simulation
   by case: (Integers.Int.eq _ _). }(*END [Case: core_initial]*)
     
 {(*[Case: diagram]*)
-move=> st1 m1 st1' m1' U1 STEP data st2 mu m2 INV. 
+move=> st1 m1 st1' m1' STEP data st2 mu m2 INV. 
 case: STEP=> STEP STEP_EFFSTEP; case: STEP.
 
 {(*[Subcase: corestep0]*)
@@ -340,11 +341,14 @@ move=> STEP.
 set c1 := peekCore st1.
 set c2 := peekCore st2.
 
-have [c1' [STEP0 [U1'_EQ [c1_args [c1_rets [c1_locs ST1']]]]]]:
-   exists c1',
+have [U1 [c1' [STEP0 [ESTEP0 [U1'_EQ [c1_args [c1_rets [c1_locs ST1']]]]]]]]:
+   exists (U1:block -> Z -> bool) c1',
        Coresem.corestep 
          (t := effect_instance (sem (cores_S (Core.i c1)))) 
          (ge (cores_S (Core.i c1))) (Core.c c1) m1 c1' m1' 
+   /\  effect_semantics.effstep 
+         (sem (cores_S (Core.i c1)))
+         (ge (cores_S (Core.i c1))) U1 (Core.c c1) m1 c1' m1'
    /\ (forall b ofs, U1 b ofs -> 
        RC.reach_set (ge (cores_S (Core.i c1))) (Core.c c1) m1 b)
    /\ RC.args (Core.c (c INV)) = RC.args c1'
@@ -356,20 +360,14 @@ have [c1' [STEP0 [U1'_EQ [c1_args [c1_rets [c1_locs ST1']]]]]]:
   { move: (STEP_EFFSTEP STEP)=> EFFSTEP.
     move: STEP; rewrite/LinkerSem.corestep0=> [][]c1' []B C. 
     move: EFFSTEP; rewrite/effstep0.
-    move=> []? []/=; rewrite/RC.effstep=> [][]EFFSTEP []u1 []args []rets locs D.
-    exists c1'. split=> //. split=> //.
+    move=> []U1 []/=; rewrite/RC.effstep=> x [][]EFFSTEP []u1 []args []rets locs D.
+    exists U1, c1'. split=> //. split=> //.
+    by move: C D=> ->; move/updCore_inj_upd=> ->; split. 
     by move: C D=> ->; move/updCore_inj_upd=> ->; split. }
-
-have EFFSTEP: 
-    effect_semantics.effstep 
-    (sem (cores_S (Core.i c1)))
-    (ge (cores_S (Core.i c1))) U1 (Core.c c1) m1 c1' m1'.
-  { move: (STEP_EFFSTEP STEP); rewrite/effstep0=> [][] c1'' [] STEP0' ST1''. 
-    by rewrite ST1'' in ST1'; rewrite -(updCore_inj_upd ST1'). }
 
 (* specialize core diagram at module (Core.i c1) *)
 move: (effcore_diagram _ _ _ _ (sims sims' (Core.i c1))).  
-move/(_ _ _ _ _ _ EFFSTEP).
+move/(_ _ _ _ _ _ ESTEP0).
 case: (R_inv INV)=> pf []pf_sig []mupkg []mus []mu_eq.
 move=> []pf2 hdinv tlinv.
 
@@ -408,22 +406,26 @@ set data'  := (existT (fun ix => core_data (sims sims' ix)) (Core.i c1) cd').
 set mu'    := mu_top'.
 exists st2', m2', data', mu'. 
 
+Require Import core_semantics_lemmas.
+
 have [n STEPN]: 
- exists n, effstepN (sem (cores_T (Core.i c2)))
-   (ge (cores_T (Core.i c2))) n U2 (Core.c (d INV)) m2 c2'' m2'. 
+ exists n, corestepN (sem (cores_T (Core.i c2)))
+   (ge (cores_T (Core.i c2))) n (Core.c (d INV)) m2 c2'' m2'. 
  { set T := C \o cores_T.
    case: STEP'. case=> n step; exists (S n).
    set P := fun ix (x : T ix) (y : T ix) => 
-             effstepN (sem (cores_T ix))
-             (ge (cores_T ix)) (S n) U2 x m2 y m2'.
+             corestepN (sem (cores_T ix))
+             (ge (cores_T ix)) (S n) x m2 y m2'.
    change (P (Core.i c2) (Core.c c2) c2''); apply: cast_indnatdep2.
-   by move: step; have ->: pf = peek_ieq INV by apply: proof_irr.
+   move: step; have ->: pf = peek_ieq INV by apply: proof_irr.
+   by apply: effstepN_corestepN.
    case; case=> n step _; exists n.
    set P := fun ix (x : T ix) (y : T ix) => 
-             effstepN (sem (cores_T ix))
-             (ge (cores_T ix)) n U2 x m2 y m2'.
+             corestepN (sem (cores_T ix))
+             (ge (cores_T ix)) n x m2 y m2'.
    change (P (Core.i c2) (Core.c c2) c2''); apply: cast_indnatdep2.
-   by move: step; have ->: pf = peek_ieq INV by apply: proof_irr. }
+   move: step; have ->: pf = peek_ieq INV by apply: proof_irr. 
+   by apply: effstepN_corestepN. }
 
 split. 
 
@@ -445,6 +447,7 @@ split.
      (c INV) (d INV) pf c1' c2'' _ _ mus
      (STACK.pop (CallStack.callStack (s1 INV))) 
      (STACK.pop (CallStack.callStack (s2 INV))) U1 n U2 hdinv frameall)=> //=.
+   admit.
    by apply: (R_ge INV).
    by have ->: cast'' pf c2'' = c2' by apply: cast_cast_eq'. }
 

@@ -675,7 +675,7 @@ case hdl:   (handle (ef_sig ef) id l args)=> [l''|//] ->.
 move: hdl; case/handleP=> pf []ix []bf []c []fntbl genv init ->.
 move: init; rewrite /initCore.
 case init: (core_semantics.initial_core _ _ _ _)=> [c'|//]; case=> <-. 
-by apply: (@Corestep_call _ _ ef dep_sig args id).
+by apply: (@Corestep_call _ _ ef dep_sig args id bf).
 case inCtx: (inContext _)=> //.
 case hlt: (halted0 _)=> [rv|//].
 case pop: (popCore _)=> [c|//].

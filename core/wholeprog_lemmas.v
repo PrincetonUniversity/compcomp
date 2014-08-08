@@ -11,79 +11,57 @@ Require Import Axioms.
 
 Require Import mem_lemmas. (*needed for definition of mem_forward etc*)
 Require Import core_semantics.
+Require Import core_semantics_tcs.
 Require Import core_semantics_lemmas.
 Require Import wholeprog_simulations.
 Require Import closed_safety.
 Require Import effect_semantics.
 
-Import Wholeprog_simulation.
+Import Wholeprog_sim.
 
 Arguments match_state : default implicits.
 Arguments core_halted : default implicits.
 Arguments core_data : default implicits.
 Arguments core_ord : default implicits.
 Arguments core_ord_wf : default implicits.
-Arguments effcore_diagram : default implicits.
+Arguments core_diagram : default implicits.
 
 (** * Safety and semantics preservation *)
 
 Section safety_preservation_lemmas.
-Context  {F V TF TV C D Z data : Type}
-         {source : @EffectSem (Genv.t F V) C}
-         {target : @EffectSem (Genv.t TF TV) D}
-         {geS : Genv.t F V}
-         {geT : Genv.t TF TV}
+Context  {G TG C D M TM Z data : Type}
+         {source : @CoreSemantics G C M}
+         {target : @CoreSemantics TG D TM}
+         {geS : G}
+         {geT : TG}
          (main : val)
 
-  (sim : Wholeprog_simulation source target geS geT main)
+  (sim : Wholeprog_sim source target geS geT main 
+                       (fun _ _ => True)
+                       (fun _ _ _ _ _ _ _ => True)
+                       (fun _ _ _ _ _ _ _ => True))
   (c : C)
   (d : D)
-  (m : mem)
-  (tm: mem)
-
-  (P : val -> mem -> Prop)
-  (P_good : forall j v tv m tm, val_inject j v tv -> Mem.inject j m tm -> P v m -> P tv tm)
+  (m : M)
+  (tm: TM)
 
   (TGT_DET : corestep_fun target)
   
-  (source_safe : forall n, safeN source geS n c m)
-.
+  (source_safe : forall n, safeN source geS n c m).
 
 Definition my_P := fun (x: core_data sim) => 
-   forall j (c : C) (d : D) (m tm : mem),
+   forall j (c : C) (d : D) (m : M) (tm : TM),
    (forall n : nat, safeN source geS n c m) ->
    match_state sim x j c m d tm ->
    (exists rv : val, halted source c = Some rv) \/
-   (exists (cd' : core_data sim) j' (c' : C) (m' : mem),
+   (exists (cd' : core_data sim) j' (c' : C) (m' : M),
       corestep_plus source geS c m c' m' /\
-      ((exists (d' : D) (tm' : mem),
+      ((exists (d' : D) (tm' : TM),
           corestep_plus target geT d tm d' tm' /\
           match_state sim cd' j' c' m' d' tm') \/
        (exists rv : val,
         halted source c' = Some rv 
         /\ match_state sim cd' j' c' m' d tm))).
-
-Lemma core_diagram : 
-  forall st1 m1 st1' m1', 
-    corestep source geS st1 m1 st1' m1' ->
-    forall cd st2 mu m2,
-      match_state sim cd mu st1 m1 st2 m2 ->
-      exists st2', exists m2', exists cd', exists mu',
-        match_state sim cd' mu' st1' m1' st2' m2' /\
-        ((corestep_plus target geT st2 m2 st2' m2') \/
-          corestep_star target geT st2 m2 st2' m2' /\
-          core_ord sim cd' cd).
-Proof.
-intros. apply effax2 in H. destruct H as [M H]. 
-exploit effcore_diagram; eauto.
-intros [st2' [m2' [cd' [mu' [mtch' [M' [H2 H3]]]]]]].
-exists st2',m2',cd',mu'; split; auto. 
-destruct H2. left. destruct H1 as [n H1]. 
-eapply effstepN_corestepN in H1. solve[exists n; auto].
-destruct H1 as [H1 H4]. right; split; auto.
-destruct H1 as [n H1]. 
-eapply effstepN_corestepN in H1. solve[exists n; auto].
-Qed.
 
 Lemma corestep_ord:
   forall cd j,
@@ -189,7 +167,7 @@ left.
 unfold halt_match.
 generalize HALT as HALT'; intro.
 apply (core_halted sim cd j c m d tm) in HALT; auto.
-destruct HALT as [j' [rv' [INJ [HALT [INJ2 HLT2]]]]].
+destruct HALT as [j' [rv' [INJ HALT]]].
 exists rv, rv'.
 split; auto.
 }
@@ -212,7 +190,7 @@ split; auto.
 unfold halt_match.
 generalize HALT as HALT'; intro.
 apply (core_halted sim cd' j' c' m' d tm) in HALT; auto.
-destruct HALT as [j'' [rv' [INJ [HALT [INJ2 HLT2]]]]].
+destruct HALT as [j'' [rv' [INJ HALT]]].
 exists rv, rv'.
 split; auto.
 }
@@ -277,15 +255,17 @@ Definition terminates {G C M} (csem : CoreSemantics G C M)
   /\ exists v, halted csem c' = Some v.
 
 Section termination_preservation.
-Context  {F V TF TV C D Z data : Type}
-         {source : @EffectSem (Genv.t F V) C}
-         {target : @EffectSem (Genv.t TF TV) D}
-         {geS : Genv.t F V}
-         {geT : Genv.t TF TV}
+Context  {G TG C D M TM Z data : Type}
+         {source : @CoreSemantics G C M}
+         {target : @CoreSemantics TG D TM}
+         {geS : G}
+         {geT : TG}
          (main : val)
 
-  (sim : Wholeprog_simulation source target geS geT main)
-.
+  (sim : Wholeprog_sim source target geS geT main 
+                       (fun _ _ => True)
+                       (fun _ _ _ _ _ _ _ => True)
+                       (fun _ _ _ _ _ _ _ => True)).
 
 Lemma termination_preservation:
   forall cd c m d tm j c' m' rv1,
@@ -299,7 +279,7 @@ destruct H0 as [n H0].
 revert cd j c m d tm H H0.
 induction n; intros.
 simpl in H0. symmetry in H0; inv H0.
-cut (@halt_match F V _ _ C D source target c d). intro.
+cut (@halt_match G _ C D _ _ source target c d). intro.
 unfold halt_match in H0.
 destruct H0 as [rv [trv [? ?]]].
 exists d, tm; split; auto. 
@@ -307,7 +287,7 @@ solve[exists O; simpl; auto].
 solve[exists trv; auto].
 generalize H1 as H1'; intro.
 eapply core_halted in H1; eauto. 
-destruct H1 as [? [rv2 [? [? [? ?]]]]]. 
+destruct H1 as [? [rv2 [? ?]]].
 exists rv1, rv2; split; auto.
 simpl in H0.
 destruct H0 as [c2 [m2 [STEP STEPN]]].
@@ -333,17 +313,19 @@ Qed.
 End termination_preservation.
 
 Section equitermination.
-Context  {F V TF TV C D Z data : Type}
-         {source : @EffectSem (Genv.t F V) C}
-         {target : @EffectSem (Genv.t TF TV) D}
-         {geS : Genv.t F V}
-         {geT : Genv.t TF TV}
+Context  {G TG C D M TM Z data : Type}
+         {source : @CoreSemantics G C M}
+         {target : @CoreSemantics TG D TM}
+         {geS : G}
+         {geT : TG}
          (main : val)
 
-  (sim : Wholeprog_simulation source target geS geT main)
+  (sim : Wholeprog_sim source target geS geT main 
+                       (fun _ _ => True)
+                       (fun _ _ _ _ _ _ _ => True)
+                       (fun _ _ _ _ _ _ _ => True))
 
-  (TGT_DET : corestep_fun target)
-.
+  (TGT_DET : corestep_fun target).
 
 Lemma termination_reflection:
   forall n c m d tm cd j d' tm' hv'
@@ -354,9 +336,9 @@ Lemma termination_reflection:
     terminates source geS c m.
 Proof.
 set (my_P := fun (n : nat) => 
-   forall (c : C) (m : mem) (d : D) (tm : mem) 
+   forall (c : C) (m : M) (d : D) (tm : TM) 
      (cd : core_data sim) (j : StructuredInjections.SM_Injection) 
-     (d' : D) (tm' : mem) (hv' : val),
+     (d' : D) (tm' : TM) (hv' : val),
    (forall n0 : nat, safeN source geS n0 c m) ->
    match_state sim cd j c m d tm ->
    corestepN target geT n d tm d' tm' ->

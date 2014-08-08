@@ -132,7 +132,7 @@ CORE=Extensionality.v base.v eq_dec.v Address.v \
   arguments.v compcert.v \
   closed_safety.v closed_safety_weak.v trace_semantics.v\
   nucular_semantics.v \
-  wholeprog_simulations.v wholeprog_lemmas.v wholeprog_lemmas_weak.v \
+  wholeprog_simulations.v wholeprog_lemmas.v \
   barebones_simulations.v \
   val_casted.v
 

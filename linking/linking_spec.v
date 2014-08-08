@@ -46,7 +46,7 @@ Require Import Values.
 (* where >< denotes the semantic linking operation defined in             *)
 (* compcert_linking.v.                                                    *)
 
-Import Wholeprog_simulation.
+Import Wholeprog_sim.
 Import SM_simulation.
 Import Linker. 
 Import Modsem.
@@ -74,7 +74,7 @@ Axiom link : forall
   let linker_S := effsem N sems_S plt in
   let linker_T := effsem N sems_T plt in forall
   (main : val), 
-  Wholeprog_simulation linker_S linker_T ge_top ge_top main.
+  CompCert_wholeprog_sim linker_S linker_T ge_top ge_top main.
 
 End LINKING_SIMULATION.
 

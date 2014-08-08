@@ -45,7 +45,7 @@ Unset Printing Implicit Defensive.
 Require Import Values.   
 Require Import nucular_semantics.
 
-Import Wholeprog_simulation.
+Import Wholeprog_sim.
 Import SM_simulation.
 Import Linker. 
 Import Modsem.
