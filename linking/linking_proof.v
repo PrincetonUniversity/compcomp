@@ -406,7 +406,24 @@ set data'  := (existT (fun ix => core_data (sims sims' ix)) (Core.i c1) cd').
 set mu'    := mu_top'.
 exists st2', m2', data', mu'. 
 
-Require Import core_semantics_lemmas.
+have [n STEPN]:
+  exists n, effstepN (sem (cores_T (Core.i c2)))
+    (ge (cores_T (Core.i c2))) n U2 (Core.c (d INV)) m2 c2'' m2'.
+{ set T := C \o cores_T.
+  case: STEP'. case=> n step; exists (S n).
+  set P := fun ix (x : T ix) (y : T ix) =>
+             effstepN (sem (cores_T ix))
+                      (ge (cores_T ix)) (S n) U2 x m2 y m2'.
+  change (P (Core.i c2) (Core.c c2) c2''); apply: cast_indnatdep2.
+  by move: step; have ->: pf = peek_ieq INV by apply: proof_irr.
+  case; case=> n step _; exists n.
+  set P := fun ix (x : T ix) (y : T ix) =>
+             effstepN (sem (cores_T ix))
+                      (ge (cores_T ix)) n U2 x m2 y m2'.
+  change (P (Core.i c2) (Core.c c2) c2''); apply: cast_indnatdep2.
+    by move: step; have ->: pf = peek_ieq INV by apply: proof_irr. }
+
+(*Require Import core_semantics_lemmas.
 
 have [n STEPN]: 
  exists n, corestepN (sem (cores_T (Core.i c2)))
@@ -425,7 +442,7 @@ have [n STEPN]:
              (ge (cores_T ix)) n x m2 y m2'.
    change (P (Core.i c2) (Core.c c2) c2''); apply: cast_indnatdep2.
    move: step; have ->: pf = peek_ieq INV by apply: proof_irr. 
-   by apply: effstepN_corestepN. }
+   by apply: effstepN_corestepN. }*)
 
 split. 
 
@@ -447,15 +464,14 @@ split.
      (c INV) (d INV) pf c1' c2'' _ _ mus
      (STACK.pop (CallStack.callStack (s1 INV))) 
      (STACK.pop (CallStack.callStack (s2 INV))) U1 n U2 hdinv frameall)=> //=.
-   admit.
    by apply: (R_ge INV).
    by have ->: cast'' pf c2'' = c2' by apply: cast_cast_eq'. }
 
  (* tail_inv *)
  { eapply tail_inv_step with (Esrc := U1) (Etgt := U2) (mu' := mu_top'); eauto.
-   by apply: (effstep_unchanged _ _ _ _ _ _ _ EFFSTEP).
+   by apply: (effstep_unchanged _ _ _ _ _ _ _ ESTEP0).
    by move: STEPN; apply: effect_semantics.effstepN_unchanged.
-   by move: (effax1 EFFSTEP)=> []; move/corestep_fwd.
+   by move: (effax1 ESTEP0)=> []; move/corestep_fwd.
    move=> ? ? X; move: (PERM U1_DEF' _ _ X)=> []Y Z; split=> //.
    by eapply effstepN_valid in STEPN; eauto.
    by apply: (head_valid hdinv).
@@ -494,7 +510,7 @@ split.
    by move: H; rewrite mu_eq. 
    by rewrite mu_eq. }
 
-exists U2; split=> //; case: STEP'=> STEP'.
+case: STEP'=> STEP'.
 
 have STEP'': 
   effstep_plus (sem (cores_T (Core.i c2)))
@@ -505,7 +521,8 @@ have STEP'':
              (ge (cores_T ix)) U2 x m2 y m2'.
    change (P (Core.i c2) (Core.c c2) c2''); apply: cast_indnatdep2.
    by move: STEP'; have ->: pf = peek_ieq INV by apply: proof_irr. }
-by left; move: STEP''; apply: stepPLUS_STEPPLUS.
+left; move: STEP''; move/(@stepPLUS_STEPPLUS _ _ fun_tbl my_ge).
+by case=> m H; apply effstepN_corestepN in H; exists m; apply: H.
 
 have STEP'': 
   effstep_star (sem (cores_T (Core.i c2)))
@@ -516,7 +533,8 @@ have STEP'':
              (ge (cores_T ix)) U2 x m2 y m2'.
    change (P (Core.i c2) (Core.c c2) c2''); apply: cast_indnatdep2.
    by case: STEP'; have ->: pf = peek_ieq INV by apply: proof_irr; by []. }
-right; split; first by move: STEP''; apply: stepSTAR_STEPSTAR.
+right; move: STEP''; move/(@stepSTAR_STEPSTAR _ _ fun_tbl my_ge).
+case=> m H; apply effstepN_corestepN in H; split; first by exists m; apply: H.
 rewrite /sig_ord /data' /=.
 
 have eq: Core.i c1 = projT1 data.
@@ -532,15 +550,14 @@ case AT1: (LinkerSem.at_external0 st1)=> [[[ef1 sig1] args1]|].
 
 {(*[Subcase: at_external0]*)
 case FID: (LinkerSem.fun_id ef1)=> [id|//].
-case HDL: (LinkerSem.handle _)=> [st1''|//] eq1 A.
+case HDL: (LinkerSem.handle _ _ _ _)=> [st1''|//] eq1.
 have wd: SM_wd mu by apply: (R_wd INV).
 have INV': R data (Inj.mk wd) st1 m1 st2 m2 by [].
 case: (atext2 AT1 INV')=> args2 AT2.
 case: (hdl2 find_symbol_ST my_ge_S my_ge_T AT1 HDL INV' AT2)=> 
   cd' []st2' []mu' []HDL2 INV2.
 exists st2',m2,cd',mu'; split=> //; first by rewrite eq1.
-set (empty_U := fun (_ : block) (_ : Z) => false); exists empty_U; split=> //.
-left; exists O=> /=; exists st2',m2,empty_U,empty_U; split=> //.
+left; exists O=> /=; exists st2',m2; split=> //.
 constructor=> //. 
 right; split=> //; split=> //.
 by move/LinkerSem.corestep_not_at_external0; rewrite AT2.
@@ -553,7 +570,7 @@ case HLT1: (LinkerSem.halted0 st1)=> [rv|].
 
 {(*[Subcase: halted0]*)
 case POP1: (popCore st1)=> [st1''|//].
-case AFT1: (LinkerSem.after_external (Some rv) st1'')=> [st1'''|//] eq1 A.
+case AFT1: (LinkerSem.after_external (Some rv) st1'')=> [st1'''|//] eq1.
 
 have mu_wd: SM_wd mu. 
 { by apply: (R_wd INV). }
@@ -565,8 +582,7 @@ case: (aft2 my_ge_S HLT1 POP1 INV' AFT1)=>
   rv2 []st2'' []st2' []cd' []mu' []HLT2 CTX2 POP2 AFT2 INV''.
 exists st2',m2,cd',mu'.
 split=> //; first by rewrite eq1.
-exists (fun _ _ => false); split=> //.
-left; exists O=> /=; exists st2',m2,(fun _ _ => false),(fun _ _ => false).
+left; exists O=> /=; exists st2',m2.
 split=> //.
 rewrite /effstep; split=> //.
 rewrite /LinkerSem.corestep; right; split=> //.
@@ -611,16 +627,18 @@ have hlt10:
 case: (core_halted (sims sims' (Core.i (c inv'))) _ _ _ _ _ _ mtch0 hlt10).
 move=> v2' []inj []vinj hlt2'.
 
-exists (as_inj mupkg),v2'; split.
+exists mupkg,v2'; split.
 
+rewrite /cc_halt_inv.
 rewrite -meminj_preserves_genv2blocks.
 rewrite (genvs_domain_eq_match_genvs (my_ge_S (Core.i (c inv')))).
 rewrite meminj_preserves_genv2blocks.
 case: (match_genv mtch0)=> ext isGlob_frgn.
 rewrite match_genv_meminj_preserves_extern_iff_all=> //.
-by apply: Inj_wd.
+split=> //. 
 split; first by apply: (val_inject_restrictD _ _ _ _ vinj).
-split; first by [].
+by [].
+by apply: Inj_wd.
 rewrite /= hlt2.
 move: hlt2; rewrite /LinkerSem.halted.
 case e: (~~ inContext c2)=> //.
@@ -675,7 +693,8 @@ Lemma link :
     sem := RC.effsem (sem (sems_S ix)) |} in
   let linker_S := effsem N sems_S0 plt in
   let linker_T := effsem N sems_T plt in
-  forall main : val, Wholeprog_simulation linker_S linker_T ge_top ge_top main.
+  forall main : val, 
+  CompCert_wholeprog_sim linker_S linker_T ge_top ge_top main.
 Proof. by move=> *; apply: link. Qed.
 
 End LinkingSimulation.
