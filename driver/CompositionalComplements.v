@@ -106,7 +106,12 @@ Lemma find_syms :
   Genv.find_symbol (Modsem.ge (sems_S i)) id = Some bf ->
   Genv.find_symbol (Modsem.ge (sems_T i)) id = Some bf.
 Proof.
-Admitted. (*TODO*)
+intros idx id bf.
+unfold sems_S, sems_T; simpl.
+generalize (transf idx); intros H.
+apply transf_clight_program_preserves_syms with (s := id) in H.
+rewrite H; auto.
+Qed.
 
 Notation lifted_sim := 
   (CE.lifted_sim asm_modules_nucular plt modules_inject domeq_S domeq_T 

@@ -424,3 +424,77 @@ Proof.
   eapply TransformLNR_partial in LNR. 2: eauto.
   eapply transf_cminor_program_correct; eassumption. 
 Qed.
+
+(* Prove that global symbols are preserved by compilation. *)
+
+Theorem transf_rtl_program_preserves_syms:
+  forall p tp, 
+  transf_rtl_program p = OK tp ->
+  forall s : ident,
+  Genv.find_symbol (Genv.globalenv tp) s =
+  Genv.find_symbol (Genv.globalenv p) s.
+Proof.
+  intros. 
+  unfold transf_rtl_program in H.
+  repeat rewrite compose_print_identity in H.
+  simpl in H. 
+  set (p1 := Tailcall.transf_program p) in *.
+  set (p2 := Renumber.transf_program p1) in *.
+  destruct (Allocation.transf_program p2) as [p3|] eqn:?; simpl in H; try discriminate.
+  set (p4 := Tunneling.tunnel_program p3) in *.
+  destruct (Linearize.transf_program p4) as [p5|] eqn:?; simpl in H; try discriminate.
+  set (p6 := CleanupLabels.transf_program p5) in *.
+  destruct (Stacking.transf_program p6) as [p7|] eqn:?; simpl in H; try discriminate.
+  generalize (TailcallproofEFF.symbols_preserved p s); intro Heqr5.
+  generalize (RenumberproofEFF.symbols_preserved p1 s); intro Heqr4.
+  apply AllocproofEFF.symbols_preserved with (s:=s) in Heqr.
+  generalize (TunnelingproofEFF.symbols_preserved p3 s); intro Heqr3.
+  apply LinearizeproofEFF.symbols_preserved with (id:=s) in Heqr0.
+  generalize (CleanupLabelsproofEFF.symbols_preserved p5 s); intro Heqr2.
+  apply StackingproofEFF.symbols_preserved with (id:=s) in Heqr1.
+  apply AsmgenproofEFF.symbols_preserved with (id:=s) in H.
+  rewrite H, Heqr1; unfold p6; rewrite Heqr2, Heqr0. 
+  unfold p4; rewrite Heqr3, Heqr.
+  unfold p2; rewrite Heqr4; unfold p1; rewrite Heqr5; auto.
+Qed.
+
+Theorem transf_cminor_program_preserves_syms:
+  forall p tp,
+  transf_cminor_program p = OK tp ->
+  forall s : ident,
+  Genv.find_symbol (Genv.globalenv tp) s =
+  Genv.find_symbol (Genv.globalenv p) s.
+Proof.
+  intros.
+  unfold transf_cminor_program in H.
+  repeat rewrite compose_print_identity in H.
+  simpl in H. 
+  destruct (SelectionNEW.sel_program p) as [p1|] eqn:?; simpl in H; try discriminate.
+  destruct (RTLgen.transl_program p1) as [p2|] eqn:?; simpl in H; try discriminate.
+  apply transf_rtl_program_preserves_syms with (s:=s) in H; rewrite H.
+  apply RTLgenproofEFF.symbols_preserved with (s:=s) in Heqr0; rewrite Heqr0.
+  generalize (SelectionproofEFF.symbols_preserved p hf s); intros H2.
+  revert Heqr; unfold SelectionNEW.sel_program, bind.
+  rewrite HelpersOK; inversion 1; rewrite H2; auto.
+Qed.
+
+Theorem transf_clight_program_preserves_syms:
+  forall p tp,
+  transf_clight_program p = OK tp ->
+  forall s : ident,
+  Genv.find_symbol (Genv.globalenv tp) s =
+  Genv.find_symbol (Genv.globalenv p) s.
+Proof.
+  intros.
+  unfold transf_clight_program in H.
+  repeat rewrite compose_print_identity in H.
+  simpl in H. 
+  destruct (SimplLocals.transf_program p) as [p1|] eqn:?; simpl in H; try discriminate.
+  destruct (Cshmgen.transl_program p1) as [p2|] eqn:?; simpl in H; try discriminate.
+  destruct (Cminorgen.transl_program p2) as [p3|] eqn:?; simpl in H; try discriminate.
+  apply SimplLocalsproofEFF.symbols_preserved with (s := s) in Heqr.
+  apply CshmgenproofEFF.symbols_preserved with (s := s) in Heqr0.
+  apply CminorgenproofRestructured.symbols_preserved with (s := s) in Heqr1.
+  apply transf_cminor_program_preserves_syms with (s := s) in H.
+  rewrite H, Heqr1, Heqr0, Heqr; auto.
+Qed.
