@@ -1,4 +1,4 @@
-Require Import Axioms.
+Require Import compcert.lib.Axioms.
 
 Require Import sepcomp. Import SepComp.
 
@@ -455,7 +455,7 @@ Definition at_external0 (l: linker N my_cores) :=
 
 Arguments at_external0 !l.
 
-Require Import val_casted. (*for val_has_type_func*)
+Require Import core.val_casted. (*for val_has_type_func*)
 
 Definition halted0 (l: linker N my_cores) :=
   let: c   := peekCore l in
@@ -710,6 +710,13 @@ move=> []newCore []H1 H2; rewrite/halted.
 case Hcx: (~~ inContext _)=>//; case Hht: (halted0 _)=>//.
 move: Hht; rewrite/halted0; apply corestep_not_halted in H1. 
 by move: H1=> /= ->. 
+Qed.
+
+Lemma corestep_not_halted0' m c m' c' : corestep0 c m c' m' -> halted0 c = None.
+Proof.
+move=> []newCore []H1 H2; rewrite/halted.
+case Hht: (halted0 _)=>//.
+by move: Hht; rewrite/halted0; apply corestep_not_halted in H1; rewrite /= H1.
 Qed.
 
 Lemma corestep_not_at_external (ge : ge_ty) m c m' c' : 
