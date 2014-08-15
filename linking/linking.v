@@ -366,14 +366,15 @@ End handle_lems.
 
 Definition main_sig := mksignature nil (Some Tint).
 
-Definition initial_core (tt: ge_ty) (v: val) (args: list val)
+Definition initial_core (ge: ge_ty) (v: val) (args: list val)
   : option (linker N my_cores) :=
-  if v is Vptr id ofs then 
+  if v is Vptr bf ofs then 
   if Int.eq ofs Int.zero then
+  if Genv.invert_symbol ge bf is Some id then
   if my_fn_tbl id is Some ix then
-  if initCore my_cores main_sig ix (Vptr id Int.zero) args is Some c 
+  if initCore my_cores main_sig ix (Vptr bf Int.zero) args is Some c 
   then Some (mkLinker my_fn_tbl (CallStack.singl c))
-  else None else None else None else None.
+  else None else None else None else None else None.
 
 (* Functions suffixed w/ 0 always operate on the running core on the (top *)
 (* of the) call stack.                                                    *)
@@ -432,7 +433,7 @@ Definition at_external (l: linker N my_cores) :=
   if at_external0 l is Some (ef, dep_sig, args) 
     then if fun_id ef is Some id then
          if fn_tbl l id is None then Some (ef, dep_sig, args) else None
-         else None
+         else Some (ef, dep_sig, args)
   else at_external0 l.
 
 Definition after_external (mv: option val) (l: linker N my_cores) :=

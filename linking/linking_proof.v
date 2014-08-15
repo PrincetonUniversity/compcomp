@@ -8,7 +8,7 @@ Require Import Axioms. (*for proof_irr*)
 
 (* sepcomp imports *)
 
-Require Import sepcomp. Import SepComp. 
+Require Import linking.sepcomp. Import SepComp. 
 Require Import arguments.
 
 Require Import pos.
@@ -158,9 +158,10 @@ eapply Build_Wholeprog_sim
   move: init1. 
   rewrite /= /LinkerSem.initial_core.
   case e: main=> [//|//|//|//|b ofs].
-  case f: (fun_tbl b)=> [ix|//].
-  case g: (initCore _ _ _ _)=> [x|//].
   case h: (Integers.Int.eq _ _)=> //.
+  case i: (Genv.invert_symbol _ _)=> // [id].
+  case f: (fun_tbl id)=> [ix|//].
+  case g: (initCore _ _ _ _)=> [x|//].
   case.
   move=> <-.
   case: x g=> ix1 c0 init1.
@@ -328,9 +329,7 @@ eapply Build_Wholeprog_sim
 
   by apply: (Nuke_sem.wmd_initial _ vval vgenv_ix wd init2).
   by move=> ix'; move: vgenv; apply: valid_genvs_domain_eq.
-  by apply: ord_dec. 
-  by case: (Integers.Int.eq _ _).
-  by case: (Integers.Int.eq _ _). }(*END [Case: core_initial]*)
+  by apply: ord_dec. }(*END [Case: core_initial]*)
     
 {(*[Case: diagram]*)
 move=> st1 m1 st1' m1' STEP data st2 mu m2 INV. 
@@ -422,27 +421,6 @@ have [n STEPN]:
                       (ge (cores_T ix)) n U2 x m2 y m2'.
   change (P (Core.i c2) (Core.c c2) c2''); apply: cast_indnatdep2.
     by move: step; have ->: pf = peek_ieq INV by apply: proof_irr. }
-
-(*Require Import core_semantics_lemmas.
-
-have [n STEPN]: 
- exists n, corestepN (sem (cores_T (Core.i c2)))
-   (ge (cores_T (Core.i c2))) n (Core.c (d INV)) m2 c2'' m2'. 
- { set T := C \o cores_T.
-   case: STEP'. case=> n step; exists (S n).
-   set P := fun ix (x : T ix) (y : T ix) => 
-             corestepN (sem (cores_T ix))
-             (ge (cores_T ix)) (S n) x m2 y m2'.
-   change (P (Core.i c2) (Core.c c2) c2''); apply: cast_indnatdep2.
-   move: step; have ->: pf = peek_ieq INV by apply: proof_irr.
-   by apply: effstepN_corestepN.
-   case; case=> n step _; exists n.
-   set P := fun ix (x : T ix) (y : T ix) => 
-             corestepN (sem (cores_T ix))
-             (ge (cores_T ix)) n x m2 y m2'.
-   change (P (Core.i c2) (Core.c c2) c2''); apply: cast_indnatdep2.
-   move: step; have ->: pf = peek_ieq INV by apply: proof_irr. 
-   by apply: effstepN_corestepN. }*)
 
 split. 
 
