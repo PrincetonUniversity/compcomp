@@ -1,20 +1,23 @@
-                         Installation
-                         ============
+INSTALL
 
-Compositional CompCert builds under Coq 8.4pl4 plus Ssreflect 1.5 and MathComp
-1.5. If you do not have Ssreflect+MathComp, you will be able to build everything
-but the files in the linking/ subdirectory (horizontal composition/proofs) and
+Compositional CompCert builds under Coq 8.4pl4 plus Ssreflect
+1.5 and MathComp 1.5. If you do not have Ssreflect+MathComp,
+you will be able to build everything but the files in the
+linking/ subdirectory (horizontal composition/proofs) and
 driver/CompilerComplements.v, which depends on linking/.
 
-To build just the proof, unzip the .tgz file, go to the root directory, 
+To build, unzip the .tgz file, go to the root directory,
 and type:
   ./configure ia32-linux
   make depend
-  make proof
-
-To build the compiler, do:
-  ./configure ia32-linux
-  make depend
   make
+
+CUSTOM SSREFLECT INSTALLATION
+
+If your Ssreflect/MathComp are installed in a nonstandard
+place (e.g., in your home directory rather than system-wide),
+edit variables SSREFLECT and MATHCOMP in the Makefile to
+point to appropriate installation directories.
+
 
 
