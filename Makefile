@@ -20,9 +20,29 @@ DIRS=lib common $(ARCH)/$(VARIANT) $(ARCH) backend cfrontend core linking driver
 
 RECDIRS=lib common backend cfrontend core linking driver flocq exportclight
 
-COQINCLUDES=$(foreach d, $(RECDIRS), -R $(d) -as compcert.$(d)) \
+# NOTE:
+# To use a nonstandard Ssreflect+MathComp installation, 
+# change the following two configuration variables to 
+# point to the base directories of your Ssreflect and 
+# MathComp installations.
+
+# If SSREFLECT is set to "" (default), no additional 
+# include directives will be passed to coqc.
+
+SSREFLECT=""
+MATHCOMP=""
+
+COQINCLUDES0=$(foreach d, $(RECDIRS), -R $(d) -as compcert.$(d)) \
   -I $(ARCH)/$(VARIANT) -as compcert.$(ARCH).$(VARIANT) \
   -I $(ARCH) -as compcert.$(ARCH)
+
+ifeq ($(SSREFLECT),"")
+  COQINCLUDES=$(COQINCLUDES0)
+else 
+  COQINCLUDES=$(COQINCLUDES0) \
+  -I $(SSREFLECT)/src -R $(SSREFLECT)/theories -as Ssreflect \
+  -R $(MATHCOMP)/theories -as MathComp
+endif
 
 CAMLINCLUDES=$(patsubst %,-I %, $(DIRS)) -I extraction -I cparser
 
@@ -140,7 +160,7 @@ CORE=Extensionality.v base.v eq_dec.v Address.v \
 
 LINKING=cast.v pos.v stack.v seq_lemmas.v pred_lemmas.v core_semantics_tcs.v \
   sepcomp.v gallina_coresem.v inj_lemmas.v join_sm.v reestablish.v wf_lemmas.v\
-  linking_spec.v linking.v compcert_linking.v linking_lemmas.v compcert_linking_lemmas.v \
+  linking_spec.v linking.v compcert_linking.v compcert_linking_lemmas.v \
   disjointness.v reach_lemmas.v rc_semantics.v rc_semantics_lemmas.v \
   linking_inv.v ret_lemmas.v call_lemmas.v linking_proof.v context_equiv.v
 
@@ -257,7 +277,10 @@ driver/Configuration.ml: Makefile.config VERSION
          echo let version = "\"$$version\"") \
         > driver/Configuration.ml
 
-depend: $(FILES) exportclight/Clightdefs.v
+.depend: 
+	touch .depend
+
+depend: $(FILES) exportclight/Clightdefs.v .depend
 	$(COQDEP) $^ \
         | sed -e 's|$(ARCH)/$(VARIANT)/|$$(ARCH)/$$(VARIANT)/|g' \
               -e 's|$(ARCH)/|$$(ARCH)/|g' \

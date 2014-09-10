@@ -20,17 +20,7 @@ their standard CompCert counterparts.
 
 BUILDING:
 
-Compositional CompCert builds under Coq 8.4pl4+Ssreflect 1.5. If you
-do not have Ssreflect, you will be able to build everything but the
-files in the linking/ subdirectory (horizontal composition/proofs) 
-and driver/CompilerComplements.v, which depends on linking/.
-
-To build, unzip the .tgz file, go to the root directory, and type:
-  ./configure ia32-cygwin
-  touch .depend
-  make depend
-  make proof
-
+See INSTALL.
 
 FILES:
 
