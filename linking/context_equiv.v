@@ -167,6 +167,30 @@ have target_det: corestep_fun linker_T by apply: linking_det.
 by apply (equitermination _ _ target_det _ _ _ _ _ _ source_safe match12).
 Qed.
 
+Lemma init_context_equiv l1 m1 m2 j vals1 vals2 
+  (main : val)
+  (targets_det : forall ix : 'I_N, corestep_fun (sem (sems_T ix))) 
+  (source_safe : forall n, closed_safety.safeN linker_S ge_top n l1 m1)
+  (init1 : initial_core linker_S ge_top main vals1 = Some l1)
+  (init1_inv : cc_init_inv j ge_top vals1 m1 ge_top vals2 m2) :
+  exists l2, 
+  [/\ initial_core linker_T ge_top main vals2 = Some l2 
+    & (terminates linker_S ge_top l1 m1 <-> terminates linker_T ge_top l2 m2)].
+Proof.
+eapply @core_initial 
+  with (Sem1 := linker_S) (Sem2 := linker_T) 
+       (ge1 := ge_top) (ge2 := ge_top) 
+       (halt_inv := cc_halt_inv)
+       (j := j)
+       (main := main)
+       (m1 := m1)
+       (m2 := m2)
+       (w := lifted_sim main)
+  in init1; eauto.
+case init1=> mu []cd []c2 []H []H2 H3; exists c2; split=> //.
+eapply context_equiv; eauto.
+Qed.
+
 End ContextEquiv.
 
 End ContextEquiv.
