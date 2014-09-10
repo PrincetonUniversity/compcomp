@@ -29,8 +29,8 @@ RECDIRS=lib common backend cfrontend core linking driver flocq exportclight
 # If SSREFLECT is set to "" (default), no additional 
 # include directives will be passed to coqc.
 
-SSREFLECT=""
-MATHCOMP=""
+SSREFLECT="/u/jsseven/Downloads/ssreflect-1.5"
+MATHCOMP="/u/jsseven/Downloads/mathcomp-1.5"
 
 COQINCLUDES0=$(foreach d, $(RECDIRS), -R $(d) -as compcert.$(d)) \
   -I $(ARCH)/$(VARIANT) -as compcert.$(ARCH).$(VARIANT) \
@@ -140,11 +140,15 @@ CFRONTEND=Ctypes.v Cop.v Csyntax.v Csem.v Cstrategy.v Cexec.v \
 
 # Core separate compilation modules (in core/)
 
-CORE=Extensionality.v base.v eq_dec.v Address.v \
-  Coqlib2.v mem_lemmas.v mem_wd.v \
-  core_semantics.v core_semantics_lemmas.v extspec.v step_lemmas.v \
+CORE=Extensionality.v \
+  base.v eq_dec.v Address.v \
+  Coqlib2.v \
+  mem_lemmas.v mem_wd.v \
+  core_semantics.v core_semantics_lemmas.v \
+  extspec.v step_lemmas.v \
   StructuredInjections.v \
-  effect_semantics.v reach.v effect_simulations.v rg_lemmas.v \
+  effect_semantics.v reach.v effect_simulations.v \
+  rg_lemmas.v \
   effect_simulations_lemmas.v effect_properties.v effect_corediagram_trans.v \
   effect_simulations_trans.v \
   FiniteMaps.v mem_interpolation_defs.v mem_interpolation_II.v \
