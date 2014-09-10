@@ -8,7 +8,7 @@ Require Import Axioms. (*for proof_irr*)
 
 (* sepcomp imports *)
 
-Require Import linking.sepcomp. Import SepComp. 
+Require Import sepcomp. Import SepComp. 
 Require Import arguments.
 
 Require Import pos.

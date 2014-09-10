@@ -1,4 +1,4 @@
-Require Import compcert.lib.Axioms.
+Require Import Axioms.
 
 Require Import sepcomp. Import SepComp.
 
@@ -456,7 +456,7 @@ Definition at_external0 (l: linker N my_cores) :=
 
 Arguments at_external0 !l.
 
-Require Import core.val_casted. (*for val_has_type_func*)
+Require Import val_casted. (*for val_has_type_func*)
 
 Definition halted0 (l: linker N my_cores) :=
   let: c   := peekCore l in
