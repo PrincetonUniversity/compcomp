@@ -205,7 +205,7 @@ Lemma corestepN_splits_lt
   corestep_fun csem -> 
   corestepN csem ge (S n1) c m c' m' -> 
   corestepN csem ge n2 c m c'' m'' -> 
-  (n1 < n2)%nat -> 
+  (S n1 <= n2)%nat -> 
   exists a b,
     (a > O)%nat
     /\ (b=0 -> S n1=n2)%nat
@@ -217,7 +217,7 @@ intros FN H1 H2 LT.
 revert c m n1 H1 H2 LT.
 induction n2; intros.
 destruct n1; try inv LT.
-destruct n1. 
+destruct n1.
 destruct H1 as [c2' [m2' [STEP STEPN]]].
 inv STEPN.
 exists (S O), n2.
