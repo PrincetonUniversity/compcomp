@@ -1429,41 +1429,31 @@ Qed.
 
 Lemma vis_inv_step (c c' : Core.t cores_S) :
   vis_inv c mu -> 
-  RC.args (Core.c c)=RC.args (Core.c c') -> 
-  RC.rets (Core.c c)=RC.rets (Core.c c') -> 
   RC.locs (Core.c c') 
-    = (fun b => freshloc m1 m1' b 
-             || RC.reach_set (ge (cores_S (Core.i c))) (Core.c c) m1 b
-             || RC.reach_set (ge (cores_S (Core.i c))) (Core.c c) m1' b) ->
+    = REACH m1' (fun b => StructuredInjections.freshloc m1 m1' b
+                       || RC.reach_set (ge (cores_S (Core.i c))) (Core.c c) m1 b) ->
   REACH_closed m1 (vis mu) -> 
   vis_inv c' mu'.
 Proof.
-move=> E A B C rc; move: E.
+move=> E C rc; move: E.
 case=> E; apply: Build_vis_inv=> b F.
 move: F; rewrite/RC.roots/in_mem/=; move/orP=> [|F].
-rewrite -A -B=> F. 
+move=> F.
 by apply: (intern_incr_vis _ _ incr); apply: E; apply/orP; left.
 case G: (RC.locs (Core.c c) b).
 by apply: (intern_incr_vis _ _ incr); apply: E; apply/orP; right.
-move: C F=> ->; case/orP=> H.
-case: {H}(orP H)=> H.
-move: alloc; rewrite sm_locally_allocatedChar /vis; case. 
-by move=> _ []_ []-> _; rewrite H -orb_assoc orb_comm.
-suff: vis mu b. 
-rewrite /vis; case: incr=> _ []_ []sub1 []_ []_ []_ []<- _; case/orP.
-by move/sub1=> ->.
-by move=> ->; rewrite orb_comm.
-apply: rc; apply: (REACH_mono _ _ _ _ _ H)=> b0 H2. 
-move: (E b0); rewrite /in_mem /=; apply.
-apply: (RC.roots_domains_eq _ H2).
-by apply: genvs_domain_eq_sym; apply: (my_ge_S (Core.i c)).
+move: C F=> -> H.
 apply: visrc; apply: (REACH_mono _ _ _ _ _ H)=> b0 H2. 
+case: {H2}(orP H2)=> H2.
+move: alloc; rewrite sm_locally_allocatedChar /vis; case. 
+by move=> _ []_ []-> _; rewrite H2 -orb_assoc orb_comm.
 suff: vis mu b0. 
 rewrite /vis; case: incr=> _ []_ []sub1 []_ []_ []_ []<- _; case/orP.
 by move/sub1=> ->.
 by move=> ->; rewrite orb_comm.
-move: (E b0); rewrite /in_mem /=; apply.
-apply: (RC.roots_domains_eq _ H2).
+apply: rc; apply: (REACH_mono _ _ _ _ _ H2)=> b2 H3. 
+move: (E b2); rewrite /in_mem /=; apply.
+apply: (RC.roots_domains_eq _ H3).
 by apply: genvs_domain_eq_sym; apply: (my_ge_S (Core.i c)).
 Qed.
 
@@ -1472,12 +1462,9 @@ Lemma head_inv_step
     cd cd' mus s1 s2 U n V :
   head_inv pf cd mu mus m1 m2 -> 
   frame_all mus m1 m2 s1 s2 -> 
-  RC.args (Core.c c)=RC.args c' -> 
-  RC.rets (Core.c c)=RC.rets c' -> 
   RC.locs c' 
-    = (fun b => freshloc m1 m1' b 
-             || RC.reach_set (ge (cores_S (Core.i c))) (Core.c c) m1 b
-             || RC.reach_set (ge (cores_S (Core.i c))) (Core.c c) m1' b) ->
+    = REACH m1' (fun b => StructuredInjections.freshloc m1 m1' b
+                       || RC.reach_set (ge (cores_S (Core.i c))) (Core.c c) m1 b) ->
   effect_semantics.effstep 
     (sem (cores_S (Core.i c))) (ge (cores_S (Core.i c))) U 
     (Core.c c) m1 c' m1' -> 
@@ -1490,7 +1477,7 @@ Lemma head_inv_step
     (cast'' pf (Core.c (Core.upd d d'))) m2' -> 
   @head_inv (Core.upd c c') (Core.upd d d') pf cd' mu' mus m1' m2'.
 Proof.
-move=> hdinv frame args rets locs effstep effstepN vgenv mtch.
+move=> hdinv frame locs effstep effstepN vgenv mtch.
 apply: Build_head_inv=> //.
 by apply: (all_relinv_step frame); apply: (head_rel hdinv).
 + case: hdinv=> hdmtch ? A ? ?; apply: (vis_inv_step A)=> //.
@@ -1661,25 +1648,11 @@ Section initCore_lems2.
 
 Context c1 sg ix v vs (init1 : initCore cores_S sg ix v vs = Some c1).
 
-Lemma initCore_args : RC.args (Core.c c1) = vs.
+Lemma initCore_locs : RC.locs (Core.c c1) = (getBlocks vs).
 Proof.
 move: init1; rewrite /initCore /= /RC.initial_core.
 case: (initial_core _ _ _ _)=> // c. 
-by case; case: c1=> ?; case=> ? ? ? ? ? /=; case=> _ _ ->.
-Qed.
-
-Lemma initCore_rets : RC.rets (Core.c c1) = [::].
-Proof.
-move: init1; rewrite /initCore /= /RC.initial_core.
-case: (initial_core _ _ _ _)=> // c. 
-by case; case: c1=> ?; case=> ? ? ? ? ? /=; case=> _ _ _ ->.
-Qed.
-
-Lemma initCore_locs : RC.locs (Core.c c1) = (fun _ => false).
-Proof.
-move: init1; rewrite /initCore /= /RC.initial_core.
-case: (initial_core _ _ _ _)=> // c. 
-by case; case: c1=> ?; case=> ? ? ? ? ? /=; case=> _ _ _ _ ->.
+by case; case: c1=> ?; case=> ? ? ? /=; case=> _ _ ->.
 Qed.
 
 End initCore_lems2.

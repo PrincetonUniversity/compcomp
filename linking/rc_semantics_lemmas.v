@@ -51,14 +51,14 @@ have [c1' init1']:
   exists c1', initial_core eff_S ge_S v vals1 = Some c1'.
 { move: init1; rewrite /= /RC.initial_core.
   case x: (initial_core _ _ _ _)=> //.
-  by case; case: c1=> c ? ? ?; case=> -> _ _ _; exists c. }
+  by case; case: c1=> c ?; case=> -> _; exists c. }
 move: (init v vals1 c1' m1 j0 vals2 m2 dS dT init1').
 case/(_ inj vinj pres H I J K)=> x []c2' []init2' mtch12.
 exists x,c2'; split=> //.
 move: init1; rewrite /= /RC.initial_core; rewrite init1'; case.
-by case: c1=> ? ? ? ?; case=> <- <- <- <- /=. }
+by case: c1=> ? ?; case=> <- <- /=. }
 { move=> st1 m1 st1' m1' U1 estep cd0 st2 mu m2 mtch12.
-move: estep; rewrite /= /RC.effstep=> [][]estep []ctnd' []args []rets locs.
+move: estep; rewrite /= /RC.effstep=> [][]estep []ctnd' locs.
 move: (step (RC.core st1) m1 (RC.core st1') m1' U1 estep cd0).
 case/(_ st2 mu m2 mtch12)=> st2' []m2' []cd' []mu'.
 case=> incr []sep []localloc []mtch12' []U2 []estep' trackback.
@@ -90,7 +90,7 @@ case: (aftext cd0 mu (RC.core st1) st2 m1 e0 vals1 m2 sig vals2 e' ef_sig'
   ty1 ty2 eincr sep wd val inj' vinj' fwd fwd' fS' K fT' L mu' M unch1 unch2).
 move=> cd' []st1' []st2' []aft1' []aft2' mtch12'.
 exists cd'.
-exists (RC.mk st1' (RC.args st1) (ret1 :: RC.rets st1) (RC.locs st1)).
+exists (RC.mk st1' [predU getBlocks [::ret1] & RC.locs st1]).
 exists st2'.
 split=> //.
 by rewrite /= /RC.after_external aft1'. }

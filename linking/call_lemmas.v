@@ -434,20 +434,14 @@ have mu_new_vis_inv: vis_inv my_ge c1 mu_new'.
 { apply: Build_vis_inv=> // b; rewrite /in_mem /= => Y.
   rewrite /vis /mu_new /frgnS /exportedSrc /=.
   move: Y; rewrite /RC.roots; case/orP.
-  case/orP. case/orP. move=> H1.
+  move=> H1.
   have H1': isGlobalBlock (ge (cores_S' (Core.i c1))) b.
   { by rewrite -(isGlob_iffS my_ge_S). }
   by apply: REACH_nil; apply/orP; left.
   move=> getB; apply: REACH_nil; apply/orP; right.
-  have eq: RC.args (Core.c c1) = args1. 
-  { erewrite initCore_args; eauto. }
-  by rewrite eq in getB.
-  have eq: RC.rets (Core.c c1) = [::]. 
-  { erewrite initCore_rets; eauto. }
-  by rewrite eq getBlocksD_nil.
-  have eq: RC.locs (Core.c c1) = (fun _ => false).
+  have eq: RC.locs (Core.c c1) = getBlocks args1.
   { erewrite initCore_locs; eauto. }
-  by rewrite eq. }
+  by rewrite -eq. }
 
 have hdinv_new:
   head_inv nucular_T my_ge pf_new cd_new mu_new' (pkg :: mus) m1 m2.

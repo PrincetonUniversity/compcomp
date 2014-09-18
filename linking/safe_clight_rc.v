@@ -65,9 +65,7 @@ Definition cl_core_inv (c : RC.state CL_core) (m : mem) :=
         [/\ {subset getBlocks args <= RC.reach_set ge c m} 
           , {subset RC.reach_set ge c m <= RC.roots ge c}
           & cl_cont_inv c k m]
-    | CL_Returnstate v k => 
-        [/\ {subset getBlocks [:: v] <= RC.reach_set ge c m}
-          & cl_cont_inv c k m]
+    | CL_Returnstate v k => cl_cont_inv c k m
   end.
 
 Lemma getBlocksP l b : reflect (exists ofs, List.In (Vptr b ofs) l) (b \in getBlocks l).
@@ -198,7 +196,7 @@ case: (eval_expr_lvalue_ind ge e te m P P0)=> //.
   by apply: REACH_nil; apply: (H _ _ _ H4). }
 
 { move=> id l ty H4 H5 H6 b; case/getBlocksP=> ofs; case=> //; case=> <- _.
-  apply: REACH_nil; apply/orP; left; apply/orP; left; apply/orP; left.
+  apply: REACH_nil; apply/orP; left. 
   by apply: (find_symbol_isGlobal _ _ _ H5). }
 
 { by move=> H4 H5 H6 b H7; move: (H4 _ _ H6); apply. }
@@ -214,7 +212,7 @@ move=> H H2 b'; case/getBlocksP=> ofs'; case=> //; case=> <- _; case: H2=> //.
 { by case: H=> H ? ? ? ? ? ?; apply: REACH_nil; apply: H. }
 
 { move=> id l ty H5 H6 H7.
-  apply: REACH_nil; apply/orP; left; apply/orP; left; apply/orP; left.
+  apply: REACH_nil; apply/orP; left.
   by apply: (find_symbol_isGlobal _ _ _ H6). }
 
 { move=> a0 ty l ofs0; move/(eval_expr_reach' H). 
@@ -247,11 +245,9 @@ by move=> Heq; subst a; apply/getBlocksP; exists ofs; constructor.
 by move=> H8; apply/getBlocksP; exists ofs; right.
 Qed.
 
-Lemma freelist_effect_reach b ofs f k e te args rets locs m :
+Lemma freelist_effect_reach b ofs f k e te locs m :
   let: c := {|
      RC.core := CL_State f (Sreturn None) k e te;
-     RC.args := args;
-     RC.rets := rets;
      RC.locs := locs |} in
    FreelistEffect m (blocks_of_env e) b ofs ->
    cl_state_inv c m e te -> 
@@ -294,63 +290,52 @@ Lemma cont_inv_find_label c lbl s k s' k' m :
   cl_cont_inv c k' m.
 Admitted.
 
-Lemma cont_inv_freshlocs c0 c' k m m' args rets locs :
-   let: c := {|RC.core := c0;
-               RC.args := args;
-               RC.rets := rets;
-               RC.locs := locs |} in
-   cl_cont_inv c k m -> 
-   cl_cont_inv
-        {|RC.core := c';
-          RC.args := args;
-          RC.rets := rets;
-          RC.locs := fun b : block =>
-            freshloc m m' b || 
-            RC.reach_set ge c m b ||
-            RC.reach_set ge c m' b |} k m'.
-Proof.
-elim: k=> //= _ _ e te k' H []H2 H3; split=> //.
-+ clear -H2; move: H2; rewrite /cl_state_inv; case=> He Hte; split.
-move=> x b ty H; apply/orP; right; apply/orP; right. 
-by apply: REACH_nil; apply: (He _ _ _ H).
-move=> x v H b H2; apply: REACH_nil; apply/orP; right; apply/orP; right.
-by apply: REACH_nil; apply: p=> //; apply: (Hte _ _ H).
-
-move=> b H /=; apply/orP; right; apply/orP; right.
-
-+ by apply: H.
-Qed.
-
-Lemma state_inv_freshlocs c0 c' m m' args rets locs e te :
+Lemma state_inv_freshlocs c0 c' m m' locs e te :
   let: c := {|RC.core := c0;
-              RC.args := args;
-              RC.rets := rets;
               RC.locs := locs |} in
   cl_state_inv c m e te ->
   cl_state_inv {|
      RC.core := c';
-     RC.args := args;
-     RC.rets := rets;
-     RC.locs := fun b : block =>
-       RC.locs c b || freshloc m m' b || RC.reach_set ge c m b |} m' e te.
+     RC.locs := REACH m' (fun b : block =>
+            freshloc m m' b || 
+            RC.reach_set ge c m b)|} m' e te.
 Proof.
-case=> He Hte; split.
-+ move=> x b ty H; apply/orP; right; apply/orP; right.
-by apply: REACH_nil; apply: (He _ _ _ H).
-+ move=> x v H b H2; apply: REACH_nil; apply/orP; right; apply/orP; right.
-by apply: (Hte _ _ H _ H2).
++ rewrite /cl_state_inv; case=> He Hte; split.
+move=> x b ty H; apply/orP; right.
+by apply: REACH_nil; apply/orP; right; apply: REACH_nil; apply: (He _ _ _ H).
+move=> x v H b H2; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
+by apply/orP; right; apply: (Hte _ _ H _ H2).
+move=> b H; apply/orP; right. simpl. 
+rewrite /RC.reach_set in H. rewrite /in_mem /= in H. 
+rewrite /RC.roots in H; simpl in H.
+apply REACH_split in H; case: H.
+apply: (REACH_mono' (U:=isGlobalBlock ge))=> // b' H2.
+by apply/orP; right; apply: REACH_nil; apply/orP; left.
+by move=> H; apply: (REACH_is_closed _ _ _ H).
 Qed.
 
-Lemma function_entry1_state_inv (c0 : RC.state CL_core) c1 f vargs m e te m' args locs rets : 
+Lemma cont_inv_freshlocs c0 c' k m m' locs :
+   let: c := {|RC.core := c0;
+               RC.locs := locs |} in
+   cl_cont_inv c k m -> 
+   cl_cont_inv
+        {|RC.core := c';
+          RC.locs := REACH m' (fun b : block =>
+            freshloc m m' b || 
+            RC.reach_set ge c m b)|} k m'.
+Proof.
+elim: k=> //= _ _ e te k' H []H2 H3; split=> //.
++ by apply: state_inv_freshlocs.
++ by apply: H.
+Qed.
+
+Lemma function_entry1_state_inv (c0 : RC.state CL_core) c1 f vargs m e te m' locs : 
   let: c := {| RC.core := c0;
-               RC.args := args;
-               RC.rets := rets;
                RC.locs := locs |} in
   let: c' := {| RC.core := c1;
-               RC.args := args;
-               RC.rets := rets;
-               RC.locs := fun b0 : block =>
-                RC.locs c b0 || freshloc m m' b0 || RC.reach_set ge c m b0 |} in
+               RC.locs := REACH m' (fun b : block =>
+                           freshloc m m' b || 
+                           RC.reach_set ge c m b)|} in
   {subset getBlocks vargs <= RC.reach_set ge c m} -> 
   function_entry1 f vargs m e te m' -> 
   cl_state_inv c' m' e te.
@@ -373,15 +358,16 @@ have Hdef: vals_def args.
 rewrite Hdef; exists x; split=> // ret' m' z' Hpost'.
 case: (Hpost _ _ _ Hpost')=> c' []Haft HsafeN; move {Hpost Hpost'}.
 rewrite /RC.after_external /=; case: ret' Haft.
-{ move=> v Haft; exists (RC.mk c' (RC.args c) (v::RC.rets c) (RC.locs c)).
+{ move=> v Haft; exists (RC.mk c' [predU getBlocks [::v] & RC.locs c]).
   rewrite Haft; split=> //; apply: IH=> //. 
   move: Inv; rewrite /cl_core_inv /=.                                          
   move: Haft; rewrite /CL_after_external; case: (RC.core c)=> // fd vs k.
   case: fd=> // ef' tys ty; case=> <-; split.
-  + move=> b Hget; apply: REACH_nil; apply/orP; left; apply/orP; right.
-    case: (getBlocksP _ _ Hget)=> ofs; case=> // ->; apply/getBlocksP; exists ofs.
+  + move=> b Hget; apply: REACH_nil; apply/orP; right.
+    case: (getBlocksP _ _ Hget)=> ofs; case=> // -> /=; apply/orP.
+    left; apply/getBlocksP; exists ofs.
     by constructor.
-  + case: Inv.
+  + case: Inv=> H H2 H3 /=.
                                                                            
                  
   admit. }

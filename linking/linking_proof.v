@@ -308,21 +308,14 @@ eapply Build_Wholeprog_sim
   exists erefl; apply: Build_head_inv=> //.
   apply: Build_vis_inv; rewrite /= /RC.roots /vis /mu_top0 /= /fS.
 
-  have ->: RC.args c = vals1.
-  { by apply: (RC.initial_core_args g). }
-
-  have ->: RC.rets c = [::].
-  { by apply: (RC.initial_core_rets g). }
-
-  have ->: RC.locs c = (fun _ => false).
+  have ->: RC.locs c = getBlocks vals1.
   { by apply: (RC.initial_core_locs g). }
 
   move=> /=; rewrite /in_mem {2}/getBlocks /= => b1 H.
   suff [H2|H2]: isGlobalBlock my_ge b1 \/ getBlocks vals1 b1.
   by apply: REACH_nil; apply/orP; left; rewrite -(isGlob_iffS my_ge_S).
   by apply: REACH_nil; apply/orP; right.
-  case: (orP H)=> //; case/orP=> //; case/orP; first by move=> ->; left.
-  by move=> ->; right.
+  by move: (orP H).
 
   have vgenv_ix: valid_genv (ge (cores_T ix)) m2.
   { by apply: (valid_genvs_domain_eq (my_ge_T ix) vgenv). }
@@ -340,7 +333,7 @@ move=> STEP.
 set c1 := peekCore st1.
 set c2 := peekCore st2.
 
-have [U1 [c1' [STEP0 [ESTEP0 [U1'_EQ [c1_args [c1_rets [c1_locs ST1']]]]]]]]:
+have [U1 [c1' [STEP0 [ESTEP0 [U1'_EQ [c1_locs ST1']]]]]]:
    exists (U1:block -> Z -> bool) c1',
        Coresem.corestep 
          (t := effect_instance (sem (cores_S (Core.i c1)))) 
@@ -350,17 +343,14 @@ have [U1 [c1' [STEP0 [ESTEP0 [U1'_EQ [c1_args [c1_rets [c1_locs ST1']]]]]]]]:
          (ge (cores_S (Core.i c1))) U1 (Core.c c1) m1 c1' m1'
    /\ (forall b ofs, U1 b ofs -> 
        RC.reach_set (ge (cores_S (Core.i c1))) (Core.c c1) m1 b)
-   /\ RC.args (Core.c (c INV)) = RC.args c1'
-   /\ RC.rets (Core.c (c INV)) = RC.rets c1'
    /\ RC.locs c1' 
-      = (fun b => freshloc m1 m1' b 
-               || RC.reach_set (ge (cores_S (Core.i c1))) (Core.c (c INV)) m1 b
-               || RC.reach_set (ge (cores_S (Core.i c1))) (Core.c (c INV)) m1' b)
+      = REACH m1' (fun b => freshloc m1 m1' b 
+                   || RC.reach_set (ge (cores_S (Core.i c1))) (Core.c (c INV)) m1 b)
    /\ st1' = updCore st1 (Core.upd c1 c1').
   { move: (STEP_EFFSTEP STEP)=> EFFSTEP.
     move: STEP; rewrite/LinkerSem.corestep0=> [][]c1' []B C. 
     move: EFFSTEP; rewrite/effstep0.
-    move=> []U1 []/=; rewrite/RC.effstep=> x [][]EFFSTEP []u1 []args []rets locs D.
+    move=> []U1 []/=; rewrite/RC.effstep=> x [][]EFFSTEP []u1 locs D.
     exists U1, c1'. split=> //. split=> //.
     by move: C D=> ->; move/updCore_inj_upd=> ->; split. 
     by move: C D=> ->; move/updCore_inj_upd=> ->; split. }
