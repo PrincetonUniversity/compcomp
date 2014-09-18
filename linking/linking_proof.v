@@ -353,8 +353,9 @@ have [U1 [c1' [STEP0 [ESTEP0 [U1'_EQ [c1_args [c1_rets [c1_locs ST1']]]]]]]]:
    /\ RC.args (Core.c (c INV)) = RC.args c1'
    /\ RC.rets (Core.c (c INV)) = RC.rets c1'
    /\ RC.locs c1' 
-      = (fun b => RC.locs (Core.c (c INV)) b || freshloc m1 m1' b 
-               || RC.reach_set (ge (cores_S (Core.i c1))) (Core.c (c INV)) m1 b)
+      = (fun b => freshloc m1 m1' b 
+               || RC.reach_set (ge (cores_S (Core.i c1))) (Core.c (c INV)) m1 b
+               || RC.reach_set (ge (cores_S (Core.i c1))) (Core.c (c INV)) m1' b)
    /\ st1' = updCore st1 (Core.upd c1 c1').
   { move: (STEP_EFFSTEP STEP)=> EFFSTEP.
     move: STEP; rewrite/LinkerSem.corestep0=> [][]c1' []B C. 

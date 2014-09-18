@@ -152,9 +152,9 @@ Definition effstep ge U c m c' m' :=
   /\ (forall b ofs, U b ofs=true -> reach_set ge c m b=true)
   /\ args c'=args c
   /\ rets c'=rets c
-  /\ locs c' = fun b => locs c b 
-                     || StructuredInjections.freshloc m m' b
-                     || reach_set ge c m b.
+  /\ locs c' = fun b => StructuredInjections.freshloc m m' b
+                     || reach_set ge c m b
+                     || reach_set ge c m' b.
 
 Arguments effstep /.
 

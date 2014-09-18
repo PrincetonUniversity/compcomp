@@ -1432,9 +1432,9 @@ Lemma vis_inv_step (c c' : Core.t cores_S) :
   RC.args (Core.c c)=RC.args (Core.c c') -> 
   RC.rets (Core.c c)=RC.rets (Core.c c') -> 
   RC.locs (Core.c c') 
-    = (fun b => RC.locs (Core.c c) b
-             || freshloc m1 m1' b 
-             || RC.reach_set (ge (cores_S (Core.i c))) (Core.c c) m1 b) ->
+    = (fun b => freshloc m1 m1' b 
+             || RC.reach_set (ge (cores_S (Core.i c))) (Core.c c) m1 b
+             || RC.reach_set (ge (cores_S (Core.i c))) (Core.c c) m1' b) ->
   REACH_closed m1 (vis mu) -> 
   vis_inv c' mu'.
 Proof.
@@ -1443,17 +1443,26 @@ case=> E; apply: Build_vis_inv=> b F.
 move: F; rewrite/RC.roots/in_mem/=; move/orP=> [|F].
 rewrite -A -B=> F. 
 by apply: (intern_incr_vis _ _ incr); apply: E; apply/orP; left.
-case G: (RC.locs (Core.c c) b). 
+case G: (RC.locs (Core.c c) b).
 by apply: (intern_incr_vis _ _ incr); apply: E; apply/orP; right.
-move: G F; rewrite C=> -> /=; case/orP=> H.
+move: C F=> ->; case/orP=> H.
+case: {H}(orP H)=> H.
 move: alloc; rewrite sm_locally_allocatedChar /vis; case. 
 by move=> _ []_ []-> _; rewrite H -orb_assoc orb_comm.
 suff: vis mu b. 
 rewrite /vis; case: incr=> _ []_ []sub1 []_ []_ []_ []<- _; case/orP.
 by move/sub1=> ->.
 by move=> ->; rewrite orb_comm.
-apply: rc; apply: (REACH_mono _ _ _ _ _ H)=> //.
-move=> b0 H2; move: (E b0); rewrite /in_mem /=; apply.
+apply: rc; apply: (REACH_mono _ _ _ _ _ H)=> b0 H2. 
+move: (E b0); rewrite /in_mem /=; apply.
+apply: (RC.roots_domains_eq _ H2).
+by apply: genvs_domain_eq_sym; apply: (my_ge_S (Core.i c)).
+apply: visrc; apply: (REACH_mono _ _ _ _ _ H)=> b0 H2. 
+suff: vis mu b0. 
+rewrite /vis; case: incr=> _ []_ []sub1 []_ []_ []_ []<- _; case/orP.
+by move/sub1=> ->.
+by move=> ->; rewrite orb_comm.
+move: (E b0); rewrite /in_mem /=; apply.
 apply: (RC.roots_domains_eq _ H2).
 by apply: genvs_domain_eq_sym; apply: (my_ge_S (Core.i c)).
 Qed.
@@ -1465,9 +1474,10 @@ Lemma head_inv_step
   frame_all mus m1 m2 s1 s2 -> 
   RC.args (Core.c c)=RC.args c' -> 
   RC.rets (Core.c c)=RC.rets c' -> 
-  RC.locs c' = (fun b => RC.locs (Core.c c) b 
-    || freshloc m1 m1' b
-    || RC.reach_set (ge (cores_S (Core.i c))) (Core.c c) m1 b) ->
+  RC.locs c' 
+    = (fun b => freshloc m1 m1' b 
+             || RC.reach_set (ge (cores_S (Core.i c))) (Core.c c) m1 b
+             || RC.reach_set (ge (cores_S (Core.i c))) (Core.c c) m1' b) ->
   effect_semantics.effstep 
     (sem (cores_S (Core.i c))) (ge (cores_S (Core.i c))) U 
     (Core.c c) m1 c' m1' -> 
@@ -1478,13 +1488,9 @@ Lemma head_inv_step
   match_state (sims (Core.i (Core.upd c c'))) cd' mu'
     (Core.c (Core.upd c c')) m1'
     (cast'' pf (Core.c (Core.upd d d'))) m2' -> 
-  RC.locs c' 
-    = (fun b => RC.locs (Core.c c) b
-             || freshloc m1 m1' b 
-             || RC.reach_set (ge (cores_S (Core.i c))) (Core.c c) m1 b) ->
   @head_inv (Core.upd c c') (Core.upd d d') pf cd' mu' mus m1' m2'.
 Proof.
-move=> hdinv frame args rets mylocs effstep effstepN vgenv mtch locs.
+move=> hdinv frame args rets locs effstep effstepN vgenv mtch.
 apply: Build_head_inv=> //.
 by apply: (all_relinv_step frame); apply: (head_rel hdinv).
 + case: hdinv=> hdmtch ? A ? ?; apply: (vis_inv_step A)=> //.

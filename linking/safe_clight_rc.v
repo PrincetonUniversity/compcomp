@@ -41,9 +41,10 @@ Definition cl_state_inv (c : RC.state CL_core) (m : mem) e te :=
   [/\ forall x b (ty : Ctypes.type), 
         PTree.get x e = Some (b,ty) -> 
         RC.roots ge c b
-    & forall x v,
+    , forall x v,
         PTree.get x te = Some v -> 
         {subset getBlocks [:: v] <= RC.reach_set ge c m}
+    & {subset RC.reach_set ge c m <= RC.roots ge c}
   ].
 
 Fixpoint cl_cont_inv (c : RC.state CL_core) (k : cont) (m : mem) := 
@@ -62,6 +63,7 @@ Definition cl_core_inv (c : RC.state CL_core) (m : mem) :=
         [/\ cl_state_inv c m e te & cl_cont_inv c k m]
     | CL_Callstate f args k => 
         [/\ {subset getBlocks args <= RC.reach_set ge c m} 
+          , {subset RC.reach_set ge c m <= RC.roots ge c}
           & cl_cont_inv c k m]
     | CL_Returnstate v k => 
         [/\ {subset getBlocks [:: v] <= RC.reach_set ge c m}
@@ -199,7 +201,7 @@ case: (eval_expr_lvalue_ind ge e te m P P0)=> //.
   apply: REACH_nil; apply/orP; left; apply/orP; left; apply/orP; left.
   by apply: (find_symbol_isGlobal _ _ _ H5). }
 
-{ by move/(_ a v H3)=> H4 _; apply: H4. }
+{ by move=> H4 H5 H6 b H7; move: (H4 _ _ H6); apply. }
 Qed.
 
 Lemma eval_lvalue_reach c m e te a b ofs :
@@ -209,7 +211,7 @@ Lemma eval_lvalue_reach c m e te a b ofs :
 Proof.
 move=> H H2 b'; case/getBlocksP=> ofs'; case=> //; case=> <- _; case: H2=> //.
 
-{ by case: H=> H ? ? ? ? ?; apply: REACH_nil; apply: H. }
+{ by case: H=> H ? ? ? ? ? ?; apply: REACH_nil; apply: H. }
 
 { move=> id l ty H5 H6 H7.
   apply: REACH_nil; apply/orP; left; apply/orP; left; apply/orP; left.
@@ -303,14 +305,19 @@ Lemma cont_inv_freshlocs c0 c' k m m' args rets locs :
           RC.args := args;
           RC.rets := rets;
           RC.locs := fun b : block =>
-            locs b || freshloc m m' b || RC.reach_set ge c m b |} k m'.
+            freshloc m m' b || 
+            RC.reach_set ge c m b ||
+            RC.reach_set ge c m' b |} k m'.
 Proof.
 elim: k=> //= _ _ e te k' H []H2 H3; split=> //.
 + clear -H2; move: H2; rewrite /cl_state_inv; case=> He Hte; split.
 move=> x b ty H; apply/orP; right; apply/orP; right. 
 by apply: REACH_nil; apply: (He _ _ _ H).
 move=> x v H b H2; apply: REACH_nil; apply/orP; right; apply/orP; right.
-by apply: (Hte _ _ H).
+by apply: REACH_nil; apply: p=> //; apply: (Hte _ _ H).
+
+move=> b H /=; apply/orP; right; apply/orP; right.
+
 + by apply: H.
 Qed.
 
@@ -358,7 +365,8 @@ move=> Inv H n; move: z c m Inv {H} (H n); elim: n=> // n IH z c m Inv H /=.
 rewrite /RC.at_external /RC.halted; move: H=> /=.
 case Hatext: (Clight_coop.CL_at_external _ _)=> // [[[ef sig] args]|].
 have Hhlt: Clight_coop.CL_halted (RC.core c) = None.
-{ admit. }
+{ case: (CL_at_external_halted_excl hf (RC.core c))=> //.
+  rewrite Hatext; discriminate. }
 rewrite Hhlt; case=> x []Hpre Hpost.
 have Hdef: vals_def args.
 { admit. }
@@ -367,6 +375,15 @@ case: (Hpost _ _ _ Hpost')=> c' []Haft HsafeN; move {Hpost Hpost'}.
 rewrite /RC.after_external /=; case: ret' Haft.
 { move=> v Haft; exists (RC.mk c' (RC.args c) (v::RC.rets c) (RC.locs c)).
   rewrite Haft; split=> //; apply: IH=> //. 
+  move: Inv; rewrite /cl_core_inv /=.                                          
+  move: Haft; rewrite /CL_after_external; case: (RC.core c)=> // fd vs k.
+  case: fd=> // ef' tys ty; case=> <-; split.
+  + move=> b Hget; apply: REACH_nil; apply/orP; left; apply/orP; right.
+    case: (getBlocksP _ _ Hget)=> ofs; case=> // ->; apply/getBlocksP; exists ofs.
+    by constructor.
+  + case: Inv.
+                                                                           
+                 
   admit. }
 { move=> ->; exists (RC.mk c' (RC.args c) (RC.rets c) (RC.locs c)); split=> //.
   apply: IH=> //.
