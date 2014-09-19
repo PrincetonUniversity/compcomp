@@ -275,13 +275,30 @@ Lemma freelist_effect_reach b ofs f k e te locs m :
    cl_state_inv c m e te -> 
    {subset RC.reach_set ge c m <= RC.roots ge c} ->
    RC.reach_set ge c m b.
+Proof.
+move=> Hfree Hs Hsub.
+rewrite /FreelistEffect in Hfree.
 Admitted.
 
-(*FIXME*)
 Lemma builtin_effects_reach (c : RC.state CL_core) ef vargs m b ofs :
   BuiltinEffects.BuiltinEffect ge ef vargs m b ofs -> 
   REACH m (getBlocks vargs) b.
-Admitted.
+Proof.
+rewrite /BuiltinEffects.BuiltinEffect; case: ef=> //.
+{ rewrite /BuiltinEffects.free_Effect.
+  elim: vargs m b ofs=> // a l IH m b ofs; case: a=> // b' i.
+  case: l IH=> // _.
+  case Hload: (Mem.load _ _ _ _)=> // [v].
+  case: v Hload=> // i' Hload; case/andP; case/andP; case/andP=> X Y W U.
+  move: X; rewrite /eq_block; case: (Coqlib.peq b b')=> // Heq _; subst b'.
+  by apply: REACH_nil; apply/getBlocksP; exists i; constructor. }
+{ move=> sz z; rewrite /BuiltinEffects.memcpy_Effect.
+  elim: vargs m b ofs=> // a l IH m b ofs; case: a=> // b' i.
+  case: l IH=> // v l IH; case: v IH=> // b'' i'' IH.
+  case: l IH=> // IH.
+  case/andP; case/andP; case/andP; case: (eq_block b b')=> // Heq; subst b'.
+  by move=> _ _ _ _; apply: REACH_nil; apply/getBlocksP; exists i; constructor. }
+Qed.
 
 Lemma eval_expr_reach c m a v : 
   cl_core_inv c m -> 
@@ -301,6 +318,31 @@ Lemma external_call_reach l (ef : external_function) vargs m t v m' :
   external_call ef ge vargs m t v m' -> 
   {subset getBlocks vargs <= REACH m l} -> 
   {subset getBlocks [:: v] <= [predU REACH m l & freshloc m m']}.
+Proof.
+rewrite /BuiltinEffects.observableEF; case: ef=> //.
+{ move=> nm sg H.
+  have Hh: (I64Helpers.is_I64_helper hf nm sg). 
+  { by case: (I64Helpers.is_I64_helper_dec hf nm sg). }
+  move {H}; move: Hh.
+  admit. }
+{ move=> nm sg H.
+  have Hh: (I64Helpers.is_I64_helper hf nm sg). 
+  { by case: (I64Helpers.is_I64_helper_dec hf nm sg). }
+  move {H}; move: Hh.
+  admit. }
+{ move=> _ /=; case=> n m0 m0' b m'' Ha Hs.
+  move: (freshloc_alloc _ _ _ _ _ Ha)=> Ha'.
+  move: (store_freshloc _ _ _ _ _ _ Hs)=> Hs'.
+  have Hf: freshloc m0 m'' = fun b' => Coqlib.proj_sumbool (eq_block b' b).
+  { extensionality b'.
+    move: Ha' Hs'; rewrite -(freshloc_trans m0 m0' m'' b').
+    by move=> -> ->; rewrite orbC.
+    by apply: (alloc_forward _ _ _ _ _ Ha).
+    by apply: (store_forward _ _ _ _ _ _ Hs). }
+  rewrite Hf.
+  move=> Hsub b'; move/getBlocksP; case=> ofs; case=> //; case=> <- _.
+  rewrite in_predU; apply/orP; right; rewrite /in_mem /=.
+  by case: (eq_block b b). }
 Admitted.
 
 Lemma cont_inv_call_cont c k m : 
@@ -442,7 +484,7 @@ rewrite /RC.after_external /=; case: ret' Haft.
   move: Haft; rewrite /CL_after_external; case: (RC.core c)=> // fd vs k.
   case: fd=> // ef' tys ty; case=> <-; case=> H H2 H3 /=. 
   split. 
-  + admit.
+  + by move=> b Hget; apply: REACH_nil; apply/orP; right; apply/orP; left.
   + move: (@cont_inv_mem c k m m' H3); clear.
     by apply: cont_inv_retv. }
 { move=> Heq; rewrite Heq; exists (RC.mk c' (RC.locs c)); split=> //.
@@ -453,7 +495,7 @@ rewrite /RC.after_external /=; case: ret' Haft.
   case: fd=> // ef' tys ty; case=> <- /=.
   move: (@cont_inv_mem c k m m' H3).                                      
   split. 
-  + admit.
+  + by move=> b; move/getBlocksP; case=> ?; case.
   + by apply: cont_inv_retv. }              
 case Hhlt: (Clight_coop.CL_halted (RC.core c))=> [v|].
 { move=> Hexit. 
@@ -559,7 +601,10 @@ move: step Inv Hsafe Hatext Hhlt; case: c=> /= core locs; case.
          freshloc m0 m0' b || RC.reach_set ge c m0 b)).
   exists (RC.mk c'' locs''), m0'=> /=; split.
   exists (BuiltinEffects.BuiltinEffect ge ef vargs m0); split; first by econstructor; eauto.
-  split=> //; first by apply: builtin_effects_reach.
+  split=> //.
+  move=> b ofs; move/(builtin_effects_reach c)=> Hreach.
+  case: Inv=> Hs Hsub Hk; move: (eval_exprlist_reach' Hs Hsub H2)=> H7.
+  by move: Hreach; apply: REACH_mono'.
 
   apply: IH=> //.
   (*reestablish invariant*)
@@ -900,7 +945,10 @@ move: step Inv Hsafe Hatext Hhlt; case: c=> /= core locs; case.
   by move=> b ofs Hfree'; apply: (freelist_effect_reach Hfree' Inv).
   apply: IH=> //.
   move: Inv; case=> Hs Hsub Hk; split. 
-  admit.
+  move=> b Hget; move: (sem_cast_getBlocks Hcast Hget)=> Hget'.
+  move: (eval_expr_reach' Hs Hsub Heval Hget'); case/orP=> H; apply: REACH_nil; apply/orP.
+  by left.
+  by right; apply: REACH_nil; apply/orP; right; apply: REACH_nil; apply/orP; right.
   apply: cont_inv_call_cont.
   by move: Hk; apply: cont_inv_freshlocs. }
 
