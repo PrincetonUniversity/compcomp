@@ -78,12 +78,29 @@ case e: (b \in getBlocks l).
 + apply: ReflectF=> [][]ofs C.
 rewrite /in_mem /= /is_true /= in e.
 move: C e; elim: l=> //= a l IH; case.
+move=> ->; rewrite /getBlocks /= /eq_block.
+have ->: Coqlib.peq b b = left erefl. admit.
+discriminate.
+move/IH.
 Admitted.
 
 Lemma sem_cast_getBlocks v v' ty ty' : 
   Cop.sem_cast v ty ty' = Some v' -> 
   {subset getBlocks [:: v'] <= getBlocks [:: v]}.
-Admitted.
+Proof.
+rewrite /Cop.sem_cast.
+case: (Cop.classify_cast ty ty')=> //; try solve 
+ [ case: v=> // ?; [by case; move=> ->|by move=> ?; case; move=> ->]
+ | by move=> ? ?; case: v=> //; move=> ?; case=> <-
+ | by move=> ?; case: v=> //; move=> ?; case=> <-
+ | by move=> ? ?; case: v=> // ?; case: (Cop.cast_float_int _ _)=> // ?; case=> <-
+ | by move=> ? ?; case: v=> // ?; case: (Cop.cast_float_int _ _)=> // ?; case=> <-
+ | by case: v=> // ?; case=> <-
+ | by move=> ?; case: v=> // ?; case: (Cop.cast_float_long _ _)=> // ?; case=> <- 
+ | by case: v=> // ?; [by case=> // <-|by move=> ?; case=> // <-]
+ | by move=> ? ? ? ?; case: v=> // ? ?; case: (_ && _)=> //; case=> <-
+ | by case=> <-].
+Qed.
 
 Lemma REACH_mono' U V (H: {subset U <= V}) m : {subset REACH m U <= REACH m V}.
 Proof.
@@ -263,7 +280,7 @@ Admitted.
 (*FIXME*)
 Lemma builtin_effects_reach (c : RC.state CL_core) ef vargs m b ofs :
   BuiltinEffects.BuiltinEffect ge ef vargs m b ofs -> 
-  RC.reach_set ge c m b.
+  REACH m (getBlocks vargs) b.
 Admitted.
 
 Lemma eval_expr_reach c m a v : 
@@ -337,13 +354,35 @@ elim: k m m'=> //= _ _ e te k IH m m' []H H2; split=> //.
 by apply: (IH _ _ H2).
 Qed.
 
+Lemma cont_inv_ext1 c c' locs k m :
+  cl_cont_inv {| RC.core := c; RC.locs := locs |} k m -> 
+  cl_cont_inv {| RC.core := c'; RC.locs := locs |} k m.
+Proof.
+elim: k=> // ? ? ? ? ? IH /= [] ? ?; split=> //.
+by apply: IH.
+Qed.
+        
 Lemma cont_inv_retv c k v m :
   cl_cont_inv c k m ->
   cl_cont_inv
      {|
      RC.core := CL_Returnstate v k;
      RC.locs := [predU getBlocks [:: v] & RC.locs c] |} k m.
-Admitted.
+Proof.
+elim: k=> //=.
+by move=> s k IH H; move: (IH H); apply: cont_inv_ext1.
+by move=> s s' k IH H; move: (IH H); apply: cont_inv_ext1.
+by move=> s s' k IH H; move: (IH H); apply: cont_inv_ext1.
+by move=> k IH H; move: (IH H); apply: cont_inv_ext1.
+move=> oid f e te k IH []H H2; split=> //.
+case: H=> He Hte; split.
+move=> x b ty H; case: (orP (He _ _ _ H))=> X; apply/orP; first by left.
+by right; apply/orP; right.
+move=> x v0 H b Hget; case: (orP (Hte _ _ H _ Hget))=> X; apply/orP.
+by left.
+by right; apply/orP; right.
+by move: (IH H2); apply: cont_inv_ext1.
+Qed.
 
 Lemma core_inv_freshlocs locs m m' f s k s' e te :
   let: c := {| RC.core := CL_State f s k e te; RC.locs := locs |} in
@@ -380,14 +419,6 @@ Lemma function_entry1_state_inv (c0 : RC.state CL_core) c1 f vargs m e te m' loc
   cl_state_inv c' m' e te.
 Admitted.
 
-Lemma cont_inv_ext1 c c' locs k m :
-  cl_cont_inv {| RC.core := c; RC.locs := locs |} k m -> 
-  cl_cont_inv {| RC.core := c'; RC.locs := locs |} k m.
-Proof.
-elim: k=> // ? ? ? ? ? IH /= [] ? ?; split=> //.
-by apply: IH.
-Qed.
-        
 Lemma rc_safe z c m :
   cl_core_inv c m -> 
   (forall n, safeN clsem espec ge n z (RC.core c) m) -> 
