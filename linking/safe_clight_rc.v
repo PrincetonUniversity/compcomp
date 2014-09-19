@@ -76,13 +76,11 @@ Proof.
 case e: (b \in getBlocks l).
 + by apply: ReflectT; move: e; rewrite /in_mem /= /is_true /= getBlocks_char.
 + apply: ReflectF=> [][]ofs C.
-rewrite /in_mem /= /is_true /= in e.
-move: C e; elim: l=> //= a l IH; case.
-move=> ->; rewrite /getBlocks /= /eq_block.
-have ->: Coqlib.peq b b = left erefl. admit.
-discriminate.
-move/IH.
-Admitted.
+rewrite /in_mem /= /is_true /= in e; move: C e; elim: l=> //= a l IH; case.
+by move=> ->; rewrite /getBlocks /= /eq_block; case: (Coqlib.peq b b).
+move=> Hin Hget; apply: IH=> //.
+by move: Hget; rewrite getBlocksD; case: a=> // ? ?; rewrite orb_false_iff; case.
+Qed.
 
 Lemma sem_cast_getBlocks v v' ty ty' : 
   Cop.sem_cast v ty ty' = Some v' -> 
@@ -108,11 +106,27 @@ move=> b; rewrite /in_mem /= /is_true /=.
 by apply: REACH_mono; apply: H.
 Qed.
 
+Lemma REACH_loadv chunk m b i b1 ofs1
+  (LDV: Mem.loadv chunk m (Vptr b i) = Some (Vptr b1 ofs1)) L :
+  b \in L -> b1 \in REACH m L.
+Proof.
+move=> H; eapply (REACH_cons _ _ b1 b (Integers.Int.unsigned i) ofs1); 
+  first by apply: REACH_nil.
+move: LDV; rewrite /Mem.loadv; case/Mem.load_valid_access=> H2 H3; apply: H2.
+split; [omega|case: chunk H3=> /= *; omega].
+move: LDV; move/Mem.load_result=> H2; move: (sym_eq H2)=> {H2}H2.
+by case: (decode_val_pointer_inv _ _ _ _ H2)=> -> /=; case=> ->.
+Qed.
+
 Lemma loadv_reach_set ch (c : RC.state CL_core) m b ofs v :
   Mem.loadv ch m (Vptr b ofs) = Some v -> 
-  b \in RC.reach_set ge c m -> 
+  b \in RC.roots ge c -> 
   {subset getBlocks [:: v] <= RC.reach_set ge c m}.
-Admitted.
+Proof.
+case: v=> // b' i'; move/REACH_loadv=> H H2 b'' Hget. 
+move: Hget; case/getBlocksP=> ?; case; case=> ? ?; subst.
+by apply: H.
+Qed.
 
 Lemma eval_expr_reach' c m e te a v : 
   cl_state_inv c m e te ->    
@@ -164,7 +178,7 @@ case: (eval_expr_lvalue_ind ge e te m P P0)=> //.
     by move: H7; case/getBlocksP=> x; case. }    
 
 { move=> op a1 a2 ty v1 v2 v0 H4 H5 H6 H7 H8 b H9; elim: op H6 H8=> /=.
-  + rewrite /Cop.sem_add. 
+  { rewrite /Cop.sem_add. 
     case: (Cop.classify_add _ _)=> //.
     move=> ? ? Heval; case: v1 H4 H5=> // b0 i H4 H5; case: v2 H7 Heval=> // i0 ? ?.
     case=> Heq; subst v0; move: H9; case/getBlocksP=> ?; case=> //; case=> ? ?; subst b0.
@@ -178,22 +192,467 @@ case: (eval_expr_lvalue_ind ge e te m P P0)=> //.
     move=> ? ? Heval; case: v1 H4 H5=> // i H4 H5; case: v2 H7 Heval=> // ? ? H7 Heval.
     case=> Heq; subst v0; apply: H7; case: (getBlocksP _ _ H9)=> ?; case; case=> Heq' _; subst.
     by apply/getBlocksP; eexists; eauto; econstructor; eauto.
-    admit.
-  + admit.
-  + admit.
-  + admit.
-  + admit.
-  + admit.
-  + admit.
-  + admit.
-  + admit.
-  + admit.
-  + admit.
-  + admit.
-  + admit.
-  + admit.
-  + admit.
-  + admit. }
+    move=> Heval; rewrite /Cop.sem_binarith.
+    case: (Cop.sem_cast _ _ _)=> // a'.
+    case: (Cop.sem_cast _ _ _)=> // a''.
+    case: (Cop.classify_binarith _ _)=> //.
+    move=> ?; case: a'=> // i; case: a''=> // ?; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move=> ?; case: a'=> // i; case: a''=> // ?; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    case: a'=> // i; case: a''=> // ?; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. }
+  { move=> Heval; rewrite /Cop.sem_sub.
+    case: (Cop.classify_sub _ _)=> //.
+    move=> ty'.                                     
+    case: v1 H4 H5=> // ? ? Heval' Hp ?; case: v2 H7 Heval=> // i Hp' Heval''; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case; case=> <- _.
+    by apply: Hp; apply/getBlocksP; eexists; econstructor; eauto.
+    move=> ty'.                                     
+    case: v1 H4 H5=> // ? ? Heval' Hp; case: v2 H7 Heval=> // ? ? Hp' Heval''.
+    case: (eq_block _ _)=> // ?; subst.
+    case: (Integers.Int.eq _ _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move=> ty'.                                     
+    move=> ?; case: v1 H4 H5=> // ? ? Heval' Hp; case: v2 H7 Heval=> // ? Hp' Heval''. 
+    case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //; case=> ? _; subst.
+    by apply: Hp; apply/getBlocksP; eexists; econstructor; eauto.
+    rewrite /Cop.sem_binarith.
+    case: (Cop.sem_cast _ _ _)=> // a'.
+    case: (Cop.sem_cast _ _ _)=> // a''.
+    case: (Cop.classify_binarith _ _)=> //.
+    move=> ?; case: a'=> // i; case: a''=> // ?; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move=> ?; case: a'=> // i; case: a''=> // ?; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    case: a'=> // i; case: a''=> // ?; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. }
+  { move=> Heval; rewrite /Cop.sem_mul.
+    rewrite /Cop.sem_binarith.
+    case: (Cop.sem_cast _ _ _)=> // a'.
+    case: (Cop.sem_cast _ _ _)=> // a''.
+    case: (Cop.classify_binarith _ _)=> //.
+    move=> ?; case: a'=> // i; case: a''=> // ?; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move=> ?; case: a'=> // i; case: a''=> // ?; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    case: a'=> // i; case: a''=> // ?; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. }
+  { move=> Heval; rewrite /Cop.sem_div.
+    rewrite /Cop.sem_binarith.
+    case: (Cop.sem_cast _ _ _)=> // a'.
+    case: (Cop.sem_cast _ _ _)=> // a''.
+    case: (Cop.classify_binarith _ _)=> //.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //.
+    case: (_ || _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    case: (Integers.Int.eq _ _)=> //; case=> // ?; subst.                                            
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //.
+    case: (_ || _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    case: (Integers.Int64.eq _ _)=> //; case=> // ?; subst.  
+    move: H9; case/getBlocksP=> ?; case=> //.
+    case: a'=> // i; case: a''=> // ?; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. }
+  { move=> Heval; rewrite /Cop.sem_mod.
+    rewrite /Cop.sem_binarith.
+    case: (Cop.sem_cast _ _ _)=> // a'.
+    case: (Cop.sem_cast _ _ _)=> // a''.
+    case: (Cop.classify_binarith _ _)=> //.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //.
+    case: (_ || _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    case: (Integers.Int.eq _ _)=> //; case=> // ?; subst.                                            
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //.
+    case: (_ || _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    case: (Integers.Int64.eq _ _)=> //; case=> // ?; subst.  
+    move: H9; case/getBlocksP=> ?; case=> //.
+    case: a'=> // i; case: a''=> // ?; case=> ?; subst. }
+  { move: H9; case/getBlocksP=> ?; case=> //.
+    move=> ? Heval; subst; rewrite /Cop.sem_and.
+    rewrite /Cop.sem_binarith.
+    case: (Cop.sem_cast _ _ _)=> // a'.
+    case: (Cop.sem_cast _ _ _)=> // a''.
+    case: (Cop.classify_binarith _ _)=> //.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //.
+    case: a'=> // i; case: a''=> // ?; case: s=> //. }
+  { move=> Heval; subst; rewrite /Cop.sem_or.
+    rewrite /Cop.sem_binarith.
+    case: (Cop.sem_cast _ _ _)=> // a'.
+    case: (Cop.sem_cast _ _ _)=> // a''.
+    case: (Cop.classify_binarith _ _)=> //.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    case: a'=> // i; case: a''=> // ?; case: s=> //; case=> ?; subst. }
+  { move: H9; case/getBlocksP=> ?; case=> //. 
+    move=> Heval; subst; rewrite /Cop.sem_xor.
+    rewrite /Cop.sem_binarith.
+    case: (Cop.sem_cast _ _ _)=> // a'.
+    case: (Cop.sem_cast _ _ _)=> // a''.
+    case: (Cop.classify_binarith _ _)=> //.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //; case=> ?; subst.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //; case=> ?; subst.
+    move=> Heval; case: a'=> // i; case: a''=> // ?; case: s=> //; case=> ?; subst. }
+  { move=> Heval; subst; rewrite /Cop.sem_shl.
+    rewrite /Cop.sem_shift.
+    case: (Cop.classify_shift _ _)=> //.
+    move=> s; case: v1 H4 H5=> // i Heval' Hp.
+    case: v2 H7 Heval=> // i' Heval'' Hp'.
+    case: (Integers.Int.ltu _ _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move=> s; case: v1 H4 H5=> // i Heval' Hp.
+    case: v2 H7 Heval=> // i' Heval'' Hp'.
+    case: (Integers.Int64.ltu _ _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move=> s; case: v1 H4 H5=> // i Heval' Hp.
+    case: v2 H7 Heval=> // i' Heval'' Hp'.
+    case: (Integers.Int64.ltu _ _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move=> s; case: v1 H4 H5=> // i Heval' Hp.
+    case: v2 H7 Heval=> // i' Heval'' Hp'.
+    case: (Integers.Int.ltu _ _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. }
+  { move=> Heval; subst; rewrite /Cop.sem_shr.
+    rewrite /Cop.sem_shift.
+    case: (Cop.classify_shift _ _)=> //.
+    move=> s; case: v1 H4 H5=> // i Heval' Hp.
+    case: v2 H7 Heval=> // i' Heval'' Hp'.
+    case: (Integers.Int.ltu _ _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move=> s; case: v1 H4 H5=> // i Heval' Hp.
+    case: v2 H7 Heval=> // i' Heval'' Hp'.
+    case: (Integers.Int64.ltu _ _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move=> s; case: v1 H4 H5=> // i Heval' Hp.
+    case: v2 H7 Heval=> // i' Heval'' Hp'.
+    case: (Integers.Int64.ltu _ _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move=> s; case: v1 H4 H5=> // i Heval' Hp.
+    case: v2 H7 Heval=> // i' Heval'' Hp'.
+    case: (Integers.Int.ltu _ _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. }
+  { move=> Heval; rewrite/Cop.sem_cmp.
+    case: (Cop.classify_cmp _ _)=> //.
+    rewrite /Val.cmpu_bool.
+    case: v1 H4 H5=> // ? Heval' Hp.
+    case: v2 H7 Heval=> // ? Hp' Heval''.
+    case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> //.
+    move=> Heval'''; case: (Integers.Int.eq _ _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move=> Hp'; case: v2 H7 Heval=> // ? ? ? /=.
+    case: (Integers.Int.eq _ _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move=> Heval'''; case: (eq_block _ _)=> // ?; subst.
+    case: (_ && _)=> //; case=> ?; subst.
+    move: H9; rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> //.
+    case: (_ && _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    case: v2 H7 Heval=> // ? ? ?; rewrite /Val.cmpu_bool.
+    case: v1 H4 H5=> // ? ? ?.
+    case=> ?; subst.                        
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> // ?; subst.
+    move=> ? /=; case: (Integers.Int.eq _ _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    case: v1 H4 H5=> // ? ? ?. 
+    rewrite /Val.cmpu_bool.
+    case: v2 H7 Heval=> // ? ? ?.
+    case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> // ?; subst.
+    case: (Integers.Int.eq _ _)=> // ?; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Cop.sem_binarith.
+    case: (Cop.sem_cast _ _ _)=> // a'.
+    case: (Cop.sem_cast _ _ _)=> // a''.
+    case: (Cop.classify_binarith _ _)=> //.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> // ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> // ?; subst.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int64.eq _ _)=> // ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int64.eq _ _)=> // ?; subst.
+    case: a'=> // i; case: a''=> // ?; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> //.
+    case: (Floats.Float.cmp _ _)=> //.
+    case: (Floats.Float.cmp _ _)=> //. }
+  { move=> Heval; rewrite/Cop.sem_cmp.
+    case: (Cop.classify_cmp _ _)=> //.
+    rewrite /Val.cmpu_bool.
+    case: v1 H4 H5=> // ? Heval' Hp.
+    case: v2 H7 Heval=> // ? Hp' Heval''.
+    case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> //.
+    move=> Heval'''; case: (Integers.Int.eq _ _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move=> Hp'; case: v2 H7 Heval=> // ? ? ? /=.
+    case: (Integers.Int.eq _ _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move=> Heval'''; case: (eq_block _ _)=> // ?; subst.
+    case: (_ && _)=> //; case=> ?; subst.
+    move: H9; rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> //.
+    case: (_ && _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    case: v2 H7 Heval=> // ? ? ?; rewrite /Val.cmpu_bool.
+    case: v1 H4 H5=> // ? ? ?.
+    case=> ?; subst.                        
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> // ?; subst.
+    move=> ? /=; case: (Integers.Int.eq _ _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    case: v1 H4 H5=> // ? ? ?. 
+    rewrite /Val.cmpu_bool.
+    case: v2 H7 Heval=> // ? ? ?.
+    case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> // ?; subst.
+    case: (Integers.Int.eq _ _)=> // ?; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Cop.sem_binarith.
+    case: (Cop.sem_cast _ _ _)=> // a'.
+    case: (Cop.sem_cast _ _ _)=> // a''.
+    case: (Cop.classify_binarith _ _)=> //.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> // ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> // ?; subst.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int64.eq _ _)=> // ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int64.eq _ _)=> // ?; subst.
+    case: a'=> // i; case: a''=> // ?; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> //.
+    case: (Floats.Float.cmp _ _)=> //.
+    case: (Floats.Float.cmp _ _)=> //. }
+  { move=> Heval; rewrite/Cop.sem_cmp.
+    case: (Cop.classify_cmp _ _)=> //.
+    rewrite /Val.cmpu_bool.
+    case: v1 H4 H5=> // ? Heval' Hp.
+    case: v2 H7 Heval=> // ? Hp' Heval''.
+    case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> //.
+    case: (Integers.Int.ltu _ _)=> //.
+    case: (Integers.Int.ltu _ _)=> //.
+    move=> Heval'''; case: (Integers.Int.eq _ _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move=> Hp'; case: v2 H7 Heval=> // ? ? ? /=.
+    case: (Integers.Int.eq _ _)=> //; case=> ?; subst.
+    move=> Heval'''; case: (eq_block _ _)=> // ?; subst.
+    move=> Hp'; case: (_ && _)=> //; case=> H9; subst.
+    move: H9; rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> //.
+    case: (Integers.Int.ltu _ _)=> //.
+    case: (Integers.Int.ltu _ _)=> //.
+    case: (_ && _)=> //; case=> ?; subst.
+    case: v2 H7 Heval=> // ? ? ?; rewrite /Val.cmpu_bool.
+    case: v1 H4 H5=> // ? ? ?.
+    case=> ?; subst.                        
+    move: H9; case/getBlocksP=> ?; case=> //.
+    case: (Integers.Int.ltu _ _)=> //.
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> // ?; subst.
+    case: v1 H4 H5=> // ? ? ?. 
+    rewrite /Val.cmpu_bool.
+    case: v2 H7 Heval=> // ? ? ?.
+    case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    case: (Integers.Int.ltu _ _)=> //.
+    case: (Integers.Int.eq _ _)=> // ?; case=> ?; subst.
+    rewrite /Cop.sem_binarith.
+    case: (Cop.sem_cast _ _ _)=> // a'.
+    case: (Cop.sem_cast _ _ _)=> // a''.
+    case: (Cop.classify_binarith _ _)=> //.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    case: (Integers.Int.lt _ _)=> //.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.ltu _ _)=> // ?; subst.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int64.lt _ _)=> // ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int64.ltu _ _)=> // ?; subst.
+    case: a'=> // i; case: a''=> // ?; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> //.
+    case: (Floats.Float.cmp _ _)=> //.
+    case: (Floats.Float.cmp _ _)=> //. }
+  { move=> Heval; rewrite/Cop.sem_cmp.
+    case: (Cop.classify_cmp _ _)=> //.
+    rewrite /Val.cmpu_bool.
+    case: v1 H4 H5=> // ? Heval' Hp.
+    case: v2 H7 Heval=> // ? Hp' Heval''.
+    case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> //.
+    case: (Integers.Int.ltu _ _)=> //.
+    case: (Integers.Int.ltu _ _)=> //.
+    move=> Heval'''; case: (Integers.Int.eq _ _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move=> Hp'; case: v2 H7 Heval=> // ? ? ? /=.
+    case: (Integers.Int.eq _ _)=> //; case=> ?; subst.
+    move=> Heval'''; case: (eq_block _ _)=> // ?; subst.
+    move=> Hp'; case: (_ && _)=> //; case=> H9; subst.
+    move: H9; rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> //.
+    case: (Integers.Int.ltu _ _)=> //.
+    case: (Integers.Int.ltu _ _)=> //.
+    case: (_ && _)=> //; case=> ?; subst.
+    case: v2 H7 Heval=> // ? ? ?; rewrite /Val.cmpu_bool.
+    case: v1 H4 H5=> // ? ? ?.
+    case=> ?; subst.                        
+    move: H9; case/getBlocksP=> ?; case=> //.
+    case: (Integers.Int.ltu _ _)=> //.
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> // ?; subst.
+    case: v1 H4 H5=> // ? ? ?. 
+    rewrite /Val.cmpu_bool.
+    case: v2 H7 Heval=> // ? ? ?.
+    case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    case: (Integers.Int.ltu _ _)=> //.
+    case: (Integers.Int.eq _ _)=> // ?; case=> ?; subst.
+    rewrite /Cop.sem_binarith.
+    case: (Cop.sem_cast _ _ _)=> // a'.
+    case: (Cop.sem_cast _ _ _)=> // a''.
+    case: (Cop.classify_binarith _ _)=> //.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    case: (Integers.Int.lt _ _)=> //.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.ltu _ _)=> // ?; subst.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int64.lt _ _)=> // ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int64.ltu _ _)=> // ?; subst.
+    case: a'=> // i; case: a''=> // ?; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> //.
+    case: (Floats.Float.cmp _ _)=> //.
+    case: (Floats.Float.cmp _ _)=> //. }
+  { move=> Heval; rewrite/Cop.sem_cmp.
+    case: (Cop.classify_cmp _ _)=> //.
+    rewrite /Val.cmpu_bool.
+    case: v1 H4 H5=> // ? Heval' Hp.
+    case: v2 H7 Heval=> // ? Hp' Heval''.
+    case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> //.
+    case: (Integers.Int.ltu _ _)=> //.
+    case: (Integers.Int.ltu _ _)=> //.
+    move=> Heval'''; case: (Integers.Int.eq _ _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move=> Hp'; case: v2 H7 Heval=> // ? ? ? /=.
+    case: (Integers.Int.eq _ _)=> //; case=> ?; subst.
+    move=> Heval'''; case: (eq_block _ _)=> // ?; subst.
+    move=> Hp'; case: (_ && _)=> //; case=> H9; subst.
+    move: H9; rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> //.
+    case: (Integers.Int.ltu _ _)=> //.
+    case: (Integers.Int.ltu _ _)=> //.
+    case: (_ && _)=> //; case=> ?; subst.
+    case: v2 H7 Heval=> // ? ? ?; rewrite /Val.cmpu_bool.
+    case: v1 H4 H5=> // ? ? ?.
+    case=> ?; subst.                        
+    move: H9; case/getBlocksP=> ?; case=> //.
+    case: (Integers.Int.ltu _ _)=> //.
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> // ?; subst.
+    case: v1 H4 H5=> // ? ? ?. 
+    rewrite /Val.cmpu_bool.
+    case: v2 H7 Heval=> // ? ? ?.
+    case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    case: (Integers.Int.ltu _ _)=> //.
+    case: (Integers.Int.eq _ _)=> // ?; case=> ?; subst.
+    rewrite /Cop.sem_binarith.
+    case: (Cop.sem_cast _ _ _)=> // a'.
+    case: (Cop.sem_cast _ _ _)=> // a''.
+    case: (Cop.classify_binarith _ _)=> //.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    case: (Integers.Int.lt _ _)=> //.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.ltu _ _)=> // ?; subst.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int64.lt _ _)=> // ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int64.ltu _ _)=> // ?; subst.
+    case: a'=> // i; case: a''=> // ?; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> //.
+    case: (Floats.Float.cmp _ _)=> //.
+    case: (Floats.Float.cmp _ _)=> //. }
+  { move=> Heval; rewrite/Cop.sem_cmp.
+    case: (Cop.classify_cmp _ _)=> //.
+    rewrite /Val.cmpu_bool.
+    case: v1 H4 H5=> // ? Heval' Hp.
+    case: v2 H7 Heval=> // ? Hp' Heval''.
+    case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> //.
+    case: (Integers.Int.ltu _ _)=> //.
+    case: (Integers.Int.ltu _ _)=> //.
+    move=> Heval'''; case: (Integers.Int.eq _ _)=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    move=> Hp'; case: v2 H7 Heval=> // ? ? ? /=.
+    case: (Integers.Int.eq _ _)=> //; case=> ?; subst.
+    move=> Heval'''; case: (eq_block _ _)=> // ?; subst.
+    move=> Hp'; case: (_ && _)=> //; case=> H9; subst.
+    move: H9; rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> //.
+    case: (Integers.Int.ltu _ _)=> //.
+    case: (Integers.Int.ltu _ _)=> //.
+    case: (_ && _)=> //; case=> ?; subst.
+    case: v2 H7 Heval=> // ? ? ?; rewrite /Val.cmpu_bool.
+    case: v1 H4 H5=> // ? ? ?.
+    case=> ?; subst.                        
+    move: H9; case/getBlocksP=> ?; case=> //.
+    case: (Integers.Int.ltu _ _)=> //.
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> // ?; subst.
+    case: v1 H4 H5=> // ? ? ?. 
+    rewrite /Val.cmpu_bool.
+    case: v2 H7 Heval=> // ? ? ?.
+    case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    case: (Integers.Int.ltu _ _)=> //.
+    case: (Integers.Int.eq _ _)=> // ?; case=> ?; subst.
+    rewrite /Cop.sem_binarith.
+    case: (Cop.sem_cast _ _ _)=> // a'.
+    case: (Cop.sem_cast _ _ _)=> // a''.
+    case: (Cop.classify_binarith _ _)=> //.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //.
+    case: (Integers.Int.lt _ _)=> //.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.ltu _ _)=> // ?; subst.
+    move=> s; case: a'=> // i; case: a''=> // ?; case: s=> //; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int64.lt _ _)=> // ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int64.ltu _ _)=> // ?; subst.
+    case: a'=> // i; case: a''=> // ?; case=> ?; subst.
+    move: H9; case/getBlocksP=> ?; case=> //. 
+    rewrite /Val.of_bool; case: (Integers.Int.eq _ _)=> //.
+    case: (Floats.Float.cmp _ _)=> //.
+    case: (Floats.Float.cmp _ _)=> //. }
+}
 
 { move=> a0 ty v1 v0 H4 H5 H6 b H7; apply: H5.
   by apply: (sem_cast_getBlocks H6 H7). }
@@ -267,6 +726,19 @@ by move=> Heq; subst a; apply/getBlocksP; exists ofs; constructor.
 by move=> H8; apply/getBlocksP; exists ofs; right.
 Qed.
 
+Lemma freelist_effect_reach' (c : RC.state CL_core) m L b ofs :
+  (forall b z1 z2, List.In (b,z1,z2) L -> b \in RC.roots ge c) ->
+   FreelistEffect m L b ofs ->
+   RC.reach_set ge c m b.
+Proof.
+elim: L c m b ofs=> //; case; case=> a q r l' IH c m b ofs /= H; case/orP.
+by apply: IH=> // x y z H2; apply: (H x y z); right.
+rewrite /FreeEffect.
+case Hval: (valid_block_dec _ _)=> //.
+case: (eq_block _ _)=> // Heq; subst.
+by case/andP; case/andP=> _ _ _; apply: REACH_nil; apply: (H a q r)=> //; left.
+Qed.
+
 Lemma freelist_effect_reach b ofs f k e te locs m :
   let: c := {|
      RC.core := CL_State f (Sreturn None) k e te;
@@ -277,8 +749,12 @@ Lemma freelist_effect_reach b ofs f k e te locs m :
    RC.reach_set ge c m b.
 Proof.
 move=> Hfree Hs Hsub.
-rewrite /FreelistEffect in Hfree.
-Admitted.
+apply: (freelist_effect_reach' (L:=blocks_of_env e)(b:=b)(ofs:=ofs))=> //.
+move=> b' z1 z2; rewrite /blocks_of_env /PTree.elements List.in_map_iff.
+case=> [[x [y z]]] []; subst; case=> ? ? ?; subst.
+move=> Hl; case: (PTree.xelements_complete e _ _ _ _ Hl)=> //.
+by rewrite -PTree.get_xget_h; case: Hs=> He Hte; move/(He _).
+Qed.
 
 Lemma builtin_effects_reach (c : RC.state CL_core) ef vargs m b ofs :
   BuiltinEffects.BuiltinEffect ge ef vargs m b ofs -> 
@@ -313,7 +789,8 @@ rewrite /cl_core_inv; case: (RC.core c)=> //.
 by move=> f s k e te []H U V W; move: H U W; apply: eval_expr_reach'.
 Qed.
 
-Lemma external_call_reach l (ef : external_function) vargs m t v m' : 
+Lemma external_call_reach l (ef : external_function) vargs m t v m' 
+  (Hgbl: {subset isGlobalBlock ge <= l}) :
   ~BuiltinEffects.observableEF hf ef -> 
   external_call ef ge vargs m t v m' -> 
   {subset getBlocks vargs <= REACH m l} -> 
@@ -323,13 +800,149 @@ rewrite /BuiltinEffects.observableEF; case: ef=> //.
 { move=> nm sg H.
   have Hh: (I64Helpers.is_I64_helper hf nm sg). 
   { by case: (I64Helpers.is_I64_helper_dec hf nm sg). }
-  move {H}; move: Hh.
-  admit. }
+  move {H}; move: Hh=> /= H H2; inversion H2; subst; move {H2}.
+  case: H args res H0 H1=> /=. 
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd). }
 { move=> nm sg H.
   have Hh: (I64Helpers.is_I64_helper hf nm sg). 
   { by case: (I64Helpers.is_I64_helper_dec hf nm sg). }
-  move {H}; move: Hh.
-  admit. }
+  move {H}; move: Hh=> /= H H2; inversion H2; subst; move {H2}.
+  case: H args res H0 H1=> /=. 
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd).
+  + rewrite /proj_sig_res /= => ? ? ?; case=> //.
+    move=> ? ? ? Hfnd _ b'; move/getBlocksP; case=> ?; case=> //; case=> <- _.
+    apply/orP; left; apply: REACH_nil. 
+    by apply: Hgbl; apply: (find_symbol_isGlobal _ _ _ Hfnd). }
 { move=> _ /=; case=> n m0 m0' b m'' Ha Hs.
   move: (freshloc_alloc _ _ _ _ _ Ha)=> Ha'.
   move: (store_freshloc _ _ _ _ _ _ Hs)=> Hs'.
@@ -343,18 +956,51 @@ rewrite /BuiltinEffects.observableEF; case: ef=> //.
   move=> Hsub b'; move/getBlocksP; case=> ofs; case=> //; case=> <- _.
   rewrite in_predU; apply/orP; right; rewrite /in_mem /=.
   by case: (eq_block b b). }
-Admitted.
+{ move=> _ /=; case=> b lo sz m0 m0' Hl H2 Hf Hsub.
+  rewrite (freshloc_free _ _ _ _ _ Hf).
+  by move=> b'; move/getBlocksP; case=> ofs; case. }
+{ by move=> sz al _; case. }
+Qed.
 
 Lemma cont_inv_call_cont c k m : 
   cl_cont_inv c k m -> 
   cl_cont_inv c (call_cont k) m.
 Proof. by elim: k. Qed.
 
+Lemma cont_inv_find_label' c lbl s k s' k' m :
+  cl_cont_inv c k m -> 
+  find_label lbl s k = Some (s', k') -> 
+  cl_cont_inv c k' m.
+Proof.
+elim: s k s' k'=> //=.
++ move=> s1 H1 s2 H2 k s' k'.
+  case Hf: (find_label lbl s1 (Kseq s2 k))=> [[x y]|].
+  by move=> Inv; case=> ? ?; subst; apply: (H1 _ _ _ _ Hf).
+  by apply/H2.
++ move=> e s1 H1 s2 H2 k s' k'.
+  case Hf: (find_label lbl s1 k)=> [[x y]|].
+  by move=> Inv; case=> ? ?; subst; apply: (H1 _ _ _ _ Hf).
+  by apply/H2.
++ move=> s1 H1 s2 H2 k s' k'.
+  case Hf: (find_label lbl s1 (Kloop1 s1 s2 k))=> [[x y]|].
+  by move=> ?; case=> ? ?; subst; apply: (H1 _ _ _ _ Hf).
+  move=> Inv Hfnd. 
+  have Inv': cl_cont_inv c (Kloop2 s1 s2 k) m by [].
+  by apply: (H2 _ _ _ Inv' Hfnd).
++ admit. (*need induction principle for mutually recursive find_label_ls here*)
++ move=> l s H k s' k' Inv.
+  case Hid: (ident_eq lbl l)=> // [pf|pf].
+  by case=> ? ?; subst.
+  by move=> Hfnd; apply: (H _ _ _ Inv Hfnd).
+Qed.
+
 Lemma cont_inv_find_label c lbl s k s' k' m :
   cl_cont_inv c k m -> 
   find_label lbl s (call_cont k) = Some (s', k') -> 
   cl_cont_inv c k' m.
-Admitted.
+Proof.
+by move=> H H2; apply: (cont_inv_find_label' (cont_inv_call_cont H) H2).
+Qed.
 
 Lemma state_inv_freshlocs c0 c' m m' locs e te :
   let: c := {|RC.core := c0;
@@ -459,6 +1105,8 @@ Lemma function_entry1_state_inv (c0 : RC.state CL_core) c1 f vargs m e te m' loc
   {subset getBlocks vargs <= RC.reach_set ge c m} -> 
   function_entry1 f vargs m e te m' -> 
   cl_state_inv c' m' e te.
+Proof.
+move=> Hsub; case=> m1 Hno Halloc Hbind ->.
 Admitted.
 
 Lemma rc_safe z c m :
@@ -626,7 +1274,13 @@ move: step Inv Hsafe Hatext Hhlt; case: c=> /= core locs; case.
                  RC.core := CL_State f (Sbuiltin (Some a) ef tyargs a1) k e te;
                  RC.locs := locs |} m0}.
       { by move=> b Hget; move: (H7 _ Hget)=> H7'; apply: REACH_nil. }
-      move: (external_call_reach H4 H3 X)=> H8.
+      have Y: {subset isGlobalBlock ge               
+            <= RC.roots ge
+                {|
+                RC.core := CL_State f (Sbuiltin (Some a) ef tyargs a1) k e te;
+                RC.locs := locs |}}.
+      { by move=> b isGbl; apply/orP; left. }
+      move: (external_call_reach Y H4 H3 X)=> H8.
       case: (ident_eq a x)=> Heq H9.
       + subst x; rewrite PTree.gss in H9; case: H9=> Heq'; subst vres.
         move=> b H9; move: (H8 _ H9); rewrite in_predU; case/orP=> H10.
