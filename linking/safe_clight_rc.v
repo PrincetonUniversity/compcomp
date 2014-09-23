@@ -35,6 +35,16 @@ Variable Z : Type.
 
 Variable espec : external_specification mem external_function Z.
 
+Variable espec_def : 
+  forall ef x tys args z m, 
+  ext_spec_pre espec ef x tys args z m -> 
+  vals_def args.
+
+Variable espec_exit : 
+  forall v z m,
+  ext_spec_exit espec (Some v) z m -> 
+  ~~is_vundef v.
+
 Variable ge : Genv.t fundef Ctypes.type.
 
 Definition cl_state_inv (c : RC.state CL_core) (m : mem) e te := 
@@ -967,31 +977,47 @@ Lemma cont_inv_call_cont c k m :
   cl_cont_inv c (call_cont k) m.
 Proof. by elim: k. Qed.
 
+Scheme statement_ind := Induction for statement Sort Prop
+  with labeled_statements_ind := Induction for labeled_statements Sort Prop.
+
 Lemma cont_inv_find_label' c lbl s k s' k' m :
   cl_cont_inv c k m -> 
   find_label lbl s k = Some (s', k') -> 
   cl_cont_inv c k' m.
 Proof.
-elim: s k s' k'=> //=.
-+ move=> s1 H1 s2 H2 k s' k'.
-  case Hf: (find_label lbl s1 (Kseq s2 k))=> [[x y]|].
-  by move=> Inv; case=> ? ?; subst; apply: (H1 _ _ _ _ Hf).
-  by apply/H2.
-+ move=> e s1 H1 s2 H2 k s' k'.
-  case Hf: (find_label lbl s1 k)=> [[x y]|].
-  by move=> Inv; case=> ? ?; subst; apply: (H1 _ _ _ _ Hf).
-  by apply/H2.
-+ move=> s1 H1 s2 H2 k s' k'.
-  case Hf: (find_label lbl s1 (Kloop1 s1 s2 k))=> [[x y]|].
-  by move=> ?; case=> ? ?; subst; apply: (H1 _ _ _ _ Hf).
-  move=> Inv Hfnd. 
-  have Inv': cl_cont_inv c (Kloop2 s1 s2 k) m by [].
-  by apply: (H2 _ _ _ Inv' Hfnd).
-+ admit. (*need induction principle for mutually recursive find_label_ls here*)
-+ move=> l s H k s' k' Inv.
-  case Hid: (ident_eq lbl l)=> // [pf|pf].
-  by case=> ? ?; subst.
-  by move=> Hfnd; apply: (H _ _ _ Inv Hfnd).
+set (P := fun s : statement => 
+  forall k m,
+  cl_cont_inv c k m -> 
+  find_label lbl s k = Some (s', k') -> 
+  cl_cont_inv c k' m).
+set (P0 := fix F (ls : labeled_statements) :=
+  match ls with
+    | LSdefault s => P s
+    | LScase i s ls => P s /\ F ls
+  end).
+apply: (@statement_ind P P0)=> //.
++ move=> s0 Hp0 s1 Hp1 k0 m0 Inv /=.
+  case Hf: (find_label lbl s0 (Kseq s1 k0))=> [[x y]|].
+  by case=> ? ?; subst; apply: (Hp0 _ _ _ Hf).
+  by apply/Hp1.
++ move=> e s0 Hp0 s1 Hp1 k'' s'' Inv /=.
+  case Hf: (find_label lbl s0 k'')=> [[x y]|].
+  by case=> ? ?; subst; apply: (Hp0 _ _ _ Hf).
+  by apply/Hp1.
++ move=> s0 Hp0 s1 Hp1 k'' s'' Inv /=.
+  case Hf: (find_label lbl s0 (Kloop1 s0 s1 k''))=> [[x y]|].
+  by case=> ? ?; subst; apply: (Hp0 _ _ _ Hf).
+  by apply/Hp1.
++ move=> e l Hp k'' m'' Inv; elim: l Hp k'' m'' Inv=> /=.
+  by move=> s0 Hp0 k'' m'' Inv /=; apply/(Hp0 _ m'').
+  move=> i s0 l IH []H H2 k'' m'' Inv.
+  case Hf: (find_label _ _ _)=> // [[? ?]|].
+  by case=> ? ?; subst; apply: (H _ _ _ Hf).
+  by apply: IH.
++ move=> l s0 H k'' m'' Inv /=.  
+  case Hid: (ident_eq lbl l)=> // [v|].
+  by case=> ? ?; subst s0 k''.
+  by move=> Hf; apply: (H _ _ Inv).
 Qed.
 
 Lemma cont_inv_find_label c lbl s k s' k' m :
@@ -1095,6 +1121,65 @@ split.
 { by move: p; apply cont_inv_freshlocs. }
 Qed.
 
+Lemma create_undef_temps_undef l x v : 
+  (create_undef_temps l) ! x = Some v -> v = Vundef.
+Proof.
+elim: l=> //=; first by rewrite PTree.gempty.
+case=> a ? l IH; case: (ident_eq a x).
+{ by move=> ?; subst a; rewrite PTree.gss; case. }
+{ by move=> Hneq; rewrite PTree.gso=> // ?; subst. }
+Qed.
+
+(*TODO: move elsewhere*)
+Lemma alloc_variables_valid0 vars E m e m1 b :
+  alloc_variables E m vars e m1 -> 
+  Mem.valid_block m b -> 
+  Mem.valid_block m1 b.
+Proof.
+elim: vars E m m1.
+by move=> E m m1; inversion 1; subst.
+case=> b' t' l IH E m m1; inversion 1; subst=> H2.
+apply: (IH (PTree.set b' (b1,t') E) m2)=> //.
+by apply: (Mem.valid_block_alloc _ _ _ _ _ H7).
+Qed.
+
+Lemma bind_parameters_valid0 vars E m vs m1 b :
+  bind_parameters E m vars vs m1 -> 
+  Mem.valid_block m b -> 
+  Mem.valid_block m1 b.
+Proof.
+elim: vars vs E m m1.
+by move=> vs E m m1; inversion 1; subst.
+case=> b' t' l IH E m m1; inversion 1; subst=> H2.
+move: H; inversion 1; subst.
+apply: (IH vl m m3)=> //.
+by move: (assign_loc_forward _ _ _ _ _ _ H7); case/(_ _ H2).
+Qed.
+
+Lemma alloc_variables_freshblocks: forall vars E m e m1
+      (AL: alloc_variables E m vars e m1)
+      id b t (Hid: e!id = Some (b,t)),
+      E!id = Some (b,t) \/ (~Mem.valid_block m b /\ Mem.valid_block m1 b).
+Proof. intros vars.
+  induction vars; simpl; intros; inversion AL; subst; simpl in *.
+    left; trivial.
+  destruct (IHvars _ _ _ _ H6 _ _ _ Hid); clear IHvars.
+    rewrite PTree.gsspec in H. 
+    destruct (Coqlib.peq id id0); subst. 
+      inversion H; subst. right. 
+      split.
+      eapply Mem.fresh_block_alloc; eassumption.
+      apply Mem.valid_new_block in H3.
+      eapply alloc_variables_valid0; eauto.
+      left; trivial.
+    right.
+      destruct H.
+      split; auto.
+      intros N; elim H; clear H.
+      eapply Mem.valid_block_alloc; eassumption.
+Qed. 
+(*end move*)
+
 Lemma function_entry1_state_inv (c0 : RC.state CL_core) c1 f vargs m e te m' locs : 
   let: c := {| RC.core := c0;
                RC.locs := locs |} in
@@ -1106,8 +1191,17 @@ Lemma function_entry1_state_inv (c0 : RC.state CL_core) c1 f vargs m e te m' loc
   function_entry1 f vargs m e te m' -> 
   cl_state_inv c' m' e te.
 Proof.
-move=> Hsub; case=> m1 Hno Halloc Hbind ->.
-Admitted.
+move=> Hsub; case=> m1 Hno Halloc Hbind ->; split.
+{ move=> x b ty He; rewrite /RC.roots /=; apply/orP; right.
+  case: (alloc_variables_freshblocks Halloc He).
+  by rewrite PTree.gempty.
+  move=> Hvalid; apply: REACH_nil; apply/orP; left; apply/andP; split.
+  case: Hvalid=> _; move/bind_parameters_valid0; move/(_ _ _ _ _ Hbind). 
+  by case: (valid_block_dec m' b).
+  by case: Hvalid=> Hvalid ?; move: Hvalid; case: (valid_block_dec m b). }
+{ move=> x v Hundef b; case/getBlocksP=> ofs; case=> // ?; subst v.
+  by move: (create_undef_temps_undef Hundef); discriminate. }
+Qed.
 
 Lemma rc_safe z c m :
   cl_core_inv c m -> 
@@ -1122,7 +1216,7 @@ have Hhlt: Clight_coop.CL_halted (RC.core c) = None.
   rewrite Hatext; discriminate. }
 rewrite Hhlt; case=> x []Hpre Hpost.
 have Hdef: vals_def args.
-{ admit. }
+{ by eapply espec_def; eauto. }
 rewrite Hdef; exists x; split=> // ret' m' z' Hpost'.
 case: (Hpost _ _ _ Hpost')=> c' []Haft HsafeN; move {Hpost Hpost'}.
 rewrite /RC.after_external /=; case: ret' Haft.
@@ -1147,7 +1241,7 @@ rewrite /RC.after_external /=; case: ret' Haft.
   + by apply: cont_inv_retv. }              
 case Hhlt: (Clight_coop.CL_halted (RC.core c))=> [v|].
 { move=> Hexit. 
-  have Hdef: ~~is_vundef v by admit.
+  have Hdef: ~~is_vundef v by (eapply espec_exit; eauto).
   by rewrite Hdef. }
 case=> c' []m' []step Hsafe.
 rewrite /RC.corestep /RC.effstep /=.
