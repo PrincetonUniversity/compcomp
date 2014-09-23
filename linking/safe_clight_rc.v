@@ -31,6 +31,8 @@ Notation clsem := (CL_eff_sem1 hf).
 
 Notation rcsem := (RC.effsem clsem).
 
+Variable clsem_fun : corestep_fun clsem. (*TODO*)
+
 Variable Z : Type.
 
 Variable espec : external_specification mem external_function Z.
@@ -1921,6 +1923,55 @@ move: step Inv Hsafe Hatext Hhlt; case: c=> /= core locs; case.
     by apply: REACH_is_closed. }
   by move: Hk; apply: cont_inv_freshlocs. }
 
+Qed.
+
+Lemma rc_init_safe z v vs c m :
+  initial_core clsem ge v vs = Some c -> 
+  (forall n, safeN clsem espec ge n z c m) -> 
+  let c' := {| RC.core := c; RC.locs := getBlocks vs |} in
+  [/\ initial_core rcsem ge v vs = Some c'
+    & forall n, safeN rcsem espec ge n z c' m].
+Proof.
+rewrite /= /RC.initial_core /= => Heq; rewrite Heq=> Hsafe; split=> // n.
+move: Heq Hsafe; rewrite /CL_initial_core; case: v=> // b ofs.
+case: (Integers.Int.eq_dec _ _)=> // Heq; subst ofs.
+case Hg: (Genv.find_funct_ptr _ _)=> // [fd].
+case Hfd: fd=> // [f].
+case Hty: (type_of_fundef _)=> // [tys ty].
+case Hval: (_ && _)=> //.
+case=> <- /= Hsafe. 
+case: n=> //= n.
+rewrite /RC.corestep /RC.effstep /=.
+have [e [te [m' Hfe]]]: 
+  exists e te m', function_entry1 f vs m e te m'.
+{ move: (Hsafe n.+1)=> /=; case=> c' []m' []; inversion 1; subst=> _.
+  by exists e, le, m'. }
+set c' := {| RC.core := (CL_State f (fn_body f) Kstop e te)
+        ; RC.locs := REACH m'
+     (fun b0 : block =>
+      freshloc m m' b0
+      || RC.reach_set ge
+           {|
+           RC.core := CL_Callstate (Internal f) vs Kstop;
+           RC.locs := getBlocks vs |} m b0) |}.
+exists c', m'; split.
+exists EmptyEffect.
+split; first by constructor.
+split=> //.
+apply: rc_safe.
+split.
+eapply (function_entry1_state_inv (c0 := c')); eauto.
+by move=> b' Hget; apply: REACH_nil; apply/orP; right.
+rewrite /c' /= => b' Hin; apply/orP; right. 
+move: Hin; rewrite /RC.reach_set /RC.roots /=.
+move/REACH_split; case.
+apply: REACH_mono'=> b''. 
+by move=> Hglob; apply/orP; right; apply: REACH_nil; apply/orP; left.
+by move/REACH_is_closed.
+by [].
+move=> n'.
+eapply safe_corestep_forward; eauto.
+by econstructor.
 Qed.
 
 End SafeClightRC. End SAFE_CLIGHT_RC.
