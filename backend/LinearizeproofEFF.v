@@ -1489,15 +1489,12 @@ Lemma MATCH_initial: forall v (vals1 : list val) c1 (m1 : mem) (j : meminj)
   (Inj: Mem.inject j m1 m2)
   (VInj: Forall2 (val_inject j) vals1 vals2)
   (PG: meminj_preserves_globals ge j)
-  (R : list_norepet (map fst (prog_defs prog)))
   (J: forall b1 b2 d, j b1 = Some (b2, d) -> 
                       DomS b1 = true /\ DomT b2 = true)
   (RCH: forall b, REACH m2
         (fun b' : Values.block => isGlobalBlock tge b' || getBlocks vals2 b') b =
          true -> DomT b = true)
-  (InitMem : exists m0 : mem, Genv.init_mem prog = Some m0 
-      /\ Ple (Mem.nextblock m0) (Mem.nextblock m1) 
-      /\ Ple (Mem.nextblock m0) (Mem.nextblock m2))
+  (GFI: globalfunction_ptr_inject ge j)
   (GDE: genvs_domain_eq ge tge)
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
@@ -1610,14 +1607,6 @@ Proof. intros.
     eapply sig_preserved in TF. revert TF. simpl. solve[intros ->; auto].
   rewrite initial_SM_as_inj.
   intuition.
-      red; intros. specialize (Genv.find_funct_ptr_not_fresh prog). intros.
-         destruct InitMem as [m0 [INIT_MEM [? ?]]].
-         specialize (H0 _ _ _ INIT_MEM H). 
-         destruct (valid_init_is_global _ R _ INIT_MEM _ H0) as [id Hid]. 
-           destruct PG as [PGa [PGb PGc]]. split. eapply PGa; eassumption.
-         unfold isGlobalBlock. 
-          apply orb_true_iff. left. apply genv2blocksBool_char1.
-            simpl. exists id; eassumption.
 Qed.
 
 Lemma MATCH_effcorediagram: forall st1 m1 st1' m1' (U1 : block -> Z -> bool)
@@ -2367,9 +2356,7 @@ Qed.
 
 (*program structure not yet updated to module*)
 Theorem transl_program_correct:
-  forall (LNR: list_norepet (map fst (prog_defs prog)))
-         (init_mem: exists m0, Genv.init_mem prog = Some m0),
-SM_simulation.SM_simulation_inject (LTL_eff_sem  hf)
+  SM_simulation.SM_simulation_inject (LTL_eff_sem  hf)
   (Linear_eff_sem hf) ge tge.
 Proof.
 intros.
@@ -2391,50 +2378,7 @@ assert (GDE:= GDE_lemma).
   intros x. eapply MATCH_PG. 
 (*initial_core*)
   { intros.
-    eapply (MATCH_initial _ _ _); eauto.
-    destruct init_mem as [m0 INIT].
-    exists m0; split; auto.
-    unfold meminj_preserves_globals in H2.    
-    destruct H2 as [A [B C]].
-
-    assert (P: forall p q, {Ple p q} + {Plt q p}).
-      intros p q.
-      case_eq (Pos.leb p q).
-      intros TRUE.
-      apply Pos.leb_le in TRUE.
-      left; auto.
-      intros FALSE.
-      apply Pos.leb_gt in FALSE.
-      right; auto.
-
-    cut (forall b, Plt b (Mem.nextblock m0) -> 
-           exists id, Genv.find_symbol ge id = Some b). intro D.
-    
-    split.
-    destruct (P (Mem.nextblock m0) (Mem.nextblock m1)); auto.
-    exfalso. 
-    destruct (D _ p).
-    apply A in H2.
-    assert (Mem.valid_block m1 (Mem.nextblock m1)).
-      eapply Mem.valid_block_inject_1; eauto.
-    clear - H7; unfold Mem.valid_block in H7.
-    xomega.
-
-    destruct (P (Mem.nextblock m0) (Mem.nextblock m2)); auto.
-    exfalso. 
-    destruct (D _ p).
-    apply A in H2.
-    assert (Mem.valid_block m2 (Mem.nextblock m2)).
-      eapply Mem.valid_block_inject_2; eauto.
-    clear - H7; unfold Mem.valid_block in H7.
-    xomega.
-    
-    intros b LT.    
-    unfold ge. 
-    apply valid_init_is_global with (b0 := b) in INIT.
-    eapply INIT; auto.
-    apply LNR.
-    apply LT. }
+    eapply (MATCH_initial _ _ _); eauto. }
 (*halted*)
   { intros. destruct H as [MC [RC [PG [GFP [Glob [VAL [WD INJ]]]]]]].
     revert H0. simpl. destruct c1; try solve[inversion 1]. inversion 1.

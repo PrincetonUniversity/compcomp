@@ -57,6 +57,7 @@ Section Eff_INJ_SIMU_DIAGRAMS.
           Mem.inject j m1 m2 -> 
           Forall2 (val_inject j) vals1 vals2 ->
           meminj_preserves_globals ge1 j ->
+          globalfunction_ptr_inject ge1 j -> 
 
         (*the next two conditions are required to guarantee intialSM_wd*)
          (forall b1 b2 d, j b1 = Some (b2, d) -> 
@@ -199,7 +200,7 @@ clear - match_validblocks. intros.
     destruct H; subst. eauto.
 clear - inj_initial_cores. intros.
     destruct (inj_initial_cores _ _ _ _ _ _ _ _ _ H
-         H0 H1 H2 H3 H4 H5 H6)
+         H0 H1 H2 H3 H4 H5 H6 H7)
     as [c2 [INI MS]].
   exists c1, c2. intuition. 
 clear - inj_effcore_diagram. 
@@ -330,7 +331,7 @@ clear - match_restrict. intros. destruct H; subst. eauto.
 clear - match_validblocks. intros.
     destruct H; subst. eauto.
 clear - inj_initial_cores. intros.
-    destruct (inj_initial_cores _ _ _ _ _ _ _ _ _ H H0 H1 H2 H3 H4 H5 H6)
+    destruct (inj_initial_cores _ _ _ _ _ _ _ _ _ H H0 H1 H2 H3 H4 H5 H6 H7)
     as [c2 [INI MS]].
   exists c1, c2. intuition. 
 clear - inj_effcore_diagram. 

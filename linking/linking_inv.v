@@ -495,6 +495,7 @@ Record head_inv cd (mu : Inj.t) mus m1 m2 : Type :=
   ; head_vis   : vis_inv c mu 
   ; head_domt  : DomTgt mu = valid_block_dec m2 
   ; head_nukeI : Nuke_sem.I (nucular_T d.(i)) d.(Core.c) m2
+  ; head_gfi   : globalfunction_ptr_inject my_ge (as_inj mu)
   }.
 
 End head_inv.
@@ -618,7 +619,7 @@ Qed.
 
 Lemma head_valid : sm_valid mu m1 m2.
 Proof.
-by case: inv=> // A _ _ _ _; apply: (match_validblocks _ A).
+by case: inv=> // A _ _ _ _ _; apply: (match_validblocks _ A).
 Qed.
 
 Lemma head_atext_inj ef sig args : 
@@ -893,7 +894,7 @@ Qed.
 
 Lemma lo_head_inv : @head_inv c d pf cd lo mus m1 m2.
 Proof.
-case: inv=> mtch all vis domt.
+case: inv=> mtch all vis domt nuk gfi.
 apply: Build_head_inv=> //.
 clear - all; elim: mus all=> // mu0 mus' IH /= []rel rall.
 split; last by apply: IH.
@@ -919,6 +920,7 @@ case: rel=> _ _ _ H b; case/andP=> /= H2 H3; apply: H.
 by apply/andP; split=> //=; move: H2; rewrite lo_vis.
 by case: vis=> rvis; apply: Build_vis_inv; rewrite lo_vis.
 by rewrite replace_locals_DomTgt.
+by rewrite /lo /= /lo' /= replace_locals_as_inj.
 Qed.
 
 End head_inv_leakout.
@@ -1260,6 +1262,16 @@ by rewrite eq in e1; rewrite e1 in e.
 by case: incr; move/(_ _ _ _ L)=> -> _; case=> -> ->.
 Qed.
 
+Lemma globalfunction_ptr_inject_intern_incr F V (mu mu' : Inj.t) (ge : Genv.t F V) :
+  intern_incr mu mu' -> 
+  globalfunction_ptr_inject ge (as_inj mu) ->
+  globalfunction_ptr_inject ge (as_inj mu').
+Proof.
+move/intern_incr_as_inj; move/(_ (Inj_wd _)).
+rewrite /globalfunction_ptr_inject=> H H2 b f Hfind.
+by case: (H2 _ _ Hfind); split=> //; apply: H.
+Qed.
+
 Section step_lems.
 
 Context
@@ -1480,7 +1492,7 @@ Proof.
 move=> hdinv frame locs effstep effstepN vgenv mtch.
 apply: Build_head_inv=> //.
 by apply: (all_relinv_step frame); apply: (head_rel hdinv).
-+ case: hdinv=> hdmtch ? A ? ?; apply: (vis_inv_step A)=> //.
++ case: hdinv=> hdmtch ? A ? ? ?; apply: (vis_inv_step A)=> //.
   by apply match_visible in hdmtch.
 move: alloc; case/sm_locally_allocatedChar=> _ []-> []_ []H1 []_ H2.
 rewrite (head_domt hdinv); extensionality b.
@@ -1495,6 +1507,7 @@ case f: (valid_block_dec m2 b)=> [y|//].
 by case: (fwd2 y)=> H4; elimtype False; apply: H3; apply: H4.
 apply effstepN_corestepN in effstepN; simpl.
 by apply: (Nuke_sem.nucular_stepN _ _ effstepN)=> //; apply: (head_nukeI hdinv).
+by case: hdinv=> *; apply: (globalfunction_ptr_inject_intern_incr incr).
 Qed.
 
 End step_lems.
@@ -1625,7 +1638,7 @@ Proof. by rewrite /inContext /callStackSize R_len_callStack. Qed.
 Lemma R_wd : SM_wd mu.
 Proof.
 case: (R_inv pf)=> pf2 []pf_sig []mu_top []mus []eq []pf3 [].
-by move/match_sm_wd=> wd _ _ _ _ _; rewrite eq.
+by move/match_sm_wd=> wd _ _ _ _ _ _; rewrite eq.
 Qed.
 
 End R_lems.

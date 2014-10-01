@@ -936,6 +936,7 @@ have subF: {subset frgnBlocksSrc mu0 <= frgnSrc'}.
   change (P (Core.i hd2) (cast T (sym_eq pf_eq22') (Core.c hd2')) 
        -> P (Core.i hd2') (Core.c hd2')).
   by apply: cast_indnatdep'. }(*END nucular*)
+  by rewrite /= /mu' replace_externs_as_inj asInj_nu'_mu_top; case: hdinv=> *.
 }(*END head_inv*)
 
 split; first by move: allinv; rewrite mus_eq.

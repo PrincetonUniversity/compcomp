@@ -88,6 +88,7 @@ Definition cc_init_inv j (ge1 : Genv.t F1 V1) vals1 m1 (ge2 : Genv.t F2 V2) vals
   Mem.inject j m1 m2 
   /\ Forall2 (val_inject j) vals1 vals2 
   /\ meminj_preserves_globals ge1 j 
+  /\ globalfunction_ptr_inject ge1 j 
     (* TODO REACH redundant with val_valid and mem_wd, should be removed *)
   /\ (forall b, 
       REACH m2 (fun b0 => isGlobalBlock ge1 b0 || getBlocks vals2 b0) b=true ->

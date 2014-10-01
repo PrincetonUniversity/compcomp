@@ -66,6 +66,7 @@ Record SM_simulation_inject :=
     Mem.inject j m1 m2 -> 
     Forall2 (val_inject j) vals1 vals2 ->
     meminj_preserves_globals ge1 j ->
+    globalfunction_ptr_inject ge1 j -> 
 
     (*the next two conditions are required to guarantee initialSM_wd*)
     (forall b1 b2 d, j b1 = Some (b2, d) -> 

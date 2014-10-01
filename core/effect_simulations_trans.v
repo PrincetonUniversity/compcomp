@@ -303,8 +303,15 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
             as [b2 [d1 [d2 [J1 [J2 D]]]]]; subst; clear BB.
          destruct (XX _ _ _ J1); subst. trivial.
       destruct (XX _ _ _ H0); subst. trivial.
+  assert (GFI1: globalfunction_ptr_inject g1 j1).
+    { clear - X Y XX YY H2 H3.
+      intros b f Hfind.
+      destruct (H3 b f Hfind); split; auto.
+      apply compose_meminjD_Some in H. 
+      destruct H as [b1 [ofs1 [ofs [U [R S]]]]]. rewrite S.
+      rewrite U. apply XX in U. destruct U. subst b ofs1. rewrite <-S. auto. }
   assert (PG2: meminj_preserves_globals g2 j2).
-    clear - XX YY X Y PG1 H2 genvs_dom_eq12.
+  { clear - XX YY X Y PG1 H2 genvs_dom_eq12.
     apply meminj_preserves_genv2blocks.
      apply meminj_preserves_genv2blocks in H2.
       destruct H2 as [AA [BB CC]].
@@ -334,18 +341,38 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
            destruct XX as [? ?]; subst.
              apply (CC _ _ _ H1 H4).
            destruct XX as [mm [? ?]]; subst.
-             apply (CC _ _ _ H1 H4).
-    destruct (core_initial12 _ _ _ _ _ vals2 _ 
+             apply (CC _ _ _ H1 H4). }
+  assert (GFI2: globalfunction_ptr_inject g2 j2).
+  { clear - XX YY X Y PG1 H2 H3 genvs_dom_eq12 GFI1.
+    intros b f Hfind2.
+    generalize genvs_dom_eq12 as GDE. intro.
+    destruct genvs_dom_eq12 as [U [W R]].
+    specialize (R b).
+    destruct R.
+    assert (exists f, Genv.find_funct_ptr g1 b = Some f).
+    { apply H0. eauto. }
+    destruct H1 as [f0 Hfind1].
+    unfold globalfunction_ptr_inject in H3.
+    destruct (H3 b f0 Hfind1); split; auto.
+    apply compose_meminjD_Some in H1. 
+    destruct H1 as [b1 [ofs1 [ofs [UU [R S]]]]]. rewrite S.
+    destruct (GFI1 b f0 Hfind1).
+    rewrite H1 in UU.
+    inv UU.
+    rewrite R.
+    f_equal; auto. 
+    rewrite <-(genvs_domain_eq_isGlobal _ _ GDE); auto. }
+  destruct (core_initial12 _ _ _ _ _ vals2 _ 
        DomS (fun b => match j2 b with None => false
                       | Some (b3,d) => DomT b3 end) H Inj12)
      as [d12 [c2 [Ini2 MC12]]]; try assumption.
       (*eapply forall_valinject_hastype; eassumption.*)
       intros. destruct (X b1) as [_ J1Comp]. 
               destruct J1Comp as [b3 [dd COMP]]. exists b2, d; trivial.
-              specialize (H3 _ _ _ COMP).
+              specialize (H4 _ _ _ COMP).
               destruct (compose_meminjD_Some _ _ _ _ _ COMP)
                 as [bb2 [dd1 [dd2 [J1 [J2 D]]]]]; subst; clear COMP.
-              rewrite J1 in H7; inv H7. rewrite J2. apply H3.
+              rewrite J1 in H8; inv H8. rewrite J2. apply H4.
       intros.
         assert (Q: forall b,  isGlobalBlock g2 b || getBlocks vals2 b = true ->
                    exists jb d, j2 b = Some (jb, d) /\ 
@@ -361,10 +388,10 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
         destruct (REACH_inject _ _ _ Inj23 
             (fun b' : block => isGlobalBlock g2 b' || getBlocks vals2 b')
             (fun b' : block => isGlobalBlock g3 b' || getBlocks vals3 b')
-            Q _ H7) as [b3 [d2 [J2 R3]]].
+            Q _ H8) as [b3 [d2 [J2 R3]]].
         rewrite J2.
         destruct (Y _ _ _ J2) as [b1 [d COMP]].
-        apply (H3 _ _ _ COMP).
+        apply (H4 _ _ _ COMP).
       intros b2 Hb2. remember (j2 b2) as d.
         destruct d; inv Hb2; apply eq_sym in Heqd. destruct p.
         eapply Mem.valid_block_inject_1; eassumption.
@@ -373,7 +400,7 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
      as [d23 [c3 [Ini3 MC23]]]; try assumption. 
        intros b2 b3 d2 J2. rewrite J2.
          destruct (Y _ _ _ J2) as [b1 [d COMP]].
-         destruct (H3 _ _ _ COMP). split; trivial.
+         destruct (H4 _ _ _ COMP). split; trivial.
     intros b2 Hb2. remember (j2 b2) as d.
         destruct d; inv Hb2; apply eq_sym in Heqd. destruct p.
         eapply Mem.valid_block_inject_1; eassumption.

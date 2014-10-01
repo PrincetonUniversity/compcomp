@@ -96,12 +96,9 @@ Lemma asm_modules_nucular (ix : 'I_N) : Nuke_sem.t (Modsem.sem (sems_T ix)).
 Proof. solve[apply Asm_is_nuc]. Qed.
 
 (** Each Clight module is independently translated to the
- corresponding module in x86 assembly. The [init] and [lnr] conditions
- ensure that each module is well-formed (for example, no module
- defines the same function twice). *)
+ corresponding module in x86 assembly. The [init] condition
+ ensures that no module defines the same function twice. *)
 
-Variable init : forall ix : 'I_N, 
-  {m0 | Genv.init_mem (source_modules ix) = Some m0}.
 Variable lnr : forall ix : 'I_N, 
   list_norepet (map fst (prog_defs (source_modules ix))).
 
@@ -111,7 +108,6 @@ Lemma modules_inject (ix : 'I_N) :
     (Modsem.ge (sems_S ix)) (Modsem.ge (sems_T ix)).
 Proof.
 generalize (transf ix); intros H.
-generalize (init ix). intros [m0 H2].
 eapply transf_clight_program_correct in H; eauto.
 Qed.
 

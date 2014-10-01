@@ -46,14 +46,14 @@ eapply Build_SM_simulation_inject with
          fun cd mu c m d tm => 
            mtch cd mu (RC.core c) m d tm); eauto.
 { move=> v vals1 c1 m1 j0 vals2 m2 dS dT.
-move=> init1 inj vinj pres H I J K.
+move=> init1 inj vinj pres pres2 H I J K.
 have [c1' init1']:
   exists c1', initial_core eff_S ge_S v vals1 = Some c1'.
 { move: init1; rewrite /= /RC.initial_core.
   case x: (initial_core _ _ _ _)=> //.
   by case; case: c1=> c ?; case=> -> _; exists c. }
 move: (init v vals1 c1' m1 j0 vals2 m2 dS dT init1').
-case/(_ inj vinj pres H I J K)=> x []c2' []init2' mtch12.
+case/(_ inj vinj pres pres2 H I J K)=> x []c2' []init2' mtch12.
 exists x,c2'; split=> //.
 move: init1; rewrite /= /RC.initial_core; rewrite init1'; case.
 by case: c1=> ? ?; case=> <- <- /=. }
