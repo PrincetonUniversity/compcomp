@@ -1823,9 +1823,7 @@ Lemma MATCH_initial: forall v vals1 c1 m1 j vals2 m2 (DomS DomT : block -> bool)
       (RCH: forall b, REACH m2 
           (fun b' : block => isGlobalBlock tge b' || getBlocks vals2 b') b = true ->
           DomT b = true)
-      (InitMem : exists m0 : mem, Genv.init_mem prog = Some m0 
-               /\ Ple (Mem.nextblock m0) (Mem.nextblock m1) 
-               /\ Ple (Mem.nextblock m0) (Mem.nextblock m2))   
+      (GFI: globalfunction_ptr_inject ge j)
       (GDE: genvs_domain_eq ge tge)
       (HDomS: forall b : block, DomS b = true -> Mem.valid_block m1 b)
       (HDomT: forall b : block, DomT b = true -> Mem.valid_block m2 b),
@@ -1920,14 +1918,8 @@ intros.
       apply BB.
       apply EE.
     rewrite initial_SM_as_inj.
-      red; intros. specialize (Genv.find_funct_ptr_not_fresh prog). intros.
-         destruct InitMem as [m0 [InitMem [? ?]]].
-         specialize (H1 _ _ _ InitMem H). 
-         destruct (valid_init_is_global _ R _ InitMem _ H1) as [id Hid]. 
-           destruct PG as [PGa [PGb PGc]]. split. eapply PGa; eassumption.
-         unfold isGlobalBlock. 
-          apply orb_true_iff. left. apply genv2blocksBool_char1.
-            simpl. exists id; eassumption.
+      red; intros. 
+      destruct (GFI b0 f0 H); auto.
     rewrite initial_SM_as_inj; assumption.
   inv H1.
 Qed.
@@ -2130,14 +2122,6 @@ assert (RR1: REACH_closed m1'
            destruct (mappedD_true _ _ RC') as [[? ?] ?].
            eapply as_inj_DomRng; eassumption.
     eapply REACH_cons; try eassumption.
-(*assert (RRR: REACH_closed m1' (exportedSrc nu' (ret1 :: nil))).
-    intros b Hb. apply REACHAX in Hb.
-       destruct Hb as [L HL].
-       generalize dependent b.
-       induction L ; simpl; intros; inv HL; trivial.
-       specialize (IHL _ H1); clear H1.
-       unfold exportedSrc.
-       eapply REACH_cons; eassumption.*)
     
 assert (RRC: REACH_closed m1' (fun b : Values.block =>
                          mapped (as_inj nu') b &&
@@ -3179,9 +3163,8 @@ Qed.
 
 (** The simulation proof *)
 Theorem transl_program_correct:
-  forall (R: list_norepet (map fst (prog_defs prog)))
-         (init_mem: exists m0, Genv.init_mem prog = Some m0),
-SM_simulation.SM_simulation_inject (CL_eff_sem2 hf)
+  forall (R: list_norepet (map fst (prog_defs prog))),
+  SM_simulation.SM_simulation_inject (CL_eff_sem2 hf)
    (csharpmin_eff_sem hf) ge tge.
 Proof.
 intros.
@@ -3201,50 +3184,8 @@ intros.
   apply MATCH_PG.
 (*MATCHinitial*)
   { intros.
-    eapply (MATCH_initial _ _ _); eauto.
-    destruct init_mem as [m0 INIT].
-    exists m0; split; auto.
-    unfold meminj_preserves_globals in H3.    
-    destruct H2 as [A [B C]].
-
-    assert (P: forall p q, {Ple p q} + {Plt q p}).
-      intros p q.
-      case_eq (Pos.leb p q).
-      intros TRUE.
-      apply Pos.leb_le in TRUE.
-      left; auto.
-      intros FALSE.
-      apply Pos.leb_gt in FALSE.
-      right; auto.
-
-    cut (forall b, Plt b (Mem.nextblock m0) -> 
-           exists id, Genv.find_symbol ge id = Some b). intro D.
-    
-    split.
-    destruct (P (Mem.nextblock m0) (Mem.nextblock m1)); auto.
-    exfalso. 
-    destruct (D _ p).
-    apply A in H2.
-    assert (VB: Mem.valid_block m1 (Mem.nextblock m1)).
-      eapply Mem.valid_block_inject_1; eauto.
-    clear - VB; unfold Mem.valid_block in VB.
-    xomega.
-
-    destruct (P (Mem.nextblock m0) (Mem.nextblock m2)); auto.
-    exfalso. 
-    destruct (D _ p).
-    apply A in H2.
-    assert (VB: Mem.valid_block m2 (Mem.nextblock m2)).
-      eapply Mem.valid_block_inject_2; eauto.
-    clear - VB; unfold Mem.valid_block in VB.
-    xomega.
-    
-    intros b LT.    
-    unfold ge. 
-    apply valid_init_is_global with (b0 := b) in INIT.
-    eapply INIT; auto.
-    apply R.
-    apply LT. apply GDE_lemma. }
+    eapply (MATCH_initial _ _ _); eauto. 
+    apply GDE_lemma. }
 (*halted*) 
   { intros. destruct H as [MC [RC [PG [GF [Glob [VAL [WD INJ]]]]]]]. 
     destruct c1; inv H0. destruct k; inv H1.

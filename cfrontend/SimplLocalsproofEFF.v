@@ -3454,6 +3454,77 @@ Proof.
   intros. eapply Genv.find_var_info_not_fresh; eauto.
 Qed.
 
+(*TODO: move*)
+Lemma genv_next_symbol_exists' b (ge0 : Genv.t fundef type) l :
+  list_norepet (map fst l) -> 
+  (Plt b (Genv.genv_next ge0) ->
+    exists id, ~List.In id (map fst l) /\ Genv.find_symbol ge0 id = Some b) -> 
+  Plt b (Genv.genv_next (Genv.add_globals ge0 l)) ->
+  exists id, Genv.find_symbol (Genv.add_globals ge0 l) id = Some b.
+Proof.
+revert ge0 b.
+induction l; simpl; auto.
+intros ge0 b ? ? H2.
+destruct (H0 H2) as [? [? ?]].
+solve[eexists; eauto].
+intros ge0 b H H2 H3.
+inv H.
+destruct a; simpl in *.
+eapply IHl; eauto.
+intros Hplt.
+destruct (ident_eq b (Genv.genv_next ge0)). 
+* subst b.
+exists i.
+unfold Genv.add_global, Genv.find_symbol; simpl.
+rewrite PTree.gss; auto.
+* unfold Genv.add_global, Genv.find_symbol; simpl.
+destruct H2 as [x H2].
+unfold Genv.add_global in Hplt; simpl in Hplt; xomega.
+exists x.
+destruct H2 as [A B].
+split; auto.
+rewrite PTree.gso; auto.
+Qed.
+
+Lemma genv_next_symbol_exists b :
+  list_norepet (map fst (prog_defs prog)) -> 
+  Plt b (Genv.genv_next ge) -> 
+  exists id, Genv.find_symbol ge id = Some b.
+Proof.
+intros Hnorepet H.
+exploit genv_next_symbol_exists'; eauto.
+simpl; xomega.
+Qed.
+
+Lemma genv_next_symbol_exists2 b :
+  list_norepet (map fst (prog_defs prog)) -> 
+  Psucc b = Genv.genv_next ge -> 
+  exists id, Genv.find_symbol ge id = Some b.
+Proof.
+intros Hnorepet H.
+apply genv_next_symbol_exists; auto.
+xomega.
+Qed.
+
+Lemma match_globalenvs_init2:
+  forall (R: list_norepet (map fst (prog_defs prog))) j,
+  meminj_preserves_globals ge j ->
+  match_globalenvs j (Genv.genv_next ge).
+Proof.
+  intros.
+  destruct H as [A [B C]].
+  constructor.
+  intros b D. 
+  cut (exists id, Genv.find_symbol (Genv.globalenv prog) id = Some b).
+  intros [id ID].
+  solve[eapply A; eauto].
+  exploit genv_next_symbol_exists; eauto.
+  intros. symmetry. solve [eapply (C _ _ _ _ GV); eauto].
+  intros. eapply Genv.genv_symb_range; eauto.
+  intros. eapply Genv.genv_funs_range; eauto.
+  intros. eapply Genv.genv_vars_range; eauto.
+Qed.
+
 Lemma type_of_transf_function f tf : 
   transf_function f = OK tf -> 
   type_of_function f = type_of_function tf.
@@ -3482,16 +3553,14 @@ Lemma MATCH_init_core: forall v
   (CSM_Ini :initial_core (CL_eff_sem1 hf) ge v vals1 = Some c1)
   (Inj: Mem.inject j m1 m2)
   (VInj: Forall2 (val_inject j) vals1 vals2)
+  (GFI: globalfunction_ptr_inject ge j)
   (PG: meminj_preserves_globals ge j)
-  (R : list_norepet (map fst (prog_defs prog)))
+  (LNR: list_norepet (map fst (prog_defs prog)))
   (J: forall b1 b2 d, j b1 = Some (b2, d) ->
                       DomS b1 = true /\ DomT b2 = true)
   (RCH: forall b, REACH m2
         (fun b' : Values.block => isGlobalBlock tge b' || getBlocks vals2 b') b =
          true -> DomT b = true)
-  (InitMem : exists m0 : mem, Genv.init_mem prog = Some m0
-      /\ Ple (Mem.nextblock m0) (Mem.nextblock m1)
-      /\ Ple (Mem.nextblock m0) (Mem.nextblock m2))
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
@@ -3560,24 +3629,64 @@ Proof. intros.
   solve[rewrite <-val_casted_list_funcP in H; rewrite H, TNV; auto].
   intros CONTRA. solve[elimtype False; auto].
   intros CONTRA. solve[elimtype False; auto].
-  destruct InitMem as [m0 [INIT_MEM [A B]]].
   split. econstructor; try rewrite initial_SM_as_inj; try eassumption.
           intros. econstructor.
-            eapply match_globalenvs_init'. assumption. eassumption.
-              eapply restrict_preserves_globals. rewrite initial_SM_as_inj. assumption.
+          eapply match_globalenvs_init2. assumption. 
+            eapply restrict_preserves_globals. rewrite initial_SM_as_inj. assumption.
           unfold vis, initial_SM; simpl; intros.
-             apply REACH_nil. unfold ge in H. rewrite H. intuition.
-          assumption.
-          assumption.
-          unfold vis, initial_SM; simpl.
-            apply forall_inject_val_list_inject.
-            eapply restrict_forall_vals_inject; try eassumption.
-            intros. apply REACH_nil. rewrite H; intuition.
-          apply val_casted_list_funcP; auto.
-destruct (core_initial_wd ge tge _ _ _ _ _ _ _ Inj
-    VInj J RCH PG GDE_lemma HDomS HDomT _ (eq_refl _))
-   as [AA [BB [CC [DD [EE [FF GG]]]]]].
-intuition. rewrite initial_SM_as_inj. assumption.
+            apply REACH_nil. unfold ge in H. rewrite H. intuition. 
+
+  { destruct PG as [XX [Y Z]].
+    unfold Ple. rewrite <-Pos.leb_le.
+    destruct (Pos.leb (Genv.genv_next ge) (Mem.nextblock m1)) eqn:?; auto.
+    rewrite Pos.leb_nle in Heqb0.
+    assert (Heqb': (Genv.genv_next ge > Mem.nextblock m1)%positive) by xomega.
+    assert (exists b0, Psucc b0 = Genv.genv_next ge).
+    { destruct (Genv.genv_next ge). 
+      exists ((b0~1)-1)%positive. simpl. auto.
+      exists (Pos.pred (b0~0))%positive. rewrite Pos.succ_pred. auto. xomega.
+      xomega. }
+    destruct H as [b0 H].
+    generalize H as H'; intro.
+    apply genv_next_symbol_exists2 in H.
+    destruct H as [id H].
+    apply XX in H.
+    apply J in H.
+    destruct H as [H H3].
+    specialize (HDomS _ H).
+    unfold Mem.valid_block in HDomS. clear - Heqb' HDomS H'. xomega.
+    auto. }
+
+  { destruct PG as [XX [Y Z]].
+    unfold Ple. rewrite <-Pos.leb_le.
+    destruct (Pos.leb (Genv.genv_next ge) (Mem.nextblock m2)) eqn:?; auto.
+    rewrite Pos.leb_nle in Heqb0.
+    assert (Heqb': (Genv.genv_next ge > Mem.nextblock m2)%positive) by xomega.
+    assert (exists b0, Psucc b0 = Genv.genv_next ge).
+    { destruct (Genv.genv_next ge). 
+      exists ((b0~1)-1)%positive. simpl. auto.
+      exists (Pos.pred (b0~0))%positive. rewrite Pos.succ_pred. auto. xomega.
+      xomega. }
+    destruct H as [b0 H].
+    generalize H as H'; intro.
+    apply genv_next_symbol_exists2 in H.
+    destruct H as [id H].
+    apply XX in H.
+    apply J in H.
+    destruct H as [H H3].
+    specialize (HDomT _ H3).
+    unfold Mem.valid_block in HDomT. clear - Heqb' HDomT H'. xomega.
+    auto. }
+
+  unfold vis, initial_SM; simpl.
+  apply forall_inject_val_list_inject.
+  eapply restrict_forall_vals_inject; try eassumption.
+  intros. apply REACH_nil. rewrite H; intuition.
+  apply val_casted_list_funcP; auto.
+  destruct (core_initial_wd ge tge _ _ _ _ _ _ _ Inj
+              VInj J RCH PG GDE_lemma HDomS HDomT _ (eq_refl _))
+    as [AA [BB [CC [DD [EE [FF GG]]]]]].
+  intuition. rewrite initial_SM_as_inj. assumption.
 Qed.
 
 Lemma FreelistEffect_PropagateLeft cenv mu e le m lo hi te tle tlo thi: forall
@@ -4478,9 +4587,8 @@ Qed.
 
 (** The simulation proof *)
 Theorem transl_program_correct:
-  forall (R: list_norepet (map fst (prog_defs prog)))
-         (init_mem: exists m0, Genv.init_mem prog = Some m0),
-SM_simulation.SM_simulation_inject 
+  forall (R: list_norepet (map fst (prog_defs prog))),
+  SM_simulation.SM_simulation_inject 
    (CL_eff_sem1 hf) (CL_eff_sem2 hf) ge tge.
 Proof.
 intros.
@@ -4503,54 +4611,15 @@ assert (GDE: genvs_domain_eq ge tge).
 (*MATCH_preserves_globals*)
   apply MATCH_PG.
 (* init*) { 
-  intros. eapply MATCH_init_core; try eassumption.
-   destruct init_mem as [m0 INIT].
-   exists m0; split; trivial.
-   unfold meminj_preserves_globals in H3.    
-   destruct H2 as [A [B C]].
-   assert (P: forall p q, {Ple p q} + {Plt q p}).
-        intros p q.
-        case_eq (Pos.leb p q).
-        intros TRUE.
-        apply Pos.leb_le in TRUE.
-        left; auto.
-        intros FALSE.
-        apply Pos.leb_gt in FALSE.
-        right; auto.
-
-      cut (forall b, Plt b (Mem.nextblock m0) -> 
-             exists id, Genv.find_symbol ge id = Some b). intro D.
-    
-      split.
-      destruct (P (Mem.nextblock m0) (Mem.nextblock m1)); auto.
-      exfalso. 
-      destruct (D _ p).
-      apply A in H2.
-      assert (VB: Mem.valid_block m1 (Mem.nextblock m1)).
-        eapply Mem.valid_block_inject_1; eauto.
-      clear - VB; unfold Mem.valid_block in VB.
-      xomega.
-
-      destruct (P (Mem.nextblock m0) (Mem.nextblock m2)); auto.
-      exfalso. 
-      destruct (D _ p).
-      apply A in H2.
-      assert (VB:Mem.valid_block m2 (Mem.nextblock m2)).
-        eapply Mem.valid_block_inject_2; eauto.
-      clear - VB; unfold Mem.valid_block in VB.
-      xomega.
-      apply (valid_init_is_global _ R _ INIT). }
+  intros. eapply MATCH_init_core; try eassumption. }
 { (* halted *)
     intros. destruct H as [MC [RC [PG [Glob [VAL WD]]]]].
     inv MC; simpl in H0. inv H0. inv H0.
     destruct k; simpl in *; inv H0.
     specialize (MCONT VSet.empty). inv MCONT.
-    exists tv. intuition.
-    (*eapply val_inject_incr; try eassumption.
-    apply incr_restrict_shared_vis; trivial.*) }
+    exists tv. intuition. }
 { (*at_external *) 
     apply MATCH_atExternal. }
-        
 { (*after_external *)
   intros. eapply MATCH_afterExternal. eapply MemInjMu. eassumption. eassumption.
      eassumption. eassumption. eassumption. eassumption. eassumption. eassumption. 

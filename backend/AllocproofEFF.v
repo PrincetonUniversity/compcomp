@@ -2426,15 +2426,12 @@ Lemma MATCH_initial: forall v
       (Inj: Mem.inject j m1 m2)
       (VInj: Forall2 (val_inject j) vals1 vals2)
       (PG:meminj_preserves_globals ge j)
-      (R : list_norepet (map fst (prog_defs prog)))
       (J: forall b1 b2 delta, j b1 = Some (b2, delta) -> 
             (DomS b1 = true /\ DomT b2 = true))
       (RCH: forall b, REACH m2 
           (fun b' : block => isGlobalBlock tge b' || getBlocks vals2 b') b = true ->
           DomT b = true) 
-      (InitMem : exists m0 : mem, Genv.init_mem prog = Some m0 
-           /\ Ple (Mem.nextblock m0) (Mem.nextblock m1) 
-           /\ Ple (Mem.nextblock m0) (Mem.nextblock m2))
+      (GFI: globalfunction_ptr_inject ge j)
       (GDE: genvs_domain_eq ge tge)
       (HDomS: forall b : block, DomS b = true -> Mem.valid_block m1 b)
       (HDomT: forall b : block, DomT b = true -> Mem.valid_block m2 b),
@@ -2587,16 +2584,8 @@ Proof. intros.
       assumption.
       apply BB.
       apply EE.
-  rewrite initial_SM_as_inj.
-      red; intros. specialize (Genv.find_funct_ptr_not_fresh prog). intros FFP.
-         destruct InitMem as [m0 [INIT_MEM [? ?]]].
-         specialize (FFP _ _ _ INIT_MEM H). 
-         destruct (valid_init_is_global _ R _ INIT_MEM _ FFP) as [id Hid]. 
-           destruct PG as [PGa [PGb PGc]]. split. eapply PGa; eassumption.
-         unfold isGlobalBlock. 
-          apply orb_true_iff. left. apply genv2blocksBool_char1.
-            simpl. exists id; eassumption.
-    rewrite initial_SM_as_inj. assumption. 
+  rewrite initial_SM_as_inj; auto.
+  rewrite initial_SM_as_inj. assumption. 
 Qed.
 
 Lemma loc_result_locs_diff sig : locs_diff (map R (loc_result sig)).
@@ -2899,8 +2888,7 @@ Lemma Match_effcore_diagram:
       st1 m1 st1' m1' (U1 : block -> Z -> bool)
       (CS: effstep (rtl_eff_sem hf) ge U1 st1 m1 st1' m1')
       st2 mu m2 
-      (MTCH: MATCH mu st1 m1 st2 m2)
-      (LNR: list_norepet (map fst (prog_defs prog))),
+      (MTCH: MATCH mu st1 m1 st2 m2),
   exists st2' m2' (U2 : block -> Z -> bool),
      effstep_plus (LTL_eff_sem hf) tge U2 st2 m2 st2' m2' 
   /\ exists mu',
@@ -2947,16 +2935,7 @@ induction CS;
          intuition.
   intuition. }
 
-{ (* op move *)
-  (*inv MSTATE. try UseShape. 
-  destruct (invert_code _ _ _ _ _ _ _ WTF H EQ) as (eafter & bsh & bb & AFTER & BSH & TCODE & EBS & TR & WTI).
-  inv EBS. unfold transfer_aux in TR; MonadInv. 
- unfold transfer_aux in TR; MonadInv.
-  | [ WT: wt_function _ _, CODE: (RTL.fn_code _)!_ = Some _, EQ: transfer _ _ _ _ _ = OK _ |- _ ] =>
-      destruct (invert_code _ _ _ _ _ _ _ WT CODE EQ) as (eafter & bsh & bb & AFTER & BSH & TCODE & EBS & TR & WTI); 
-      inv EBS; unfold transfer_aux in TR; MonadInv
-  end.*)
-  generalize (wt_exec_Iop _ _ _ _ _ _ _ _ _ _ _ WTI H0 WTRS). intros WTRS'.
+{ generalize (wt_exec_Iop _ _ _ _ _ _ _ _ _ _ _ WTI H0 WTRS). intros WTRS'.
   simpl in H0. inv H0.  
   destruct PRE as [RC [PG [GFP [Glob [SMV [WD MInj]]]]]].
   exploit (Eff_exec_moves mv); eauto. intros [ls1 [X Y]]. 
@@ -4324,9 +4303,7 @@ induction CS;
 Qed.
 
 Theorem transl_program_correct:
-  forall (LNR: list_norepet (map fst (prog_defs prog)))
-         (init_mem: exists m0, Genv.init_mem prog = Some m0),
-SM_simulation.SM_simulation_inject (rtl_eff_sem hf)
+  SM_simulation.SM_simulation_inject (rtl_eff_sem hf)
   (LTL_eff_sem hf) ge tge.
 Proof.
 intros.
@@ -4348,50 +4325,7 @@ assert (GDE:= GDE_lemma).
   intros x. eapply MATCH_PG. 
 (*initial_core*)
   { intros.
-    eapply (MATCH_initial _ _ _); eauto.
-    destruct init_mem as [m0 INIT].
-    exists m0; split; auto.
-    unfold meminj_preserves_globals in H3.    
-    destruct H2 as [A [B C]].
-
-    assert (P: forall p q, {Ple p q} + {Plt q p}).
-      intros p q.
-      case_eq (Pos.leb p q).
-      intros TRUE.
-      apply Pos.leb_le in TRUE.
-      left; auto.
-      intros FALSE.
-      apply Pos.leb_gt in FALSE.
-      right; auto.
-
-    cut (forall b, Plt b (Mem.nextblock m0) -> 
-           exists id, Genv.find_symbol ge id = Some b). intro D.
-    
-    split.
-    destruct (P (Mem.nextblock m0) (Mem.nextblock m1)); auto.
-    exfalso. 
-    destruct (D _ p).
-    apply A in H2.
-    assert (Mem.valid_block m1 (Mem.nextblock m1)).
-      eapply Mem.valid_block_inject_1; eauto.
-    clear - H7; unfold Mem.valid_block in H7.
-    xomega.
-
-    destruct (P (Mem.nextblock m0) (Mem.nextblock m2)); auto.
-    exfalso. 
-    destruct (D _ p).
-    apply A in H2.
-    assert (Mem.valid_block m2 (Mem.nextblock m2)).
-      eapply Mem.valid_block_inject_2; eauto.
-    clear - H7; unfold Mem.valid_block in H7.
-    xomega.
-    
-    intros b LT.    
-    unfold ge. 
-    apply valid_init_is_global with (b0 := b) in INIT.
-    eapply INIT; auto.
-    apply LNR.
-    apply LT. }
+    eapply (MATCH_initial _ _ _); eauto. }
 (*halted*) 
   { intros. destruct H as [MC [RC [PG [GFP [GF [VAL [WD INJ]]]]]]]. 
     destruct c1; inv H0. destruct stack; inv H1.

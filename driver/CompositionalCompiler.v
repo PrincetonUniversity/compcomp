@@ -171,7 +171,6 @@ Proof.
   intros. destruct x; simpl. rewrite print_identity. auto. auto. 
 Qed.
 
-
 Lemma fst_transform_globdef_eq A B V (f : A -> B) (gv : ident*globdef A V) :
   fst (transform_program_globdef f gv) = fst gv.
 Proof.
@@ -281,8 +280,7 @@ Axiom HelpersOK: I64Helpers.get_helpers = OK hf.
    functions as nonobservable. *)
 
 Theorem transf_rtl_program_correct:
-  forall p tp m0 (INIT: Genv.init_mem p = Some m0)
-  (LNR: list_norepet (map fst (prog_defs p))),
+  forall p tp (LNR: list_norepet (map fst (prog_defs p))),
   transf_rtl_program p = OK tp ->
   SM_simulation.SM_simulation_inject (rtl_eff_sem hf) (Asm_eff_sem hf)
       (Genv.globalenv p) (Genv.globalenv tp).
@@ -300,59 +298,35 @@ Proof.
   destruct (Stacking.transf_program p6) as [p7|] eqn:?; simpl in H; try discriminate.
   eapply eff_sim_trans.
     eapply TailcallproofEFF.transl_program_correct. 
-    assumption. exists m0. assumption.
-  apply Genv.init_mem_transf with (transf:= Tailcall.transf_fundef)
-      in INIT.
   eapply TransformLNR in LNR.
   eapply eff_sim_trans.
     eapply RenumberproofEFF.transl_program_correct.
-    eapply LNR.
-    exists m0. apply INIT. 
-  eapply Genv.init_mem_transf with (transf:= Renumber.transf_fundef)
-      in INIT.
   eapply TransformLNR in LNR.
   eapply eff_sim_trans.
     eapply AllocproofEFF.transl_program_correct.
     instantiate (1:=p3). auto.
-    eapply LNR.
-    exists m0. apply INIT.  
-  eapply Genv.init_mem_transf_partial in INIT.  2: eauto.
-  eapply TransformLNR_partial in LNR.  2: eauto.
+  eapply TransformLNR_partial in LNR. 2: eauto.
   eapply eff_sim_trans.
     eapply TunnelingproofEFF.transl_program_correct.
-    eassumption.
-    exists m0. apply INIT. 
-  eapply Genv.init_mem_transf in INIT. 
   eapply TransformLNR in LNR. 
   eapply eff_sim_trans.
     eapply LinearizeproofEFF.transl_program_correct. 
     eassumption. 
-    eassumption.
-    exists m0. apply INIT. 
-  eapply Genv.init_mem_transf_partial in INIT. 2: eauto.
   eapply TransformLNR_partial in LNR. 2: eauto.
   eapply eff_sim_trans.
     eapply CleanupLabelsproofEFF.transl_program_correct.
-    eassumption.
-    exists m0. apply INIT. 
-  eapply Genv.init_mem_transf in INIT.
   eapply TransformLNR in LNR. 
   eapply eff_sim_trans.
     eapply StackingproofEFF.transl_program_correct.
     eexact AsmgenproofEFF.return_address_exists. eassumption.
     eassumption.
-    exists m0. apply INIT. 
-  eapply Genv.init_mem_transf_partial in INIT. 2: eauto.
   eapply TransformLNR_partial in LNR. 2: eauto.
   apply AsmgenproofEFF.transl_program_correct. 
     eassumption.
-    eassumption.
-    exists m0. apply INIT.
 Qed.
 
 Theorem transf_cminor_program_correct:
-  forall p tp m0 (INIT: Genv.init_mem p = Some m0)
-  (LNR: list_norepet (map fst (prog_defs p))),
+  forall p tp (LNR: list_norepet (map fst (prog_defs p))),
   transf_cminor_program p = OK tp ->
   SM_simulation.SM_simulation_inject (cmin_eff_sem hf) (Asm_eff_sem hf)
       (Genv.globalenv p) (Genv.globalenv tp).
@@ -366,28 +340,19 @@ Proof.
   eapply eff_sim_trans.
     eapply SelectionproofEFF.transl_program_correct.
      apply BuiltinEffects.get_helpers_correct. apply HelpersOK.
-     unfold SelectionNEW.sel_program. unfold bind.
-     rewrite HelpersOK. trivial.
-     assumption.
-     exists m0. eassumption.
   unfold SelectionNEW.sel_program in Heqr. unfold bind in Heqr.
      rewrite HelpersOK in Heqr. inv Heqr. 
-  eapply Genv.init_mem_transf in INIT. 
   eapply TransformLNR in LNR.   
   eapply eff_sim_trans.
     eapply RTLgenproofEFF.transl_program_correct.
      eassumption.
-     eassumption.
-     exists m0. apply INIT.
-  eapply Genv.init_mem_transf_partial in INIT. 2: eauto.
   eapply TransformLNR_partial in LNR.  
     eapply transf_rtl_program_correct; try eassumption. 
     unfold  RTLgen.transl_program in Heqr0. eassumption. 
 Qed.
 
 Theorem transf_clight_program_correct:
-  forall p tp m0 (INIT: Genv.init_mem p = Some m0)
-  (LNR: list_norepet (map fst (prog_defs p))),
+  forall p tp (LNR: list_norepet (map fst (prog_defs p))),
   transf_clight_program p = OK tp ->
   SM_simulation.SM_simulation_inject (CL_eff_sem1 hf) 
       (Asm_eff_sem hf)
@@ -403,24 +368,16 @@ Proof.
   eapply eff_sim_trans.
     eapply SimplLocalsproofEFF.transl_program_correct. eassumption.
      eassumption. 
-     exists m0; eassumption.
-  eapply Genv.init_mem_transf_partial in INIT. 2: eauto.
   eapply TransformLNR_partial in LNR. 2: eauto.
   eapply eff_sim_trans.
     eapply CshmgenproofEFF.transl_program_correct. 
     eassumption.
     eassumption.
-    exists m0; eassumption.
- 
-  eapply Genv.init_mem_transf_partial2 in INIT. Focus 2. eapply Heqr0. 
   eapply TransformLNR_partial2 in LNR; eauto.
-   
   eapply eff_sim_trans.
     eapply CminorgenproofEFF.transl_program_correct. 
     eassumption.
     eassumption.
-    exists m0; eassumption. 
-  eapply Genv.init_mem_transf_partial in INIT. 2: eauto.
   eapply TransformLNR_partial in LNR. 2: eauto.
   eapply transf_cminor_program_correct; eassumption. 
 Qed.

@@ -154,7 +154,7 @@ eapply Build_Wholeprog_sim
 
 {(* Case: [core_initial] *)
   move=> j c1 vals1 m1 vals2 m2 init1.
-  case=>inj []vinj []pres []reach []wd []vgenv vval.
+  case=>inj []vinj []pres []gfi []reach []wd []vgenv vval.
   move: init1. 
   rewrite /= /LinkerSem.initial_core.
   case e: main=> [//|//|//|//|b ofs].
@@ -199,10 +199,12 @@ eapply Build_Wholeprog_sim
 
   by rewrite main_eq.
 
-  rewrite -meminj_preserves_genv2blocks.
-  rewrite -(genvs_domain_eq_match_genvs (my_ge_S ix)).
-  rewrite meminj_preserves_genv2blocks.
-  by [].
+  { rewrite -meminj_preserves_genv2blocks.
+    rewrite -(genvs_domain_eq_match_genvs (my_ge_S ix)).
+    rewrite meminj_preserves_genv2blocks.
+    by []. }
+
+  { by apply: (genvs_domain_eq_globalptr_inject (my_ge_S ix) gfi). }
 
   { rewrite /dS /dT /mapped=> ? ? ? eq; split.
     apply Mem.valid_block_inject_1 with (m1:=m1) (m2:=m2) in eq=> //.
@@ -321,6 +323,7 @@ eapply Build_Wholeprog_sim
   { by apply: (valid_genvs_domain_eq (my_ge_T ix) vgenv). }
 
   by apply: (Nuke_sem.wmd_initial _ vval vgenv_ix wd init2).
+  by move: gfi; rewrite /mu_top /= /mu_top0 initial_SM_as_inj.
   by move=> ix'; move: vgenv; apply: valid_genvs_domain_eq.
   by apply: ord_dec. }(*END [Case: core_initial]*)
     

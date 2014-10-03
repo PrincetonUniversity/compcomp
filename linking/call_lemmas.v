@@ -132,6 +132,17 @@ have X: (P (Core.i (c inv)) (cast'' pf (Core.c (d inv)))).
 by apply: (cast_indnatdep' X).
 Qed.
 
+Lemma genvs_domain_eq_globalptr_inject F1 V1 F2 V2 (ge : Genv.t F1 V1) (ge' : Genv.t F2 V2) j :
+  genvs_domain_eq ge ge' -> 
+  globalfunction_ptr_inject ge j -> 
+  globalfunction_ptr_inject ge' j.
+Proof.
+move=> Hgenv; case: (Hgenv)=> _ []_ H H2 b f Hfind. 
+case: (H b)=> H3 H4; case: H4; first by exists f.
+move=> f1 Hfind1; case: (H2 _ _ Hfind1); split=> //.
+by rewrite -(genvs_domain_eq_isGlobal _ _ Hgenv).
+Qed.
+
 Import CallStack.
 
 Require Import compcert. Import CompcertLibraries.
@@ -331,6 +342,8 @@ have [cd_new [c2 [pf_new [init2 mtch12]]]]:
   move: (X) init1; case=> eq _ _ init1; subst ix=> /=.
   case: (core_initial _ _ _ _ (sims sims' c1_i) _ 
          args1 _ m1 j args2 m2 domS domT init1 inj vinj')=> //.
+  case: hdinv=> ? ? ? ? ? genvs /=; rewrite /j.
+  by apply: (genvs_domain_eq_globalptr_inject (my_ge_S c1_i) genvs). 
   move=> cd' []c2' []init2 mtch_init12.
   exists cd',(Core.mk N cores_T c1_i c2' (ef_sig ef)),erefl.
   move: init2=> /= ->; split=> //=.
@@ -459,7 +472,10 @@ have hdinv_new:
            = Some c2.(Core.c).
   { clear - init2; move: init2; rewrite /initCore.
     by case e: (initial_core _ _ _ _)=> [c|//]; case=> <- /=. }
-  by apply: (Nuke_sem.wmd_initial (nucular_T (Core.i c2)) vval vgenv2 wmd init). }
+  by apply: (Nuke_sem.wmd_initial (nucular_T (Core.i c2)) vval vgenv2 wmd init). 
+  rewrite /mu_new' /= /mu_new /= initial_SM_as_inj.
+  by case: hdinv=> ? ? ? ? ? genvs /=; rewrite /j.
+}
 
 exists (existT _ (Core.i c1) cd_new),st2',mu_new'; split.
 rewrite LinkerSem.handleP; exists all_at2,ix,bf,c2; split=> //.
