@@ -47,6 +47,7 @@ comes preinstalled with the required dependencies.
 If your Ssreflect or MathComp are installed in a nonstandard place (e.g., in
 your home directory rather than system-wide), edit variables SSREFLECT and
 MATHCOMP in the Makefile to point to appropriate installation directories.
+Otherwise, leave both SSREFLECT and MATHCOMP equal the empty string "".
 
 ## Files
 
