@@ -40,7 +40,8 @@ preinstalled with the required dependencies.
 
 * VirtualBox is available for free here: https://www.virtualbox.org/.
 * The CompComp Debian virtual machine image is here: 
-  http://www.cs.princeton.edu/~jsseven/papers/compcomp/compcomp-debian.tgz.
+
+  > http://www.cs.princeton.edu/~jsseven/papers/compcomp/compcomp-debian.tgz.
 
 Credentials for the virtual machine:
 
@@ -50,7 +51,7 @@ Credentials for the virtual machine:
 | root          | popl15   |
 
 When you download the virtual machine, you'll find the Compositional CompCert
-`compcomp` repository precloned in directory /home/popl15/Repos/compcomp.
+`compcomp` repository precloned in directory `/home/popl15/Repos/compcomp`.
 
 ### Using Custom Ssreflect Installation
 
@@ -69,7 +70,7 @@ A draft version of the paper accompanying Compositional CompCert is available he
 
 ## Files
 
-An HTML rendering of the code is browsable at 
+An HTML rendering of the code is browsable at:
 
 > http://www.cs.princeton.edu/~jsseven/papers/compcomp/html. 
 
@@ -90,8 +91,10 @@ C frontend compiler phases and proofs:
     - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Cminorgen.html)
     - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CminorgenproofEFF.html)
 
-Files suffixed `*_eff.v` and `*_coop.v` give language definitions. Files
-suffixed `*EFF.v` are the compositional compiler phase proofs.
+Source and target language definitions for these phases are generally suffixed
+`*_eff.v` (often importing files suffixed `*_coop.v`).  The compositional
+compiler correctness proofs linked above are generally suffixed `*EFF.v`, to
+distinguish from the standard CompCert proofs.
 
 ### backend/ 
 
@@ -128,8 +131,10 @@ Backend compiler phases and proofs:
     - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Asmgen.html)
     - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/AsmgenproofEFF.html)
 
-Files suffixed `*_eff.v` and `*_coop.v` give language definitions. Files
-suffixed `*EFF.v` are the compositional compiler phase proofs.
+Source and target language definitions for these phases are generally suffixed
+`*_eff.v` (often importing files suffixed `*_coop.v`).  The compositional
+compiler correctness proofs linked above are generally suffixed `*EFF.v`, to
+distinguish from the standard CompCert proofs.
 
 ### core/
 
