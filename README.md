@@ -110,70 +110,70 @@ suffixed `*EFF.v` are the compositional compiler phase proofs.
 
     > Defines interaction semantics (Section 2).
 
-  * StructuredInjections.v 
+  * [StructuredInjections.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/StructuredInjections.html)
   
     > Defines Structured Injections (Section 4).
 
-  * effect_simulations.v 
+  * [effect_simulations.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/effect_simulations.html) 
    
     > Defines structured simulations (Section 4). Concordance for this file: 
     > - `replace_locals` is the function named `export` in the paper.
     > - `replace_externs` is the function named `import` in the paper.
 
-  * effect_simulations_trans.v 
+  * [effect_simulations_trans.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/effect_simulations_trans.html)  
 
     > Proves Theorem 1 (Section 5), that simulations compose vertically.
   
 ### linking/
 
-  * compcert_linking.v
+  * [compcert_linking.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/compcert_linking.html) 
 
     > Defines linking semantics (Section 3).  The linking semantics
     > (\mathcal{L}) is defined twice: First as a function (to Prop), and then as
     > an inductive relation. The two versions are proved to coincide.
 
-  * linking_spec.v
+  * [linking_spec.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/linking_spec.html) 
 
     > States Theorem 2 (Section 5).
 
-  * linking_proof.v 
+  * [linking_proof.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/linking_proof.html)  
 
     > Proves Theorem 2 (Section 5).  The two main subproofs (for the call and
     > return cases, respectively) are:
-    > - linking/call_lemmas.v
-    > - linking/ret_lemmas.v
+    > - [linking/call_lemmas.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/call_lemmas.html)  
+    > - [linking/ret_lemmas.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/ret_lemmas.html)  
 
-  * linking_inv.v 
+  * [linking_inv.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/linking_inv.html)  
 
     > states the main linking simulation invariant.
 
-  * rc_semantics.v 
+  * [rc_semantics.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/rc_semantics.html)   
 
     > Defines reach-closed semantics (Section 5). The definition has been 
     > weakened slightly since the POPL submission, to facilitate the proof,
     > in linking/safe_clight_rc.v, that all safe Clight programs are RC. 
 
-  * safe_clight_rc.v 
+  * [safe_clight_rc.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/safe_clight_rc.html)    
 
     > Proves that all safe Clight programs are RC (a new theorem not in the
     > paper). This is a slightly counterintuitive result that relies on the fact
     > that safe Clight programs cannot fabricate pointers (recall that even in
     > C, casting integers to pointers is only implementation-defined).
 
-  * context_equiv.v 
+  * [context_equiv.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/context_equiv.html)     
   
     > Defines reach-closed contextual equivalence and proves Corollary 1
     > (Section 5).
 
-### driver/
-
-  * CompositionalCompiler.v 
-
-    > Proves Theorem 3 (Section 6).
-
-  * CompositionalComplements.v 
+  * [CompositionalComplements.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CompositionalComplements.html)       
   
     > Proves Corollary 2 (Section 6).
+
+### driver/
+
+  * [CompositionalCompiler.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CompositionalCompiler.html)      
+
+    > Proves Theorem 3 (Section 6).
 
 ### scripts/
 
