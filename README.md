@@ -2,8 +2,8 @@
 
 ## Overview
 
-Compositional CompCert is a respecification and proof of CompCert 2.1 to support
-compositional separate compilation.
+Compositional CompCert is a respecification and proof of CompCert 2.1
+(http://compcert.inria.fr/) to support compositional separate compilation.
 
 The files are distributed as a modification of standard CompCert 2.1: The
 compiler files are the same but there are two sets of proofs, one for standard
@@ -18,9 +18,9 @@ in the same directory as their standard CompCert counterparts.
 
 Compositional CompCert builds under: 
 
-* Coq 8.4pl4,
-* Ssreflect 1.5, and
-* MathComp 1.5. 
+* Coq 8.4pl4 (http://coq.inria.fr/),
+* Ssreflect 1.5 (http://ssr.msr-inria.inria.fr/), and
+* MathComp 1.5 (http://ssr.msr-inria.inria.fr/). 
 
 If you do not have Ssreflect+MathComp, you will be able to build everything but
 the files in the linking/ subdirectory (horizontal composition/proofs).
@@ -36,7 +36,7 @@ To build, unzip the .tgz file, go to the root directory, and type:
 ### Virtual Machine Image 
 
 As a convenience, we've built a VirtualBox virtual machine image that 
-comes preinstalled with these dependencies. 
+comes preinstalled with the required dependencies. 
 
 * VirtualBox is available for free here: https://www.virtualbox.org/.
 * The CompComp Debian virtual machine image is here: 
@@ -44,69 +44,79 @@ comes preinstalled with these dependencies.
 
 ### Custom Ssreflect Installation
 
-If your Ssreflect/MathComp are installed in a nonstandard place (e.g., in your
-home directory rather than system-wide), edit variables SSREFLECT and MATHCOMP
-in the Makefile to point to appropriate installation directories.
+If your Ssreflect or MathComp are installed in a nonstandard place (e.g., in
+your home directory rather than system-wide), edit variables SSREFLECT and
+MATHCOMP in the Makefile to point to appropriate installation directories.
 
 ## Files
 
-cfrontend/ 
-  C frontend compiler phases and proofs (SimplLocals, Cshmgen,
-  Cminorgen). Files suffixed *_eff.v and *_coop.v gives 
-  language definitions. Files suffixed *EFF.v are the compositional 
-  compiler phase proofs.
+* cfrontend/ 
 
-backend/ 
-  Backend compiler phases and proofs (Selection, RTLgen, Tailcall,
-  Renumbering, Allocation, Tunneling, Linearize, CleanupLabels,
-  Stacking, Asmgen). Files suffixed *_eff.v and *_coop.v gives language
-  definitions. Files suffixed *EFF.v are the compositional compiler
-  phase proofs.
+> C frontend compiler phases and proofs (SimplLocals, Cshmgen, Cminorgen). Files
+> suffixed *_eff.v and *_coop.v gives language definitions. Files suffixed
+> *EFF.v are the compositional compiler phase proofs.
 
-core/
-  core_semantics.v: defines interaction semantics, Sec. 2 
-  StructuredInjections.v: structured injections, Sec. 4
-  effect_simulations.v: structured simulations, Sec. 4
+* backend/ 
+
+Backend compiler phases and proofs: 
+
+  - Selection 
+  - RTLgen 
+  - Tailcall 
+  - Renumbering
+  - Allocation 
+  - Tunneling 
+  - Linearize 
+  - CleanupLabels 
+  - Stacking
+  - Asmgen 
+
+Files suffixed *_eff.v and *_coop.v gives language definitions. Files suffixed
+*EFF.v are the compositional compiler phase proofs.
+
+* core/
+
+  - core_semantics.v: defines interaction semantics, Sec. 2 
+  - StructuredInjections.v: structured injections, Sec. 4
+  - effect_simulations.v: structured simulations, Sec. 4
     Concordance: 
     * [replace_locals] is the function named "export" in the paper.
     * [replace_externs] is the function named "import" in the paper.
-  effect_simulations_trans.v: Theorem 1 (transitivity), Sec. 5
+  - effect_simulations_trans.v: Theorem 1 (transitivity), Sec. 5
   
-linking/
-  compcert_linking.v: defines linking semantics, Sec. 3. 
+* linking/
+  - compcert_linking.v: defines linking semantics, Sec. 3. 
     The linking semantics (\mathcal{L}) is defined twice: 
     First as a function (to Prop), and then as an inductive 
     relation. The two versions are proved to coincide.
-  linking_spec.v: states Theorem 2, Sec. 5
-  linking_proof.v: proves Theorem 2, Sec. 5. 
+  - linking_spec.v: states Theorem 2, Sec. 5
+  - linking_proof.v: proves Theorem 2, Sec. 5. 
     The two main subproofs (for the call/return cases, resp.) are:
     * linking/call_lemmas.v
     * linking/ret_lemmas.v
     The file linking/linking_inv.v states the main linking 
     simulation invariant.
-  rc_semantics.v: defines reach-closed semantics, Sec. 5
-  context_equiv.v: defines reach-closed contextual equivalence and
+  - rc_semantics.v: defines reach-closed semantics, Sec. 5
+  - context_equiv.v: defines reach-closed contextual equivalence and
     proves Corollary 1, Sec. 5
 
-driver/
-  CompositionalCompiler.v: proves Theorem 3, Sec. 6
-  CompositionalComplements.v: proves Corollary 2, Sec. 6
+* driver/
+  - CompositionalCompiler.v: proves Theorem 3, Sec. 6
+  - CompositionalComplements.v: proves Corollary 2, Sec. 6
 
-scripts/
-  Contains the shell scripts used to calculate the line counts in
-  Sec. 6. In general, we calculate lines of spec. vs. proof 
-  by first classifying whole files as either spec. or proof, 
-  and then just use wc. The coqwc tool is an alternative, but 
-  it often seems to undercount proof lines and overcount 
-  spec. lines. 
+* scripts/
 
-  For some specification files (e.g., backend/RTL.v), we do not count
-  in our "new" line counts those parts of the file, such as
-  definitions of operational semantics, that are duplicated in our own
-  files (e.g., backend/RTL_coop.v).
+  Contains the shell scripts used to calculate the line counts in Sec. 6. In
+  general, we calculate lines of spec. vs. proof by first classifying whole
+  files as either spec. or proof, and then just use wc. The coqwc tool is an
+  alternative, but it often seems to undercount proof lines and overcount
+  spec. lines.
 
-  The current line counts are slightly lower than those listed 
-  in the paper. We added the line counts to the paper a few 
-  days before the deadline and have since removed some dead 
-  comments, definitions, and lemmas. 
+  For some specification files (e.g., backend/RTL.v), we do not count in our
+  "new" line counts those parts of the file, such as definitions of operational
+  semantics, that are duplicated in our own files (e.g., backend/RTL_coop.v).
+
+  The current line counts are slightly lower than those listed in the paper. We
+  added the line counts to the paper a few days before the deadline and have
+  since removed some dead comments, definitions, and lemmas.
 
