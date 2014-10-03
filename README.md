@@ -33,6 +33,15 @@ To build, clone the repository, go to the root directory, and type:
   make
 ```
 
+### Using Custom Ssreflect Installation
+
+If your Ssreflect or MathComp are installed in a nonstandard place (e.g., in
+your home directory rather than system-wide), edit variables `SSREFLECT` and
+`MATHCOMP` in the Makefile to point to appropriate installation directories.
+Otherwise, leave both `SSREFLECT` and `MATHCOMP` equal the empty string `""`.
+
+## Special Instructions for AEC Members
+
 ### Virtual Machine Image 
 
 As a convenience, we've built a VirtualBox virtual machine image that comes
@@ -53,14 +62,7 @@ Credentials for the virtual machine:
 When you download the virtual machine, you'll find the Compositional CompCert
 `compcomp` repository precloned in directory `/home/popl15/Repos/compcomp`.
 
-### Using Custom Ssreflect Installation
-
-If your Ssreflect or MathComp are installed in a nonstandard place (e.g., in
-your home directory rather than system-wide), edit variables `SSREFLECT` and
-`MATHCOMP` in the Makefile to point to appropriate installation directories.
-Otherwise, leave both `SSREFLECT` and `MATHCOMP` equal the empty string `""`.
-
-## The Paper
+### The Paper
 
 A draft version of the paper accompanying Compositional CompCert is available here:
 
@@ -68,7 +70,7 @@ A draft version of the paper accompanying Compositional CompCert is available he
 
 (Note to AEC members: this is the accepted version.)
 
-## Special Instructions for AEC Members
+### `popl15aec` Branch
 
 The evaluation branch of `compcomp` is `popl15aec`. This branch should already 
 be checked out in the `compcomp` repository installed on the virtual 
