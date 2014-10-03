@@ -74,8 +74,13 @@ An HTML rendering of the code is browsable at:
 
 > http://www.cs.princeton.edu/~jsseven/papers/compcomp/html. 
 
-Below is a description, with links to the HTML docs., of the main files and
-their relation to the POPL results.
+Below is a description, with HTML links, of the main files and their relation to
+the POPL results.
+
+In the `cfrontend/` and `backend/` directories, source and target language
+definitions used in each phase are generally suffixed `*_eff.v` (often importing
+files suffixed `*_coop.v`).  The compositional compiler correctness proofs are
+suffixed `*EFF.v`, to distinguish from the standard CompCert proofs.
 
 ### cfrontend/ 
 
@@ -90,11 +95,6 @@ C frontend compiler phases and proofs:
   * Cminorgen 
     - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Cminorgen.html)
     - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CminorgenproofEFF.html)
-
-Source and target language definitions for these phases are generally suffixed
-`*_eff.v` (often importing files suffixed `*_coop.v`).  The compositional
-compiler correctness proofs linked above are generally suffixed `*EFF.v`, to
-distinguish from the standard CompCert proofs.
 
 ### backend/ 
 
@@ -130,11 +130,6 @@ Backend compiler phases and proofs:
   * Asmgen
     - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Asmgen.html)
     - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/AsmgenproofEFF.html)
-
-Source and target language definitions for these phases are generally suffixed
-`*_eff.v` (often importing files suffixed `*_coop.v`).  The compositional
-compiler correctness proofs linked above are generally suffixed `*EFF.v`, to
-distinguish from the standard CompCert proofs.
 
 ### core/
 
