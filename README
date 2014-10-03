@@ -1,30 +1,54 @@
-                    Compositional CompCert
-                    ======================
+# Compositional CompCert 
 
-OVERVIEW: 
+## Overview
 
-This directory contains files accompanying the POPL submission
+Compositional CompCert is a respecification and proof of CompCert 2.1 to support
+compositional separate compilation.
 
-                    Compositional CompCert.
+The files are distributed as a modification of standard CompCert 2.1: The
+compiler files are the same but there are two sets of proofs, one for standard
+CompCert and the second for Compositional CompCert.  Both sets of proofs are
+buildable.
 
-The files are distributed as a modification of standard CompCert 2.1:
-The compiler files are the same but there are two sets of proofs, one
-for standard CompCert and the second for Compositional CompCert.  Both
-sets of proofs are buildable.
+In general, files suffixed *_coop, *_eff, or *EFF are the compositional versions
+of the standard CompCert proofs. The compositional proofs can typically be found
+in the same directory as their standard CompCert counterparts.
 
-In general, files suffixed with *_coop, *_eff, or *EFF are the
-compositional versions of the standard CompCert proofs. The
-compositional proofs can typically be found in the same directory as
-their standard CompCert counterparts.
+## Build
 
+Compositional CompCert builds under: 
 
-BUILDING:
+* Coq 8.4pl4,
+* Ssreflect 1.5, and
+* MathComp 1.5. 
 
-See INSTALL.
+If you do not have Ssreflect+MathComp, you will be able to build everything but
+the files in the linking/ subdirectory (horizontal composition/proofs).
 
-FILES:
+To build, unzip the .tgz file, go to the root directory, and type:
 
-The files and directories most relevant to the paper are:
+```
+  ./configure ia32-linux
+  make depend
+  make
+```
+
+### Virtual Machine Image 
+
+As a convenience, we've built a VirtualBox virtual machine image that 
+comes preinstalled with these dependencies. 
+
+* VirtualBox is available for free here: https://www.virtualbox.org/.
+* The CompComp Debian virtual machine image is here: 
+  http://www.cs.princeton.edu/~jsseven/compcomp-debian.tgz.
+
+### Custom Ssreflect Installation
+
+If your Ssreflect/MathComp are installed in a nonstandard place (e.g., in your
+home directory rather than system-wide), edit variables SSREFLECT and MATHCOMP
+in the Makefile to point to appropriate installation directories.
+
+## Files
 
 cfrontend/ 
   C frontend compiler phases and proofs (SimplLocals, Cshmgen,
@@ -85,43 +109,4 @@ scripts/
   in the paper. We added the line counts to the paper a few 
   days before the deadline and have since removed some dead 
   comments, definitions, and lemmas. 
-
-
-
-BELOW is the README distributed with CompCert 2.1, including copyright
-notices:
-
-                The CompCert C verified compiler
-
-OVERVIEW:
-
-The CompCert C verified compiler is a compiler for a large subset of the
-C programming language that generates code for the PowerPC, ARM and x86
-processors.
-
-The distinguishing feature of CompCert is that it has been formally
-verified using the Coq proof assistant: the generated assembly code is
-formally guaranteed to behave as prescribed by the semantics of the
-source C code.
-
-CompCert is an ongoing research project.  The present release is an
-advanced prototype intended for research, educational and evaluation
-purposes.
-
-For more information on CompCert (supported platforms, supported C
-features, installation instructions, using the compiler, etc), please
-refer to the user's manual: http://compcert.inria.fr/man/
-
-
-COPYRIGHT:
-
-The CompCert verified compiler is Copyright 2004, 2005, 2006, 2007,
-2008, 2009, 2010, 2011, 2012, 2013 Institut National de Recherche en
-Informatique et en Automatique (INRIA).  It is distributed under the
-conditions stated in file LICENSE.
-
-
-CONTACT:
-
-The authors can be contacted by e-mail at compcert@yquem.inria.fr
 
