@@ -57,9 +57,7 @@ MATHCOMP in the Makefile to point to appropriate installation directories.
 > *EFF.v are the compositional compiler phase proofs.
 
 * backend/ 
-
-Backend compiler phases and proofs: 
-
+  Backend compiler phases and proofs: 
   - Selection 
   - RTLgen 
   - Tailcall 
@@ -70,12 +68,10 @@ Backend compiler phases and proofs:
   - CleanupLabels 
   - Stacking
   - Asmgen 
-
-Files suffixed *_eff.v and *_coop.v gives language definitions. Files suffixed
-*EFF.v are the compositional compiler phase proofs.
+  Files suffixed *_eff.v and *_coop.v gives language definitions. Files suffixed
+  *EFF.v are the compositional compiler phase proofs.
 
 * core/
-
   - core_semantics.v: defines interaction semantics, Sec. 2 
   - StructuredInjections.v: structured injections, Sec. 4
   - effect_simulations.v: structured simulations, Sec. 4
@@ -105,7 +101,6 @@ Files suffixed *_eff.v and *_coop.v gives language definitions. Files suffixed
   - CompositionalComplements.v: proves Corollary 2, Sec. 6
 
 * scripts/
-
   Contains the shell scripts used to calculate the line counts in Sec. 6. In
   general, we calculate lines of spec. vs. proof by first classifying whole
   files as either spec. or proof, and then just use wc. The coqwc tool is an
