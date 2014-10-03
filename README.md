@@ -98,9 +98,10 @@ Files suffixed *_eff.v and *_coop.v gives language definitions. Files suffixed
   
 ### linking/
 
-  * compcert_linking.v: defines linking semantics (Section 3).  The linking
-    semantics (\mathcal{L}) is defined twice: First as a function (to Prop), and
-    then as an inductive relation. The two versions are proved to coincide.
+  * compcert_linking.v: 
+    > Defines linking semantics (Section 3).  The linking semantics
+    > (\mathcal{L}) is defined twice: First as a function (to Prop), and then as
+    > an inductive relation. The two versions are proved to coincide.
   * linking_spec.v: states Theorem 2 (Section 5).
   * linking_proof.v: proves Theorem 2 (Section 5). 
     The two main subproofs (for the call and return cases, respectively) are:
