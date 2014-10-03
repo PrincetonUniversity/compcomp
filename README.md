@@ -97,15 +97,35 @@ suffixed `*EFF.v` are the compositional compiler phase proofs.
 Backend compiler phases and proofs: 
 
   * Selection 
+    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Selection.html)
+    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/SelectionproofEFF.html)
   * RTLgen 
+    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/RTLgen.html)
+    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/RTLgenproofEFF.html)
   * Tailcall 
+    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Tailcall.html)
+    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/TailcallproofEFF.html)
   * Renumbering
+    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Renumbering.html)
+    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/RenumberingproofEFF.html)
   * Allocation 
+    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Alloc.html)
+    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/AllocproofEFF.html)
   * Tunneling 
+    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Tunneling.html)
+    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/TunnelingproofEFF.html)
   * Linearize 
+    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Linearize.html)
+    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/LinearizeproofEFF.html)
   * CleanupLabels 
+    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CleanupLabels.html)
+    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CleanupLabelsproofEFF.html)
   * Stacking
+    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Stacking.html)
+    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/StackingproofEFF.html)
   * Asmgen
+    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Asmgen.html)
+    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/AsmgenproofEFF.html)
 
 Files suffixed `*_eff.v` and `*_coop.v` give language definitions. Files
 suffixed `*EFF.v` are the compositional compiler phase proofs.
