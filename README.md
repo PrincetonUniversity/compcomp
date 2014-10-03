@@ -140,50 +140,50 @@ distinguish from the standard CompCert proofs.
 
   * [core_semantics.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/core_semantics.html)
 
-    > Defines interaction semantics (Section 2).
+    > Defines _Interaction Semantics (Section 2)_.
 
   * [StructuredInjections.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/StructuredInjections.html)
   
-    > Defines Structured Injections (Section 4).
+    > Defines _Structured Injections (Section 4)_.
 
   * [effect_simulations.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/effect_simulations.html) 
    
-    > Defines structured simulations (Section 4). Concordance for this file: 
+    > Defines _Structured Simulations (Section 4)_. Concordance for this file: 
     > - `replace_locals` is the function named `export` in the paper.
     > - `replace_externs` is the function named `import` in the paper.
 
   * [effect_simulations_trans.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/effect_simulations_trans.html)  
 
-    > Proves Theorem 1 (Section 5), that simulations compose vertically.
+    > Proves _Theorem 1 (Section 5)_, that simulations compose vertically.
   
 ### linking/
 
   * [compcert_linking.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/compcert_linking.html) 
 
-    > Defines linking semantics (Section 3).  The linking semantics
+    > Defines _Linking Semantics (Section 3)_.  The linking semantics
     > (\mathcal{L}) is defined twice: First as a function (to Prop), and then as
     > an inductive relation. The two versions are proved to coincide.
 
   * [linking_spec.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/linking_spec.html) 
 
-    > States Theorem 2 (Section 5).
+    > States _Theorem 2 (Section 5)_.
 
   * [linking_proof.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/linking_proof.html)  
 
-    > Proves Theorem 2 (Section 5).  The two main subproofs (for the call and
+    > Proves _Theorem 2 (Section 5)_.  The two main subproofs (for the call and
     > return cases, respectively) are:
     > - [linking/call_lemmas.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/call_lemmas.html)  
     > - [linking/ret_lemmas.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/ret_lemmas.html)  
 
   * [linking_inv.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/linking_inv.html)  
 
-    > states the main linking simulation invariant.
+    > States the main linking simulation invariant, used to prove Theorem 2.
 
   * [rc_semantics.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/rc_semantics.html)   
 
-    > Defines reach-closed semantics (Section 5). The definition has been 
+    > Defines _Reach-Closed Semantics (Section 5)_. The definition has been 
     > weakened slightly since the POPL submission, to facilitate the proof,
-    > in linking/safe_clight_rc.v, that all safe Clight programs are RC. 
+    > in `linking/safe_clight_rc.v`, that all safe Clight programs are RC. 
 
   * [safe_clight_rc.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/safe_clight_rc.html)    
 
@@ -194,18 +194,18 @@ distinguish from the standard CompCert proofs.
 
   * [context_equiv.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/context_equiv.html)     
   
-    > Defines reach-closed contextual equivalence and proves Corollary 1
-    > (Section 5).
+    > Defines _Reach-Closed Contextual Equivalence_ and proves _Corollary 1_
+    > _(Section 5)_.
 
   * [CompositionalComplements.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CompositionalComplements.html)       
   
-    > Proves Corollary 2 (Section 6).
+    > Proves _Corollary 2 (Section 6)_.
 
 ### driver/
 
   * [CompositionalCompiler.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CompositionalCompiler.html)      
 
-    > Proves Theorem 3 (Section 6).
+    > Proves _Theorem 3 (Section 6)_.
 
 ### scripts/
 
