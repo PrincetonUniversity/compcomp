@@ -52,8 +52,13 @@ MATHCOMP in the Makefile to point to appropriate installation directories.
 
 ### cfrontend/ 
 
-  C frontend compiler phases and proofs (SimplLocals, Cshmgen, Cminorgen). Files
-  suffixed *_eff.v and *_coop.v gives language definitions. Files suffixed
+  C frontend compiler phases and proofs: 
+
+  * SimplLocals 
+  * Cshmgen
+  * Cminorgen 
+
+  Files suffixed *_eff.v and *_coop.v gives language definitions. Files suffixed
   *EFF.v are the compositional compiler phase proofs.
 
 ### backend/ 
@@ -69,42 +74,41 @@ MATHCOMP in the Makefile to point to appropriate installation directories.
   * Linearize 
   * CleanupLabels 
   * Stacking
-  * Asmgen 
+  * Asmgen
 
   Files suffixed *_eff.v and *_coop.v gives language definitions. Files suffixed
   *EFF.v are the compositional compiler phase proofs.
 
 ### core/
 
-  * core_semantics.v: defines interaction semantics, Sec. 2 
-  * StructuredInjections.v: structured injections, Sec. 4
-  * effect_simulations.v: structured simulations, Sec. 4
+  * core_semantics.v: defines interaction semantics (Section 2).
+  * StructuredInjections.v: structured injections (Sec. 4).
+  * effect_simulations.v: structured simulations (Sec. 4).
     Concordance: 
     - [replace_locals] is the function named "export" in the paper.
     - [replace_externs] is the function named "import" in the paper.
-  * effect_simulations_trans.v: Theorem 1 (transitivity), Sec. 5
+  * effect_simulations_trans.v: Theorem 1 (transitivity, Sec. 5).
   
 ### linking/
 
-  * compcert_linking.v: defines linking semantics, Sec. 3. 
-    The linking semantics (\mathcal{L}) is defined twice: 
-    First as a function (to Prop), and then as an inductive 
-    relation. The two versions are proved to coincide.
-  * linking_spec.v: states Theorem 2, Sec. 5
-  * linking_proof.v: proves Theorem 2, Sec. 5. 
+  * compcert_linking.v: defines linking semantics (Sec. 3).  The linking
+    semantics (\mathcal{L}) is defined twice: First as a function (to Prop), and
+    then as an inductive relation. The two versions are proved to coincide.
+
+  * linking_spec.v: states Theorem 2 (Sec. 5).
+  * linking_proof.v: proves Theorem 2 (Sec. 5). 
     The two main subproofs (for the call/return cases, resp.) are:
     - linking/call_lemmas.v
     - linking/ret_lemmas.v
-    The file linking/linking_inv.v states the main linking 
-    simulation invariant.
-  * rc_semantics.v: defines reach-closed semantics, Sec. 5
-  * context_equiv.v: defines reach-closed contextual equivalence and
-    proves Corollary 1, Sec. 5
+    The file linking/linking_inv.v states the main linking simulation invariant.
+  * rc_semantics.v: defines reach-closed semantics (Sec. 5).
+  * context_equiv.v: defines reach-closed contextual equivalence and proves
+    Corollary 1 (Sec. 5).
 
 ### driver/
 
-  * CompositionalCompiler.v: proves Theorem 3, Sec. 6
-  * CompositionalComplements.v: proves Corollary 2, Sec. 6
+  * CompositionalCompiler.v: proves Theorem 3 (Sec. 6).
+  * CompositionalComplements.v: proves Corollary 2 (Sec. 6).
 
 ### scripts/
 
