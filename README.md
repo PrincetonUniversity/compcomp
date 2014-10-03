@@ -52,18 +52,18 @@ MATHCOMP in the Makefile to point to appropriate installation directories.
 
 ### cfrontend/ 
 
-  C frontend compiler phases and proofs: 
+C frontend compiler phases and proofs: 
 
   * SimplLocals 
   * Cshmgen
   * Cminorgen 
 
-  Files suffixed *_eff.v and *_coop.v gives language definitions. Files suffixed
-  *EFF.v are the compositional compiler phase proofs.
+Files suffixed *_eff.v and *_coop.v gives language definitions. Files suffixed
+*EFF.v are the compositional compiler phase proofs.
 
 ### backend/ 
 
-  Backend compiler phases and proofs: 
+Backend compiler phases and proofs: 
 
   * Selection 
   * RTLgen 
@@ -76,8 +76,8 @@ MATHCOMP in the Makefile to point to appropriate installation directories.
   * Stacking
   * Asmgen
 
-  Files suffixed *_eff.v and *_coop.v gives language definitions. Files suffixed
-  *EFF.v are the compositional compiler phase proofs.
+Files suffixed *_eff.v and *_coop.v gives language definitions. Files suffixed
+*EFF.v are the compositional compiler phase proofs.
 
 ### core/
 
