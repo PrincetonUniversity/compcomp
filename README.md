@@ -80,8 +80,14 @@ Below is a description of the main files and their relation to the POPL results.
 C frontend compiler phases and proofs: 
 
   * SimplLocals 
+    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/SimplLocals.html)
+    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/SimplLocalsproofEFF.html)
   * Cshmgen
+    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Cshmgen.html)
+    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CshmgenproofEFF.html)
   * Cminorgen 
+    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Cminorgen.html)
+    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CminorgenproofEFF.html)
 
 Files suffixed `*_eff.v` and `*_coop.v` give language definitions. Files
 suffixed `*EFF.v` are the compositional compiler phase proofs.
