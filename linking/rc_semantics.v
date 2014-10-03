@@ -15,6 +15,8 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
+(** * Reach-Closed Semantics *)
+
 (* Reach-closed semantics extend effect semantics w/:                       *)
 (*   1) args: the arguments passed to initial_core at initialization        *)
 (*   2) rets: the list of values returned to the core at inter. points      *)
@@ -46,6 +48,8 @@ Module RC. Section rc.
 Variables F V C : Type.
 
 Variable sem : @EffectSem (Genv.t F V) C.
+
+(** Reach-closed states *)
 
 Record state : Type := 
   mk { core :> C
@@ -122,6 +126,8 @@ Qed.
 Definition reach_set (ge : Genv.t F V) (c : state) (m : mem) := 
   REACH m (roots ge c).
 
+(** The reach-closed step relation *)
+
 Definition effstep ge U c m c' m' :=
   effstep sem ge U (core c) m (core c') m' 
   /\ (forall b ofs, U b ofs=true -> reach_set ge c m b=true)
@@ -160,6 +166,8 @@ rewrite (orb_comm (getBlocks (v :: nil) b)).
 rewrite (orb_assoc (isGlobalBlock ge b)); auto.
 inversion 1.
 Qed.
+
+(** RC core semantics *)
   
 Program Definition coresem : CoreSemantics (Genv.t F V) state mem :=
   Build_CoreSemantics _ _ _

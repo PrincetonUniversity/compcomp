@@ -28,6 +28,8 @@ Import SM_simulation.
 Import Linker. 
 Import Modsem.
 
+(** Reach-Closed Contextual Equivalence *)
+
 Module ContextEquiv (LS : LINKING_SIMULATION).                  
                                                                        
 Import LS.                                                             
@@ -155,6 +157,8 @@ Qed.
 
 Import Wholeprog_sim.
 
+(** Proof of Corollary 1. *)
+
 Lemma context_equiv 
     (main : val)  
     (targets_det : forall ix : 'I_N, corestep_fun (sem (sems_T ix))) 
@@ -166,6 +170,8 @@ Proof.
 have target_det: corestep_fun linker_T by apply: linking_det.
 by apply (equitermination _ _ target_det _ _ _ _ _ _ source_safe match12).
 Qed.
+
+(** Corollary 1, specialized to initial states. *)
 
 Lemma init_context_equiv l1 m1 m2 j vals1 vals2 
   (main : val)

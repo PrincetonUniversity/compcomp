@@ -24,6 +24,8 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
+(** This file proves that safe Clight programs are also RC. *)
+
 Module SAFE_CLIGHT_RC. Section SafeClightRC.
 Variable hf : I64Helpers.helper_functions.
 

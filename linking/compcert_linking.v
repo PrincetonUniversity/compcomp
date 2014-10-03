@@ -20,6 +20,8 @@ Require Import Integers.
 
 Require Import ZArith.
 
+(** * Language-Independent Linking Semantics *)
+
 (* This file gives the operational semantics of multi-language linking.   *)
 (*                                                                        *)
 (* The following are the key types:                                       *)
@@ -58,7 +60,7 @@ Require Import ZArith.
 (*                shown to be both a [CoopCoreSem] and an [EffectSem]     *)
 (*                (cf. core_semantics.v, effect_semantics.v).             *)
 
-(* [Modsem.t]: Semantics of translation units *)
+(** [Modsem.t]: Semantics of translation units *)
 
 Module Modsem. 
 
@@ -71,7 +73,7 @@ Record t := mk
 
 End Modsem.
 
-(* [Cores] are runtime execution units. *)
+(** [Cores] are runtime execution units. *)
 
 Module Core. Section core.
 
@@ -164,7 +166,7 @@ End coreDefs.
 
 Arguments atExternal {N} cores c.
 
-(* Call stacks are [stack]s satisfying the [wf_callStack] invariant. *)
+(** Call stacks are [stack]s satisfying the [wf_callStack] invariant. *)
 
 Module CallStack. Section callStack.
 
@@ -238,11 +240,11 @@ Definition updStack (newStack : CallStack.t my_cores) :=
   {| fn_tbl := l.(fn_tbl)
    ; stack  := newStack |}.
 
-(* [inContext]: The top core on the call stack has a return context  *)     
+(** [inContext]: The top core on the call stack has a return context  *)     
 
 Definition inContext (l0 : linker N my_cores) := callStackSize l0.(stack) > 1.
 
-(* [updCore]: Replace the top core on the call stack with [newCore]  *)     
+(** [updCore]: Replace the top core on the call stack with [newCore]  *)     
 
 Program Definition updCore (newCore: Core.t my_cores) := 
   updStack (CallStack.mk (STACK.push (STACK.pop l.(stack)) newCore) _).  
@@ -259,8 +261,8 @@ case=> H1; move: (EqdepFacts.eq_sigT_snd H1); move=> <-.
 by rewrite -Eqdep.Eq_rect_eq.eq_rect_eq.
 Qed.
 
-(* [pushCore]: Push a new core onto the call stack.                       *)
-(* Succeeds only if all cores are currently at_external.                  *)
+(** [pushCore]: Push a new core onto the call stack.                       *)
+(** Succeeds only if all cores are currently at_external.                  *)
 
 Lemma stack_push_wf newCore :
   all (atExternal my_cores) l.(stack).(callStack) -> 
@@ -274,8 +276,8 @@ Definition pushCore
   (pf : all (atExternal my_cores) l.(stack).(callStack)) := 
   updStack (CallStack.mk (STACK.push l.(stack) newCore) (stack_push_wf _ pf)).
 
-(* [popCore]: Pop the top core on the call stack.                         *)
-(* Succeeds only if the top core is running in a return context.          *)
+(** [popCore]: Pop the top core on the call stack.                         *)
+(** Succeeds only if the top core is running in a return context.          *)
 
 Lemma inContext_wf (stk : Stack.t (Core.t my_cores)) : 
   size stk > 1 -> wf_callStack stk -> wf_callStack (STACK.pop stk).
@@ -519,21 +521,21 @@ Definition after_external (mv: option val) (l: linker N my_cores) :=
       is Some c' then Some (updCore l (Core.upd c c'))
     else None.
 
-(* The linker is [halted] when the last core on the call stack is halted. *)
+(** The linker is [halted] when the last core on the call stack is halted. *)
 
 Definition halted (l: linker N my_cores) := 
   if ~~inContext l then 
   if halted0 l is Some rv then Some rv
   else None else None.
 
-(* Return type of topmost core *)
+(** Return type of topmost core *)
 
 Definition retType0 (l: linker N my_cores) : option typ :=
   let: c  := peekCore l in 
   let: sg := c.(Core.sg) in 
     sig_res sg.
 
-(* Corestep relation of linking semantics *)
+(** Corestep relation of linking semantics *)
 
 Definition corestep 
   (l: linker N my_cores) (m: Mem.mem)
@@ -566,6 +568,8 @@ Definition corestep
       else False else False else False
 
      else False).
+
+(** An inductive characterization of [corestep] above, proved equivalent below. *)
 
 Inductive Corestep : linker N my_cores -> mem 
                      -> linker N my_cores -> mem -> Prop :=
@@ -689,6 +693,8 @@ case oval: (val_has_type_func _ _)=> //; case=> Heq. subst. case=> <-.
 by apply: (@Corestep_return _ _ _ rv c'').
 Qed.
 
+(** Equivalence of the two representations of linking semantics. *)
+
 Lemma CorestepP l m l' m' : 
   corestep l m l' m' <-> Corestep l m l' m'.
 Proof. by split; [apply: CorestepI | apply: CorestepE]. Qed.
@@ -780,6 +786,8 @@ rewrite /=; exists refl_equal; exists refl_equal; split=> //; f_equal; f_equal.
 by apply: proof_irr.
 Qed.
 
+(** Construct the interaction semantics of linking. *)
+
 Definition coresem : CoreSemantics ge_ty (linker N my_cores) Mem.mem :=
   Build_CoreSemantics ge_ty (linker N my_cores) Mem.mem 
     initial_core
@@ -790,6 +798,9 @@ Definition coresem : CoreSemantics ge_ty (linker N my_cores) Mem.mem :=
     corestep_not_at_external    
     corestep_not_halted 
     at_external_halted_excl.
+
+(** The linking semantics function \mathcal{L} is deterministic:
+    \mathcal{L}(M1,...,Mn) is deterministic as long as M1, ..., Mn are. *)
 
 Lemma linking_det 
   (dets : forall ix : 'I_N, 
@@ -824,7 +835,7 @@ Qed.
 
 End linkerSem. End LinkerSem.
 
-(* Specialize to effect semantics *)
+(** Specialize to effect semantics *)
 
 Section effingLinker.
 

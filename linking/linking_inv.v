@@ -44,9 +44,7 @@ Unset Printing Implicit Defensive.
 Require Import Values.   
 Require Import nucular_semantics.
 
-(* This file proves the main linking simulation result (see               *)
-(* linking/linking_spec.v for the specification of the theorem that's     *)
-(* proved).                                                               *)
+(** This file states the simulation invariant used in Theorem 2. *)
 
 Import Wholeprog_sim.
 Import SM_simulation.

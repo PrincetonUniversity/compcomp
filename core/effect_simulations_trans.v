@@ -22,6 +22,8 @@ Require Import Relations.
 Require Import effect_corediagram_trans.
 Require Import effect_interpolants.
 
+(** * Transitivity of Structured Simulations *)
+
 Declare Module EFFAX : EffectInterpolationAxioms.
 
 Import SM_simulation.
@@ -181,6 +183,8 @@ Context {F1 V1 C1 F2 V2 C2 F3 V3 C3:Type}
         (g1 : Genv.t F1 V1)
         (g2 : Genv.t F2 V2)
         (g3 : Genv.t F3 V3).
+
+(** Transitivity proof proper: *)
 
 Theorem eff_sim_trans: forall 
         (SIM12: @SM_simulation_inject _ _ _ _ _ _ Sem1 Sem2 g1 g2)
@@ -636,15 +640,14 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
   destruct (core_at_external23 _ _ _ _ _ _ _ _ _ MC23 AtExt2)
    as [MInj23 [vals3 [ArgsInj23 (*[ArgsHT3*) [AtExt3 _](*]*)]]]; clear core_at_external23.
   
-  (*Prove uniqueness of e, ef_sig, vals3. We do this by hand, instead of 
+  (** Prove uniqueness of e, ef_sig, vals3. We do this by hand, instead of 
      rewrite AtExtTgt in AtExt3; inv Atext3 in order to avoid the subst
-     that's inherent in inv AtExt3. Probably there's a better way to do this..*)
+     that's inherent in inv AtExt3. Probably there's a better way to do this... *)
   assert (e' = e /\ ef_sig' = ef_sig /\ vals3'=vals3).
      rewrite AtExtTgt in AtExt3. inv AtExt3. intuition.
   destruct H as [HH1 [HH2 HH3]].
   rewrite HH1, HH2, HH3 in *. clear HH1 HH2 HH3 e' ef_sig' vals3' AtExt3.
 
-  (*clear MemInjMu. follows from MInj12 MInj23*)
   specialize (eff_after_external12 _ _ _ _ _ _ _ _ _ _ _ _ MInj12 
         NormMC12 AtExtSrc AtExt2 ArgsInj12
         _ (eq_refl _) _ (eq_refl _) _ (eq_refl _)). 
@@ -682,7 +685,7 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
         subst.
         clear UnchLOOR13 UnchPrivSrc SEP INC MemInjMu ArgsInj12 MInj12.
               
-        rewrite restrict_sm_locBlocksTgt. (*sm_extern_normalize_exportedTgt; trivial.*)
+        rewrite restrict_sm_locBlocksTgt.
            rewrite GlueA. intros b Hb. rewrite andb_true_iff in *.
         destruct Hb. split; trivial.
         eapply REACH_mono; try eassumption.

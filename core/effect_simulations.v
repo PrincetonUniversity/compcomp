@@ -16,6 +16,8 @@ Require Import effect_semantics.
 Require Import StructuredInjections.
 Require Import reach.
 
+(** * Structured Simulations *)
+
 Module SM_simulation. Section SharedMemory_simulation_inject. 
 
 Context 
@@ -87,6 +89,8 @@ Record SM_simulation_inject :=
            (REACH m2 (fun b => isGlobalBlock ge2 b || getBlocks vals2 b)) j)
          c1 m1 c2 m2
 
+(** The diagram for internal steps: *)
+
 ; effcore_diagram : 
     forall st1 m1 st1' m1' U1, 
     effstep Sem1 ge1 U1 st1 m1 st1' m1' ->
@@ -143,13 +147,15 @@ Record SM_simulation_inject :=
        match_state cd nu c1 m1 c2 m2 
        /\ Mem.inject (shared_of nu) m1 m2
 
+(** The diagram for external steps: *)
+
 ; eff_after_external: 
     forall cd mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
       (MemInjMu: Mem.inject (as_inj mu) m1 m2)
       (MatchMu: match_state cd mu st1 m1 st2 m2)
       (AtExtSrc: at_external Sem1 st1 = Some (e,ef_sig,vals1))
 
-        (* We include the clause AtExtTgt to ensure that vals2 is
+        (** We include the clause AtExtTgt to ensure that vals2 is
          uniquely determined. We have e=e' and ef_sig=ef_sig' by the
          at_external clause, but omitting the hypothesis AtExtTgt
          would result in in 2 not necesssarily equal target argument
@@ -214,6 +220,8 @@ Record SM_simulation_inject :=
           match_state cd' mu' st1' m1' st2' m2' }.
 
 Require Import core_semantics_lemmas.
+
+(** Here we derive a simpler internal step diagram clause from the above: *)
 
 Lemma core_diagram (SMI: SM_simulation_inject):
       forall st1 m1 st1' m1', 

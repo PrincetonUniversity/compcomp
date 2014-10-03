@@ -4,6 +4,11 @@ Require Import Coqlib.
 Require Import Values.
 Require Import Axioms.
 
+(** * Structured Injections *)
+
+(** The definition of structured injections is given below. First, 
+  some lemmas: *)
+
 Require Import mem_lemmas.
 
 Lemma compose_meminjI_Some: forall j k b1 b2 d1 b3 d2
@@ -215,32 +220,34 @@ Qed.
 Lemma join_None_leftneutral: forall j, join (fun b => None) j = j.
 Proof. unfold join; intros. extensionality b. trivial. Qed.
 
+(** ** The definition of structured injections: *)
+
 Record SM_Injection :=
   { locBlocksSrc : block -> bool;
-                     (* The blocks allocated by THIS module in the
+                     (** The blocks allocated by THIS module in the
                         source language SRC*)
     locBlocksTgt : block -> bool; 
-                     (* The blocks allocated by THIS module in the
+                     (** The blocks allocated by THIS module in the
                         target language TGT*) 
-    pubBlocksSrc : block -> bool; (*subset of locBlocksSrc that have been 
+    pubBlocksSrc : block -> bool; (** subset of locBlocksSrc that have been 
                         made public. Must be mapped by pubInj.*)
-    pubBlocksTgt : block -> bool; (*subset of locBlocksTgt that have been 
+    pubBlocksTgt : block -> bool; (** subset of locBlocksTgt that have been 
                         made public. Contains the image of pubInj.*)
-    local_of: meminj; (* meminj on blocks allocated by THIS module.
+    local_of: meminj; (** meminj on blocks allocated by THIS module.
                         Remains unchanged by external steps,
                         and is partitioned by pubBlocksSrc/Tgt into
                         exported (public)
                         and non-exporrted (private) component.  *)
 
-    extBlocksSrc: block -> bool; (*blocks allocated by OTHER modules in SRC *)
-    extBlocksTgt: block -> bool; (*blocks allocated by OTHER modules in TGT *)
+    extBlocksSrc: block -> bool; (** blocks allocated by OTHER modules in SRC *)
+    extBlocksTgt: block -> bool; (** blocks allocated by OTHER modules in TGT *)
 
-    frgnBlocksSrc : block -> bool; (*subset of extBlocksSrc that have been 
+    frgnBlocksSrc : block -> bool; (** subset of extBlocksSrc that have been 
                         made visible to THIS module. Must be apped by foreign.*)
-    frgnBlocksTgt : block -> bool; (*subset of extBlocksTgt that have been 
+    frgnBlocksTgt : block -> bool; (** subset of extBlocksTgt that have been 
                         made visible to THIS module. Contains image of foreign*)
    
-    extern_of: meminj (* a meminj on blocks allocated by OTHER modules; 
+    extern_of: meminj (** a meminj on blocks allocated by OTHER modules; 
                         the injection is not modified by coresteps, and
                         is partitioned by frgnBlocksSrc/Tgt into 
                         foreign (leaked to this module) and unknown (non-leaked)
@@ -252,7 +259,8 @@ Record SM_Injection :=
                         nor does it spill into them*)
 }.
 
-(*The four projections*)
+(** The four projections: *)
+
 Definition unknown_of (mu: SM_Injection) : meminj :=
   match mu with 
     Build_SM_Injection locBSrc locBTgt pSrc pTgt local extBSrc extBTgt fSrc fTgt extern => 

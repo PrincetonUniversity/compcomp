@@ -47,9 +47,8 @@ Unset Printing Implicit Defensive.
 Require Import Values.   
 Require Import nucular_semantics.
 
-(* This file proves the main linking simulation result (see               *)
-(* linking/linking_spec.v for the specification of the theorem that's     *)
-(* proved).                                                               *)
+(** This file proves the main linking simulation result (see
+  linking/linking_spec.v for the specification of the theorem that's proved). *)
 
 Import Wholeprog_sim.
 Import SM_simulation.
@@ -138,6 +137,8 @@ by apply (H2 _ isGlob).
 case: H1=> _ []_; case/(_ b)=> X Y Z; case: Y; first by exists isGlob.
 by move=> x FND; apply: (H3 _ _ FND).
 Qed.
+
+(** Proof of Theorem 2 *)
 
 Lemma link (main : val) : CompCert_wholeprog_sim linker_S linker_T my_ge my_ge main.
 Proof.
