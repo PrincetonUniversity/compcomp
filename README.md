@@ -43,31 +43,39 @@ preinstalled with the required dependencies.
   http://www.cs.princeton.edu/~jsseven/papers/compcomp/compcomp-debian.tgz.
 
 When you download the virtual machine, you'll find the Compositional CompCert
-repository precloned in directory /home/popl15/Repos/compcomp.
+`compcomp` repository precloned in directory /home/popl15/Repos/compcomp.
 
 Credentials for the virtual machine:
 
-* User: popl15
-* Password: popl15
-* Root password: popl15
+----------------------------
+| User          | `popl15` |
+----------------------------
+| Password      | `popl15` |
+----------------------------
+| Root password | `popl15` |
+----------------------------
 
-### Custom Ssreflect Installation
+### Using Custom Ssreflect Installation
 
 If your Ssreflect or MathComp are installed in a nonstandard place (e.g., in
-your home directory rather than system-wide), edit variables SSREFLECT and
-MATHCOMP in the Makefile to point to appropriate installation directories.
-Otherwise, leave both SSREFLECT and MATHCOMP equal the empty string "".
+your home directory rather than system-wide), edit variables `SSREFLECT` and
+`MATHCOMP` in the Makefile to point to appropriate installation directories.
+Otherwise, leave both `SSREFLECT` and `MATHCOMP` equal the empty string "".
 
 ## The Paper
 
 A draft version of the paper accompanying this work is available here:
-http://www.cs.princeton.edu/~jsseven/papers/compcomp/paper.pdf. 
+
+> http://www.cs.princeton.edu/~jsseven/papers/compcomp/paper.pdf. 
+
 (Note to AEC members: this is the accepted version.)
 
 ## Files
 
 An HTML rendering of the code is browsable at 
-http://www.cs.princeton.edu/~jsseven/papers/compcomp/html. 
+
+> http://www.cs.princeton.edu/~jsseven/papers/compcomp/html. 
+
 Below is a description of the main files and their relation to the POPL results.
 
 ### cfrontend/ 
@@ -78,7 +86,7 @@ C frontend compiler phases and proofs:
   * Cshmgen
   * Cminorgen 
 
-Files suffixed `*_eff.v` and `*_coop.v` gives language definitions. Files
+Files suffixed `*_eff.v` and `*_coop.v` give language definitions. Files
 suffixed `*EFF.v` are the compositional compiler phase proofs.
 
 ### backend/ 
@@ -96,7 +104,7 @@ Backend compiler phases and proofs:
   * Stacking
   * Asmgen
 
-Files suffixed `*_eff.v` and `*_coop.v` gives language definitions. Files
+Files suffixed `*_eff.v` and `*_coop.v` give language definitions. Files
 suffixed `*EFF.v` are the compositional compiler phase proofs.
 
 ### core/
