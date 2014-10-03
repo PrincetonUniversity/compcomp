@@ -29,8 +29,8 @@ RECDIRS=lib common backend cfrontend core linking driver flocq exportclight
 # If SSREFLECT is set to "" (default), no additional 
 # include directives will be passed to coqc.
 
-SSREFLECT="/u/jsseven/Downloads/ssreflect-1.5"
-MATHCOMP="/u/jsseven/Downloads/mathcomp-1.5"
+SSREFLECT=""
+MATHCOMP=""
 
 COQINCLUDES0=$(foreach d, $(RECDIRS), -R $(d) -as compcert.$(d)) \
   -I $(ARCH)/$(VARIANT) -as compcert.$(ARCH).$(VARIANT) \
