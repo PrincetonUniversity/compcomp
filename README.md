@@ -42,6 +42,12 @@ comes preinstalled with the required dependencies.
 * The CompComp Debian virtual machine image is here: 
   http://www.cs.princeton.edu/~jsseven/compcomp-debian.tgz.
 
+### The Paper
+
+A draft version of the paper accompanying this work is available here:
+http://www.cs.princeton.edu/~jsseven/papers/popl15/paper.pdf. Note to AEC 
+members: this is the accepted version of the paper.
+
 ### Custom Ssreflect Installation
 
 If your Ssreflect or MathComp are installed in a nonstandard place (e.g., in
