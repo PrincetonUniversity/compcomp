@@ -93,10 +93,9 @@ Notation "a @@ b" :=
 Definition print {A: Type} (printer: A -> unit) (prog: A) : A :=
   let unused := printer prog in prog.
 
-(** We define three translation functions for whole programs: one
-  starting with a C program, one with a Cminor program, one with an
-  RTL program.  The three translations produce Asm programs ready for
-  pretty-printing and assembling. *)
+(** We define three translation functions: one starting with a C program, one
+  with a Cminor program, one with an RTL program.  The three translations
+  produce Asm programs ready for pretty-printing and assembling. *)
 
 Definition transf_rtl_program (f: RTL.program) : res AsmEFF.program :=
    OK f
