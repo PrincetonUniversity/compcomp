@@ -62,8 +62,8 @@ Credentials for the virtual machine:
 When you download the virtual machine, you'll find the Compositional CompCert
 `compcomp` repository precloned in directory `/home/popl15/Repos/compcomp`.
 
-On the virtual machine, the repository could take up to *2 hours* to build. Make
-sure to configure the virtual machine to use at least *2GB of memory.*
+On the virtual machine, the repository could take up to **2 hours** to build. Make
+sure to configure the virtual machine to use at least **2GB of memory.**
 
 ### The Paper
 
