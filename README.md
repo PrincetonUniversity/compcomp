@@ -68,6 +68,19 @@ A draft version of the paper accompanying Compositional CompCert is available he
 
 (Note to AEC members: this is the accepted version.)
 
+## Special Instructions for AEC Members
+
+The evaluation branch of `compcomp` is `popl15aec`. This branch should already 
+be checked out in the `compcomp` repository installed on the virtual 
+machine. If it isn't for some reason, or you would like to clone the repository
+yourself, you can switch to the `popl15aec` branch as follows:
+
+```
+git clone https://github.com/PrincetonUniversity/compcomp.git <compcomp-dir>
+cd <compcomp-dir>
+git checkout popl15aec
+```
+
 ## Files
 
 An HTML rendering of the code is browsable at:
