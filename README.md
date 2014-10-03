@@ -81,6 +81,12 @@ cd <compcomp-dir>
 git checkout popl15aec
 ```
 
+The `compcomp` development team tries to make sure that `master` always 
+builds and contains no admits (incomplete proofs are developed in separate
+branches and only merged into `master` when complete). However, further 
+development on `compcomp` after the AEC begins its work could result in 
+transitory build issues on `master`.
+
 ## Files
 
 An HTML rendering of the code is browsable at:
