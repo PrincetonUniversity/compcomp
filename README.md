@@ -106,7 +106,7 @@ suffixed `*EFF.v` are the compositional compiler phase proofs.
 
 ### core/
 
-  * core_semantics.v 
+  * [core_semantics.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/core_semantics.html)
 
     > Defines interaction semantics (Section 2).
 
@@ -117,8 +117,8 @@ suffixed `*EFF.v` are the compositional compiler phase proofs.
   * effect_simulations.v 
    
     > Defines structured simulations (Section 4). Concordance for this file: 
-    > - [replace_locals] is the function named "export" in the paper.
-    > - [replace_externs] is the function named "import" in the paper.
+    > - `replace_locals` is the function named `export` in the paper.
+    > - `replace_externs` is the function named `import` in the paper.
 
   * effect_simulations_trans.v 
 
