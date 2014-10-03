@@ -45,9 +45,7 @@ comes preinstalled with the required dependencies.
 ### The Paper
 
 A draft version of the paper accompanying this work is available here:
-
-* http://www.cs.princeton.edu/~jsseven/papers/compcomp/paper.pdf. 
-
+http://www.cs.princeton.edu/~jsseven/papers/compcomp/paper.pdf. 
 Note to AEC members: this is the accepted version of the paper.
 
 ### Custom Ssreflect Installation
@@ -60,9 +58,7 @@ Otherwise, leave both SSREFLECT and MATHCOMP equal the empty string "".
 ## Files
 
 The code is browsable at 
-
-* http://www.cs.princeton.edu/~jsseven/papers/compcomp/html. 
-
+http://www.cs.princeton.edu/~jsseven/papers/compcomp/html. 
 Below is a description of the main files and their relation to the results POPL
 paper.
 
