@@ -40,10 +40,7 @@ Require Cminorgen.
 Require SelectionNEW.
 Require RTLgen.
 Require Tailcall.
-(*Require Inlining.*)
 Require Renumber.
-(*Require Constprop.
-Require CSE.*)
 Require Allocation.
 Require Tunneling.
 Require Linearize.
@@ -58,10 +55,7 @@ Require CminorgenproofEFF.
 Require SelectionproofEFF.
 Require RTLgenproofEFF.
 Require TailcallproofEFF.
-(*Require Inliningproof.*)
 Require RenumberproofEFF.
-(*Require Constpropproof.
-Require CSEproof.*)
 Require AllocproofEFF.
 Require TunnelingproofEFF.
 Require LinearizeproofEFF.
@@ -74,9 +68,6 @@ Parameter print_Clight: Clight.program -> unit.
 Parameter print_Cminor: Cminor.program -> unit.
 Parameter print_RTL: RTL.program -> unit.
 Parameter print_RTL_tailcall: RTL.program -> unit.
-(*Parameter print_RTL_inline: RTL.program -> unit.
-Parameter print_RTL_constprop: RTL.program -> unit.
-Parameter print_RTL_cse: RTL.program -> unit.*)
 Parameter print_LTL: LTL.program -> unit.
 Parameter print_Mach: Mach.program -> unit.
 
@@ -112,14 +103,7 @@ Definition transf_rtl_program (f: RTL.program) : res AsmEFF.program :=
    @@ print print_RTL
    @@ Tailcall.transf_program
    @@ print print_RTL_tailcall
-(*  @@@ Inlining.transf_program*)
    @@ Renumber.transf_program
-(*  @@ print print_RTL_inline*)
-(*   @@ Constprop.transf_program*)
-(*  @@ Renumber.transf_program*)
-(*   @@ print print_RTL_constprop
-  @@@ CSE.transf_program
-   @@ print print_RTL_cse*)
   @@@ Allocation.transf_program
    @@ print print_LTL
    @@ Tunneling.tunnel_program
@@ -144,12 +128,6 @@ Definition transf_clight_program (p: Clight.program) : res AsmEFF.program :=
   @@@ Cminorgen.transl_program
   @@@ transf_cminor_program.
 
-(*Definition transf_c_program (p: Csyntax.program) : res Asm.program :=
-  OK p 
-  @@@ SimplExpr.transl_program
-  @@@ transf_clight_program.
-*)
-
 (** Force [Initializers] and [Cexec] to be extracted as well. *)
 
 Definition transl_init := Initializers.transl_init.
@@ -161,7 +139,7 @@ Lemma print_identity:
   forall (A: Type) (printer: A -> unit) (prog: A),
   print printer prog = prog.
 Proof.
-  intros; unfold print. (*destruct (printer prog);*) auto. 
+  intros; unfold print. auto.
 Qed.
 
 Lemma compose_print_identity:
@@ -250,18 +228,6 @@ Proof. intros; erewrite <-list_norepet_transform; eauto. Qed.
 
 (** * Semantic preservation *)
 
-(** We prove that the [transf_program] translations preserve semantics
-  by constructing the following simulations:
-- Forward simulations from [Cstrategy] / [Cminor] / [RTL] to [Asm]
-  (composition of the forward simulations for each pass).
-- Backward simulations for the same languages
-  (derived from the forward simulation, using receptiveness of the source
-  language and determinacy of [Asm]).
-- Backward simulation from [Csem] to [Asm]
-  (composition of two backward simulations).
-
-These results establish the correctness of the whole compiler! *)
-
 Require Import effect_simulations.
 Require Import effect_simulations_trans.
 Require Import Globalenvs.
@@ -270,14 +236,15 @@ Require Import Clight_eff.
 Require Import RTL_eff.
 Require Import Asm_eff.
 
-(* See CompCert's Selectionproof.v, in which the same assumption is made: *)
+(** See CompCert's backend/Selectionproof.v, in which the same assumption is
+  made (l. 690).  We pull it out to the top-level because all of our language semantics
+  are now parameterized by [hf], in order to properly classify I64 helper
+  functions as nonobservable. *)
 
 Parameter hf : I64Helpers.helper_functions.
 Axiom HelpersOK: I64Helpers.get_helpers = OK hf.
 
-(* We pull it out to the top-level because all of our language semantics 
-   are now parameterized by [hf], in order to properly classify I64 helper
-   functions as nonobservable. *)
+(** Prove the existence of a structured simulation between RTL and Asm. *)
 
 Theorem transf_rtl_program_correct:
   forall p tp (LNR: list_norepet (map fst (prog_defs p))),
@@ -325,6 +292,9 @@ Proof.
     eassumption.
 Qed.
 
+(** Prove the existence of a structured simulation between Cminor and Asm, 
+    relying on [transf_rtl_program_correct] above. *)
+
 Theorem transf_cminor_program_correct:
   forall p tp (LNR: list_norepet (map fst (prog_defs p))),
   transf_cminor_program p = OK tp ->
@@ -350,6 +320,11 @@ Proof.
     eapply transf_rtl_program_correct; try eassumption. 
     unfold  RTLgen.transl_program in Heqr0. eassumption. 
 Qed.
+
+(** Prove the existence of a structured simulation between Clight and Asm, 
+    relying on [transf_cminor_program_correct] above. 
+
+    This is Theorem 3, Compiler Correctness in on pg. 11. *)
 
 Theorem transf_clight_program_correct:
   forall p tp (LNR: list_norepet (map fst (prog_defs p))),

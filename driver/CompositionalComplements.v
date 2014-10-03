@@ -16,10 +16,7 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-(** Apply the contextual equivalence functor from
-   linking/context_equiv.v to to linking/linking_proof.v.*)
-
-Module CE := ContextEquiv LinkingSimulation.
+(** Notations and convenient definitions: *)
 
 Notation Clight_module := (program Clight.fundef Ctypes.type).
 Notation Asm_module := (AsmEFF.program).
@@ -32,30 +29,50 @@ Definition mk_tgt_sem (tp : Asm_module) :=
   let tge := Genv.globalenv tp in
   @Modsem.mk AsmEFF.fundef unit tge Asm_coop.state (Asm_eff.Asm_eff_sem hf).
 
+(** Apply the contextual equivalence functor from
+   linking/context_equiv.v to to linking/linking_proof.v.*)
+
+Module CE := ContextEquiv LinkingSimulation.
+
 Section CompositionalComplements.
 
+(** There are [N] modules. *)
+
 Variable N : pos.
+
+(** Source and target modules. 'I_N -> A, for (A : Type), is the type of finite
+ functions from {0..N-1} to A. *)
+
 Variable source_modules : 'I_N -> Clight_module.
 Variable target_modules : 'I_N -> Asm_module.
+
+(** [plt] maps a subset of the possible function names to the modules in which
+ they are defined. *)
+
 Variable plt : ident -> option 'I_N.
+
+(** Wrap the source and target modules as 'Modsem's (as in Section 3). *)
 
 Definition sems_S (ix : 'I_N) := mk_src_sem (source_modules ix).
 Definition sems_T (ix : 'I_N) := mk_tgt_sem (target_modules ix).
 
-(** [ge_top] constrains the source--target global envs. of the modules in 
-  sems_S and sems_T to have equal domain. *)
+(** [ge_top], and the [domeq_*] hypotheses below, constrain the source--target
+  global envs. of the modules in sems_S and sems_T to have equal domain, as
+  explained in Section 3, footnote 2, pg. 5. *)
 
 Variable ge_top : ge_ty.
 Variable domeq_S : forall ix : 'I_N, genvs_domain_eq ge_top (sems_S ix).(Modsem.ge).
 Variable domeq_T : forall ix : 'I_N, genvs_domain_eq ge_top (sems_T ix).(Modsem.ge). 
 
 (** The target modules are (independently) compiled from source the respective
-  source modules. *)
+  source modules ([transf_clight_program] compiles Clight programs to Asm). *)
 
 Variable transf : 
   forall ix : 'I_N, 
   transf_clight_program (source_modules ix) 
   = Errors.OK (target_modules ix).
+
+(** Here we just prove that compilation preserves the set of global symbols. *)
 
 Lemma find_syms :
   forall (i : 'I_N) (id : ident) (bf : block),
@@ -69,23 +86,41 @@ apply transf_clight_program_preserves_syms with (s := id) in H.
 rewrite H; auto.
 Qed.
 
-(** The (deterministic) context [C]. 
-    - [nuke_C] restricts contexts to those that store only valid blocks 
-      (this holds of all assembly contexts; see backend/Asm_nucular.v).
-    - [sim_C]: C self-inject (C <= C).
-  *)
+(** The (deterministic) context [C]. Assumptions on [C] are:
+    - [sim_C]: C self-simulates (C <= C) (cf. Definition 2, pg. 10).
+
+    - [det_C]: C is deterministic (cf. Definition 2, pg. 10). This is true,
+      e.g., of all Clight and assembly contexts.
+
+    - [nuke_C] restricts contexts to those that store only valid blocks.  This
+      is footnote 5 on pg. 9 of the paper (one reviewer suggested we present
+      this condition in the body of the text; we tend to agree and plan to do so
+      in the final version of the paper). It turns out that this condition holds
+      of all assembly contexts; see backend/Asm_nucular.v for the proof.
+
+    - [domeq_C]: The global environment attached to the [C] module semantics 
+      has the same domain (set of blocks marked "global") as [ge_top].
+      This is footnote 2 on pg. 5.
+
+    NOTE: many of these side conditions fall away nicely if we abandon 
+    'semantic' contexts, and instead express [C] in, e.g., CompCert Asm.
+    But the current statement of the theorem is more general; for example,
+    it supports contexts that are just mathematical relations expressed 
+    in Coq's Gallina.
+  *) 
 
 Variable C : Modsem.t.   
 Variable sim_C : 
   SM_simulation.SM_simulation_inject 
   C.(Modsem.sem) C.(Modsem.sem) C.(Modsem.ge) C.(Modsem.ge).
 Variable nuke_C : Nuke_sem.t (Modsem.sem C).
-Variable domeq_C : genvs_domain_eq ge_top C.(Modsem.ge).
 Variable det_C : core_semantics_lemmas.corestep_fun (Modsem.sem C).
+Variable domeq_C : genvs_domain_eq ge_top C.(Modsem.ge).
 
 (** [NOTE: RC] [CE.linker_S] ensures that both the context [C] the source
   modules [sems_S] are reach-closed. See file linking/context_equiv.v for
-  details. *)
+  details. Since the POPL deadline, we have proved that all safe Clight programs
+  are reach-closed in this way. *)
 
 Notation source_linked_semantics := (CE.linker_S sems_S plt C).
 Notation target_linked_semantics := (CE.linker_T sems_T plt C).
@@ -95,12 +130,15 @@ Definition safe ge l m :=
 Lemma asm_modules_nucular (ix : 'I_N) : Nuke_sem.t (Modsem.sem (sems_T ix)).
 Proof. solve[apply Asm_is_nuc]. Qed.
 
-(** Each Clight module is independently translated to the
- corresponding module in x86 assembly. The [init] condition
- ensures that no module defines the same function twice. *)
+(** The [init] hypothesis just ensures that no module defines the same function
+  twice. *)
 
 Variable lnr : forall ix : 'I_N, 
   list_norepet (map fst (prog_defs (source_modules ix))).
+
+(** Here we prove that S_i <= T_i for each source/target module pair, using
+  Theorem [transf_clight_program_correct] from
+  driver/CompositionalCompiler.v. *)
 
 Lemma modules_inject (ix : 'I_N) : 
   SM_simulation.SM_simulation_inject 
@@ -136,7 +174,8 @@ simpl in H, H2; eapply asm_step_det; eauto.
 Qed.
 
 (** The following corollary (really, of CE.context_equiv) specializes
-  to entry point main. *)
+  to entry point main and the initial state of the linked program. 
+  This is Corollary 2 on pg. 11 of the paper. *)
 
 Theorem init_context_equiv l1 m1 m2 j vals1 vals2
   (source_safe : safe ge_top l1 m1)
