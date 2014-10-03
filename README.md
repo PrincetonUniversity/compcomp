@@ -64,11 +64,9 @@ When you download the virtual machine, you'll find the Compositional CompCert
 
 ### The Paper
 
-A draft version of the paper accompanying Compositional CompCert is available here:
+The accepted version of the paper is available here:
 
 > http://www.cs.princeton.edu/~jsseven/papers/compcomp/paper.pdf. 
-
-(Note to AEC members: this is the accepted version.)
 
 ### `popl15aec` Branch
 
