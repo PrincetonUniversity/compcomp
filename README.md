@@ -99,7 +99,7 @@ Files suffixed *_eff.v and *_coop.v gives language definitions. Files suffixed
     The two main subproofs (for the call and return cases, respectively) are:
     - linking/call_lemmas.v
     - linking/ret_lemmas.v
-    The file linking/linking_inv.v states the main linking simulation invariant.
+  * linking_inv.v: states the main linking simulation invariant.
   * rc_semantics.v: defines reach-closed semantics (Section 5).
   * context_equiv.v: defines reach-closed contextual equivalence and proves
     Corollary 1 (Section 5).
