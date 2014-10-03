@@ -82,14 +82,11 @@ Files suffixed *_eff.v and *_coop.v gives language definitions. Files suffixed
 ### core/
 
   * core_semantics.v: defines interaction semantics (Section 2).
-
   * StructuredInjections.v: structured injections (Section 4).
-
   * effect_simulations.v: structured simulations (Section 4).
     Concordance: 
     - [replace_locals] is the function named "export" in the paper.
     - [replace_externs] is the function named "import" in the paper.
-
   * effect_simulations_trans.v: Theorem 1 (Section 5).
   
 ### linking/
@@ -97,17 +94,13 @@ Files suffixed *_eff.v and *_coop.v gives language definitions. Files suffixed
   * compcert_linking.v: defines linking semantics (Section 3).  The linking
     semantics (\mathcal{L}) is defined twice: First as a function (to Prop), and
     then as an inductive relation. The two versions are proved to coincide.
-
   * linking_spec.v: states Theorem 2 (Section 5).
-
   * linking_proof.v: proves Theorem 2 (Section 5). 
     The two main subproofs (for the call and return cases, respectively) are:
     - linking/call_lemmas.v
     - linking/ret_lemmas.v
     The file linking/linking_inv.v states the main linking simulation invariant.
-
   * rc_semantics.v: defines reach-closed semantics (Section 5).
-
   * context_equiv.v: defines reach-closed contextual equivalence and proves
     Corollary 1 (Section 5).
 
