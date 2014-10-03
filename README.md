@@ -137,10 +137,10 @@ Files suffixed *_eff.v and *_coop.v gives language definitions. Files suffixed
 
   * safe_clight_rc.v 
 
-    > Prove that all safe Clight programs are RC. This is a slightly
-    > counterintuitive result that relies on the fact that safe Clight programs
-    > cannot fabricate pointers (recall that even in C, casting integers to 
-    > pointers is only implementation-defined). 
+    > Prove that all safe Clight programs are RC (a new theorem not in the
+    > paper). This is a slightly counterintuitive result that relies on the fact
+    > that safe Clight programs cannot fabricate pointers (recall that even in
+    > C, casting integers to pointers is only implementation-defined).
 
   * context_equiv.v 
   
@@ -149,8 +149,13 @@ Files suffixed *_eff.v and *_coop.v gives language definitions. Files suffixed
 
 ### driver/
 
-  * CompositionalCompiler.v: proves Theorem 3 (Section 6).
-  * CompositionalComplements.v: proves Corollary 2 (Section 6).
+  * CompositionalCompiler.v 
+
+    > Proves Theorem 3 (Section 6).
+
+  * CompositionalComplements.v 
+  
+    > Proves Corollary 2 (Section 6).
 
 ### scripts/
 
