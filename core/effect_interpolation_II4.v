@@ -13,8 +13,10 @@ Require Import effect_simulations_lemmas.
 Require Import mem_lemmas.
 Require Import mem_interpolation_defs.
 Require Import mem_interpolation_II.
+Load mem_interpolation_II3.
 Require Import FiniteMaps.
 
+Require Import pure.
 
 (*Inserts the new injection entries into extern component, but not into foreign*)
 Definition insert_as_extern (mu: SM_Injection) (j: meminj) (DomJ TgtJ:block->bool)
@@ -122,7 +124,7 @@ Lemma convertR_local: forall nu23 j23' FreshMid FreshTgt,
             local_of (convertR nu23 j23' FreshMid FreshTgt) =
             local_of nu23.
 Proof. intros. destruct nu23; simpl. reflexivity. Qed.
- 
+  
 Lemma convertR_pub: forall nu23 j23' FreshMid FreshTgt,
             pub_of (convertR nu23 j23' FreshMid FreshTgt) =
             pub_of nu23.
@@ -312,7 +314,8 @@ Lemma effect_interp_OK: forall m1 m2 nu12
                              (MemInjNu' : Mem.inject (as_inj nu') m1' m3')
                              
                              (ExtIncr: extern_incr (compose_sm nu12 nu23) nu')
-                             (SMInjSep: sm_inject_separated (compose_sm nu12 nu23) nu' m1 m3)
+                             (Pure: pure_comp_ext nu12 nu23 m1 m2)
+                             (*SMInjSep: sm_inject_separated (compose_sm nu12 nu23) nu' m1 m3*)
                              (SMV12: sm_valid nu12 m1 m2)
                              (SMV23: sm_valid nu23 m2 m3)
                              (UnchPrivSrc: Mem.unchanged_on (fun b ofs => locBlocksSrc (compose_sm nu12 nu23) b = true /\ 
@@ -330,7 +333,7 @@ Lemma effect_interp_OK: forall m1 m2 nu12
                              (Norm12: forall b1 b2 d1, extern_of  nu12 b1 = Some(b2,d1) ->
                                              exists b3 d2, extern_of nu23 b2 = Some(b3, d2))
                prej12' j23' n1' n2'
-               (HeqMKI: mkInjections m1 m1' m2 (as_inj nu12) (as_inj nu23) (as_inj nu') = 
+               (HeqMKI: mkInjections' m1 m1' m2 (as_inj nu12) (as_inj nu23) (as_inj nu') = 
                             (prej12', j23', n1', n2'))
                j12' (Hj12': j12'= removeUndefs (as_inj nu12) (as_inj nu') prej12')
                m2'
@@ -353,8 +356,9 @@ Lemma effect_interp_OK: forall m1 m2 nu12
                       (*FreshTgt:*) (fun b => andb (DomTgt nu' b) (negb (DomTgt nu23 b))))
                       /\ nu'=compose_sm nu12' nu23' /\
                              extern_incr nu12 nu12' /\ extern_incr nu23 nu23' /\
-                             sm_inject_separated nu12 nu12' m1 m2 /\ 
-                             sm_inject_separated nu23 nu23' m2 m3 /\
+                             pure_comp_ext nu12' nu23' m1' m2' /\
+                             (*sm_inject_separated nu12 nu12' m1 m2 /\ 
+                             sm_inject_separated nu23 nu23' m2 m3 /\*)
                              sm_valid nu12' m1' m2' /\ sm_valid nu23' m2' m3' /\
                              (SM_wd nu12' /\ SM_wd nu23' /\
                               locBlocksTgt nu12' = locBlocksSrc nu23' /\
@@ -385,16 +389,17 @@ Proof. intros.
                  (as_inj nu12) b3 = Some (b4, ofs3) -> 
                 (b3 < Mem.nextblock m1 /\ b4 < Mem.nextblock m2)%positive).
       intros. split. apply (VBj12_1 _ _ _ H). apply (VBj12_2 _ _ _ H).
-  assert (preinc12:= mkInjections_1_injinc _ _ _ _ _ _ _ _ _ _ HeqMKI VBj12_1).
-  assert (inc12:= inc_RU _ _ preinc12 (as_inj nu')).
-  assert (presep12:= mkInjections_1_injsep _ _ _ _ _ _ _ _ _ _ HeqMKI).
-  assert (sep12: inject_separated (as_inj nu12) (removeUndefs (as_inj nu12) (as_inj nu') prej12') m1 m2).
+  (*assert (preinc12:= mkInjections_1_injinc _ _ _ _ _ _ _ _ _ _ HeqMKI VBj12_1).*)
+  (*assert (inc12:= inc_RU _ _ preinc12 (as_inj nu')).*)
+  (*assert (presep12:= mkInjections_1_injsep _ _ _ _ _ _ _ _ _ _ HeqMKI).*)
+  (*assert (sep12: inject_separated (as_inj nu12) (removeUndefs (as_inj nu12) (as_inj nu') prej12') m1 m2).
        intros b; intros. eapply presep12. apply H. 
-       eapply RU_D. apply preinc12. apply H0.
+       eapply RU_D. apply preinc12. apply H0.*)
   assert (InjIncr: inject_incr (compose_meminj (as_inj nu12) (as_inj nu23)) (as_inj nu')).
     subst. eapply extern_incr_inject_incr; eassumption. 
-  assert (InjSep: inject_separated (compose_meminj (as_inj nu12) (as_inj nu23)) (as_inj nu') m1 m3).
+    (*assert (InjSep: inject_separated (compose_meminj (as_inj nu12) (as_inj nu23)) (as_inj nu') m1 m3). unfold inject_separated. 
     subst. clear CONT ACCESS HeqMKI.
+    
     apply sm_inject_separated_mem in SMInjSep.  
     rewrite compose_sm_as_inj in SMInjSep.
       assumption.
@@ -402,21 +407,24 @@ Proof. intros.
       eapply GlueInvNu.
       eapply GlueInvNu.
       eapply GlueInvNu.
-      assumption.
-  assert (inc23:= mkInjections_2_injinc _ _ _ _ _ _ _ _ _ _ HeqMKI VBj23_1).
-  assert (sep23:= mkInjections_2_injsep _ _ _ _ _ _ _ _ _ _ HeqMKI 
-                  VBj12_1 _ InjSep).
+      assumption. *)
+  (*assert (inc23:= mkInjections_2_injinc _ _ _ _ _ _ _ _ _ _ HeqMKI VBj23_1).*)
+  (*assert (sep23:= mkInjections_2_injsep _ _ _ _ _ _ _ _ _ _ HeqMKI 
+                  VBj12_1 _ InjSep).*)
   assert (NB1:= forward_nextblock _ _ Fwd1).
   assert (XX: n1' = Mem.nextblock m1'). 
-    destruct (mkInjections_0  _ _ _ _ _ _ _ _ _ _ HeqMKI)
+  unfold mkInjections', mkInjections in HeqMKI; inversion HeqMKI; auto.
+    (*destruct (mkInjections_0  _ _ _ _ _ _ _ _ _ _ HeqMKI)
       as [[NN [N1 [N2 [JJ1 JJ2]]]] | [n [NN [N1 [N2 N3]]]]].
-    subst. eapply Pos.le_antisym; assumption. assumption.
+    subst. eapply Pos.le_antisym; assumption. assumption.*)
  subst.
   assert (VBj': forall b1 b3 ofs3, (as_inj nu') b1 = Some (b3, ofs3) -> 
                 (b1 < Mem.nextblock m1')%positive).
       intros. apply (Mem.valid_block_inject_1 _ _ _ _ _ _ H MemInjNu').
-  assert (ID:= RU_composememinj _ _ _ _ _ _ _ _ _ _ HeqMKI 
-               InjIncr _ InjSep VBj12_1 VBj12_2 VBj23_1 VBj').
+      
+      (* Trying something here *)
+      assert (ID:= RU_composememinj' _ _ _ _ _ _ _ _ _ _ HeqMKI 
+               InjIncr _ Norm12 VBj12_1 VBj12_2 VBj23_1 VBj').
 destruct GlueInvNu as [WDnu12 [WDnu23 [GlueLoc [GlueExt [GluePub GlueFrgn]]]]].
 assert (Fwd2: mem_forward m2 m2').
   split; intros; rename b into b2.
@@ -829,20 +837,30 @@ assert (Inj12': Mem.inject j12' m1' m2').
                   destruct (pubSrc _ WDnu12 _  HeqPubSrcb1) as [bb2 [dd1 [PUB12 TGT2]]].
                   rewrite (pub_in_local _ _ _ _ PUB12) in LOC12. inv LOC12.
                   assert (Nu'b1: as_inj nu' b1 = Some (b3, delta+d2)).
-                      rewrite ID. eapply compose_meminjI_Some; try eassumption.
-                             apply inc12. eassumption. apply (inc23 _ _ _ AsInj23). 
+                  { move ExtIncr at bottom. apply extern_incr_as_inj in ExtIncr; auto.
+                    apply ExtIncr.
+                    unfold compose_sm, compose_meminj, as_inj, join ; simpl.
+                    rewrite NoEXT12. 
+                    unfold pub_of in PUB12; unfold pub_of in Pub23.
+                    destruct nu12; simpl in *.
+                    rewrite HeqPubSrcb1 in PUB12.
+                    rewrite PUB12. 
+                    destruct nu23; simpl in *.
+                    rewrite HeqPubB2 in Pub23.
+                    rewrite Pub23; auto.
+                  }
                   assert (MV:= Mem.mi_memval _ _ _
                                  (Mem.mi_inj _ _ _ MemInjNu') _ _ _ _ Nu'b1 H0).
                   inv MV; try constructor. 
-                           simpl. 
-                           rewrite ID in H4.
+                  simpl.  admit.
+                           (*rewrite ID in H4.
                            destruct (compose_meminjD_Some _ _ _ _ _ H4)
                               as [bb2 [dd1 [dd2 [JJ1 [JJ2 Delta]]]]].
                            rewrite JJ1. econstructor. 
-                             apply JJ1. reflexivity.
+                             apply JJ1. reflexivity.*)
                (*case pubBlocksSrc nu12 b1 = false*)
                   assert (PK: Mem.perm m1 b1 ofs Cur Readable).
-                    solve[eapply UnchPrivSrc; eauto].
+                  solve[ eapply UnchPrivSrc; simpl; try split; eauto].
                   destruct UnchPrivSrc as [_ UPS].
                   rewrite UPS; try assumption; try (split; assumption).
                   eapply memval_inject_incr.
@@ -873,19 +891,19 @@ assert (Inj12': Mem.inject j12' m1' m2').
                 destruct (local_DomRng _ WDnu12 _ _ _ H2).
                 rewrite GlueLoc in H5. congruence. 
               destruct (Norm12 _ _ _ EXT1) as [b3 [d2 EXT2]]. 
-               assert (Nu'b1: as_inj nu' b1 = Some (b3, delta+d2)).
-                      rewrite ID. eapply compose_meminjI_Some; try eassumption.
+               (*assert (Nu'b1: as_inj nu' b1 = Some (b3, delta+d2)).
+                        rewrite ID. eapply compose_meminjI_Some; try eassumption.
                              apply inc12. eassumption. 
-                             apply inc23. apply (extern_in_all _ _ _ _ EXT2).
+                             apply inc23. apply (extern_in_all _ _ _ _ EXT2). *)
                   assert (MV:= Mem.mi_memval _ _ _
-                                 (Mem.mi_inj _ _ _ MemInjNu') _ _ _ _ Nu'b1 H0).
+                                 (Mem.mi_inj _ _ _ MemInjNu')) (* _ _ _ _)  Nu'b1 H0) *).
                   inv MV; try constructor. 
                            simpl. 
                            rewrite ID in H4.
                            destruct (compose_meminjD_Some _ _ _ _ _ H4)
                               as [bb2 [dd1 [dd2 [JJ1 [JJ2 Delta]]]]].
                            rewrite JJ1. econstructor. 
-                             apply JJ1. reflexivity.
+                             apply JJ1. reflexivity.*)
          (*case ~ Mem.valid_block m2 b2*)
             specialize (H2 (ofs + delta)).
             assert (J12: as_inj nu12 b1 = None).
@@ -3822,6 +3840,5 @@ Proof. intros.
               Fwd3 _ WDnu' SMvalNu' MemInjNu' ExtIncr SMInjSep
               SMV12 SMV23 UnchPrivSrc UnchLOOR13 GlueInvNu Norm12)
   as [m2' [nu12' [nu23' [A [B [C [D [E [F [G [H [I [J [K [L [M [N P]]]]]]]]]]]]]]]]].
-  clear P.
   exists m2', nu12', nu23'. intuition.
 Qed.

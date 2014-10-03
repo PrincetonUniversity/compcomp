@@ -10,6 +10,64 @@ Require Import Axioms.
 Require Import mem_lemmas.
 Require Import mem_interpolation_defs.
 
+Definition access: Type:= Z -> perm_kind -> option permission.
+
+(* The default is just constat None*)
+Definition sum_access (a a: access)(limit: block): access:=
+  ((fun k ofs => None), 
+   fun b => if Plt b limit then
+              PMap.get 
+     
+    
+
+
+Definition AccessMap_II_FUN (b2:block):
+           Z -> perm_kind -> option permission :=
+  if plt b2 (Mem.nextblock m2)
+  then (fun ofs2 k =>
+       match j23 b2 with 
+         None => PMap.get b2 m2.(Mem.mem_access) ofs2 k
+       | Some (b3,d3) => 
+         match source j12 m1 b2 ofs2 with
+             Some(b1,ofs1) => PMap.get b1 m1'.(Mem.mem_access) ofs1 k
+           | None => PMap.get b2 m2.(Mem.mem_access) ofs2 k
+           end
+        end)
+  else (fun ofs2 k =>
+           match source j12' m1' b2 ofs2 with 
+              Some(b1,ofs1) => PMap.get b1 m1'.(Mem.mem_access) ofs1 k
+            | None => None
+          end).
+
+Definition sum_contents (b b' : PMap.t (ZMap.t memval)): PMap.t (ZMap.t memval).
+  destruct b, b'.
+Admitted.
+End boo.
+  
+
+Definition sum_blocks (b b' : block): block:= (b + b')%positive.
+
+
+
+Definition mem_sum (m m': mem): mem. 
+  unfold mem_sim_cont, mem_sim_acc; intros.
+  apply Mem.mkmem with 
+  (mem_contents:=Mem.mem_contents m)
+    (mem_access:=Mem.mem_access m)
+  (nextblock:= sum_blocks (Mem.nextblock m) (Mem.nextblock m'));
+  try solve[destruct m; trivial].
+  intros.
+  unfold PMap.get. 
+  destruct (Mem.mem_access m).
+  simpl in *.
+  unfold sum_blocks in H1.
+  
+
+
+
+
+
+
 Fixpoint mkInjectionsN (N:nat)(n1 n2:block)(j k l: meminj) 
                      :  meminj * meminj * block * block := 
    match N with O => (j,k,n1,n2)
@@ -632,22 +690,6 @@ Lemma mkInjections_composememinj: forall m1 m1' m2 j k l j' k' n1' n2'
       l = compose_meminj j' k'.
 Proof. intros.
 extensionality b. 
-(*{ (* THIS is me trying*)
-  unfold mkInjections in HI.
-  destruct (plt (Mem.nextblock m1) (Mem.nextblock m1')).
-  + admit.
-  + inversion HI; subst.
-    clear HI.
-    destruct (compose_meminj j' k' b) eqn:HH. 
-      destruct p.
-      apply InjIncr; auto.
-      destruct (l b) eqn:HH'; trivial; destruct p.
-      
-}*)
-
-
-
-
 (*unfold mkInjections in HI.
 destruct (plt (Mem.nextblock m1) (Mem.nextblock m1')).
   *)remember (compose_meminj j' k' b) as z. 
@@ -724,8 +766,7 @@ destruct (plt (Mem.nextblock m1) (Mem.nextblock m1')).
        (*j b = Some*) destruct H as [? [? ?]].
             assert (JKNone: compose_meminj j k b = None).
                 unfold compose_meminj. rewrite H. rewrite KNone. reflexivity.
-                
-            destruct (InjSep _ _ _ JKNone Heqlb). exfalso. specialize (H2 H0).
+            destruct (InjSep _ _ _ JKNone Heqlb). exfalso. apply (H2 H0).
        (*second case*) 
             destruct H as [B1 [B2 [? [? ?]]]]; subst.
             destruct (mkInjections_5 _ _ _ _ _ _ _ _ _ _ HI VBj1 

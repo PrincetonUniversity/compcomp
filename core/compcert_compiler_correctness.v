@@ -38,9 +38,9 @@ Require Import Memory.
 Require Import compcert.common.Values.
 Require Import Integers.
 
-Require Import sepcomp.mem_lemmas.
-Require Import sepcomp.core_semantics.
-Require Import sepcomp.forward_simulations.
+Require Import mem_lemmas.
+Require Import core_semantics.
+Require Import forward_simulations.
 Require Import sepcomp.compiler_correctness.
 
 Require Import sepcomp.Coqlib2. 

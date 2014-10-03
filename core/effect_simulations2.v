@@ -16,7 +16,10 @@ Require Import effect_semantics.
 Require Import StructuredInjections.
 Require Import reach.
 
-Module SM_simulation. Section SharedMemory_simulation_inject. 
+(*Load no_junk.*)
+
+Module SM_simulation. 
+Section SharedMemory_simulation_inject. 
 
 Context 
   {F1 V1 C1 F2 V2 C2 : Type}
@@ -47,12 +50,28 @@ Record SM_simulation_inject :=
     match_state d mu c1 m1 c2 m2 -> 
     REACH_closed m1 (vis mu)
 
+(*; match_restrict:
+    forall d mu c1 m1 c2 m2,
+      match_state d mu c1 m1 c2 m2 ->
+      forall X, (forall b, vis mu b = true -> X b = true) ->
+                REACH_closed m1 X ->
+      (*forall m2', junk_inv_r (restrict_sm mu X) m1' m2 m2' ->
+                  junk_inv_l (restrict_sm mu X) m1 m1' ->*)
+      match_state d (restrict_sm mu X) c1 m1 c2 m2*)
+
+(*match_junk_inv: 
+    forall d mu c1 m1 c2 m2,
+    match_state d mu c1 m1 c2 m2 -> 
+    forall m2', junk_inv_r mu m1 m2 m2' ->
+    (*forall m1', junk_inv_l mu m1 m1' ->*)
+    match_state d mu c1 m1 c2 m2'
+
 ; match_restrict : 
     forall d mu c1 m1 c2 m2 X, 
     match_state d mu c1 m1 c2 m2 -> 
     (forall b, vis mu b = true -> X b = true) ->
     REACH_closed m1 X ->
-    match_state d (restrict_sm mu X) c1 m1 c2 m2
+    match_state d (restrict_sm mu X) c1 m1 c2 m2*)
 
 ; match_validblocks : 
     forall d mu c1 m1 c2 m2, 
@@ -68,7 +87,7 @@ Record SM_simulation_inject :=
     meminj_preserves_globals ge1 j ->
 
     (*the next two conditions are required to guarantee initialSM_wd*)
-    (forall b1 b2 d, j b1 = Some (b2, d) ->
+    (forall b1 b2 d, j b1 = Some (b2, d) -> 
       DomS b1 = true /\ DomT b2 = true) ->
     (forall b, 
       REACH m2 (fun b' => isGlobalBlock ge2 b' || getBlocks vals2 b') b=true -> 
@@ -92,8 +111,7 @@ Record SM_simulation_inject :=
     forall cd st2 mu m2,
     match_state cd mu st1 m1 st2 m2 ->
     exists st2', exists m2', exists cd', exists mu',
-      intern_incr mu mu' 
-      /\ sm_inject_separated mu mu' m1 m2 
+      intern_incr mu mu'
       /\ sm_locally_allocated mu mu' m1 m2 m1' m2' 
       /\ match_state cd' mu' st1' m1' st2' m2'
       /\ exists U2,              
@@ -175,7 +193,7 @@ Record SM_simulation_inject :=
         (HasTy1: Val.has_type ret1 (proj_sig_res (AST.ef_sig e)))
         (HasTy2: Val.has_type ret2 (proj_sig_res (AST.ef_sig e')))
         (INC: extern_incr nu nu')  
-        (SEP: sm_inject_separated nu nu' m1 m2)
+        (*  SEP: sm_inject_separated nu nu' m1 m2 *)
 
         (WDnu': SM_wd nu') (SMvalNu': sm_valid nu' m1' m2')
 
@@ -221,7 +239,6 @@ Lemma core_diagram (SMI: SM_simulation_inject):
         match_state SMI cd mu st1 m1 st2 m2 ->
         exists st2', exists m2', exists cd', exists mu',
           intern_incr mu mu' /\
-          sm_inject_separated mu mu' m1 m2 /\
           sm_locally_allocated mu mu' m1 m2 m1' m2' /\ 
           match_state SMI cd' mu' st1' m1' st2' m2' /\
           ((corestep_plus Sem2 ge2 st2 m2 st2' m2') \/
@@ -230,13 +247,13 @@ Lemma core_diagram (SMI: SM_simulation_inject):
 Proof. intros. 
 apply effax2 in H. destruct H as [U1 H]. 
 exploit (effcore_diagram SMI); eauto.
-intros [st2' [m2' [cd' [mu' [INC [SEP [LOCALLOC 
-  [MST [U2 [STEP _]]]]]]]]]].
+intros [st2' [m2' [cd' [mu' [INC [LOCALLOC 
+  [MST [U2 [STEP _]]]]]]]]].
 exists st2', m2', cd', mu'.
 split; try assumption.
 split; try assumption.
 split; try assumption.
-split; try assumption.
+(*split; try assumption.*)
 destruct STEP as [[n STEP] | [[n STEP] CO]];
   apply effstepN_corestepN in STEP.
 left. exists n. assumption.
@@ -246,3 +263,4 @@ Qed.
 End SharedMemory_simulation_inject. 
 
 End SM_simulation.
+

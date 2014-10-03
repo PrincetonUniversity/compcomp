@@ -174,8 +174,7 @@ Definition Asm_after_external (vret: option val)(c: state) : option state :=
   | _ => None
   end.
 
-Definition Asm_initial_core (ge:genv) (v: val) (args:list val): 
-           option state :=
+Definition Asm_initial_core (ge:genv) (v: val) (args:list val): option state :=
   match v with
      | Vptr b i => 
           if Int.eq_dec i Int.zero 

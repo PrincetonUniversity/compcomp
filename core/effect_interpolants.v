@@ -14,6 +14,7 @@ Require Import reach.
 Require Import effect_simulations.
 Require Import effect_simulations_lemmas.
 
+Require Import pure.
 Module Type EffectInterpolationAxioms.
 
 Parameter effect_interp_II: forall m1 m2 nu12 
@@ -24,9 +25,8 @@ Parameter effect_interp_II: forall m1 m2 nu12
                               nu' (WDnu' : SM_wd nu')
                              (SMvalNu' : sm_valid nu' m1' m3')
                              (MemInjNu' : Mem.inject (as_inj nu') m1' m3')
-                             
                              (ExtIncr: extern_incr (compose_sm nu12 nu23) nu')
-                             (SMInjSep: sm_inject_separated (compose_sm nu12 nu23) nu' m1 m3)
+                             (Pure: pure_comp_ext nu12 nu23 m1 m2)
                              (SMV12: sm_valid nu12 m1 m2)
                              (SMV23: sm_valid nu23 m2 m3)
                              (UnchPrivSrc: Mem.unchanged_on (fun b ofs => locBlocksSrc (compose_sm nu12 nu23) b = true /\ 
@@ -40,14 +40,13 @@ Parameter effect_interp_II: forall m1 m2 nu12
                                                     pubBlocksSrc nu23 b = true) /\
                                          (forall b, frgnBlocksTgt nu12 b = true -> 
                                                     frgnBlocksSrc nu23 b = true))
-                             (Norm12: forall b1 b2 d1, extern_of nu12 b1 = Some(b2,d1) ->
+                             (Norm12: forall b1 b2 d1, extern_of nu12 b1 = Some(b2, d1) ->
                                              exists b3 d2, extern_of nu23 b2 = Some(b3, d2)),
      exists m2', exists nu12', exists nu23', nu'=compose_sm nu12' nu23' /\
                              extern_incr nu12 nu12' /\ extern_incr nu23 nu23' /\
+                             pure_comp_ext nu12' nu23' m1' m2' /\
                              Mem.inject (as_inj nu12') m1' m2' /\ mem_forward m2 m2' /\
                              Mem.inject (as_inj nu23') m2' m3' /\
-                             sm_inject_separated nu12 nu12' m1 m2 /\ 
-                             sm_inject_separated nu23 nu23' m2 m3 /\
                              sm_valid nu12' m1' m2' /\ sm_valid nu23' m2' m3' /\
                              (SM_wd nu12' /\ SM_wd nu23' /\
                               locBlocksTgt nu12' = locBlocksSrc nu23' /\
@@ -73,7 +72,6 @@ Parameter interpolate_II_strongHeqMKI: forall m1 m2 j12 (MInj12 : Mem.inject j12
                   (MInj23 : Mem.inject j23 m2 m3) m3' (Fwd3: mem_forward m3 m3')
                   j' (MInj13': Mem.inject j' m1' m3')
                   (InjIncr: inject_incr (compose_meminj j12 j23) j')
-                  (InjSep: inject_separated (compose_meminj j12 j23) j' m1 m3)
                   (Unch11': Mem.unchanged_on 
                             (loc_unmapped (compose_meminj j12 j23)) m1 m1')
                   (Unch33': Mem.unchanged_on
@@ -89,8 +87,7 @@ Parameter interpolate_II_strongHeqMKI: forall m1 m2 j12 (MInj12 : Mem.inject j12
                    Mem.inject j12' m1' m2' /\ mem_forward m2 m2' /\ 
                    Mem.inject j23' m2' m3' /\
                    Mem.unchanged_on (loc_out_of_reach j12 m1) m2 m2' /\
-                   inject_separated j12 j12' m1 m2 /\ 
-                   inject_separated j23 j23' m2 m3 /\
+                   pure_composition j12' j23' m1' m2' /\
                    Mem.unchanged_on (loc_unmapped j23) m2 m2' /\ 
                    Mem.unchanged_on (loc_out_of_reach j23 m2) m3 m3' /\
                    (forall b1 b2 ofs2, j12' b1 = Some(b2,ofs2) -> 
