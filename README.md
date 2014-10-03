@@ -37,15 +37,15 @@ To build, clone the repository, go to the root directory, and type:
 
 If your Ssreflect or MathComp are installed in a nonstandard place (e.g., in
 your home directory rather than system-wide), edit variables `SSREFLECT` and
-`MATHCOMP` in the Makefile to point to appropriate installation directories.
+`MATHCOMP` in the Makefile to point to the appropriate installation directories.
 Otherwise, leave both `SSREFLECT` and `MATHCOMP` equal the empty string `""`.
 
 ## Special Instructions for AEC Members
 
 ### Virtual Machine Image 
 
-As a convenience, we've built a VirtualBox virtual machine image that comes
-preinstalled with the required dependencies.
+To assist the AEC members, we've built a VirtualBox virtual machine image that
+comes preinstalled with the required dependencies.
 
 * VirtualBox is available for free here: https://www.virtualbox.org/.
 * The CompComp Debian virtual machine image is here: 
