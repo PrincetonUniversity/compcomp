@@ -23,7 +23,7 @@ Compositional CompCert builds under:
 * MathComp 1.5 (http://ssr.msr-inria.inria.fr/). 
 
 If you do not have Ssreflect+MathComp, you will be able to build everything but
-the files in the linking/ subdirectory (horizontal composition/proofs).
+the files in the `linking/` subdirectory (horizontal composition/proofs).
 
 To build, clone the repository, go to the root directory, and type:
 
@@ -42,26 +42,26 @@ preinstalled with the required dependencies.
 * The CompComp Debian virtual machine image is here: 
   http://www.cs.princeton.edu/~jsseven/papers/compcomp/compcomp-debian.tgz.
 
-When you download the virtual machine, you'll find the Compositional CompCert
-`compcomp` repository precloned in directory /home/popl15/Repos/compcomp.
-
 Credentials for the virtual machine:
 
 | User          | Password |
-| ------------: | -------- |
-| popl15        | `popl15` |
-| root          | `popl15` |
+| ------------: | :------: |
+| popl15        | popl15   |
+| root          | popl15   |
+
+When you download the virtual machine, you'll find the Compositional CompCert
+`compcomp` repository precloned in directory /home/popl15/Repos/compcomp.
 
 ### Using Custom Ssreflect Installation
 
 If your Ssreflect or MathComp are installed in a nonstandard place (e.g., in
 your home directory rather than system-wide), edit variables `SSREFLECT` and
 `MATHCOMP` in the Makefile to point to appropriate installation directories.
-Otherwise, leave both `SSREFLECT` and `MATHCOMP` equal the empty string "".
+Otherwise, leave both `SSREFLECT` and `MATHCOMP` equal the empty string `""`.
 
 ## The Paper
 
-A draft version of the paper accompanying this work is available here:
+A draft version of the paper accompanying Compositional CompCert is available here:
 
 > http://www.cs.princeton.edu/~jsseven/papers/compcomp/paper.pdf. 
 
@@ -73,7 +73,8 @@ An HTML rendering of the code is browsable at
 
 > http://www.cs.princeton.edu/~jsseven/papers/compcomp/html. 
 
-Below is a description of the main files and their relation to the POPL results.
+Below is a description, with links to the HTML docs., of the main files and
+their relation to the POPL results.
 
 ### cfrontend/ 
 
@@ -106,10 +107,10 @@ Backend compiler phases and proofs:
     - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Tailcall.html)
     - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/TailcallproofEFF.html)
   * Renumbering
-    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Renumbering.html)
-    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/RenumberingproofEFF.html)
+    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Renumber.html)
+    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/RenumberproofEFF.html)
   * Allocation 
-    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Alloc.html)
+    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Allocation.html)
     - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/AllocproofEFF.html)
   * Tunneling 
     - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Tunneling.html)
