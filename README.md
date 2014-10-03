@@ -47,13 +47,9 @@ When you download the virtual machine, you'll find the Compositional CompCert
 
 Credentials for the virtual machine:
 
-----------------------------
 | User          | `popl15` |
-----------------------------
 | Password      | `popl15` |
-----------------------------
 | Root password | `popl15` |
-----------------------------
 
 ### Using Custom Ssreflect Installation
 
