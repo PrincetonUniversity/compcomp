@@ -59,13 +59,12 @@ Record CoreSemantics {G C M : Type} : Type :=
 
 Implicit Arguments CoreSemantics [].
 
-(** * Cooperating Interaction Semantics" *)
+(** * Cooperating Interaction Semantics *)
 
-(** "Cooperating" semantics impose additional constraints; in
-   particular, they specialize core semantics to CompCert memories and
-   require that the memories produced by coresteps are "forward" w/r/t
-   the initial memory. See [mem_lemmas.v] for the defn. of
-   [mem_forward]. *)
+(** Cooperating semantics impose additional constraints; in particular, they
+   specialize interaction semantics to CompCert memories and require that the
+   memories produced by coresteps are [forward] wrt. the initial memory. See
+   [core/mem_lemmas.v] for the defn. of [mem_forward]. *)
 
 Record CoopCoreSem {G C} :=
   { coopsem :> CoreSemantics G C mem
