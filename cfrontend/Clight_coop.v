@@ -14,7 +14,7 @@ Require Import Cop.
 
 Require Import Clight. 
 Require Import mem_lemmas. (*for mem_forward*)
-Require Import core_semantics.
+Require Import semantics.
 Require Import BuiltinEffects.
 
 Require Import val_casted.

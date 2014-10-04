@@ -9,10 +9,10 @@ Require Import Maps.
 Require Import Integers.
 
 Require Import mem_lemmas.
-Require Import StructuredInjections.
+Require Import structured_injections.
 Require Import reach.
-Require Import effect_simulations.
-Require Import effect_simulations_lemmas.
+Require Import simulations.
+Require Import simulations_lemmas.
 
 Module Type EffectInterpolationAxioms.
 

@@ -10,7 +10,7 @@ Require Import Globalenvs.
 Require Import Axioms.
 
 Require Import mem_lemmas.
-Require Import core_semantics.
+Require Import semantics.
 
 Definition corestep_fun {G C M : Type} (sem : CoreSemantics G C M) :=
   forall (m m' m'' : M) ge c c' c'',

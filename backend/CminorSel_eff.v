@@ -8,7 +8,7 @@ Require Import Events.
 Require Import Globalenvs.
 
 Require Import mem_lemmas. (*for mem_forward*)
-Require Import core_semantics.
+Require Import semantics.
 Require Import effect_semantics.
 
 Require Import CminorSel.

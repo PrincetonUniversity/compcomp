@@ -1,5 +1,5 @@
-Require Import effect_interpolants.
-Require Import effect_interpolation_II.
+Require Import interpolants.
+Require Import interpolation_II.
 Require Import mem_interpolation_II.
 
 Module EffectInterpolations <: EffectInterpolationAxioms.

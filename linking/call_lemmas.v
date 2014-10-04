@@ -18,7 +18,7 @@ Require Import pred_lemmas.
 Require Import seq_lemmas.
 Require Import wf_lemmas.
 Require Import reestablish.
-Require Import core_semantics_tcs.
+Require Import semantics_tcs.
 Require Import inj_lemmas.
 Require Import join_sm.
 Require Import reach_lemmas.
@@ -145,8 +145,8 @@ Qed.
 
 Import CallStack.
 
-Require Import compcert. Import CompcertLibraries.
-Require Import mem_wd.
+Require Import compcert_imports. Import CompcertLibraries.
+Require Import mem_welldefined.
 
 Lemma hdl2 args2 : 
   LinkerSem.at_external0 st2 = Some (ef,sig,args2) -> 
@@ -337,7 +337,7 @@ have [cd_new [c2 [pf_new [init2 mtch12]]]]:
         (initial_SM domS domT frgnS frgnT j) 
         (Core.c c1) m1 (cast'' pf (Core.c c2)) m2].
 { move: init1; rewrite /initCore.
-  case init1: (core_semantics.initial_core _ _ _ _)=> //[c1']; case=> X.
+  case init1: (semantics.initial_core _ _ _ _)=> //[c1']; case=> X.
   generalize dependent c1; case=> c1_i c1; intros.
   move: (X) init1; case=> eq _ _ init1; subst ix=> /=.
   case: (core_initial _ _ _ _ (sims sims' c1_i) _ 

@@ -14,7 +14,7 @@ Require Import Conventions.
 Require Import Linear.
 
 Require Import mem_lemmas. (*for mem_forward*)
-Require Import core_semantics.
+Require Import semantics.
 Require Import val_casted.
 Require Import BuiltinEffects.
 

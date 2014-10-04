@@ -4,12 +4,12 @@ Require Import BinPos.
 
 Require Import Axioms.
 
-Require Import compcert. Import CompcertCommon.
+Require Import compcert_imports. Import CompcertCommon.
 
 Require Import sepcomp. Import SepComp.
 Require Import arguments.
 
-Require Import core_semantics_tcs.
+Require Import semantics_tcs.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -17,31 +17,21 @@ Unset Printing Implicit Defensive.
 
 (** * Reach-Closed Semantics *)
 
-(* Reach-closed semantics extend effect semantics w/:                       *)
-(*   1) args: the arguments passed to initial_core at initialization        *)
-(*   2) rets: the list of values returned to the core at inter. points      *)
-(*   3) locs: the set of blocks allocated by this core, together            *)
-(*            with blocks leaked by the environment at previous             *)
-(*            interaction points                                            *)
-(*                                                                          *)
-(* We say that the /reachable set/ of a reach-closed configuration          *)
-(*   <(c,args,rets,locs), m>                                                *)
-(* in global env. ge is                                                     *)
-(*   REACH m                                                                *)
-(*     (globalBlocks ge                                                     *)
-(*     \cup blocksOf args                                                   *)
-(*     \cup blocksOf rets                                                   *)
-(*     \cup locs)                                                           *)
-(*                                                                          *)
-(* RC semantics are /reach closed/ in the sense that whenever               *)
-(*   effstep rcsem ge U (c,args,rets,locs) m                                *)
-(*                      (c',args,rets,locs\cup freshlocs m m') m'           *)
-(* then                                                                     *)
-(*   U is a subset of the reachable set of <(c,args,rets,locs),m>.          *)
-(*                                                                          *)
-(* That is, a reach-closed core only writes to blocks that it               *)
-(* allocated or which were revealed to it by interaction at an external     *)
-(* call point.                                                              *)
+(** Reach-closed semantics extend effect semantics by tracking *)
+(**  1) the arguments passed to initial_core at initialization; *)
+(**  2) the list of values returned to the core at inter. points; *)
+(**  3) the set of blocks allocated by this coe, together
+        with blocks reachable at previous interaction points. *)
+(** The blocks are tracked in new local state called [locs], 
+    attached to the core states of the underlying semantics. *)
+
+(** We say that the /reachable set/ of a reach-closed configuration [(c,locs),
+     m] in global env. [ge] is [REACH m (globalBlocks ge \cup locs)].  RC
+     semantics are /reach closed/ in the sense that whenever [effstep rcsem ge U
+     (c,locs) m (c',locs\cup freshlocs m m') m'] then [U] is a subset of the
+     reachable set of [(c,locs),m].  That is, a reach-closed core only writes to
+     blocks that it allocated or which were revealed to it by interaction at an
+     external call point. *)
 
 Module RC. Section rc.
 
@@ -49,7 +39,7 @@ Variables F V C : Type.
 
 Variable sem : @EffectSem (Genv.t F V) C.
 
-(** Reach-closed states *)
+(** ** Reach-closed States *)
 
 Record state : Type := 
   mk { core :> C
@@ -76,7 +66,7 @@ Lemma initial_core_locs ge v vs c :
   locs c = getBlocks vs.
 Proof.
 unfold initial_core.
-case_eq (core_semantics.initial_core sem ge v vs).
+case_eq (semantics.initial_core sem ge v vs).
 solve[intros c0 H; inversion 1; subst; simpl; auto].
 solve[intros _; inversion 1].
 Qed.
@@ -126,12 +116,12 @@ Qed.
 Definition reach_set (ge : Genv.t F V) (c : state) (m : mem) := 
   REACH m (roots ge c).
 
-(** The reach-closed step relation *)
+(** ** Reach-Closed Step Relation *)
 
 Definition effstep ge U c m c' m' :=
   effstep sem ge U (core c) m (core c') m' 
   /\ (forall b ofs, U b ofs=true -> reach_set ge c m b=true)
-  /\ locs c' = REACH m' (fun b => StructuredInjections.freshloc m m' b
+  /\ locs c' = REACH m' (fun b => structured_injections.freshloc m m' b
                                || reach_set ge c m b).
 
 Arguments effstep /.
@@ -157,7 +147,7 @@ Lemma after_external_rc_basis (ge : Genv.t F V) v (c c' : state) :
   after_external (Some v) c = Some c' -> 
   roots ge c' = (fun b => getBlocks (v :: nil) b || roots ge c b).
 Proof.
-unfold after_external; case (core_semantics.after_external _ _).
+unfold after_external; case (semantics.after_external _ _).
 intros ?; inversion 1; subst; unfold roots; simpl.
 extensionality b.
 rewrite (orb_assoc (getBlocks (v :: nil) b)).
@@ -167,7 +157,7 @@ rewrite (orb_assoc (isGlobalBlock ge b)); auto.
 inversion 1.
 Qed.
 
-(** RC core semantics *)
+(** ** RC Interaction Semantics *)
   
 Program Definition coresem : CoreSemantics (Genv.t F V) state mem :=
   Build_CoreSemantics _ _ _
@@ -178,19 +168,19 @@ Program Definition coresem : CoreSemantics (Genv.t F V) state mem :=
     corestep _ _ _.
 Next Obligation. 
 destruct (effax1 H0) as [X Y].
-case_eq (core_semantics.at_external sem q); auto; intros [[ef dep_sig] args] H5.
+case_eq (semantics.at_external sem q); auto; intros [[ef dep_sig] args] H5.
 destruct (vals_def args); auto.
 apply corestep_not_at_external in X; rewrite X in H5; congruence.
 Qed.
 Next Obligation. 
 destruct (effax1 H0) as [X Y].
-case_eq (core_semantics.halted sem q). intros v.
+case_eq (semantics.halted sem q). intros v.
 apply corestep_not_halted in X. rewrite X; inversion 1.
 auto.
 Qed.
 Next Obligation. 
 case_eq (at_external_halted_excl sem (core q)); auto; intros e _. 
-case_eq (core_semantics.at_external sem q); auto; intros [[ef dep_sig] args] H5.
+case_eq (semantics.at_external sem q); auto; intros [[ef dep_sig] args] H5.
 destruct (vals_def args); auto.
 rewrite e in H5; congruence.
 rewrite e; auto.
@@ -202,6 +192,8 @@ Next Obligation.
 destruct (effax1 H) as [X Y].
 revert X; apply corestep_fwd. 
 Qed.
+
+(** ** RC Effect Semantics *)
 
 Lemma my_effax1 M ge c m c' m' :
   effstep ge M c m c' m' ->

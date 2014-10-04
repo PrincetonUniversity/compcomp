@@ -4,7 +4,7 @@ Require Import sepcomp. Import SepComp.
 
 Require Import pos.
 Require Import stack. 
-Require Import core_semantics_tcs.
+Require Import semantics_tcs.
 
 Require Import ssreflect ssrbool ssrnat ssrfun eqtype seq fintype finfun.
 Set Implicit Arguments.
@@ -496,7 +496,7 @@ Inductive Corestep : linker N my_cores -> M
   let: c_ix  := Core.i c in
   let: c_ge  := Modsem.ge (my_cores c_ix) in
   let: c_sem := Modsem.sem (my_cores c_ix) in
-    core_semantics.corestep c_sem c_ge (Core.c c) m c' m' -> 
+    semantics.corestep c_sem c_ge (Core.c c) m c' m' -> 
     Corestep l m (updCore l (Core.upd (peekCore l) c')) m'
 
 | Corestep_call :
@@ -508,7 +508,7 @@ Inductive Corestep : linker N my_cores -> M
   let: c_ge  := Modsem.ge (my_cores c_ix) in
   let: c_sem := Modsem.sem (my_cores c_ix) in
 
-  core_semantics.at_external c_sem (Core.c c) = Some (ef,dep_sig,args) -> 
+  semantics.at_external c_sem (Core.c c) = Some (ef,dep_sig,args) -> 
   fun_id ef = Some id -> 
   fn_tbl l id = Some d_ix -> 
   Genv.find_symbol (my_cores d_ix).(Modsem.ge) id = Some bf -> 
@@ -516,7 +516,7 @@ Inductive Corestep : linker N my_cores -> M
   let: d_ge  := Modsem.ge (my_cores d_ix) in
   let: d_sem := Modsem.sem (my_cores d_ix) in
 
-  core_semantics.initial_core d_sem d_ge (Vptr bf Int.zero) args = Some d -> 
+  semantics.initial_core d_sem d_ge (Vptr bf Int.zero) args = Some d -> 
   Corestep l m (pushCore l (Core.mk _ _ _ d (ef_sig ef)) pf) m
 
 | Corestep_return : 
@@ -537,9 +537,9 @@ Inductive Corestep : linker N my_cores -> M
   let: d_ge  := Modsem.ge (my_cores d_ix) in
   let: d_sem := Modsem.sem (my_cores d_ix) in
 
-  core_semantics.halted c_sem (Core.c c) = Some rv -> 
+  semantics.halted c_sem (Core.c c) = Some rv -> 
   val_has_type_func rv (proj_sig_res c_sg)=true -> 
-  core_semantics.after_external d_sem (Some rv) (Core.c d) = Some d' -> 
+  semantics.after_external d_sem (Some rv) (Core.c d) = Some d' -> 
   Corestep l m (updCore l'' (Core.upd d d')) m.
 
 Lemma CorestepE l m l' m' : 
@@ -572,7 +572,7 @@ split=> //.
 rewrite /corestep0=> [][]c' []step.
 by rewrite /= (corestep_not_halted _ _ _ _ _ _ step) in H2.
 have at_ext: 
-  core_semantics.at_external
+  semantics.at_external
     (Modsem.sem (my_cores (Core.i (peekCore l))))
     (Core.c (peekCore l)) = None.
 { case: (@at_external_halted_excl _ _ _
@@ -597,16 +597,16 @@ case funid: (fun_id ef)=> [id|//].
 case hdl:   (handle (ef_sig ef) id l args)=> [l''|//] ->.
 move: hdl; case/handleP=> pf []ix []bf []c []fntbl genv init ->.
 move: init; rewrite /initCore.
-case init: (core_semantics.initial_core _ _ _)=> [c'|//]; case=> <-. 
+case init: (semantics.initial_core _ _ _)=> [c'|//]; case=> <-. 
 by apply: (@Corestep_call _ _ ef dep_sig args id bf).
 case inCtx: (inContext _)=> //.
 case hlt: (halted0 _)=> [rv|//].
 case pop: (popCore _)=> [c|//].
 case aft: (after_external _ _)=> [l''|//] ->.
 move: aft; rewrite /after_external.
-case aft: (core_semantics.after_external _ _)=> [c''|//]. 
+case aft: (semantics.after_external _ _)=> [c''|//]. 
 rewrite /halted0 in hlt; move: hlt.
-case hlt: (core_semantics.halted _)=> //. 
+case hlt: (semantics.halted _)=> //. 
 case oval: (val_has_type_func _ _)=> //; case=> Heq. subst. case=> <-.
 by apply: (@Corestep_return _ _ _ rv c'').
 Qed.

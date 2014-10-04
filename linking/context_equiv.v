@@ -4,7 +4,7 @@ Require Import sepcomp. Import SepComp.
 Require Import arguments.
 
 Require Import pos.
-Require Import core_semantics_tcs.
+Require Import semantics_tcs.
 Require Import compcert_linking.
 Require Import rc_semantics.
 Require Import rc_semantics_lemmas.
@@ -19,16 +19,16 @@ Unset Printing Implicit Defensive.
 
 Require Import nucular_semantics.
 Require Import Values.   
-Require Import wholeprog_lemmas.
+Require Import closed_simulations_lemmas.
 Require Import closed_safety.
-Require Import core_semantics_lemmas.
+Require Import semantics_lemmas.
 
 Import Wholeprog_sim.
 Import SM_simulation.
 Import Linker. 
 Import Modsem.
 
-(** Reach-Closed Contextual Equivalence *)
+(** * Reach-Closed Contextual Equivalence *)
 
 Module ContextEquiv (LS : LINKING_SIMULATION).                  
                                                                        
@@ -157,7 +157,7 @@ Qed.
 
 Import Wholeprog_sim.
 
-(** Proof of Corollary 1. *)
+(** ** Proof of Corollary 1. *)
 
 Lemma context_equiv 
     (main : val)  
@@ -171,7 +171,7 @@ have target_det: corestep_fun linker_T by apply: linking_det.
 by apply (equitermination _ _ target_det _ _ _ _ _ _ source_safe match12).
 Qed.
 
-(** Corollary 1, specialized to initial states. *)
+(** ** Corollary 1, specialized to initial states. *)
 
 Lemma init_context_equiv l1 m1 m2 j vals1 vals2 
   (main : val)

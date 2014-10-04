@@ -7,7 +7,7 @@ Require Import Bool.
 Require Import Zbool.
 Require Import BinPos. 
 
-Require Import compcert. Import CompcertCommon.
+Require Import compcert_imports. Import CompcertCommon.
 
 Require Import Axioms.
 
@@ -2022,7 +2022,7 @@ Proof.
 by move=> b b' ofs; discriminate.
 Qed.
 
-Import StructuredInjections.
+Import structured_injections.
 
 Lemma sharedTgt_DomTgt (mu : Inj.t) :
   forall b, sharedTgt mu b -> DomTgt mu b.

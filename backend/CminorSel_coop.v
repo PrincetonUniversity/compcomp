@@ -12,7 +12,7 @@ Require Import Switch.
 Require Import CminorSel. 
 
 Require Import mem_lemmas. (*for mem_forward*)
-Require Import core_semantics.
+Require Import semantics.
 Require Import val_casted.
 Require Import effect_semantics. (*for EmptyEffect*)
 Require Import BuiltinEffects.

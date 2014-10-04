@@ -14,14 +14,14 @@ Require Import Cminor.
 Require Import Cminorgen.
 
 Require Import mem_lemmas.
-Require Import core_semantics.
-Require Import core_semantics_lemmas.
+Require Import semantics.
+Require Import semantics_lemmas.
 Require Import effect_semantics.
-Require Import StructuredInjections.
+Require Import structured_injections.
 Require Import reach.
-Require Import effect_simulations.
+Require Import simulations.
 Require Import effect_properties.
-Require Import effect_simulations_lemmas.
+Require Import simulations_lemmas.
 
 Require Import Cminor_coop.
 Require Import Cminor_eff.
@@ -3422,7 +3422,7 @@ Theorem transl_program_correct:
 Proof.
 intros.
 assert (GDE:= GDE_lemma).
- eapply effect_simulations_lemmas.inj_simulation_star with
+ eapply simulations_lemmas.inj_simulation_star with
   (match_states:=MATCH) (measure:=MC_measure).
 (*genvs_dom_eq*)
   apply GDE.

@@ -36,14 +36,14 @@ Require Import Stacklayout.
 Require Import Stacking.
 
 Require Import mem_lemmas.
-Require Import core_semantics.
-Require Import core_semantics_lemmas.
+Require Import semantics.
+Require Import semantics_lemmas.
 Require Import effect_semantics.
-Require Import StructuredInjections.
+Require Import structured_injections.
 Require Import reach.
-Require Import effect_simulations.
+Require Import simulations.
 Require Import effect_properties.
-Require Import effect_simulations_lemmas.
+Require Import simulations_lemmas.
 
 Require Import Linear_coop.
 Require Import Linear_eff.
@@ -6663,7 +6663,7 @@ Theorem transl_program_correct
 Proof.
 intros.
 assert (GDE:= GDE_lemma). 
- eapply effect_simulations_lemmas.inj_simulation_plus_typed with
+ eapply simulations_lemmas.inj_simulation_plus_typed with
   (match_states:=MATCH) (measure:=fun x => O).
 (*genvs_dom_eq*)
   assumption.

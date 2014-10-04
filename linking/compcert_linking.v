@@ -5,7 +5,7 @@ Require Import sepcomp. Import SepComp.
 Require Import pos.
 Require Import stack. 
 Require Import cast.
-Require Import core_semantics_tcs.
+Require Import semantics_tcs.
 
 Require Import ssreflect ssrbool ssrnat ssrfun eqtype seq fintype finfun.
 Set Implicit Arguments.
@@ -22,43 +22,38 @@ Require Import ZArith.
 
 (** * Language-Independent Linking Semantics *)
 
-(* This file gives the operational semantics of multi-language linking.   *)
-(*                                                                        *)
-(* The following are the key types:                                       *)
-(* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                                       *)
-(*                                                                        *)
-(*   [Modsem.t]: The semantics of a single translation unit, written in a *)
-(*               particular programming language and w/ a particular      *)
-(*               global environment.                                      *)
-(*                                                                        *)
-(*   [Core.t]:   Runtime states corresponding to dynamic invocations of   *)
-(*               [Modsem.t]s, initialized from a [Modsem] module to       *)
-(*               handle a particular external function call made by       *)
-(*               another [Core].                                          *)
-(*                                                                        *)
-(*   [CallStack.t]: Stacks of [Core.t]s satisfying a few                  *)
-(*                  well-formedness properties.                           *)
-(*                                                                        *)
-(*   [Linker.t]: The type of linker corestates. Linker states contain:    *)
-(*                                                                        *)
-(*      - [stack]:   The stack of cores maintained at runtime.            *)
-(*      - [fn_tbl]:  A table mapping external function                    *)
-(*                   id's to module id's.                                 *)
-(*                                                                        *)
-(*      and are parameterized by:                                         *)
-(*                                                                        *)
-(*      - [N : nat]: The number of modules in the program.                *)
-(*      - [cores : 'I_N -> Modsem.t]:                                     *)
-(*          A function from module id's ('I_N, or integers in the range   *)
-(*          [0..N-1]) to module semantics.                                *)
-(*                                                                        *)
-(* Semantics                                                              *)
-(* ~~~~~~~~~                                                              *)
-(*                                                                        *)
-(*   [LinkerSem]: A module defining the actual linking semantics. In      *)
-(*                later parts of the file, the [LinkerSem] semantics is   *)
-(*                shown to be both a [CoopCoreSem] and an [EffectSem]     *)
-(*                (cf. core_semantics.v, effect_semantics.v).             *)
+(** This file gives the operational semantics of multi-language linking. *)
+
+(** ** The following are the key types: *)
+
+(** [Modsem.t]: The semantics of a single translation unit, written in a
+              particular programming language and w/ a particular
+              global environment. *)
+
+(** [Core.t]:   Runtime states corresponding to dynamic invocations of
+              [Modsem.t]s, initialized from a [Modsem] module to
+              handle a particular external function call made by
+              another [Core]. *)
+
+(** [CallStack.t]: Stacks of [Core.t]s satisfying a few
+                 well-formedness properties. *)
+
+(** [Linker.t]: The type of linker corestates. Linker states contain: *)
+(**   - [stack]:   The stack of cores maintained at runtime. *)
+(**   - [fn_tbl]:  A table mapping external function 
+                   id's to module id's. *)
+(**  Linked states are parameterized by: *)
+(**   - [N : nat]: The number of modules in the program. *)
+(**   - [cores : 'I_N -> Modsem.t]:
+         A function from module id's ('I_N, or integers in the range
+         [0..N-1]) to module semantics. *)
+
+(** ** Semantics *)
+
+(** [LinkerSem]: A module defining the actual linking semantics. In
+               later parts of the file, the [LinkerSem] semantics is
+               shown to be both a [CoopCoreSem] and an [EffectSem]
+               (cf. core_semantics.v, effect_semantics.v). *)
 
 (** [Modsem.t]: Semantics of translation units *)
 
@@ -82,39 +77,15 @@ Variable cores : 'I_N -> Modsem.t.
 
 Import Modsem.
 
-(*                            [Core.t]                                    *)
-(*                            ~~~~~~~~                                    *)
-(* The type [Core.t] gives runtime states of dynamic module invocations.  *)
-(*   i : 'I_N                                                             *)
-(*                                                                        *)
-(*       A natural between [0..n-1] that maps this core back to the       *)
-(*       translation unit numbered [i] from which it was invoked.         *)
-(*                                                                        *)
-(*   c : (cores i).(C)                                                    *)
-(*                                                                        *)
-(*       Runtime states of module i.                                      *)
-(*                                                                        *)
-(* When we model the semantics of source languages, c is typically        *)
-(* specialized to reach-closed core states:                               *)
-(*                                                                        *)
-(*   c : RC.state (cores i).(C)                                           *)
-(*                                                                        *)
-(*      Runtime states. These comprise:                                   *)
-(*                                                                        *)
-(*      { -- Corestates of the type associated w/ module (cores i).       *)
-(*        core : (cores i).(C)                                            *)
-(*                                                                        *)
-(*        -- The arguments used to initialize this core.                  *)
-(*      ; args : seq val                                                  *)
-(*                                                                        *)
-(*        -- Values returned to this core after calls to third modules.   *)
-(*      ; rets : seq val                                                  *)
-(*                                                                        *)
-(*        -- Local blocks allocated by this core.                         *)
-(*      ; locs : block -> bool                                            *)
-(*      }                                                                 *)
-(*                                                                        *)
-(* Cf. rc_semantics.v for more details.                                   *)
+(** **                        [Core.t] *)
+(** The type [Core.t] gives runtime states of dynamic module invocations. *)
+(**  [i : 'I_N]:
+      A natural between [0..n-1] that maps this core back to the
+      translation unit numbered [i] from which it was invoked. *)
+(**  [c : (cores i).(C)]:
+      Runtime states of module [i]. *)
+(**  [sg : signature]:
+      Type signature of the function that this core was spawned to handle. *)
 
 Record t := mk
   { i  : 'I_N
@@ -200,20 +171,16 @@ End callStackDefs.
 
 End callStack. End CallStack.
 
-(*                            [Linker.t]                                  *)
-(*                            ~~~~~~~~~~                                  *)
-(*                                                                        *)
-(* The first two parameters of this record are static configuration data: *)
-(*                                                                        *)
-(*    - [N] is the number of modules in the program.                      *)
-(*    - [cores] is a function from module id's ('I_n, or integers in the  *)
-(*      range [0..n-1]) to genvs and core semantics, with existentially   *)
-(*      quantified core type [C].                                         *)
-(*                                                                        *)
-(* Fields:                                                                *)
-(*                                                                        *)
-(*    - [fn_tbl] maps external function id's to module id's               *)
-(*    - [stack] is used to maintain a stack of cores, at runtime.         *)
+(** **                        [Linker.t] *)
+(** The first two parameters of this record are static configuration data: *)
+(**   - [N] is the number of modules in the program. *)
+(**   - [cores] is a function from module id's (['I_n], or integers in the 
+     range [0..n-1]) to genvs and core semantics, with existentially
+     quantified core type [C]. *)
+
+(** Fields: *)
+(**   - [fn_tbl] maps external function id's to module id's *)
+(**   - [stack] is used to maintain a stack of cores, at runtime. *)
 
 Module Linker. Section linker.
 
@@ -360,8 +327,7 @@ exists pf; split=> //.
 by f_equal; f_equal; apply: proof_irr.
 Qed.
 
-(*                         Semantics                                      *)
-(*                         ~~~~~~~~~                                      *)
+(** **                     Linking Interaction Semantics                  *)
 
 Module LinkerSem. Section linkerSem.
 
@@ -535,7 +501,7 @@ Definition retType0 (l: linker N my_cores) : option typ :=
   let: sg := c.(Core.sg) in 
     sig_res sg.
 
-(** Corestep relation of linking semantics *)
+(** ** Corestep relation of linking semantics *)
 
 Definition corestep 
   (l: linker N my_cores) (m: Mem.mem)
@@ -579,7 +545,7 @@ Inductive Corestep : linker N my_cores -> mem
   let: c_ix  := Core.i c in
   let: c_ge  := Modsem.ge (my_cores c_ix) in
   let: c_sem := Modsem.sem (my_cores c_ix) in
-    core_semantics.corestep c_sem c_ge (Core.c c) m c' m' -> 
+    semantics.corestep c_sem c_ge (Core.c c) m c' m' -> 
     Corestep l m (updCore l (Core.upd (peekCore l) c')) m'
 
 | Corestep_call :
@@ -591,7 +557,7 @@ Inductive Corestep : linker N my_cores -> mem
   let: c_ge  := Modsem.ge (my_cores c_ix) in
   let: c_sem := Modsem.sem (my_cores c_ix) in
 
-  core_semantics.at_external c_sem (Core.c c) = Some (ef,dep_sig,args) -> 
+  semantics.at_external c_sem (Core.c c) = Some (ef,dep_sig,args) -> 
   fun_id ef = Some id -> 
   fn_tbl l id = Some d_ix -> 
   Genv.find_symbol (my_cores d_ix).(Modsem.ge) id = Some bf -> 
@@ -599,7 +565,7 @@ Inductive Corestep : linker N my_cores -> mem
   let: d_ge  := Modsem.ge (my_cores d_ix) in
   let: d_sem := Modsem.sem (my_cores d_ix) in
 
-  core_semantics.initial_core d_sem d_ge (Vptr bf Int.zero) args = Some d -> 
+  semantics.initial_core d_sem d_ge (Vptr bf Int.zero) args = Some d -> 
   Corestep l m (pushCore l (Core.mk _ _ _ d (ef_sig ef)) pf) m
 
 | Corestep_return : 
@@ -620,9 +586,9 @@ Inductive Corestep : linker N my_cores -> mem
   let: d_ge  := Modsem.ge (my_cores d_ix) in
   let: d_sem := Modsem.sem (my_cores d_ix) in
 
-  core_semantics.halted c_sem (Core.c c) = Some rv -> 
+  semantics.halted c_sem (Core.c c) = Some rv -> 
   val_has_type_func rv (proj_sig_res c_sg)=true -> 
-  core_semantics.after_external d_sem (Some rv) (Core.c d) = Some d' -> 
+  semantics.after_external d_sem (Some rv) (Core.c d) = Some d' -> 
   Corestep l m (updCore l'' (Core.upd d d')) m.
 
 Lemma CorestepE l m l' m' : 
@@ -654,7 +620,7 @@ split=> //.
 rewrite /corestep0=> [][]c' []step.
 by rewrite (corestep_not_halted _ _ _ _ _ _ step) in H2.
 have at_ext: 
-  core_semantics.at_external
+  semantics.at_external
     (Modsem.sem (my_cores (Core.i (peekCore l))))
     (Core.c (peekCore l)) = None.
 { case: (at_external_halted_excl 
@@ -679,21 +645,21 @@ case funid: (fun_id ef)=> [id|//].
 case hdl:   (handle (ef_sig ef) id l args)=> [l''|//] ->.
 move: hdl; case/handleP=> pf []ix []bf []c []fntbl genv init ->.
 move: init; rewrite /initCore.
-case init: (core_semantics.initial_core _ _ _ _)=> [c'|//]; case=> <-. 
+case init: (semantics.initial_core _ _ _ _)=> [c'|//]; case=> <-. 
 by apply: (@Corestep_call _ _ ef dep_sig args id bf).
 case inCtx: (inContext _)=> //.
 case hlt: (halted0 _)=> [rv|//].
 case pop: (popCore _)=> [c|//].
 case aft: (after_external _ _)=> [l''|//] ->.
 move: aft; rewrite /after_external.
-case aft: (core_semantics.after_external _ _ _)=> [c''|//]. 
+case aft: (semantics.after_external _ _ _)=> [c''|//]. 
 rewrite /halted0 in hlt; move: hlt.
-case hlt: (core_semantics.halted _ _)=> //. 
+case hlt: (semantics.halted _ _)=> //. 
 case oval: (val_has_type_func _ _)=> //; case=> Heq. subst. case=> <-.
 by apply: (@Corestep_return _ _ _ rv c'').
 Qed.
 
-(** Equivalence of the two representations of linking semantics. *)
+(** Prove that the two representations above coincide. *)
 
 Lemma CorestepP l m l' m' : 
   corestep l m l' m' <-> Corestep l m l' m'.
@@ -774,13 +740,13 @@ Lemma after_externalE rv c c' :
          (sig_pf : Core.sg hd = Core.sg hd'),
   [/\ c  = mkLinker fn_tbl (CallStack.mk [:: hd & tl] pf)
     , c' = mkLinker fn_tbl (CallStack.mk [:: hd' & tl]  pf')
-    & core_semantics.after_external
+    & semantics.after_external
        (Modsem.sem (my_cores (Core.i hd))) rv (Core.c hd)
       = Some (cast'' eq_pf (Core.c hd'))].
 Proof.
 case: c=> fntbl; case; case=> // hd stk pf aft; exists fntbl,hd.
 move: aft; rewrite /after_external /=.
-case e: (core_semantics.after_external _ _ _)=> // [hd']; case=> <-.
+case e: (semantics.after_external _ _ _)=> // [hd']; case=> <-.
 exists (Core.mk N my_cores (Core.i hd) hd' (Core.sg hd)),stk,pf,pf.
 rewrite /=; exists refl_equal; exists refl_equal; split=> //; f_equal; f_equal.
 by apply: proof_irr.
@@ -804,28 +770,28 @@ Definition coresem : CoreSemantics ge_ty (linker N my_cores) Mem.mem :=
 
 Lemma linking_det 
   (dets : forall ix : 'I_N, 
-    core_semantics_lemmas.corestep_fun (Modsem.sem (my_cores ix))) :
-  core_semantics_lemmas.corestep_fun coresem.
+    semantics_lemmas.corestep_fun (Modsem.sem (my_cores ix))) :
+  semantics_lemmas.corestep_fun coresem.
 Proof.
 move=> ge m c m' c' m'' c''.
 move/CorestepP=> H1; move/CorestepP=> H2. 
 inversion H2; subst.
 { inversion H1; subst; first by case: (dets _ _ _ _ _ _ _ _ H H0)=> -> ->.
-  by apply core_semantics.corestep_not_at_external in H; rewrite H in H0.
-  by apply core_semantics.corestep_not_halted in H; rewrite H in H4. }
+  by apply semantics.corestep_not_at_external in H; rewrite H in H0.
+  by apply semantics.corestep_not_halted in H; rewrite H in H4. }
 { inversion H1; subst.
-  by apply core_semantics.corestep_not_at_external in H6; rewrite H6 in H.
+  by apply semantics.corestep_not_at_external in H6; rewrite H6 in H.
   move: H0 H7 H3 H8; rewrite H6 in H; case: H=> <- _ eq0 ->; case=> eq1; subst.
   move=> ->; case=> eq_ix; subst d_ix0.
   rewrite H4 in H9; case: H9; move=> ?; subst.
   rewrite H10 in H5; case: H5=> ->.
   by split=> //; f_equal; f_equal; apply: proof_irr.
-  case: (core_semantics.at_external_halted_excl 
+  case: (semantics.at_external_halted_excl 
           (Modsem.sem (my_cores (Core.i (peekCore c')))) (Core.c (peekCore c'))).
   by rewrite H. by rewrite H8. }
 { inversion H1; subst.
-  by apply core_semantics.corestep_not_halted in H6; rewrite H6 in H3. 
-  case: (core_semantics.at_external_halted_excl 
+  by apply semantics.corestep_not_halted in H6; rewrite H6 in H3. 
+  case: (semantics.at_external_halted_excl 
           (Modsem.sem (my_cores (Core.i (peekCore c')))) (Core.c (peekCore c'))).
   by rewrite H6. by rewrite H3. 
   rewrite H8 in H3; case: H3=> eq1; subst. 
@@ -835,7 +801,7 @@ Qed.
 
 End linkerSem. End LinkerSem.
 
-(** Specialize to effect semantics *)
+(** ** Linking Effect Semantics *)
 
 Section effingLinker.
 
@@ -919,8 +885,8 @@ End csem.
 
 Lemma linking_det 
   (dets : forall ix : 'I_N, 
-    core_semantics_lemmas.corestep_fun (Modsem.sem (my_cores ix))) :
-  core_semantics_lemmas.corestep_fun csem.
+    semantics_lemmas.corestep_fun (Modsem.sem (my_cores ix))) :
+  semantics_lemmas.corestep_fun csem.
 Proof.
 move=> m m' m'' ge c c' c''; rewrite /= /inner_effstep => [][]H1 _ []H2 _.
 case: (@LinkerSem.linking_det N my_cores my_fun_tbl dets _ _ _ _ _ _ _ H1 H2).

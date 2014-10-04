@@ -4,12 +4,76 @@ Require Import Coqlib.
 Require Import Values.
 Require Import Axioms.
 
+Require Import mem_lemmas.
+
 (** * Structured Injections *)
 
-(** The definition of structured injections is given below. First, 
-  some lemmas: *)
+Record SM_Injection :=
+  { (** The blocks allocated by *this* module in the source language. *)
+    locBlocksSrc : block -> bool
 
-Require Import mem_lemmas.
+    (** The blocks allocated by *this* module in the target language. *) 
+  ; locBlocksTgt : block -> bool
+  
+    (** The subset of local source blocks that have been made public. Must be mapped. *)
+  ; pubBlocksSrc : block -> bool
+
+    (** The subset of local target blocks that have been made public. Contains the image
+        of the public source blocks. *)
+  ; pubBlocksTgt : block -> bool
+
+    (** Memory injection on blocks allocated by *this* module. *)
+  ; local_of: meminj
+
+    (** The blocks allocated by *other* modules at the source level. *)
+  ; extBlocksSrc: block -> bool
+
+    (** The blocks allocated by *other* modules at the target level. *)
+  ; extBlocksTgt: block -> bool
+
+    (** The subset of extern source blocks that have been made public. Must be mapped. *)
+  ; frgnBlocksSrc : block -> bool
+
+
+    (** The subset of extern source blocks that have been made public. Must be mapped. *)
+  ; frgnBlocksTgt : block -> bool
+   
+    (** Memory injection on blocks allocated by OTHER modules; the injection is
+        not modified by coresteps, and is partitioned by frgnBlocksSrc/Tgt into
+        foreign (leaked to this module) and unknown (non-leaked) components,
+        where the former blocks are accessible by *this* module. This module
+        behaves uniformly over block mentioned by frgnInj, and assumes that
+        blocks in frgnInj remain mapped. Compilation of *this* module neither
+        merges nor unmaps blocks from here, nor does it spill into them. *) 
+  ; extern_of: meminj }.
+
+(** The four projections: *)
+
+Definition unknown_of (mu: SM_Injection) : meminj :=
+  match mu with 
+    Build_SM_Injection locBSrc locBTgt pSrc pTgt local extBSrc extBTgt fSrc fTgt extern => 
+    fun b => if locBSrc b then None else if fSrc b then None else extern b 
+  end.
+
+Definition foreign_of (mu: SM_Injection) : meminj :=
+  match mu with 
+    Build_SM_Injection locBSrc locBTgt pSrc pTgt local extBSrc extBTgt fSrc fTgt extern => 
+    fun b => if fSrc b then extern b else None
+  end.
+
+Definition pub_of (mu: SM_Injection) : meminj :=
+  match mu with 
+    Build_SM_Injection locBSrc locBTgt pSrc pTgt local extBSrc extBTgt fSrc fTgt extern => 
+    fun b => if pSrc b then local b else None
+  end.
+
+Definition priv_of (mu: SM_Injection) : meminj :=
+  match mu with 
+    Build_SM_Injection locBSrc locBTgt pSrc pTgt local extBSrc extBTgt fSrc fTgt extern => 
+    fun b => if pSrc b then None else local b
+  end.
+
+(** * Lemmas *)
 
 Lemma compose_meminjI_Some: forall j k b1 b2 d1 b3 d2
           (J:j b1 = Some(b2,d1)) (K:k b2 = Some(b3,d2)),
@@ -217,73 +281,9 @@ Lemma join_None_rightneutral: forall j, join j (fun b => None) = j.
 Proof. unfold join; intros. extensionality b.
   destruct (j b); trivial. destruct p; trivial.
 Qed.
+
 Lemma join_None_leftneutral: forall j, join (fun b => None) j = j.
 Proof. unfold join; intros. extensionality b. trivial. Qed.
-
-(** ** The definition of structured injections: *)
-
-Record SM_Injection :=
-  { locBlocksSrc : block -> bool;
-                     (** The blocks allocated by THIS module in the
-                        source language SRC*)
-    locBlocksTgt : block -> bool; 
-                     (** The blocks allocated by THIS module in the
-                        target language TGT*) 
-    pubBlocksSrc : block -> bool; (** subset of locBlocksSrc that have been 
-                        made public. Must be mapped by pubInj.*)
-    pubBlocksTgt : block -> bool; (** subset of locBlocksTgt that have been 
-                        made public. Contains the image of pubInj.*)
-    local_of: meminj; (** meminj on blocks allocated by THIS module.
-                        Remains unchanged by external steps,
-                        and is partitioned by pubBlocksSrc/Tgt into
-                        exported (public)
-                        and non-exporrted (private) component.  *)
-
-    extBlocksSrc: block -> bool; (** blocks allocated by OTHER modules in SRC *)
-    extBlocksTgt: block -> bool; (** blocks allocated by OTHER modules in TGT *)
-
-    frgnBlocksSrc : block -> bool; (** subset of extBlocksSrc that have been 
-                        made visible to THIS module. Must be apped by foreign.*)
-    frgnBlocksTgt : block -> bool; (** subset of extBlocksTgt that have been 
-                        made visible to THIS module. Contains image of foreign*)
-   
-    extern_of: meminj (** a meminj on blocks allocated by OTHER modules; 
-                        the injection is not modified by coresteps, and
-                        is partitioned by frgnBlocksSrc/Tgt into 
-                        foreign (leaked to this module) and unknown (non-leaked)
-                        components, where the former blocks are 
-                        accessible by THIS module. 
-                        THIS module behaves uniformly over block mentioned by frgnInj, and
-                        assumes that blocks in frgnInj remain mapped. Compilation of THIS 
-                        module neither merges nor unmaps blocks from here, 
-                        nor does it spill into them*)
-}.
-
-(** The four projections: *)
-
-Definition unknown_of (mu: SM_Injection) : meminj :=
-  match mu with 
-    Build_SM_Injection locBSrc locBTgt pSrc pTgt local extBSrc extBTgt fSrc fTgt extern => 
-    fun b => if locBSrc b then None else if fSrc b then None else extern b 
-  end.
-
-Definition foreign_of (mu: SM_Injection) : meminj :=
-  match mu with 
-    Build_SM_Injection locBSrc locBTgt pSrc pTgt local extBSrc extBTgt fSrc fTgt extern => 
-    fun b => if fSrc b then extern b else None
-  end.
-
-Definition pub_of (mu: SM_Injection) : meminj :=
-  match mu with 
-    Build_SM_Injection locBSrc locBTgt pSrc pTgt local extBSrc extBTgt fSrc fTgt extern => 
-    fun b => if pSrc b then local b else None
-  end.
-
-Definition priv_of (mu: SM_Injection) : meminj :=
-  match mu with 
-    Build_SM_Injection locBSrc locBTgt pSrc pTgt local extBSrc extBTgt fSrc fTgt extern => 
-    fun b => if pSrc b then None else local b
-  end.
 
 Lemma local_pubpriv: forall mu, 
       local_of mu = join (pub_of mu) (priv_of mu).

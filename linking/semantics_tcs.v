@@ -3,8 +3,8 @@ Require Import ZArith.
 Require Import AST. (*for mksignature*)
 Require Import Globalenvs.
 
-Require Import core_semantics.
-Require Import core_semantics_lemmas.
+Require Import semantics.
+Require Import semantics_lemmas.
 Require Import effect_semantics.
 
 Require Import ssreflect ssrbool ssrnat ssrfun eqtype seq fintype finfun.

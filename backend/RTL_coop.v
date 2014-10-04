@@ -10,7 +10,7 @@ Require Import Smallstep.
 Require Import Op.
 Require Import Registers.
 
-Require Import core_semantics.
+Require Import semantics.
 Require Import val_casted.
 
 Require Import RTL.

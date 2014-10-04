@@ -7,7 +7,7 @@ Require Import Bool.
 Require Import Zbool.
 Require Import BinPos. 
 
-Require Import compcert. Import CompcertCommon.
+Require Import compcert_imports. Import CompcertCommon.
 
 Require Import Axioms.
 
@@ -328,14 +328,14 @@ Qed.
 Lemma pubsrc_sub_locsrc (mu : Inj.t) : 
   {subset (pubBlocksSrc mu) <= locBlocksSrc mu}.
 Proof. 
-move=> b; apply: StructuredInjections.pubBlocksLocalSrc.
+move=> b; apply: structured_injections.pubBlocksLocalSrc.
 by apply: Inj_wd.
 Qed.
 
 Lemma pubtgt_sub_loctgt (mu : Inj.t) : 
   {subset (pubBlocksTgt mu) <= locBlocksTgt mu}.
 Proof. 
-move=> b; apply: StructuredInjections.pubBlocksLocalTgt.
+move=> b; apply: structured_injections.pubBlocksLocalTgt.
 by apply: Inj_wd.
 Qed.
 

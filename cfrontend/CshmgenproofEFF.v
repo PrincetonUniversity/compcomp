@@ -23,14 +23,14 @@ Require Import Csharpminor_coop.
 Require Import Csharpminor_eff.
 
 Require Import mem_lemmas.
-Require Import core_semantics.
-Require Import core_semantics_lemmas.
+Require Import semantics.
+Require Import semantics_lemmas.
 Require Import effect_semantics.
-Require Import StructuredInjections.
+Require Import structured_injections.
 Require Import reach.
-Require Import effect_simulations.
+Require Import simulations.
 Require Import effect_properties.
-Require Import effect_simulations_lemmas.
+Require Import simulations_lemmas.
 
 Require Import BuiltinEffects.
 
@@ -3168,7 +3168,7 @@ Theorem transl_program_correct:
    (csharpmin_eff_sem hf) ge tge.
 Proof.
 intros.
- eapply effect_simulations_lemmas.inj_simulation_plus with
+ eapply simulations_lemmas.inj_simulation_plus with
   (match_states:=MATCH) (measure:=fun x => O).
 (*genvs_dom_eq*)
   apply GDE_lemma.

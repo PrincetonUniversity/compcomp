@@ -6,10 +6,10 @@ Require Import Values.
 Require Import Maps.
 Require Import Axioms.
 
-Require Import StructuredInjections.
+Require Import structured_injections.
 Require Import reach.
-Require Import effect_simulations.
-Require Import effect_simulations_lemmas.
+Require Import simulations.
+Require Import simulations_lemmas.
 Require Import mem_lemmas.
 Require Import mem_interpolation_defs.
 Require Import mem_interpolation_II.

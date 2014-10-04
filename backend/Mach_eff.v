@@ -17,7 +17,7 @@ Require Import Mach.
 Require Import Mach_coop. 
 
 Require Import mem_lemmas. (*for mem_forward*)
-Require Import core_semantics.
+Require Import semantics.
 Require Import effect_semantics.
 Require Import BuiltinEffects.
 Require Import load_frame.

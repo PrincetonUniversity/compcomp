@@ -10,11 +10,11 @@ Require Import Ctypes. (*for type and access_mode*)
 Require Import mem_lemmas. (*needed for definition of valid_block_dec etc*)
 
 Require Import Axioms.
-Require Import StructuredInjections.
+Require Import structured_injections.
 Require Import reach. 
 Require Import effect_semantics. 
 Require Import effect_properties.
-Require Import effect_simulations. 
+Require Import simulations. 
 
 Require Import I64Helpers.
 

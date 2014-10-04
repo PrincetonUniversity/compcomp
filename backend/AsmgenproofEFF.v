@@ -37,14 +37,14 @@ Require Import Asm_coop.
 Require Import Asm_eff.
 
 Require Import mem_lemmas.
-Require Import core_semantics.
-Require Import core_semantics_lemmas.
+Require Import semantics.
+Require Import semantics_lemmas.
 Require Import effect_semantics.
-Require Import StructuredInjections.
+Require Import structured_injections.
 Require Import reach.
-Require Import effect_simulations.
+Require Import simulations.
 Require Import effect_properties.
-Require Import effect_simulations_lemmas.
+Require Import simulations_lemmas.
 Require Import BuiltinEffects.
 
 Require Export Axioms.
@@ -3055,7 +3055,7 @@ Theorem transl_program_correct:
 Proof.
 intros.
 assert (GDE:= GDE_lemma). 
- eapply effect_simulations_lemmas.inj_simulation_plus with
+ eapply simulations_lemmas.inj_simulation_plus with
   (match_states:=MATCH) (measure:=measure).
 (*genvs_dom_eq*)
   assumption.

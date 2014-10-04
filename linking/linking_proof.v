@@ -18,7 +18,7 @@ Require Import pred_lemmas.
 Require Import seq_lemmas.
 Require Import wf_lemmas.
 Require Import reestablish.
-Require Import core_semantics_tcs.
+Require Import semantics_tcs.
 Require Import inj_lemmas.
 Require Import join_sm.
 Require Import reach_lemmas.
@@ -47,8 +47,10 @@ Unset Printing Implicit Defensive.
 Require Import Values.   
 Require Import nucular_semantics.
 
+(** * Linking Proof (Theorem 2) *)
+
 (** This file proves the main linking simulation result (see
-  linking/linking_spec.v for the specification of the theorem that's proved). *)
+  linking/linking_spec.v for the specification of the theorem). *)
 
 Import Wholeprog_sim.
 Import SM_simulation.
@@ -122,7 +124,7 @@ Qed.
 
 End halted_lems.
 
-Require Import mem_wd.
+Require Import mem_welldefined.
 
 (*TODO: move elsewhere*)
 Lemma valid_genvs_domain_eq F1 F2 V1 V2 
@@ -138,7 +140,7 @@ case: H1=> _ []_; case/(_ b)=> X Y Z; case: Y; first by exists isGlob.
 by move=> x FND; apply: (H3 _ _ FND).
 Qed.
 
-(** Proof of Theorem 2 *)
+(** ** Proof of Theorem 2 *)
 
 Lemma link (main : val) : CompCert_wholeprog_sim linker_S linker_T my_ge my_ge main.
 Proof.
@@ -147,13 +149,13 @@ eapply Build_Wholeprog_sim
        (core_ord    := sig_ord (fun ix : 'I_N => (sims sims' ix).(core_ord)))
        (match_state := R).
 
-(* well_founded ord *)
+(** well_founded ord *)
 { by apply: wf_sig_ord=> ix; case: (sims sims' ix). }
 
-(* genvs_domain_eq *)
+(** genvs_domain_eq *)
 { by apply: genvs_domain_eq_refl. }
 
-{(* Case: [core_initial] *)
+{(** Case: [core_initial] *)
   move=> j c1 vals1 m1 vals2 m2 init1.
   case=>inj []vinj []pres []gfi []reach []wd []vgenv vval.
   move: init1. 
@@ -180,7 +182,7 @@ eapply Build_Wholeprog_sim
   Arguments core_initial : default implicits.
 
   move: init1 g; rewrite /initCore.
-  case g: (core_semantics.initial_core _ _ _ _)=> [c|//].
+  case g: (semantics.initial_core _ _ _ _)=> [c|//].
   move=> sig1; case=> eq1 H2. subst ix1.
   apply Eqdep_dec.inj_pair2_eq_dec in H2. subst c0.
 
@@ -328,11 +330,11 @@ eapply Build_Wholeprog_sim
   by move=> ix'; move: vgenv; apply: valid_genvs_domain_eq.
   by apply: ord_dec. }(*END [Case: core_initial]*)
     
-{(*[Case: diagram]*)
+{(** Case: diagram*)
 move=> st1 m1 st1' m1' STEP data st2 mu m2 INV. 
 case: STEP=> STEP STEP_EFFSTEP; case: STEP.
 
-{(*[Subcase: corestep0]*)
+{(** Subcase: corestep0*)
 move=> STEP. 
 set c1 := peekCore st1.
 set c2 := peekCore st2.
@@ -359,7 +361,7 @@ have [U1 [c1' [STEP0 [ESTEP0 [U1'_EQ [c1_locs ST1']]]]]]:
     by move: C D=> ->; move/updCore_inj_upd=> ->; split. 
     by move: C D=> ->; move/updCore_inj_upd=> ->; split. }
 
-(* specialize core diagram at module (Core.i c1) *)
+(** Specialize core diagram at module (Core.i c1). *)
 move: (effcore_diagram _ _ _ _ (sims sims' (Core.i c1))).  
 move/(_ _ _ _ _ _ ESTEP0).
 case: (R_inv INV)=> pf []pf_sig []mupkg []mus []mu_eq.
@@ -419,7 +421,7 @@ have [n STEPN]:
 
 split. 
 
-{(* Label: [re-establish invariant] *) 
+{(** Re-establish invariant. *) 
  apply: Build_R. rewrite ST1'; rewrite /st2'.
 
  have sgeq: Core.sg c1=Core.sg c2.
@@ -470,7 +472,7 @@ split.
 
  } (*end [re-establish invariant]*)
  
- {(* Label: [matching execution] *) 
+ {(** Matching execution *) 
  have EFFECTS_REFINEMENT: 
      forall b ofs, U2 b ofs = true ->
      visTgt mu b = true /\
@@ -521,7 +523,7 @@ by apply: ORD. } (*end [Label: matching execution]*)
 move=> []<- []NSTEP.
 case AT1: (LinkerSem.at_external0 st1)=> [[[ef1 sig1] args1]|].
 
-{(*[Subcase: at_external0]*)
+{(** Subcase: at_external0 *)
 case FID: (LinkerSem.fun_id ef1)=> [id|//].
 case HDL: (LinkerSem.handle _ _ _ _)=> [st1''|//] eq1.
 have wd: SM_wd mu by apply: (R_wd INV).
@@ -541,7 +543,7 @@ by move/LinkerSem.corestep_not_at_external0; rewrite AT2.
 case CTXT: (inContext st1)=> //.
 case HLT1: (LinkerSem.halted0 st1)=> [rv|].
 
-{(*[Subcase: halted0]*)
+{(** Subcase: halted0 *)
 case POP1: (popCore st1)=> [st1''|//].
 case AFT1: (LinkerSem.after_external (Some rv) st1'')=> [st1'''|//] eq1.
 
@@ -578,7 +580,7 @@ by [].
 
 } (*end [Case: diagram]*)
 
-{(*Case: halted*)
+{(** Case: halted *)
 move=> cd mu c1 m1 c2 m2 v1 inv hlt1.
 have mu_wd: SM_wd mu by apply: R_wd inv.
 have inv': R cd (Inj.mk mu_wd) c1 m1 c2 m2 by [].

@@ -29,8 +29,8 @@ RECDIRS=lib common backend cfrontend core linking driver flocq exportclight
 # If SSREFLECT is set to "" (default), no additional 
 # include directives will be passed to coqc.
 
-SSREFLECT=""
-MATHCOMP=""
+SSREFLECT="/u/jsseven/Downloads/ssreflect-1.5"
+MATHCOMP="/u/jsseven/Downloads/mathcomp-1.5"
 
 COQINCLUDES0=$(foreach d, $(RECDIRS), -R $(d) -as compcert.$(d)) \
   -I $(ARCH)/$(VARIANT) -as compcert.$(ARCH).$(VARIANT) \
@@ -143,26 +143,28 @@ CFRONTEND=Ctypes.v Cop.v Csyntax.v Csem.v Cstrategy.v Cexec.v \
 CORE=Extensionality.v \
   base.v eq_dec.v Address.v \
   Coqlib2.v \
-  mem_lemmas.v mem_wd.v \
-  core_semantics.v core_semantics_lemmas.v \
-  extspec.v step_lemmas.v \
-  StructuredInjections.v \
-  effect_semantics.v reach.v effect_simulations.v \
-  rg_lemmas.v \
-  effect_simulations_lemmas.v effect_properties.v effect_corediagram_trans.v \
-  effect_simulations_trans.v \
+  mem_lemmas.v mem_welldefined.v \
+  semantics.v semantics_lemmas.v \
+  extspec.v open_safety.v \
+  structured_injections.v \
+  effect_semantics.v \
+  reach.v \
+  simulations.v \
+  relyguarantee_lemmas.v \
+  simulations_lemmas.v effect_properties.v internal_diagram_trans.v \
+  simulations_trans.v \
   FiniteMaps.v mem_interpolation_defs.v mem_interpolation_II.v \
-  effect_interpolation_II.v effect_interpolants.v effect_interpolation_proofs.v \
-  arguments.v compcert.v \
-  closed_safety.v closed_safety_weak.v trace_semantics.v\
+  interpolation_II.v interpolants.v interpolation_proofs.v \
+  arguments.v compcert_imports.v \
+  closed_safety.v trace_semantics.v\
   nucular_semantics.v \
-  wholeprog_simulations.v wholeprog_lemmas.v \
+  closed_simulations.v closed_simulations_lemmas.v \
   barebones_simulations.v \
   val_casted.v
 
 # Linking files
 
-LINKING=cast.v pos.v stack.v seq_lemmas.v pred_lemmas.v core_semantics_tcs.v \
+LINKING=cast.v pos.v stack.v seq_lemmas.v pred_lemmas.v semantics_tcs.v \
   sepcomp.v gallina_coresem.v inj_lemmas.v join_sm.v reestablish.v wf_lemmas.v\
   linking_spec.v linking.v compcert_linking.v compcert_linking_lemmas.v \
   disjointness.v reach_lemmas.v rc_semantics.v rc_semantics_lemmas.v \

@@ -11,11 +11,11 @@ Require Import Globalenvs.
 Require Import Axioms.
 
 Require Import mem_lemmas. (*needed for definition of mem_forward etc*)
-Require Import core_semantics.
-Require Import core_semantics_lemmas.
-Require Import StructuredInjections.
+Require Import semantics.
+Require Import semantics_lemmas.
+Require Import structured_injections.
 Require Import reach.
-Require Import mem_wd.
+Require Import mem_welldefined.
 
 Require Import effect_semantics. (*for specialization below*)
 

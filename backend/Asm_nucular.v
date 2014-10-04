@@ -17,9 +17,9 @@ Require Import val_casted.
 Require Import BuiltinEffects.
 Require Import load_frame.
 
-Require Import core_semantics.
-Require Import core_semantics_lemmas.
-Require Import mem_wd.
+Require Import semantics.
+Require Import semantics_lemmas.
+Require Import mem_welldefined.
 Require Import mem_lemmas.
 Require Import reach.
 Require Import nucular_semantics.

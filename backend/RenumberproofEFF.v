@@ -28,14 +28,14 @@ Require Import RTL.
 Require Import Renumber.
 
 Require Import mem_lemmas.
-Require Import core_semantics.
-Require Import core_semantics_lemmas.
+Require Import semantics.
+Require Import semantics_lemmas.
 Require Import reach.
 Require Import effect_semantics.
-Require Import StructuredInjections.
-Require Import effect_simulations.
+Require Import structured_injections.
+Require Import simulations.
 Require Import effect_properties.
-Require Import effect_simulations_lemmas.
+Require Import simulations_lemmas.
 
 Require Export Axioms.
 Require Import RTL_coop.
@@ -1371,7 +1371,7 @@ Theorem transl_program_correct:
 Proof.
 intros.
 assert (GDE:= GDE_lemma).
- eapply effect_simulations_lemmas.inj_simulation_plus with
+ eapply simulations_lemmas.inj_simulation_plus with
   (match_states:=fun x mu st m st' m' => MATCH mu st m st' m')
   (measure:=fun x => O).
 (*genvs_dom_eq*)

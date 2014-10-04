@@ -10,7 +10,7 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(** The whole compiler and its proof of semantic preservation *)
+(** * The whole compiler and its proof of semantic preservation *)
 
 (** Libraries. *)
 Require Import Coqlib.
@@ -227,8 +227,8 @@ Proof. intros; erewrite <-list_norepet_transform; eauto. Qed.
 
 (** * Semantic preservation *)
 
-Require Import effect_simulations.
-Require Import effect_simulations_trans.
+Require Import simulations.
+Require Import simulations_trans.
 Require Import Globalenvs.
 Require Import Cminor_eff.
 Require Import Clight_eff.
@@ -321,9 +321,9 @@ Proof.
 Qed.
 
 (** Prove the existence of a structured simulation between Clight and Asm, 
-    relying on [transf_cminor_program_correct] above. 
+    relying on [transf_cminor_program_correct] above. *)
 
-    This is Theorem 3, Compiler Correctness in on pg. 11. *)
+(** This is Theorem 3, Compiler Correctness in on pg. 11. *)
 
 Theorem transf_clight_program_correct:
   forall p tp (LNR: list_norepet (map fst (prog_defs p))),
@@ -356,7 +356,7 @@ Proof.
   eapply transf_cminor_program_correct; eassumption. 
 Qed.
 
-(* Prove that global symbols are preserved by compilation. *)
+(** Prove that global symbols are preserved by compilation. *)
 
 Theorem transf_rtl_program_preserves_syms:
   forall p tp, 

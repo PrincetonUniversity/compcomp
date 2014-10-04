@@ -11,14 +11,20 @@ Require Import Globalenvs.
 Require Import Axioms.
 
 Require Import mem_lemmas. (*needed for definition of mem_forward etc*)
-Require Import core_semantics.
+Require Import semantics.
 Require Import effect_semantics.
-Require Import StructuredInjections.
+Require Import structured_injections.
 Require Import reach.
 
 (** * Structured Simulations *)
 
 Module SM_simulation. Section SharedMemory_simulation_inject. 
+
+(** Structured simulations are parameterized by a source interaction semantics
+    [Sem1] and by a target interaction semantics [Sem2]. *)
+
+(** [ge1] and [ge2] are the global environments associated with [Sem1] and
+    [Sem2] respectively. *)
 
 Context 
   {F1 V1 C1 F2 V2 C2 : Type}
@@ -27,28 +33,39 @@ Context
   (ge1 : Genv.t F1 V1)
   (ge2 : Genv.t F2 V2).
 
-Record SM_simulation_inject := 
-{ core_data : Type
+Record SM_simulation_inject := { 
+  (** The type of auxiliary data used to model stuttering. *)
+  core_data : Type
+
+  (** The (existentially quantified) match-state relation of the simulation. *)
 ; match_state : core_data -> SM_Injection -> C1 -> mem -> C2 -> mem -> Prop
+
+  (** A well-founded order on values of type [core_data]. *)
 ; core_ord : core_data -> core_data -> Prop
 ; core_ord_wf : well_founded core_ord
 
+  (** The match relation implies that [mu] is well-defined. *)
 ; match_sm_wd : 
     forall d mu c1 m1 c2 m2, 
     match_state d mu c1 m1 c2 m2 -> SM_wd mu
 
+  (** The global environments have equal domain. *)
 ; genvs_dom_eq : genvs_domain_eq ge1 ge2
 
+  (** The injection [mu] preserves global blocks. *)
 ; match_genv : 
     forall d mu c1 m1 c2 m2 (MC : match_state d mu c1 m1 c2 m2),
     meminj_preserves_globals ge1 (extern_of mu) /\
     (forall b, isGlobalBlock ge1 b = true -> frgnBlocksSrc mu b = true)
 
+  (** The set of visible blocks is [REACH]-closed. *)
 ; match_visible : 
     forall d mu c1 m1 c2 m2, 
     match_state d mu c1 m1 c2 m2 -> 
     REACH_closed m1 (vis mu)
 
+  (** [match_state] is closed under restriction to reach-closed supersets of 
+      the visible blocks. *)
 ; match_restrict : 
     forall d mu c1 m1 c2 m2 X, 
     match_state d mu c1 m1 c2 m2 -> 
@@ -56,12 +73,13 @@ Record SM_simulation_inject :=
     REACH_closed m1 X ->
     match_state d (restrict_sm mu X) c1 m1 c2 m2
 
+  (** The blocks in the domain/range of [mu] are valid in [m1]/[m2]. *)
 ; match_validblocks : 
     forall d mu c1 m1 c2 m2, 
     match_state d mu c1 m1 c2 m2 ->
     sm_valid mu m1 m2
 
-
+  (** The clause that relates initial states. *)
 ; core_initial : 
     forall v vals1 c1 m1 j vals2 m2 DomS DomT,
     initial_core Sem1 ge1 v vals1 = Some c1 ->
@@ -89,8 +107,7 @@ Record SM_simulation_inject :=
            (REACH m2 (fun b => isGlobalBlock ge2 b || getBlocks vals2 b)) j)
          c1 m1 c2 m2
 
-(** The diagram for internal steps: *)
-
+  (** The diagram for internal steps. *)
 ; effcore_diagram : 
     forall st1 m1 st1' m1' U1, 
     effstep Sem1 ge1 U1 st1 m1 st1' m1' ->
@@ -115,7 +132,7 @@ Record SM_simulation_inject :=
                  /\ U1 b1 (ofs-delta1) = true 
                  /\ Mem.perm m1 b1 (ofs-delta1) Max Nonempty))
 
-      
+  (** The clause that relates halted states. *)      
 ; core_halted : 
     forall cd mu c1 m1 c2 m2 v1,
     match_state cd mu c1 m1 c2 m2 ->
@@ -125,7 +142,7 @@ Record SM_simulation_inject :=
     /\ val_inject (restrict (as_inj mu) (vis mu)) v1 v2 
     /\ halted Sem2 c2 = Some v2 
 
-
+  (** The clause that relates [at_external] call points. *)      
 ; core_at_external : 
     forall cd mu c1 m1 c2 m2 e vals1 ef_sig,
     match_state cd mu c1 m1 c2 m2 ->
@@ -147,21 +164,20 @@ Record SM_simulation_inject :=
        match_state cd nu c1 m1 c2 m2 
        /\ Mem.inject (shared_of nu) m1 m2
 
-(** The diagram for external steps: *)
-
+  (** The diagram for external steps. *)
 ; eff_after_external: 
     forall cd mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
       (MemInjMu: Mem.inject (as_inj mu) m1 m2)
       (MatchMu: match_state cd mu st1 m1 st2 m2)
       (AtExtSrc: at_external Sem1 st1 = Some (e,ef_sig,vals1))
 
-        (** We include the clause AtExtTgt to ensure that vals2 is
-         uniquely determined. We have e=e' and ef_sig=ef_sig' by the
-         at_external clause, but omitting the hypothesis AtExtTgt
-         would result in in 2 not necesssarily equal target argument
-         lists in language 3 in the transitivity, as val_inject is not
-         functional in the case where the left value is Vundef. (And
-         we need to keep ValInjMu since vals2 occurs in pubTgtHyp) *)
+        (** We include the clause [AtExtTgt] to ensure that [vals2] is uniquely
+         determined. We have [e=e'] and [ef_sig=ef_sig'] by the [at_external]
+         clause, but omitting the hypothesis [AtExtTgt] would result in two not
+         necesssarily equal target argument lists in language three in the
+         transitivity proof, as [val_inject] is not functional in the case in
+         which the left value is [Vundef] ([Vundef]s can be refined under memory
+         injections to arbitrary values). *)
 
       (AtExtTgt: at_external Sem2 st2 = Some (e',ef_sig',vals2)) 
       (ValInjMu: Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2)  
@@ -219,9 +235,10 @@ Record SM_simulation_inject :=
           after_external Sem2 (Some ret2) st2 = Some st2' /\
           match_state cd' mu' st1' m1' st2' m2' }.
 
-Require Import core_semantics_lemmas.
+Require Import semantics_lemmas.
 
-(** Here we derive a simpler internal step diagram clause from the above: *)
+(** Derive an effectless internal step diagram clause from the effectful diagram
+  above. *)
 
 Lemma core_diagram (SMI: SM_simulation_inject):
       forall st1 m1 st1' m1', 

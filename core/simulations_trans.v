@@ -9,22 +9,23 @@ Require Import Globalenvs.
 Require Import Axioms.
 
 Require Import mem_lemmas. (*needed for definition of mem_forward etc*)
-Require Import core_semantics.
-Require Import core_semantics_lemmas.
+Require Import semantics.
+Require Import semantics_lemmas.
 
-Require Import StructuredInjections.
+Require Import structured_injections.
 Require Import reach.
 Require Import effect_semantics.
-Require Import effect_simulations.
-Require Import effect_simulations_lemmas.
+Require Import simulations.
+Require Import simulations_lemmas.
 Require Import Wellfounded.
 Require Import Relations.
-Require Import effect_corediagram_trans.
-Require Import effect_interpolants.
+Require Import internal_diagram_trans.
+Require Import interpolants.
+Require Import interpolation_proofs.
 
 (** * Transitivity of Structured Simulations *)
 
-Declare Module EFFAX : EffectInterpolationAxioms.
+Module EFFAX : EffectInterpolationAxioms := EffectInterpolations.
 
 Import SM_simulation.
 
@@ -175,6 +176,8 @@ Proof. intros.
     split; econstructor; eauto.
 Qed.
 
+(** ** Transitivity Proper *)
+
 Section Eff_sim_trans.
 Context {F1 V1 C1 F2 V2 C2 F3 V3 C3:Type}
         (Sem1 : @EffectSem (Genv.t F1 V1) C1)
@@ -183,8 +186,6 @@ Context {F1 V1 C1 F2 V2 C2 F3 V3 C3:Type}
         (g1 : Genv.t F1 V1)
         (g2 : Genv.t F2 V2)
         (g3 : Genv.t F3 V3).
-
-(** Transitivity proof proper: *)
 
 Theorem eff_sim_trans: forall 
         (SIM12: @SM_simulation_inject _ _ _ _ _ _ Sem1 Sem2 g1 g2)
@@ -614,7 +615,7 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
             rewrite EE; simpl.
             remember (frgnBlocksSrc b) as q.
             destruct q; apply eq_sym in Heqq; simpl in *. reflexivity.
-            remember (StructuredInjections.extern_of mu23 b2) as w.
+            remember (structured_injections.extern_of mu23 b2) as w.
             destruct w; trivial. destruct p. rewrite <- Heqw. trivial.    
          remember (locBlocksSrc b) as q. 
          destruct q; simpl; trivial.

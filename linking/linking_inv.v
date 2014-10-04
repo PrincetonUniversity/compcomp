@@ -18,7 +18,7 @@ Require Import pred_lemmas.
 Require Import seq_lemmas.
 Require Import wf_lemmas.
 Require Import reestablish.
-Require Import core_semantics_tcs.
+Require Import semantics_tcs.
 Require Import inj_lemmas.
 Require Import join_sm.
 Require Import reach_lemmas.
@@ -43,6 +43,8 @@ Unset Printing Implicit Defensive.
 
 Require Import Values.   
 Require Import nucular_semantics.
+
+(** * Linking Invariant *)
 
 (** This file states the simulation invariant used in Theorem 2. *)
 
@@ -156,25 +158,23 @@ split=> b G; first by apply: (E _ (B _ G)).
 by apply: (F _ (C _ G)).
 Qed.
 
-(* Initial core asserts that we match w/ SM_injection                     *)
-(*   initial_SM DomS DomT                                                 *)
-(*     (REACH m1 (fun b => isGlobalBlock ge1 b || getBlocks vals1 b))     *)
-(*     (REACH m2 (fun b => isGlobalBlock ge2 b || getBlocks vals2 b)) j)  *)
-(* where the clauses beginning REACH... give frgnSrc/Tgt respectively.    *)
-(*                                                                        *)
-(* I.e., we establish initially that                                      *)
-(*                                                                        *)
-(*   fun b => isGlobalBlock ge1 b || getBlocks vals1 b                    *)
-(*                                                                        *)
-(* is a subset of the visible set for the injection of the initialized    *)
-(* core.                                                                  *)
-(*                                                                        *)
-(* We record this fact (really, a slight modification of the invariant    *)
-(* that accounts for return values as well) as an invariant of execution  *)
-(* for both the head and tail cores. Then the guarantees we get from RC   *)
-(* executions (that write effects are limited to blocks in the RC of      *)
-(* initial args, rets, local blocks) imply that effects are also a        *)
-(* subset of the visible region for each core.                            *)
+(** Initial core asserts that we match w/ SM_injection
+  [initial_SM DomS DomT
+    (REACH m1 (fun b => isGlobalBlock ge1 b || getBlocks vals1 b))
+    (REACH m2 (fun b => isGlobalBlock ge2 b || getBlocks vals2 b)) j)]
+where the clauses beginning REACH... give frgnSrc/Tgt respectively. *)
+
+(** I.e., we establish initially that
+  [fun b => isGlobalBlock ge1 b || getBlocks vals1 b]
+is a subset of the visible set for the injection of the initialized
+core. *)
+
+(** We record this fact (really, a slight modification of the invariant
+that accounts for return values as well) as an invariant of execution
+for both the head and tail cores. Then the guarantees we get from RC
+executions (that write effects are limited to blocks in the RC of
+initial args, rets, local blocks) imply that effects are also a
+subset of the visible region for each core. *)
 
 Section glob_lems.
 
@@ -335,6 +335,11 @@ Record vis_inv (c : t cores_S) mu : Type :=
 
 End vis_inv.
 
+(** ** Callstack Frame Invariant *)
+
+(** [frame_inv] is the invariant that relates a pair of (source--target) cores 
+  at a given frame on the source--target callstacks. *)
+
 Record frame_inv 
   cd0 mu0 m10 m1 e1 ef_sig1 vals1 m20 m2 e2 ef_sig2 vals2 : Prop :=
   { (* local definitions *)
@@ -485,6 +490,8 @@ Import Core.
 
 Variables (c : t cores_S) (d : t cores_T). 
 Variable  (pf : c.(i)=d.(i)).
+
+(** ** Running Cores Invariant *)
 
 Record head_inv cd (mu : Inj.t) mus m1 m2 : Type :=
   { head_match : (sims c.(i)).(match_state) cd mu 
@@ -1440,7 +1447,7 @@ Qed.
 Lemma vis_inv_step (c c' : Core.t cores_S) :
   vis_inv c mu -> 
   RC.locs (Core.c c') 
-    = REACH m1' (fun b => StructuredInjections.freshloc m1 m1' b
+    = REACH m1' (fun b => structured_injections.freshloc m1 m1' b
                        || RC.reach_set (ge (cores_S (Core.i c))) (Core.c c) m1 b) ->
   REACH_closed m1 (vis mu) -> 
   vis_inv c' mu'.
@@ -1473,7 +1480,7 @@ Lemma head_inv_step
   head_inv pf cd mu mus m1 m2 -> 
   frame_all mus m1 m2 s1 s2 -> 
   RC.locs c' 
-    = REACH m1' (fun b => StructuredInjections.freshloc m1 m1' b
+    = REACH m1' (fun b => structured_injections.freshloc m1 m1' b
                        || RC.reach_set (ge (cores_S (Core.i c))) (Core.c c) m1 b) ->
   effect_semantics.effstep 
     (sem (cores_S (Core.i c))) (ge (cores_S (Core.i c))) U 
@@ -1481,7 +1488,7 @@ Lemma head_inv_step
   effect_semantics.effstepN 
     (sem (cores_T (Core.i d))) (ge (cores_T (Core.i d))) n V 
     (Core.c d) m2 d' m2' -> 
-  mem_wd.valid_genv (ge (cores_T (Core.i d))) m2 ->
+  mem_welldefined.valid_genv (ge (cores_T (Core.i d))) m2 ->
   match_state (sims (Core.i (Core.upd c c'))) cd' mu'
     (Core.c (Core.upd c c')) m1'
     (cast'' pf (Core.c (Core.upd d d'))) m2' -> 
@@ -1516,7 +1523,9 @@ Import CallStack.
 Import Linker.
 Import STACK.
 
-Require Import mem_wd.
+Require Import mem_welldefined.
+
+(** ** Top-Level Invariant *)
 
 Record R (data : sig_data N (fun ix : 'I_N => (sims ix).(core_data))) 
          (mu : SM_Injection)
@@ -1649,7 +1658,7 @@ Context (my_cores : 'I_N -> t) c1 sg ix v vs
 Lemma initCore_ix : ix = Core.i c1.
 Proof.
 move: init1; rewrite /init1 /initCore.
-by case: (core_semantics.initial_core _ _ _ _)=> // c;
+by case: (semantics.initial_core _ _ _ _)=> // c;
   case; case: c1=> ? ? ?; case.
 Qed.
 

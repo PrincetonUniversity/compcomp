@@ -4,13 +4,13 @@ Require Import BinPos.
 
 Require Import Axioms.
 
-Require Import compcert. Import CompcertCommon.
+Require Import compcert_imports. Import CompcertCommon.
 
 Require Import sepcomp. Import SepComp.
 Require Import arguments.
 
 Require Import rc_semantics.
-Require Import core_semantics_tcs.
+Require Import semantics_tcs.
 
 Require Import ssreflect ssrbool ssrfun seq eqtype fintype.
 Set Implicit Arguments.

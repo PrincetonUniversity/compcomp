@@ -18,7 +18,7 @@ Require Import pred_lemmas.
 Require Import seq_lemmas.
 Require Import wf_lemmas.
 Require Import reestablish.
-Require Import core_semantics_tcs.
+Require Import semantics_tcs.
 Require Import inj_lemmas.
 Require Import join_sm.
 Require Import reach_lemmas.
@@ -149,7 +149,7 @@ exists (updStack st2
 by apply: popCoreI.
 Qed.
 
-Require Import mem_wd.
+Require Import mem_welldefined.
 
 Context (aft1 : LinkerSem.after_external (Some rv1) st1'' = Some st1').
 

@@ -12,7 +12,7 @@ Require Import Cminor.
 Require Import Op.
 
 Require Import mem_lemmas.
-Require Import StructuredInjections.
+Require Import structured_injections.
 Require Import reach.
 Require Import Axioms.
 

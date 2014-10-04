@@ -11,7 +11,7 @@ Require Import Globalenvs.
 Require Import Cminor.
 
 Require Import mem_lemmas. (*for mem_forward and wd_mem*)
-Require Import core_semantics.
+Require Import semantics.
 Require Import val_casted.
 Require Import BuiltinEffects.
 

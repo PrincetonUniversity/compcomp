@@ -7,7 +7,7 @@ Require Import Axioms.
 Require Import ssreflect ssrbool ssrnat ssrfun eqtype seq fintype finfun.
 Set Implicit Arguments.
 
-Require Import compcert. Import CompcertCommon.
+Require Import compcert_imports. Import CompcertCommon.
 Require Import Clight.
 Require Import Clight_coop.
 Require Import Clight_eff.
@@ -16,15 +16,17 @@ Require Import sepcomp. Import SepComp.
 Require Import arguments.
 
 Require Import pred_lemmas.
-Require Import core_semantics_tcs.
+Require Import semantics_tcs.
 Require Import rc_semantics.
-Require Import effect_simulations. Import SM_simulation.
+Require Import simulations. Import SM_simulation.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-(** This file proves that safe Clight programs are also RC. *)
+(** * Reach-Closed Clight *)
+
+(** This file proves that safe Clight programs are also reach-closed. *)
 
 Module SAFE_CLIGHT_RC. Section SafeClightRC.
 Variable hf : I64Helpers.helper_functions.

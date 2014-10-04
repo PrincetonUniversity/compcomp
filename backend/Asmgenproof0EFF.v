@@ -32,9 +32,9 @@ Require Import Conventions.
 Require Import Axioms.
 
 Require Import mem_lemmas. (*for valid_block_dec, mem_forward etc*)
-Require Import core_semantics.
-Require Import core_semantics_lemmas.
-Require Import StructuredInjections.
+Require Import semantics.
+Require Import semantics_lemmas.
+Require Import structured_injections.
 Require Import effect_semantics.
 Require Import reach.
 Require Import Asm_coop.

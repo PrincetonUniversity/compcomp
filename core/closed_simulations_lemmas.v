@@ -10,10 +10,10 @@ Require Import Globalenvs.
 Require Import Axioms.
 
 Require Import mem_lemmas. (*needed for definition of mem_forward etc*)
-Require Import core_semantics.
-Require Import core_semantics_tcs.
-Require Import core_semantics_lemmas.
-Require Import wholeprog_simulations.
+Require Import semantics.
+Require Import semantics_tcs.
+Require Import semantics_lemmas.
+Require Import closed_simulations.
 Require Import closed_safety.
 Require Import effect_semantics.
 
@@ -36,7 +36,7 @@ Context  {G TG C D M TM Z data : Type}
          {geT : TG}
          {ge_inv : G -> TG -> Prop}
          {init_inv : meminj -> G -> list val -> M -> TG -> list val -> TM -> Prop}
-         {halt_inv : StructuredInjections.SM_Injection ->
+         {halt_inv : structured_injections.SM_Injection ->
                      G -> val -> M -> TG -> val -> TM -> Prop}
          (main : val)
 
@@ -263,7 +263,7 @@ Context  {G TG C D M TM Z data : Type}
          {geT : TG}
          {ge_inv : G -> TG -> Prop}
          {init_inv : meminj -> G -> list val -> M -> TG -> list val -> TM -> Prop}
-         {halt_inv : StructuredInjections.SM_Injection ->
+         {halt_inv : structured_injections.SM_Injection ->
                      G -> val -> M -> TG -> val -> TM -> Prop}
          (main : val)
 
@@ -322,7 +322,7 @@ Context  {G TG C D M TM Z data : Type}
          {geT : TG}
          {ge_inv : G -> TG -> Prop}
          {init_inv : meminj -> G -> list val -> M -> TG -> list val -> TM -> Prop}
-         {halt_inv : StructuredInjections.SM_Injection ->
+         {halt_inv : structured_injections.SM_Injection ->
                      G -> val -> M -> TG -> val -> TM -> Prop}
          (main : val)
 
@@ -339,7 +339,7 @@ Lemma termination_reflection:
 Proof.
 set (my_P := fun (n : nat) => 
    forall (c : C) (m : M) (d : D) (tm : TM) 
-     (cd : core_data sim) (j : StructuredInjections.SM_Injection) 
+     (cd : core_data sim) (j : structured_injections.SM_Injection) 
      (d' : D) (tm' : TM) (hv' : val),
    (forall n0 : nat, safeN source geS n0 c m) ->
    match_state sim cd j c m d tm ->

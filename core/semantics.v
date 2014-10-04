@@ -11,13 +11,9 @@ Require Import Axioms.
 
 Require Import mem_lemmas.
 
-(** * Core semantics *)
+(** * Interaction Semantics *)
 
-(** A "core semantics" represents a fairly traditional small step
-   semantics of computation.  Core semantics are designed to cooperate
-   with "extensions" which give semantics to primtive constructs not
-   defined by the extensible semantics (e.g., external function
-   calls). *)
+(** NOTE: In the code, we call interaction semantics [CoreSemantics]. *)
 
 (** The [G] type parameter is the type of global environments, the type
    [C] is the type of core states, and the type [E] is the type of
@@ -42,11 +38,10 @@ Require Import mem_lemmas.
    sequential semantics. *)
 
 (** The remaining properties give basic sanity properties which constrain
-   the behavior of programs.
-    -1 a state cannot be both blocked on an extension call
-       and also step,
-    -2 a state cannot both step and be halted, and
-    -3 a state cannot both be halted and blocked on an external call. *)
+   the behavior of programs. *)
+(** -1 a state cannot be both blocked on an extension call and also step, *)
+(** -2 a state cannot both step and be halted, and *)
+(** -3 a state cannot both be halted and blocked on an external call. *)
 
 Record CoreSemantics {G C M : Type} : Type :=
   { initial_core : G -> val -> list val -> option C
@@ -63,6 +58,8 @@ Record CoreSemantics {G C M : Type} : Type :=
       forall q, at_external q = None \/ halted q = None }.
 
 Implicit Arguments CoreSemantics [].
+
+(** * Cooperating Interaction Semantics" *)
 
 (** "Cooperating" semantics impose additional constraints; in
    particular, they specialize core semantics to CompCert memories and

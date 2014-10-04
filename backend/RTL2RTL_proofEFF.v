@@ -4,7 +4,7 @@ Require Import Globalenvs.
 Require Import Registers.
 Require Import Values.
 Require Import RTL.
-Require Import StructuredInjections.
+Require Import structured_injections.
 
 Definition regset_inject j (rs rs': regset) : Prop :=
   forall r, val_inject j (rs#r) (rs'#r).

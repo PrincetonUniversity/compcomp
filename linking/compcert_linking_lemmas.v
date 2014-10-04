@@ -4,7 +4,7 @@ Require Import effect_semantics.
 
 Require Import pos.
 Require Import compcert_linking.
-Require Import core_semantics_tcs.
+Require Import semantics_tcs.
 
 Require Import ssreflect ssrbool ssrnat ssrfun seq fintype.
 Set Implicit Arguments.
