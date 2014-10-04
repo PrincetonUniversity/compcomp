@@ -155,21 +155,21 @@ Backend compiler phases and proofs:
 
 ### core/
 
-  * [core_semantics.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/core_semantics.html)
+  * [semantics.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/semantics.html)
 
     > Defines _Interaction Semantics (Section 2)_.
 
-  * [StructuredInjections.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/StructuredInjections.html)
+  * [structured_injections.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/structured_injections.html)
   
     > Defines _Structured Injections (Section 4)_.
 
-  * [effect_simulations.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/effect_simulations.html) 
+  * [simulations.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/simulations.html) 
    
     > Defines _Structured Simulations (Section 4)_. Concordance for this file: 
     > - `replace_locals` is the function named `export` in the paper.
     > - `replace_externs` is the function named `import` in the paper.
 
-  * [effect_simulations_trans.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/effect_simulations_trans.html)  
+  * [simulations_trans.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/simulations_trans.html)  
 
     > Proves _Theorem 1 (Section 5)_, that simulations compose vertically.
   
