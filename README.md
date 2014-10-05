@@ -10,9 +10,11 @@ compiler files are the same but there are two sets of proofs, one for standard
 CompCert and the second for Compositional CompCert.  Both sets of proofs are
 buildable.
 
-In general, files suffixed `*_coop`, `*_eff`, or `*EFF` are the compositional
-variants of the standard CompCert proofs. The compositional proofs can typically
-be found in the same directory as their standard CompCert counterparts.
+In general, files suffixed `*_coop` and `*_eff` are the compositional variants
+of standard CompCert intermediate language semantics.  Files suffixed `*EFF` are
+the compositional variants of the standard CompCert proofs. The compositional
+proofs can typically be found in the same directory as their standard CompCert
+counterparts.
 
 ## Build
 
@@ -109,49 +111,49 @@ suffixed `*EFF.v`, to distinguish from the standard CompCert proofs.
 C frontend compiler phases and proofs: 
 
   * SimplLocals 
-    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/SimplLocals.html)
-    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/SimplLocalsproofEFF.html)
+    - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/SimplLocals.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/SimplLocalsproofEFF.html)
   * Cshmgen
-    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Cshmgen.html)
-    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CshmgenproofEFF.html)
+    - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Cshmgen.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CshmgenproofEFF.html)
   * Cminorgen 
-    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Cminorgen.html)
-    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CminorgenproofEFF.html)
+    - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Cminorgen.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CminorgenproofEFF.html)
 
 ### backend/ 
 
 Backend compiler phases and proofs: 
 
   * Selection 
-    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Selection.html)
-    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/SelectionproofEFF.html)
+    - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Selection.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/SelectionproofEFF.html)
   * RTLgen 
-    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/RTLgen.html)
-    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/RTLgenproofEFF.html)
+    - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/RTLgen.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/RTLgenproofEFF.html)
   * Tailcall 
-    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Tailcall.html)
-    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/TailcallproofEFF.html)
+    - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Tailcall.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/TailcallproofEFF.html)
   * Renumbering
-    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Renumber.html)
-    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/RenumberproofEFF.html)
+    - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Renumber.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/RenumberproofEFF.html)
   * Allocation 
-    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Allocation.html)
-    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/AllocproofEFF.html)
+    - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Allocation.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/AllocproofEFF.html)
   * Tunneling 
-    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Tunneling.html)
-    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/TunnelingproofEFF.html)
+    - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Tunneling.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/TunnelingproofEFF.html)
   * Linearize 
-    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Linearize.html)
-    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/LinearizeproofEFF.html)
+    - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Linearize.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/LinearizeproofEFF.html)
   * CleanupLabels 
-    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CleanupLabels.html)
-    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CleanupLabelsproofEFF.html)
+    - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CleanupLabels.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CleanupLabelsproofEFF.html)
   * Stacking
-    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Stacking.html)
-    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/StackingproofEFF.html)
+    - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Stacking.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/StackingproofEFF.html)
   * Asmgen
-    - [Compiler phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Asmgen.html)
-    - [Compositional correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/AsmgenproofEFF.html)
+    - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Asmgen.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/AsmgenproofEFF.html)
 
 ### core/
 
@@ -169,10 +171,42 @@ Backend compiler phases and proofs:
     > - `replace_locals` is the function named `export` in the paper.
     > - `replace_externs` is the function named `import` in the paper.
 
+  * [simulations_lemmas.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/simulations_lemmas.html) 
+   
+    > Various derived structured simulations, specialized for particular use cases.
+
   * [simulations_trans.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/simulations_trans.html)  
 
     > Proves _Theorem 1 (Section 5)_, that simulations compose vertically.
-  
+    > The main subproofs are:
+    > - [internal_diagram_trans.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/internal_diagram_trans.html) 
+        proves transitivity of the internal step diagram. 
+    > - [interpolation.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/interpolation.html) 
+        proves the interpolation lemma required to prove transitivity of the external step diagram.
+
+  * [closed_simulations.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/closed_simulations.html)  
+
+    > Defines a variant of _simulations_ suitable for closed programs.
+
+  * [closed_simulations_lemmas.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/closed_simulations_lemmas.html)  
+
+    > Corollaries of closed program simulation.
+
+  * [reach.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/reach.html)  
+
+    > Defines the reach-closure operation used in _Structured Simulations_ and
+    > _Reach-Closed Semantics_.
+
+  * [relyguarantee_lemmas.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/relyguarantee_lemmas.html)  
+
+    > Proves a number of rely-guarantee compatibility lemmas used in the linking proof.
+
+  * [nucular_semantics.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/nucular_semantics.html)  
+
+    > A notion of _Interaction Semantics_ that never store invalid pointers in memory. 
+    > Why "nucular"? We call the memory invariant that is preserved by such semantics the "WMD" condition, 
+    > as defined in file [mem_welldefined.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/mem_welldefined.html).  
+
 ### linking/
 
   * [compcert_linking.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/compcert_linking.html) 
@@ -181,9 +215,19 @@ Backend compiler phases and proofs:
     > (\mathcal{L}) is defined twice: First as a function (to Prop), and then as
     > an inductive relation. The two versions are proved to coincide.
 
+  * [compcert_linking_lemmas.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/compcert_linking_lemmas.html) 
+
+    > A few lemmas on linking semantics.
+
   * [linking_spec.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/linking_spec.html) 
 
     > States _Theorem 2 (Section 5)_.
+
+  * [linking_inv.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/linking_inv.html)  
+
+    > States the main linking simulation invariant, used to prove Theorem 2.
+    > Subsidiary files include:
+    > [linking/disjointness.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/disjointness.html).
 
   * [linking_proof.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/linking_proof.html)  
 
@@ -192,15 +236,15 @@ Backend compiler phases and proofs:
     > - [linking/call_lemmas.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/call_lemmas.html)  
     > - [linking/ret_lemmas.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/ret_lemmas.html)  
 
-  * [linking_inv.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/linking_inv.html)  
-
-    > States the main linking simulation invariant, used to prove Theorem 2.
-
   * [rc_semantics.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/rc_semantics.html)   
 
     > Defines _Reach-Closed Semantics (Section 5)_. The definition has been 
     > weakened slightly since the POPL submission, to facilitate the proof,
     > in `linking/safe_clight_rc.v`, that all safe Clight programs are RC. 
+
+  * [rc_semantics_lemmas.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/rc_semantics_lemmas.html)   
+
+    > Lemmas on _Reach-Closed Semantics_.
 
   * [safe_clight_rc.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/safe_clight_rc.html)    
 
@@ -217,6 +261,19 @@ Backend compiler phases and proofs:
   * [CompositionalComplements.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CompositionalComplements.html)       
   
     > Proves _Corollary 2 (Section 6)_.
+
+  * [gallina_coresem.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/gallina_coresem.html)       
+
+    > Demonstrates one way in which to construct an interaction semantics that is just 
+    > a mathematical relation in Gallina.
+
+  * [reach_lemmas.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/reach_lemmas.html)       
+
+    > Lemmas concerning reachability.
+
+  * [wf_lemmas.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/wf_lemmas.html)       
+
+    > Lemmas about well-founded orders.
 
 ### driver/
 
