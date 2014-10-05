@@ -18,25 +18,29 @@ Unset Printing Implicit Defensive.
 Require Import nucular_semantics.
 Require Import Values.   
 
-(** This file states the main linking simulation result. *)
-(** Informally, *)
-(**  - Assume a multi-module program with N translation units:
-        M_0, M_1, ..., M_{N-1}, and *)
-(** - For each module M_i, we have an induced *)
-(**      o Source effect semantics Source_i operating on source states
-           C_i of source language S_i *)
-(**      o Target effect semantics Target_i operating on target states
-           D_i of target language T_i *)
-(**    (Note that it's not required that S_i = S_j for i<>j.) *)
-(**  - Assume we also have, for each 0 <= i < N, a simulation relation
-       from S_i to T_i. *)
-(** Then we can construct a simulation relation Sim between the source
-  semantics *)
-(**  Source_0 >< Source_1 >< ... >< Source_{N-1} *)
-(** and target semantics *)
-(**  Target_0 >< Target_1 >< ... >< Target_{N-1} *)
-(** where >< denotes the semantic linking operation defined in 
-  compcert_linking.v. *)
+(** * Congruence *)
+
+(** This file states one of the primary linking results, essentially, 
+    that simulation is a congruence wrt. \mathcal{L}. *)
+
+(** Informally, 
+- Assume a multi-module program with N translation units:
+        [M_0, M_1, ..., M_{N-1}], and 
+- For each module [M_i], we have an induced 
+    source effect semantics [Source_i]
+        operating on source states [C_i] of source language [S_i] and 
+    target effect semantics [Target_i] 
+        operating on target states [D_i] of target language [T_i]
+    (note that it's not required that S_i = S_j for i<>j.)
+- Assume we also have, for each [0 <= i < N], a simulation relation
+       from [S_i] to [T_i]. *)
+
+(** Then we can construct a simulation relation [Sim] between the source semantics 
+- [Source_0 >< Source_1 >< ... >< Source_{N-1}] and target semantics 
+- [Target_0 >< Target_1 >< ... >< Target_{N-1}] *)
+
+(** where [><] denotes the semantic linking operation defined in 
+  [linking/compcert_linking.v]. *)
 
 Import Wholeprog_sim.
 Import SM_simulation.

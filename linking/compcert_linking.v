@@ -38,13 +38,13 @@ Require Import ZArith.
 (** [CallStack.t]: Stacks of [Core.t]s satisfying a few
                  well-formedness properties. *)
 
-(** [Linker.t]: The type of linker corestates. Linker states contain: *)
-(**   - [stack]:   The stack of cores maintained at runtime. *)
-(**   - [fn_tbl]:  A table mapping external function 
-                   id's to module id's. *)
-(**  Linked states are parameterized by: *)
-(**   - [N : nat]: The number of modules in the program. *)
-(**   - [cores : 'I_N -> Modsem.t]:
+(** [Linker.t]: The type of linker corestates. Linker states contain: 
+- [stack]:   The stack of cores maintained at runtime. 
+- [fn_tbl]:  A table mapping external function id's to module id's. *)
+
+(**  Linked states are parameterized by:
+- [N : nat]: The number of modules in the program. 
+- [cores : 'I_N -> Modsem.t]:
          A function from module id's ('I_N, or integers in the range
          [0..N-1]) to module semantics. *)
 
@@ -78,13 +78,13 @@ Variable cores : 'I_N -> Modsem.t.
 Import Modsem.
 
 (** **                        [Core.t] *)
-(** The type [Core.t] gives runtime states of dynamic module invocations. *)
-(**  [i : 'I_N]:
+(** The type [Core.t] gives runtime states of dynamic module invocations. 
+- [i : 'I_N]:
       A natural between [0..n-1] that maps this core back to the
-      translation unit numbered [i] from which it was invoked. *)
-(**  [c : (cores i).(C)]:
-      Runtime states of module [i]. *)
-(**  [sg : signature]:
+      translation unit numbered [i] from which it was invoked. 
+- [c : (cores i).(C)]:
+      Runtime states of module [i]. 
+- [sg : signature]:
       Type signature of the function that this core was spawned to handle. *)
 
 Record t := mk
@@ -172,15 +172,15 @@ End callStackDefs.
 End callStack. End CallStack.
 
 (** **                        [Linker.t] *)
-(** The first two parameters of this record are static configuration data: *)
-(**   - [N] is the number of modules in the program. *)
-(**   - [cores] is a function from module id's (['I_n], or integers in the 
+(** The first two parameters of this record are static configuration data: 
+- [N] is the number of modules in the program. 
+- [cores] is a function from module id's (['I_n], or integers in the 
      range [0..n-1]) to genvs and core semantics, with existentially
      quantified core type [C]. *)
 
-(** Fields: *)
-(**   - [fn_tbl] maps external function id's to module id's *)
-(**   - [stack] is used to maintain a stack of cores, at runtime. *)
+(** Fields:
+- [fn_tbl] maps external function id's to module id's
+- [stack] is used to maintain a stack of cores, at runtime. *)
 
 Module Linker. Section linker.
 

@@ -26,9 +26,9 @@ Arguments core_ord : default implicits.
 Arguments core_ord_wf : default implicits.
 Arguments core_diagram : default implicits.
 
-(** * Safety and semantics preservation *)
+(** * Closed Simulations Lemmas *)
 
-Section safety_preservation_lemmas.
+Section closed_simulations_lemmas.
 Context  {G TG C D M TM Z data : Type}
          {source : @CoreSemantics G C M}
          {target : @CoreSemantics TG D TM}
@@ -197,7 +197,7 @@ split; auto.
 }
 Qed.
 
-End safety_preservation_lemmas.
+End closed_simulations_lemmas.
 
 Lemma corestepN_splits_lt 
        {G C M} (csem : CoreSemantics G C M) (ge : G)
@@ -248,7 +248,7 @@ exists c2,m2'.
 split; auto.
 Qed.
 
-(** ** Equitermination *)
+(** ** Closed Simulation Implies Equitermination *)
 
 Definition terminates {G C M} (csem : CoreSemantics G C M) 
     (ge : G) (c : C) (m : M) :=

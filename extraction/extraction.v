@@ -22,7 +22,7 @@ Require ConstpropOp.
 Require Constprop.
 Require Tailcall.
 Require Allocation.
-Require Compiler.
+Require CompositionalCompiler.
 
 (* Standard lib *)
 Require Import ExtrOcamlBasic.
@@ -70,14 +70,14 @@ Extract Constant RTLgen.more_likely => "RTLgenaux.more_likely".
 Extraction Inline RTLgen.ret RTLgen.error RTLgen.bind RTLgen.bind2.
 
 (* Inlining *)
-Extract Inlined Constant Inlining.should_inline => "Inliningaux.should_inline".
-Extraction Inline Inlining.ret Inlining.bind.
+(*Extract Inlined Constant Inlining.should_inline => "Inliningaux.should_inline".
+Extraction Inline Inlining.ret Inlining.bind.*)
 
 (* Constprop *)
-Extract Constant ConstpropOp.propagate_float_constants =>
+(*Extract Constant ConstpropOp.propagate_float_constants =>
   "fun _ -> !Clflags.option_ffloatconstprop >= 1".
 Extract Constant Constprop.generate_float_constants =>
-  "fun _ -> !Clflags.option_ffloatconstprop >= 2".
+  "fun _ -> !Clflags.option_ffloatconstprop >= 2".*)
 
 (* Tailcall *)
 Extract Constant Tailcall.eliminate_tailcalls =>
@@ -94,17 +94,17 @@ Extract Constant SimplExpr.first_unused_ident => "Camlcoq.first_unused_ident".
 Extraction Inline SimplExpr.ret SimplExpr.error SimplExpr.bind SimplExpr.bind2.
 
 (* Compiler *)
-Extract Constant Compiler.print_Clight => "PrintClight.print_if".
-Extract Constant Compiler.print_Cminor => "PrintCminor.print_if".
-Extract Constant Compiler.print_RTL => "PrintRTL.print_rtl".
-Extract Constant Compiler.print_RTL_tailcall => "PrintRTL.print_tailcall".
-Extract Constant Compiler.print_RTL_inline => "PrintRTL.print_inlining".
-Extract Constant Compiler.print_RTL_constprop => "PrintRTL.print_constprop".
-Extract Constant Compiler.print_RTL_cse => "PrintRTL.print_cse".
-Extract Constant Compiler.print_LTL => "PrintLTL.print_if".
-Extract Constant Compiler.print_Mach => "PrintMach.print_if".
-Extract Constant Compiler.print => "fun (f: 'a -> unit) (x: 'a) -> f x; x".
-(*Extraction Inline Compiler.apply_total Compiler.apply_partial.*)
+Extract Constant CompositionalCompiler.print_Clight => "PrintClight.print_if".
+Extract Constant CompositionalCompiler.print_Cminor => "PrintCminor.print_if".
+Extract Constant CompositionalCompiler.print_RTL => "PrintRTL.print_rtl".
+Extract Constant CompositionalCompiler.print_RTL_tailcall => "PrintRTL.print_tailcall".
+(*Extract Constant CompositionalCompiler.print_RTL_inline => "PrintRTL.print_inlining".*)
+(*Extract Constant CompositionalCompiler.print_RTL_constprop => "PrintRTL.print_constprop".*)
+(*Extract Constant CompositionalCompiler.print_RTL_cse => "PrintRTL.print_cse".*)
+Extract Constant CompositionalCompiler.print_LTL => "PrintLTL.print_if".
+Extract Constant CompositionalCompiler.print_Mach => "PrintMach.print_if".
+Extract Constant CompositionalCompiler.print => "fun (f: 'a -> unit) (x: 'a) -> f x; x".
+(*Extraction Inline CompositionalCompiler.apply_total CompositionalCompiler.apply_partial.*)
 
 (* Processor-specific extraction directives *)
 
@@ -125,9 +125,9 @@ Set Extraction AccessOpaque.
 
 (* Go! *)
 Cd "extraction".
-(* Recursive Extraction Library Compiler. *)
+(* Recursive Extraction Library CompositionalCompiler. *)
 Separate Extraction
-   Compiler.transf_c_program Compiler.transf_cminor_program
+   CompositionalCompiler.transf_c_program CompositionalCompiler.transf_cminor_program
    Cexec.do_initial_state Cexec.do_step Cexec.at_final_state
    Initializers.transl_init Initializers.constval
    Csyntax.Eindex Csyntax.Epreincr

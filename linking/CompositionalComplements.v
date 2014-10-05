@@ -9,7 +9,7 @@ Require Import Asm_coop.
 Require Import Asm_nucular.
 Require Import CompositionalCompiler.
 
-(** * Contextual Equivalence for CompCert *)
+(** * Contextual Equivalence for CompCert Clight->x86 Asm *)
 
 (* ssreflect *)
 
@@ -88,20 +88,16 @@ apply transf_clight_program_preserves_syms with (s := id) in H.
 rewrite H; auto.
 Qed.
 
-(** The (deterministic) context [C]. Assumptions on [C] are: *)
-
-(** [sim_C]: C self-simulates ([C <= C]) (cf. Definition 2, pg. 10). *)
-
-(** [det_C]: C is deterministic (cf. Definition 2, pg. 10). This is true,
-      e.g., of all Clight and assembly contexts. *)
-
-(** [nuke_C] restricts contexts to those that store only valid blocks.  This is
+(** The (deterministic) context [C]. Assumptions on [C] are: 
+- [sim_C]: C self-simulates ([C <= C]) (cf. Definition 2, pg. 10). 
+- [det_C]: C is deterministic (cf. Definition 2, pg. 10). This is true,
+      e.g., of all Clight and assembly contexts. 
+- [nuke_C] restricts contexts to those that store only valid blocks.  This is
       footnote 5 on pg. 9 of the paper (one reviewer suggested we describe this
       condition in a bit more detail in the paper; we tend to agree and plan to
       do so in the final version). It turns out that this condition holds of all
-      assembly contexts; see backend/Asm_nucular.v for the proof. *)
-
-(** [domeq_C]: The global environment attached to the [C] module semantics 
+      assembly contexts; see backend/Asm_nucular.v for the proof. 
+- [domeq_C]: The global environment attached to the [C] module semantics 
       has the same domain (set of blocks marked "global") as [ge_top]. *)
 
 (** NOTE: many of these side conditions fall away nicely if we abandon 

@@ -113,6 +113,9 @@ Definition plt (id : ident) :=
     | Some ix => Some (widen_ord leq_N0_N ix)
   end.
 
+(** [linker_S] and [linker_T] define the extended source--target semantics,
+resp., in which [sems_S0] and [sems_T0] are linked with the context [C]. *)
+
 Definition linker_S := effsem N sems_S' plt.
 
 Definition linker_T := effsem N sems_T plt.

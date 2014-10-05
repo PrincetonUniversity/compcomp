@@ -127,6 +127,11 @@ Definition transf_clight_program (p: Clight.program) : res AsmEFF.program :=
   @@@ Cminorgen.transl_program
   @@@ transf_cminor_program.
 
+Definition transf_c_program (p: Csyntax.program) : res AsmEFF.program :=
+  OK p 
+  @@@ SimplExpr.transl_program
+  @@@ transf_clight_program.
+
 (** Force [Initializers] and [Cexec] to be extracted as well. *)
 
 Definition transl_init := Initializers.transl_init.
@@ -323,7 +328,7 @@ Qed.
 (** Prove the existence of a structured simulation between Clight and Asm, 
     relying on [transf_cminor_program_correct] above. *)
 
-(** This is Theorem 3, Compiler Correctness in on pg. 11. *)
+(** This is Theorem 3, Compiler Correctness in on pg. 11 (Clight->x86 Asm). *)
 
 Theorem transf_clight_program_correct:
   forall p tp (LNR: list_norepet (map fst (prog_defs p))),

@@ -777,6 +777,7 @@ Qed.
 Let lo' := replace_locals mu pubS' pubT'.
 
 Lemma lo_wd : SM_wd lo'.
+Proof.
 move: vinj'=> H.
 exploit eff_after_check1; eauto.
 by move: (head_match inv); apply/match_sm_wd.

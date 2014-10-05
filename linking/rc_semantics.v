@@ -17,11 +17,11 @@ Unset Printing Implicit Defensive.
 
 (** * Reach-Closed Semantics *)
 
-(** Reach-closed semantics extend effect semantics by tracking *)
-(**  1) the arguments passed to initial_core at initialization; *)
-(**  2) the list of values returned to the core at inter. points; *)
-(**  3) the set of blocks allocated by this coe, together
-        with blocks reachable at previous interaction points. *)
+(** Reach-closed semantics extend effect semantics by tracking 
+- the arguments passed to initial_core at initialization; 
+- the list of values returned to the core at inter. points;
+- the set of blocks allocated by this coe, together
+  with blocks reachable at previous interaction points. *)
 (** The blocks are tracked in new local state called [locs], 
     attached to the core states of the underlying semantics. *)
 
@@ -193,7 +193,7 @@ destruct (effax1 H) as [X Y].
 revert X; apply corestep_fwd. 
 Qed.
 
-(** ** RC Effect Semantics *)
+(** ** Reach-Closed Effect Semantics *)
 
 Lemma my_effax1 M ge c m c' m' :
   effstep ge M c m c' m' ->

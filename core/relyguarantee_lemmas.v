@@ -22,6 +22,7 @@ Definition FLIP mu :=
   end.
 
 Lemma SAWP_wd: forall mu (WD: SM_wd mu), SM_wd (FLIP mu).
+Proof.
 intros.
 destruct mu; simpl in *.
 destruct WD.

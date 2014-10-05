@@ -208,28 +208,6 @@ Definition FreshDom (j j': meminj) b :=
                    | Some _ => false
                    end
   end.
-(*So FreshDom in src language is FreshDom j12 j12', equaling 
-        (not quite, due to unmapped!) DomSrc nu' - DomSrc nu (take DomSrc nu' - DomSrc nu, since
-          that has all the unmapped ones, too, to satisfy nu' = sm_compose nu12' nu23'
-     FreshDom in mid langauge is FreshDom j23 j23', and
-     FreshDom in tgt language is DomTgt nu' - DomTgt nu*)
-
-(*And frgnMid b = (match j23' b with
-                        None => false
-                      | Some (b',z) => frgnBlocksTgt nu' b' end)*)
-
-Goal forall mu (WD: SM_wd mu) M, 
-          (forall b ofs, locBlocksSrc mu b = true -> loc_unmapped (pub_of mu) b ofs -> ~M b ofs)
-          <-> (forall b, locBlocksSrc mu b = true -> forall ofs, M b ofs -> pubBlocksSrc mu b = true).
-intros. split; intros.
-  remember (pubBlocksSrc mu b) as d.
-  destruct d; trivial; apply eq_sym in Heqd.
-  exfalso. apply (H _ _ H0 (pubSrcContra _ _ Heqd) H1).
-intros N. specialize (H _ H0 _ N).
-  unfold loc_unmapped in H1.
-  destruct (pubSrc _ WD _ H) as [b2 [d [P _]]].
-  rewrite P in H1. discriminate.
-Qed.
 
 Definition AccessEffProperty nu23 nu12 (j12' :meminj) (m1 m1' m2 : mem)
            (AM:ZMap.t (Z -> perm_kind -> option permission)):Prop :=
