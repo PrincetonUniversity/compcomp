@@ -24,8 +24,9 @@ Compositional CompCert builds under:
 * Ssreflect 1.5 (http://ssr.msr-inria.inria.fr/), and
 * MathComp 1.5 (http://ssr.msr-inria.inria.fr/). 
 
-If you do not have Ssreflect+MathComp, you will be able to build everything but
-the files in the `linking/` subdirectory (horizontal composition/proofs).
+If you do not have Ssreflect+MathComp, you should be able to build everything
+but the files in the `linking/` subdirectory (horizontal composition/proofs)
+but we make no guarantees.
 
 To build, clone the repository, go to the root directory, and type:
 
@@ -181,7 +182,7 @@ Backend compiler phases and proofs:
     > The main subproofs are:
     > - [internal_diagram_trans.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/internal_diagram_trans.html) 
         proves transitivity of the internal step diagram. 
-    > - [interpolation.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/interpolation.html) 
+    > - [interpolation_II.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/interpolation_II.html) 
         proves the interpolation lemma required to prove transitivity of the external step diagram.
 
   * [closed_simulations.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/closed_simulations.html)  
