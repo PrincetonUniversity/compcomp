@@ -10,11 +10,12 @@ compiler files are the same but there are two sets of proofs, one for standard
 CompCert and the second for Compositional CompCert.  Both sets of proofs are
 buildable.
 
-In general, files suffixed `*_coop` and `*_eff` are the compositional variants
-of standard CompCert intermediate language semantics.  Files suffixed `*EFF` are
-the compositional variants of the standard CompCert proofs. The compositional
-proofs can typically be found in the same directory as their standard CompCert
-counterparts.
+In general, files suffixed `*_coop.v` and `*_eff.v` are the compositional
+variants of standard CompCert intermediate language semantics (`*_coop.v` is the
+base interaction semantics of a given IL; `*_eff.v` is the effectful version).
+Files suffixed `*_comp.v` are the compositional variants of the standard
+CompCert proofs. The compositional proofs can typically be found in the same
+directory as their standard CompCert counterparts.
 
 ## Build
 
@@ -65,12 +66,13 @@ Credentials for the virtual machine:
 When you download the virtual machine, you'll find the Compositional CompCert
 `compcomp` repository precloned in directory `/home/popl15/Repos/compcomp`.
 
-On the virtual machine, the repository could take up to **2 hours** to build. Make
-sure to configure the virtual machine to use at least **2GB of memory.**
+**WARNING:** On the virtual machine, the repository could take up to **2 hours**
+to build. Make sure to configure the virtual machine to use at least **2GB of
+memory.**
 
 ### The Paper
 
-The accepted version of the paper is available here:
+The accepted version of the paper (but now with author names) is available here:
 
 > http://www.cs.princeton.edu/~jsseven/papers/compcomp/paper.pdf. 
 
@@ -87,11 +89,11 @@ cd <compcomp-dir>
 git checkout popl15aec
 ```
 
-The `compcomp` development team tries to make sure that `master` always 
-builds and contains no admits (incomplete proofs are developed in separate
-branches and only merged into `master` when complete). However, further 
-development on `compcomp` after the AEC begins its work could result in 
-transitory build issues on `master`.
+The `compcomp` developers try to make sure that `master` always builds and
+contains no admits (incomplete proofs are developed in separate branches and
+only merged into `master` when complete). However, further development on
+`compcomp` after the AEC begins its work could result in transitory build issues
+on `master`.
 
 ## Files
 
@@ -105,7 +107,17 @@ the POPL results.
 In the `cfrontend/` and `backend/` directories, source and target language
 definitions used in each phase are generally suffixed `*_eff.v` (often importing
 files suffixed `*_coop.v`).  The compositional compiler correctness proofs are
-suffixed `*EFF.v`, to distinguish from the standard CompCert proofs.
+suffixed `*_comp.v`, to distinguish from the standard CompCert proofs.
+
+### Toplevel Files
+
+  * [driver/CompositionalCompiler.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CompositionalCompiler.html)      
+
+    > Proves _Theorem 3 (Section 6)_.
+
+  * [linking/CompositionalComplements.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CompositionalComplements.html)       
+  
+    > Proves _Corollary 2 (Section 6)_.
 
 ### cfrontend/ 
 
@@ -155,6 +167,38 @@ Backend compiler phases and proofs:
   * Asmgen
     - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Asmgen.html)
     - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Asmgenproof_comp.html)
+
+### Intermediate Language Semantics 
+
+_Interaction Semantics_ of the intermediate languages used in Compositional CompCert. 
+
+  * Clight
+    - [Interaction Semantics](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Clight_coop.html)
+    - [Effectful Interaction Semantics](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Clight_eff.html)
+  * Csharpminor
+    - [Interaction Semantics](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Csharpminor_coop.html)
+    - [Effectful Interaction Semantics](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Csharpminor_eff.html)
+  * Cminor
+    - [Interaction Semantics](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Cminor_coop.html)
+    - [Effectful Interaction Semantics](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Cminor_eff.html)
+  * CminorSel
+    - [Interaction Semantics](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CminorSel_coop.html)
+    - [Effectful Interaction Semantics](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CminorSel_eff.html)
+  * RTL
+    - [Interaction Semantics](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/RTL_coop.html)
+    - [Effectful Interaction Semantics](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/RTL_eff.html)
+  * LTL
+    - [Interaction Semantics](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/LTL_coop.html)
+    - [Effectful Interaction Semantics](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/LTL_eff.html)
+  * Linear
+    - [Interaction Semantics](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Linear_coop.html)
+    - [Effectful Interaction Semantics](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Linear_eff.html)
+  * Mach
+    - [Interaction Semantics](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Mach_coop.html)
+    - [Effectful Interaction Semantics](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Mach_eff.html)
+  * IA32 Asm
+    - [Interaction Semantics](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Asm_coop.html)
+    - [Effectful Interaction Semantics](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Asm_eff.html)
 
 ### core/
 
@@ -259,10 +303,6 @@ Backend compiler phases and proofs:
     > Defines _Reach-Closed Contextual Equivalence_ and proves _Corollary 1_
     > _(Section 5)_.
 
-  * [CompositionalComplements.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CompositionalComplements.html)       
-  
-    > Proves _Corollary 2 (Section 6)_.
-
   * [gallina_coresem.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/gallina_coresem.html)       
 
     > Demonstrates one way in which to construct an interaction semantics that is just 
@@ -275,12 +315,6 @@ Backend compiler phases and proofs:
   * [wf_lemmas.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/wf_lemmas.html)       
 
     > Lemmas about well-founded orders.
-
-### driver/
-
-  * [CompositionalCompiler.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CompositionalCompiler.html)      
-
-    > Proves _Theorem 3 (Section 6)_.
 
 ### scripts/
 
@@ -296,7 +330,6 @@ Backend compiler phases and proofs:
 
   To run the script we used to generate the line counts in the paper, from 
   the root directory of the repository, do: 
-
 
   ```
   cd scripts
