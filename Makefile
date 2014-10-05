@@ -97,34 +97,34 @@ COMMON=Errors.v AST.v Events.v Globalenvs.v Memdata.v Memtype.v Memory.v \
 
 BACKEND=\
   Cminor.v Cminor_coop.v Cminor_eff.v \
-  Op.v OpEFF.v \
+  Op.v Op_comp.v \
   CminorSel.v CminorSel_coop.v CminorSel_eff.v \
   SelectOp.v SelectDiv.v SelectLong.v Selection.v \
   I64Helpers.v BuiltinEffects.v SelectionNEW.v SelectLongNEW.v \
-  SelectOpproof.v SelectDivproof.v SelectLongproof.v SelectLongproofEFF.v \
-  Selectionproof.v SelectionproofEFF.v \
+  SelectOpproof.v SelectDivproof.v SelectLongproof.v SelectLongproof_comp.v \
+  Selectionproof.v Selectionproof_comp.v \
   Registers.v RTL.v RTL_coop.v RTL_eff.v \
-  RTLgen.v RTLgenspec.v RTLgenproof.v RTLgenproofEFF.v \
-  RTL2RTL_proofEFF.v \
-  Tailcall.v Tailcallproof.v  TailcallproofEFF.v \
+  RTLgen.v RTLgenspec.v RTLgenproof.v RTLgenproof_comp.v \
+  RTL2RTL_proof_comp.v \
+  Tailcall.v Tailcallproof.v  Tailcallproof_comp.v \
   Inlining.v Inliningspec.v Inliningproof.v \
-  Renumber.v Renumberproof.v RenumberproofEFF.v \
+  Renumber.v Renumberproof.v Renumberproof_comp.v \
   RTLtyping.v \
   Kildall.v Liveness.v \
   ConstpropOp.v Constprop.v ConstpropOpproof.v Constpropproof.v \
   CombineOp.v CSE.v CombineOpproof.v CSEproof.v \
   Machregs.v Locations.v Conventions1.v Conventions.v \
   LTL.v LTL_coop.v LTL_eff.v \
-  Allocation.v Allocproof.v AllocproofEFF.v \
-  Tunneling.v Tunnelingproof.v  TunnelingproofEFF.v \
+  Allocation.v Allocproof.v Allocproof_comp.v \
+  Tunneling.v Tunnelingproof.v  Tunnelingproof_comp.v \
   Linear.v Linear_coop.v Linear_eff.v Lineartyping.v \
-  Linearize.v Linearizeproof.v LinearizeproofEFF.v \
-  CleanupLabels.v CleanupLabelsproof.v CleanupLabelsproofEFF.v \
+  Linearize.v Linearizeproof.v Linearizeproof_comp.v \
+  CleanupLabels.v CleanupLabelsproof.v CleanupLabelsproof_comp.v \
   load_frame.v Mach.v Mach_coop.v Mach_eff.v \
-  Bounds.v Stacklayout.v Stacking.v Stackingproof.v StackingproofEFF.v \
+  Bounds.v Stacklayout.v Stacking.v Stackingproof.v Stackingproof_comp.v \
   Asm.v Asmgen.v Asmgenproof0.v Asmgenproof1.v Asmgenproof.v \
-  AsmEFF.v AsmgenEFF.v Asm_coop.v Asm_eff.v \
-  Asmgenproof0EFF.v Asmgenproof1EFF.v AsmgenproofEFF.v Asm_nucular.v \
+  Asm_comp.v Asmgen_comp.v Asm_coop.v Asm_eff.v \
+  Asmgenproof0_comp.v Asmgenproof1_comp.v Asmgenproof_comp.v Asm_nucular.v \
 
 # C front-end modules (in cfrontend/)
 
@@ -132,11 +132,11 @@ CFRONTEND=Ctypes.v Cop.v Csyntax.v Csem.v Cstrategy.v Cexec.v \
   Initializers.v Initializersproof.v \
   SimplExpr.v SimplExprspec.v SimplExprproof.v \
   Clight.v Clight_coop.v Clight_eff.v ClightBigstep.v \
-  SimplLocals.v SimplLocalsproof.v SimplLocalsproofEFF.v \
-  Cshmgen.v Cshmgenproof.v CshmgenproofEFF.v \
+  SimplLocals.v SimplLocalsproof.v SimplLocalsproof_comp.v \
+  Cshmgen.v Cshmgenproof.v Cshmgenproof_comp.v \
   Csharpminor.v Csharpminor_coop.v Csharpminor_eff.v \
   Cminorgen.v Cminorgenproof.v \
-  CminorgenproofRestructured.v CminorgenproofSIM.v CminorgenproofEFF.v
+  CminorgenproofRestructured.v CminorgenproofSIM.v Cminorgenproof_comp.v
 
 # Core separate compilation modules (in core/)
 

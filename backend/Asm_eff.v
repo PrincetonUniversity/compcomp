@@ -12,7 +12,7 @@ Require Import Stacklayout.
 Require Import Conventions.
 
 (*LENB: again, we import the modified Asm*)
-Require Import AsmEFF. 
+Require Import Asm_comp. 
 Require Import Asm_coop. 
 
 Require Import mem_lemmas. (*for mem_forward*)

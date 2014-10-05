@@ -13,7 +13,7 @@ Require Import Stacklayout.
 Require Import Conventions.
 
 (*LENB: We don't import CompCert's original Asm.v, but the modified one*)
-Require Import AsmEFF. 
+Require Import Asm_comp. 
 
 Require Import mem_lemmas. (*for mem_forward*)
 Require Import semantics.

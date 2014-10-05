@@ -22,7 +22,7 @@ Require Import SelectionNEW.
 Require Import SelectOpproof.
 Require Import SelectDivproof.
 Require Import BuiltinEffects.
-Require Import SelectLongproofEFF.
+Require Import SelectLongproof_comp.
 
 Require Import mem_lemmas.
 Require Import semantics.

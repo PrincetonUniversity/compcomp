@@ -41,7 +41,7 @@ Require Export Axioms.
 Require Import Linear_coop.
 Require Import BuiltinEffects.
 Require Import Linear_eff.
-Require Import OpEFF.
+Require Import Op_comp.
 
 Module LabelsetFacts := FSetFacts.Facts(Labelset).
 
@@ -1133,7 +1133,7 @@ unfold vis in *.
   rewrite replace_externs_locBlocksSrc, replace_externs_frgnBlocksSrc,
   replace_externs_as_inj in *.
 intuition.
-(*as in selectionproofEFF*)
+(*as in selectionproof_comp*)
   red; intros. destruct (GFP _ _ H2). split; trivial.
   eapply extern_incr_as_inj; try eassumption.
   rewrite replace_locals_as_inj. assumption.

@@ -21,7 +21,7 @@ Unset Printing Implicit Defensive.
 (** Notations and convenient definitions: *)
 
 Notation Clight_module := (program Clight.fundef Ctypes.type).
-Notation Asm_module := (AsmEFF.program).
+Notation Asm_module := (Asm_comp.program).
 
 Definition mk_src_sem (p : Clight_module) :=
   let ge := Genv.globalenv p in 
@@ -29,7 +29,7 @@ Definition mk_src_sem (p : Clight_module) :=
 
 Definition mk_tgt_sem (tp : Asm_module) :=
   let tge := Genv.globalenv tp in
-  @Modsem.mk AsmEFF.fundef unit tge Asm_coop.state (Asm_eff.Asm_eff_sem hf).
+  @Modsem.mk Asm_comp.fundef unit tge Asm_coop.state (Asm_eff.Asm_eff_sem hf).
 
 (** Apply the contextual equivalence functor from
    linking/context_equiv.v to to linking/linking_proof.v.*)

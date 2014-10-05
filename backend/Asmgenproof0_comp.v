@@ -26,8 +26,8 @@ Require Import Smallstep.
 Require Import Locations.
 Require Import Mach.
 Require Import Mach_coop.
-Require Import AsmEFF.
-Require Import AsmgenEFF.
+Require Import Asm_comp.
+Require Import Asmgen_comp.
 Require Import Conventions.
 Require Import Axioms.
 
@@ -193,7 +193,7 @@ destruct ZLOC as [b [ofs [tb [SP LOC]]]]; subst.
 Qed.
 
 (*NEW: added parameter j:meminj and changed lessdef into val_inject*)
-Record agree mu (ms: Mach.regset) (sp: val) (rs: AsmEFF.regset) : Prop := mkagree {
+Record agree mu (ms: Mach.regset) (sp: val) (rs: Asm_comp.regset) : Prop := mkagree {
   (*Modified*) agree_sp_local: val_inject (local_of mu) sp (rs#SP);
   agree_mregs: forall r: mreg, val_inject (as_inj mu) (ms r) (rs#(preg_of r))
 }.
@@ -376,7 +376,7 @@ Lemma extcall_arg_match:
   agree mu ms sp rs ->
   Mem.inject (as_inj mu) m m' -> (*WAS: Mem.extends m m'*)
   Mach.extcall_arg ms m sp l v ->
-  exists v', AsmEFF.extcall_arg rs m' l v' /\ 
+  exists v', Asm_comp.extcall_arg rs m' l v' /\ 
              val_inject (as_inj mu) v v' (*WAS: lessdef*).
 Proof.
   intros. inv H1.
@@ -396,7 +396,7 @@ Lemma extcall_args_match: forall mu ms sp rs m m' (WD: SM_wd mu),
      agree mu ms sp rs -> Mem.inject (as_inj mu) m m' ->
   forall ll vl,
   list_forall2 (Mach.extcall_arg ms m sp) ll vl ->
-  exists vl', list_forall2 (AsmEFF.extcall_arg rs m') ll vl' /\ 
+  exists vl', list_forall2 (Asm_comp.extcall_arg rs m') ll vl' /\ 
               val_list_inject (as_inj mu) vl vl'.
 Proof.
   induction 4; intros. 
@@ -410,10 +410,10 @@ Lemma extcall_arguments_match:
   forall mu ms m m' sp rs sg args (WD: SM_wd mu),
   agree mu ms sp rs -> Mem.inject (as_inj mu) m m' ->
   Mach.extcall_arguments ms m sp sg args ->
-  exists args', AsmEFF.extcall_arguments rs m' sg args' /\ 
+  exists args', Asm_comp.extcall_arguments rs m' sg args' /\ 
                 val_list_inject (as_inj mu) args args'.
 Proof.
-  unfold Mach.extcall_arguments, AsmEFF.extcall_arguments; intros.
+  unfold Mach.extcall_arguments, Asm_comp.extcall_arguments; intros.
   eapply extcall_args_match; eauto.
 Qed.
 
@@ -509,7 +509,7 @@ Qed.
   to the code pointer [pc]. *)
 
 Inductive transl_code_at_pc (ge: Mach.genv):
-    val -> block -> Mach.function -> Mach.code -> bool -> AsmEFF.function -> AsmEFF.code -> Prop :=
+    val -> block -> Mach.function -> Mach.code -> bool -> Asm_comp.function -> Asm_comp.code -> Prop :=
   transl_code_at_pc_intro:
     forall b ofs f c ep tf tc,
     Genv.find_funct_ptr ge b = Some(Internal f) ->

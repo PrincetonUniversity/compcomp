@@ -30,7 +30,7 @@ Require RTL.
 Require LTL.
 Require Linear.
 Require Mach.
-Require AsmEFF.
+Require Asm_comp.
 (** Translation passes. *)
 Require Initializers.
 Require SimplExpr.
@@ -46,22 +46,22 @@ Require Tunneling.
 Require Linearize.
 Require CleanupLabels.
 Require Stacking.
-Require AsmgenEFF.
+Require Asmgen_comp.
 (** Proofs of semantic preservation. *)
 Require SimplExprproof.
-Require SimplLocalsproofEFF.
-Require CshmgenproofEFF.
-Require CminorgenproofEFF.
-Require SelectionproofEFF.
-Require RTLgenproofEFF.
-Require TailcallproofEFF.
-Require RenumberproofEFF.
-Require AllocproofEFF.
-Require TunnelingproofEFF.
-Require LinearizeproofEFF.
-Require CleanupLabelsproofEFF.
-Require StackingproofEFF.
-Require AsmgenproofEFF.
+Require SimplLocalsproof_comp.
+Require Cshmgenproof_comp.
+Require Cminorgenproof_comp.
+Require Selectionproof_comp.
+Require RTLgenproof_comp.
+Require Tailcallproof_comp.
+Require Renumberproof_comp.
+Require Allocproof_comp.
+Require Tunnelingproof_comp.
+Require Linearizeproof_comp.
+Require CleanupLabelsproof_comp.
+Require Stackingproof_comp.
+Require Asmgenproof_comp.
 
 (** Pretty-printers (defined in Caml). *)
 Parameter print_Clight: Clight.program -> unit.
@@ -97,7 +97,7 @@ Definition print {A: Type} (printer: A -> unit) (prog: A) : A :=
   with a Cminor program, one with an RTL program.  The three translations
   produce Asm programs ready for pretty-printing and assembling. *)
 
-Definition transf_rtl_program (f: RTL.program) : res AsmEFF.program :=
+Definition transf_rtl_program (f: RTL.program) : res Asm_comp.program :=
    OK f
    @@ print print_RTL
    @@ Tailcall.transf_program
@@ -110,16 +110,16 @@ Definition transf_rtl_program (f: RTL.program) : res AsmEFF.program :=
    @@ CleanupLabels.transf_program
   @@@ Stacking.transf_program
    @@ print print_Mach
-  @@@ AsmgenEFF.transf_program.
+  @@@ Asmgen_comp.transf_program.
 
-Definition transf_cminor_program (p: Cminor.program) : res AsmEFF.program :=
+Definition transf_cminor_program (p: Cminor.program) : res Asm_comp.program :=
    OK p
    @@ print print_Cminor
   @@@ SelectionNEW.sel_program
   @@@ RTLgen.transl_program
   @@@ transf_rtl_program.
 
-Definition transf_clight_program (p: Clight.program) : res AsmEFF.program :=
+Definition transf_clight_program (p: Clight.program) : res Asm_comp.program :=
   OK p 
    @@ print print_Clight
   @@@ SimplLocals.transf_program
@@ -127,7 +127,7 @@ Definition transf_clight_program (p: Clight.program) : res AsmEFF.program :=
   @@@ Cminorgen.transl_program
   @@@ transf_cminor_program.
 
-Definition transf_c_program (p: Csyntax.program) : res AsmEFF.program :=
+Definition transf_c_program (p: Csyntax.program) : res Asm_comp.program :=
   OK p 
   @@@ SimplExpr.transl_program
   @@@ transf_clight_program.
@@ -268,31 +268,31 @@ Proof.
   set (p6 := CleanupLabels.transf_program p5) in *.
   destruct (Stacking.transf_program p6) as [p7|] eqn:?; simpl in H; try discriminate.
   eapply eff_sim_trans.
-    eapply TailcallproofEFF.transl_program_correct. 
+    eapply Tailcallproof_comp.transl_program_correct. 
   eapply TransformLNR in LNR.
   eapply eff_sim_trans.
-    eapply RenumberproofEFF.transl_program_correct.
+    eapply Renumberproof_comp.transl_program_correct.
   eapply TransformLNR in LNR.
   eapply eff_sim_trans.
-    eapply AllocproofEFF.transl_program_correct.
+    eapply Allocproof_comp.transl_program_correct.
     instantiate (1:=p3). auto.
   eapply TransformLNR_partial in LNR. 2: eauto.
   eapply eff_sim_trans.
-    eapply TunnelingproofEFF.transl_program_correct.
+    eapply Tunnelingproof_comp.transl_program_correct.
   eapply TransformLNR in LNR. 
   eapply eff_sim_trans.
-    eapply LinearizeproofEFF.transl_program_correct. 
+    eapply Linearizeproof_comp.transl_program_correct. 
     eassumption. 
   eapply TransformLNR_partial in LNR. 2: eauto.
   eapply eff_sim_trans.
-    eapply CleanupLabelsproofEFF.transl_program_correct.
+    eapply CleanupLabelsproof_comp.transl_program_correct.
   eapply TransformLNR in LNR. 
   eapply eff_sim_trans.
-    eapply StackingproofEFF.transl_program_correct.
-    eexact AsmgenproofEFF.return_address_exists. eassumption.
+    eapply Stackingproof_comp.transl_program_correct.
+    eexact Asmgenproof_comp.return_address_exists. eassumption.
     eassumption.
   eapply TransformLNR_partial in LNR. 2: eauto.
-  apply AsmgenproofEFF.transl_program_correct. 
+  apply Asmgenproof_comp.transl_program_correct. 
     eassumption.
 Qed.
 
@@ -312,13 +312,13 @@ Proof.
   destruct (SelectionNEW.sel_program p) as [p1|] eqn:?; simpl in H; try discriminate.
   destruct (RTLgen.transl_program p1) as [p2|] eqn:?; simpl in H; try discriminate.
   eapply eff_sim_trans.
-    eapply SelectionproofEFF.transl_program_correct.
+    eapply Selectionproof_comp.transl_program_correct.
      apply BuiltinEffects.get_helpers_correct. apply HelpersOK.
   unfold SelectionNEW.sel_program in Heqr. unfold bind in Heqr.
      rewrite HelpersOK in Heqr. inv Heqr. 
   eapply TransformLNR in LNR.   
   eapply eff_sim_trans.
-    eapply RTLgenproofEFF.transl_program_correct.
+    eapply RTLgenproof_comp.transl_program_correct.
      eassumption.
   eapply TransformLNR_partial in LNR.  
     eapply transf_rtl_program_correct; try eassumption. 
@@ -345,16 +345,16 @@ Proof.
   destruct (Cshmgen.transl_program p1) as [p2|] eqn:?; simpl in H; try discriminate.
   destruct (Cminorgen.transl_program p2) as [p3|] eqn:?; simpl in H; try discriminate.
   eapply eff_sim_trans.
-    eapply SimplLocalsproofEFF.transl_program_correct. eassumption.
+    eapply SimplLocalsproof_comp.transl_program_correct. eassumption.
      eassumption. 
   eapply TransformLNR_partial in LNR. 2: eauto.
   eapply eff_sim_trans.
-    eapply CshmgenproofEFF.transl_program_correct. 
+    eapply Cshmgenproof_comp.transl_program_correct. 
     eassumption.
     eassumption.
   eapply TransformLNR_partial2 in LNR; eauto.
   eapply eff_sim_trans.
-    eapply CminorgenproofEFF.transl_program_correct. 
+    eapply Cminorgenproof_comp.transl_program_correct. 
     eassumption.
     eassumption.
   eapply TransformLNR_partial in LNR. 2: eauto.
@@ -381,14 +381,14 @@ Proof.
   destruct (Linearize.transf_program p4) as [p5|] eqn:?; simpl in H; try discriminate.
   set (p6 := CleanupLabels.transf_program p5) in *.
   destruct (Stacking.transf_program p6) as [p7|] eqn:?; simpl in H; try discriminate.
-  generalize (TailcallproofEFF.symbols_preserved p s); intro Heqr5.
-  generalize (RenumberproofEFF.symbols_preserved p1 s); intro Heqr4.
-  apply AllocproofEFF.symbols_preserved with (s:=s) in Heqr.
-  generalize (TunnelingproofEFF.symbols_preserved p3 s); intro Heqr3.
-  apply LinearizeproofEFF.symbols_preserved with (id:=s) in Heqr0.
-  generalize (CleanupLabelsproofEFF.symbols_preserved p5 s); intro Heqr2.
-  apply StackingproofEFF.symbols_preserved with (id:=s) in Heqr1.
-  apply AsmgenproofEFF.symbols_preserved with (id:=s) in H.
+  generalize (Tailcallproof_comp.symbols_preserved p s); intro Heqr5.
+  generalize (Renumberproof_comp.symbols_preserved p1 s); intro Heqr4.
+  apply Allocproof_comp.symbols_preserved with (s:=s) in Heqr.
+  generalize (Tunnelingproof_comp.symbols_preserved p3 s); intro Heqr3.
+  apply Linearizeproof_comp.symbols_preserved with (id:=s) in Heqr0.
+  generalize (CleanupLabelsproof_comp.symbols_preserved p5 s); intro Heqr2.
+  apply Stackingproof_comp.symbols_preserved with (id:=s) in Heqr1.
+  apply Asmgenproof_comp.symbols_preserved with (id:=s) in H.
   rewrite H, Heqr1; unfold p6; rewrite Heqr2, Heqr0. 
   unfold p4; rewrite Heqr3, Heqr.
   unfold p2; rewrite Heqr4; unfold p1; rewrite Heqr5; auto.
@@ -408,8 +408,8 @@ Proof.
   destruct (SelectionNEW.sel_program p) as [p1|] eqn:?; simpl in H; try discriminate.
   destruct (RTLgen.transl_program p1) as [p2|] eqn:?; simpl in H; try discriminate.
   apply transf_rtl_program_preserves_syms with (s:=s) in H; rewrite H.
-  apply RTLgenproofEFF.symbols_preserved with (s:=s) in Heqr0; rewrite Heqr0.
-  generalize (SelectionproofEFF.symbols_preserved p hf s); intros H2.
+  apply RTLgenproof_comp.symbols_preserved with (s:=s) in Heqr0; rewrite Heqr0.
+  generalize (Selectionproof_comp.symbols_preserved p hf s); intros H2.
   revert Heqr; unfold SelectionNEW.sel_program, bind.
   rewrite HelpersOK; inversion 1; rewrite H2; auto.
 Qed.
@@ -428,8 +428,8 @@ Proof.
   destruct (SimplLocals.transf_program p) as [p1|] eqn:?; simpl in H; try discriminate.
   destruct (Cshmgen.transl_program p1) as [p2|] eqn:?; simpl in H; try discriminate.
   destruct (Cminorgen.transl_program p2) as [p3|] eqn:?; simpl in H; try discriminate.
-  apply SimplLocalsproofEFF.symbols_preserved with (s := s) in Heqr.
-  apply CshmgenproofEFF.symbols_preserved with (s := s) in Heqr0.
+  apply SimplLocalsproof_comp.symbols_preserved with (s := s) in Heqr.
+  apply Cshmgenproof_comp.symbols_preserved with (s := s) in Heqr0.
   apply CminorgenproofRestructured.symbols_preserved with (s := s) in Heqr1.
   apply transf_cminor_program_preserves_syms with (s := s) in H.
   rewrite H, Heqr1, Heqr0, Heqr; auto.

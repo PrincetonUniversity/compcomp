@@ -113,13 +113,13 @@ C frontend compiler phases and proofs:
 
   * SimplLocals 
     - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/SimplLocals.html)
-    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/SimplLocalsproofEFF.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/SimplLocalsproof_comp.html)
   * Cshmgen
     - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Cshmgen.html)
-    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CshmgenproofEFF.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Cshmgenproof_comp.html)
   * Cminorgen 
     - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Cminorgen.html)
-    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CminorgenproofEFF.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Cminorgenproof_comp.html)
 
 ### backend/ 
 
@@ -127,34 +127,34 @@ Backend compiler phases and proofs:
 
   * Selection 
     - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Selection.html)
-    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/SelectionproofEFF.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Selectionproof_comp.html)
   * RTLgen 
     - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/RTLgen.html)
-    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/RTLgenproofEFF.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/RTLgenproof_comp.html)
   * Tailcall 
     - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Tailcall.html)
-    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/TailcallproofEFF.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Tailcallproof_comp.html)
   * Renumbering
     - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Renumber.html)
-    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/RenumberproofEFF.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Renumberproof_comp.html)
   * Allocation 
     - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Allocation.html)
-    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/AllocproofEFF.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Allocproof_comp.html)
   * Tunneling 
     - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Tunneling.html)
-    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/TunnelingproofEFF.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Tunnelingproof_comp.html)
   * Linearize 
     - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Linearize.html)
-    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/LinearizeproofEFF.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Linearizeproof_comp.html)
   * CleanupLabels 
     - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CleanupLabels.html)
-    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CleanupLabelsproofEFF.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CleanupLabelsproof_comp.html)
   * Stacking
     - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Stacking.html)
-    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/StackingproofEFF.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Stackingproof_comp.html)
   * Asmgen
     - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Asmgen.html)
-    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/AsmgenproofEFF.html)
+    - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Asmgenproof_comp.html)
 
 ### core/
 

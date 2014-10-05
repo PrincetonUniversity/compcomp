@@ -26,10 +26,10 @@ Require Import Op.
 Require Import Locations.
 Require Import Mach.
 Require Import Conventions.
-Require Import AsmEFF.
-Require Import AsmgenEFF.
-Require Import Asmgenproof0EFF.
-Require Import Asmgenproof1EFF.
+Require Import Asm_comp.
+Require Import Asmgen_comp.
+Require Import Asmgenproof0_comp.
+Require Import Asmgenproof1_comp.
 
 Require Import Mach_coop.
 Require Import Mach_eff.
@@ -48,12 +48,12 @@ Require Import simulations_lemmas.
 Require Import BuiltinEffects.
 
 Require Export Axioms.
-Require Import OpEFF.
+Require Import Op_comp.
 
 Section PRESERVATION.
 
 Variable prog: Mach.program.
-Variable tprog: AsmEFF.program.
+Variable tprog: Asm_comp.program.
 Hypothesis TRANSF: transf_program prog = Errors.OK tprog.
 
 Variable hf : I64Helpers.helper_functions.
@@ -388,7 +388,7 @@ Lemma return_address_exists:
   forall f sg ros c, is_tail (Mcall sg ros :: c) f.(Mach.fn_code) ->
   exists ra, return_address_offset f c ra.
 Proof.
-  intros. eapply Asmgenproof0EFF.return_address_exists; eauto. 
+  intros. eapply Asmgenproof0_comp.return_address_exists; eauto. 
 - intros. exploit transl_instr_label; eauto. 
   destruct i; try (intros [A B]; apply A). intros. subst c0. repeat constructor.
 - intros. monadInv H0. 

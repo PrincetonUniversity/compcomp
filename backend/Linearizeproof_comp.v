@@ -52,7 +52,7 @@ Require Import BuiltinEffects.
 Require Import Linear_eff.
 
 (*further down we also Require Import Mach. (*for RegEq.eq*)*)
-Require Import OpEFF.
+Require Import Op_comp.
 
 Module NodesetFacts := FSetFacts.Facts(Nodeset).
 
@@ -1477,7 +1477,7 @@ unfold vis in *.
   rewrite replace_externs_locBlocksSrc, replace_externs_frgnBlocksSrc,
   replace_externs_as_inj in *.
 intuition.
-(*as in selectionproofEFF*)
+(*as in selectionproof_comp*)
   red; intros. destruct (GFP _ _ H2). split; trivial.
   eapply extern_incr_as_inj; try eassumption.
   rewrite replace_locals_as_inj. assumption.

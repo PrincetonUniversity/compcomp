@@ -23,9 +23,9 @@ Require Import Globalenvs.
 Require Import Op.
 Require Import Locations.
 Require Import Mach.
-Require Import AsmEFF.
-Require Import AsmgenEFF.
-Require Import Asmgenproof0EFF.
+Require Import Asm_comp.
+Require Import Asmgen_comp.
+Require Import Asmgenproof0_comp.
 Require Import Conventions.
 Require Import Axioms.
 
@@ -36,7 +36,7 @@ Require Import Asm_eff.
 Open Local Scope error_monad_scope.
 
 Lemma effect_instr_floatcomp g c cmp r1 r2 rs m:
-      effect_instr g c (AsmgenEFF.floatcomp cmp r1 r2) rs m = EmptyEffect.
+      effect_instr g c (Asmgen_comp.floatcomp cmp r1 r2) rs m = EmptyEffect.
 Proof. intros.
   destruct cmp; reflexivity. 
 Qed. 

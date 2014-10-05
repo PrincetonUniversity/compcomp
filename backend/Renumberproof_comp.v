@@ -41,9 +41,9 @@ Require Export Axioms.
 Require Import RTL_coop.
 Require Import BuiltinEffects.
 Require Import RTL_eff.
-Require Import OpEFF.
+Require Import Op_comp.
 
-Require Import RTL2RTL_proofEFF.
+Require Import RTL2RTL_proof_comp.
 
 Section PRESERVATION.
 

@@ -42,7 +42,8 @@ Require Import RTL_coop.
 Require Import BuiltinEffects.
 Require Import RTL_eff.
 
-Require Import RTL2RTL_proofEFF.
+Require Import RTL2RTL_proof_comp.
+
 (** * Syntactic properties of the code transformation *)
 
 (** ** Measuring the number of instructions eliminated *)

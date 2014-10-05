@@ -42,7 +42,7 @@ Require Export Axioms.
 Require Import LTL_coop.
 Require Import BuiltinEffects.
 Require Import LTL_eff.
-Require Import OpEFF.
+Require Import Op_comp.
 
 
 (** * Properties of the branch map computed using union-find. *)

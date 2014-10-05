@@ -21,7 +21,7 @@ Require Import Memdata.
 Require Import Op.
 Require Import Locations.
 Require Import Mach.
-Require Import AsmEFF.
+Require Import Asm_comp.
 
 Open Local Scope string_scope.
 Open Local Scope error_monad_scope.
@@ -468,7 +468,7 @@ Definition transl_store (chunk: memory_chunk)
 
 (** Translation of arguments to annotations *)
 
-Definition transl_annot_param (p: Mach.annot_param) : AsmEFF.annot_param :=
+Definition transl_annot_param (p: Mach.annot_param) : Asm_comp.annot_param :=
   match p with
   | Mach.APreg r => APreg (preg_of r)
   | Mach.APstack chunk ofs => APstack chunk ofs
@@ -563,13 +563,13 @@ Definition transl_code' (f: Mach.function) (il: list Mach.instruction) (it1p: bo
   otherwise the offset part of the [PC] code pointer could wrap
   around, leading to incorrect executions. *)
 (*
-Definition transf_function (f: Mach.function) : res AsmEFF.code :=
+Definition transf_function (f: Mach.function) : res Asm_comp.code :=
   do c <- transl_code' f f.(Mach.fn_code) true;
   if zlt (list_length_z c) Int.max_unsigned 
   then OK (Pallocframe f.(fn_stacksize) f.(fn_retaddr_ofs) f.(fn_link_ofs) :: c)
   else Error (msg "code size exceeded").
 *)
-Definition transf_function (f: Mach.function) : res AsmEFF.function :=
+Definition transf_function (f: Mach.function) : res Asm_comp.function :=
   do c <- transl_code' f f.(Mach.fn_code) true;
   if zlt (list_length_z c) Int.max_unsigned 
   then OK (mkfunction
@@ -577,9 +577,9 @@ Definition transf_function (f: Mach.function) : res AsmEFF.function :=
              (Pallocframe f.(fn_stacksize) f.(fn_retaddr_ofs) f.(fn_link_ofs) :: c))
   else Error (msg "code size exceeded").
 
-Definition transf_fundef (f: Mach.fundef) : res AsmEFF.fundef :=
+Definition transf_fundef (f: Mach.fundef) : res Asm_comp.fundef :=
   transf_partial_fundef transf_function f.
 
-Definition transf_program (p: Mach.program) : res AsmEFF.program :=
+Definition transf_program (p: Mach.program) : res Asm_comp.program :=
   transform_partial_program transf_fundef p.
 
