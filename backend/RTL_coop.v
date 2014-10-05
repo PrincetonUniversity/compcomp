@@ -227,6 +227,7 @@ Lemma after_xor_at_external: forall (retv : option val) (q q' : RTL_core),
 Qed.
 
 Definition RTL_core_sem : CoreSemantics genv RTL_core mem.
+Proof.
   eapply (@Build_CoreSemantics _ _ _ 
             RTL_initial_core
             RTL_at_external
@@ -259,6 +260,7 @@ Qed.
 
 Program Definition rtl_coop_sem : 
   CoopCoreSem genv RTL_core.
+Proof.
 apply Build_CoopCoreSem with (coopsem := RTL_core_sem).
   apply rtl_coop_forward.
 Defined.

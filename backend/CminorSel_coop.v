@@ -301,6 +301,7 @@ Definition CMinSel_initial_core (ge:genv) (v: val) (args:list val): option CMinS
     end.
 
 Definition CMinSel_core_sem : CoreSemantics genv CMinSel_core mem.
+Proof.
   eapply (@Build_CoreSemantics _ _ _ 
     CMinSel_initial_core
     CMinSel_at_external
@@ -332,6 +333,7 @@ Qed.
 
 Program Definition cminsel_coop_sem : 
   CoopCoreSem genv CMinSel_core.
+Proof.
 apply Build_CoopCoreSem with (coopsem := CMinSel_core_sem).
   apply CMinSel_forward.
 Defined.

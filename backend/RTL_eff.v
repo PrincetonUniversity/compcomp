@@ -243,6 +243,7 @@ Qed.
 
 Program Definition rtl_eff_sem : 
   @EffectSem genv RTL_core.
+Proof.
 eapply Build_EffectSem with (sem := rtl_coop_sem hf)(effstep:=RTL_effstep).
 apply rtl_effax1.
 apply rtl_effax2.

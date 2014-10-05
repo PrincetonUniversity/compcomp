@@ -376,6 +376,7 @@ Qed.
 
 Program Definition Mach_eff_sem : 
   @EffectSem genv Mach_core.
+Proof.
 eapply Build_EffectSem with 
  (sem := Mach_coop_sem hf return_address_offset).
 apply machstep_effax1.

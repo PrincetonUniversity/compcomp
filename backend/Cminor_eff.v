@@ -252,6 +252,7 @@ Qed.
  
 Program Definition cmin_eff_sem : 
   @EffectSem Cminor.genv CMin_core.
+Proof.
 eapply Build_EffectSem with (sem := cmin_coop_sem hf)(effstep:=cmin_effstep).
 apply cminstep_effax1.
 apply cminstep_effax2.

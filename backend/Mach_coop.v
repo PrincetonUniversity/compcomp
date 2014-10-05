@@ -412,6 +412,7 @@ Lemma Mach_corestep_not_halted ge m q m' q':
 Proof. intros. inv H; auto. Qed.
 
 Definition Mach_core_sem : CoreSemantics genv Mach_core mem.
+Proof.
   eapply (@Build_CoreSemantics _ _ _ 
             Mach_initial_core
             Mach_at_external
@@ -465,6 +466,7 @@ Qed.
 
 Program Definition Mach_coop_sem : 
   CoopCoreSem genv Mach_core.
+Proof.
 apply Build_CoopCoreSem with (coopsem := Mach_core_sem).
   apply Mach_forward.
 Defined.

@@ -273,6 +273,7 @@ Qed.
  
 Program Definition cminsel_eff_sem : 
   @EffectSem genv CMinSel_core.
+Proof.
 eapply Build_EffectSem with (sem := cminsel_coop_sem hf)(effstep:=cminsel_effstep).
 apply cminselstep_effax1.
 apply cminselstep_effax2.

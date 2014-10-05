@@ -215,6 +215,7 @@ Qed.
 
 Program Definition LTL_eff_sem : 
   @EffectSem genv LTL_core.
+Proof.
 eapply Build_EffectSem with (sem := LTL_coop_sem hf)(effstep:=ltl_effstep).
 apply ltlstep_effax1.
 apply ltlstep_effax2.

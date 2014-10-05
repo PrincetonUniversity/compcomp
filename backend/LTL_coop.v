@@ -284,6 +284,7 @@ Inductive initial_state (p: program): state -> Prop :=
 *)
 
 Definition LTL_core_sem : CoreSemantics genv LTL_core mem.
+Proof.
   eapply (@Build_CoreSemantics _ _ _ 
        LTL_initial_core
        LTL_at_external
@@ -322,6 +323,7 @@ Qed.
 
 Program Definition LTL_coop_sem : 
   CoopCoreSem genv LTL_core.
+Proof.
 apply Build_CoopCoreSem with (coopsem := LTL_core_sem).
   apply LTL_forward.
 Defined.

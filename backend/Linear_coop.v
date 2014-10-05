@@ -332,6 +332,7 @@ Lemma Linear_after_at_external_excl retv q q':
   Qed.
 
 Definition Linear_core_sem : CoreSemantics genv Linear_core mem.
+Proof.
   eapply (@Build_CoreSemantics _ _ _ 
            Linear_initial_core
            Linear_at_external
@@ -370,6 +371,7 @@ Qed.
 
 Program Definition Linear_coop_sem : 
   CoopCoreSem genv Linear_core.
+Proof.
 apply Build_CoopCoreSem with (coopsem := Linear_core_sem).
   apply Linear_forward.
 Defined.

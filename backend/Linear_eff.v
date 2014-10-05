@@ -268,6 +268,7 @@ Qed.
 
 Program Definition Linear_eff_sem : 
   @EffectSem genv Linear_core.
+Proof.
 eapply Build_EffectSem with (sem := Linear_coop_sem hf)(effstep:=linear_effstep).
 apply linearstep_effax1.
 apply linearstep_effax2.

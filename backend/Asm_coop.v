@@ -365,6 +365,7 @@ Qed.
    
 Program Definition Asm_coop_sem : 
   CoopCoreSem genv state.
+Proof.
 apply Build_CoopCoreSem with (coopsem := Asm_core_sem).
   apply Asm_forward.
 Defined.

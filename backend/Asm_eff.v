@@ -407,6 +407,7 @@ Qed.
 
 Program Definition Asm_eff_sem : 
   @EffectSem genv state.
+Proof.
 eapply Build_EffectSem with (sem := Asm_coop_sem hf).
 apply asmstep_effax1.
 apply asmstep_effax2.

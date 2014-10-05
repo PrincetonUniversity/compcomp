@@ -386,12 +386,14 @@ Qed.
 
 Definition clight_eff_sem  
   :  @EffectSem Clight.genv CL_core.
+Proof.
 eapply Build_EffectSem with (sem := CL_coop_sem hf _ FE_FWD)
          (effstep:=clight_effstep).
 eapply clightstep_effax1. 
 apply clightstep_effax2. 
 eapply clight_effstep_valid.
 Defined.
+
 End EFFSEM.
 
 Lemma function_entry1_UNCH: forall f vargs m e le m', 

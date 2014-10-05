@@ -300,6 +300,7 @@ Qed.
 
 Program Definition csharpmin_coop_sem : 
   CoopCoreSem Csharpminor.genv CSharpMin_core.
+Proof.
 apply Build_CoopCoreSem with (coopsem := CSharpMin_core_sem).
   apply CSharpMin_forward.
 Defined.

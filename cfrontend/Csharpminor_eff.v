@@ -260,6 +260,7 @@ Qed.
  
 Program Definition csharpmin_eff_sem : 
   @EffectSem Csharpminor.genv CSharpMin_core.
+Proof.
 eapply Build_EffectSem with (sem := csharpmin_coop_sem hf)
        (effstep:=csharpmin_effstep).
 apply csharpminstep_effax1.
