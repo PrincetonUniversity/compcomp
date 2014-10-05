@@ -13,7 +13,7 @@ buildable.
 In general, files suffixed `*_coop.v` and `*_eff.v` are the compositional
 variants of standard CompCert intermediate language semantics (`*_coop.v` is the
 base interaction semantics of a given IL; `*_eff.v` is the effectful version).
-Files suffixed `*_comp.v` are the compositional variants of the standard
+Files suffixed `*_comp.v`, for "compositional," are the compositional variants of the standard
 CompCert proofs. The compositional proofs can typically be found in the same
 directory as their standard CompCert counterparts.
 
