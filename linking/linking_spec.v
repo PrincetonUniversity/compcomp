@@ -31,7 +31,7 @@ Require Import Values.
         operating on source states [C_i] of source language [S_i] and 
     target effect semantics [Target_i] 
         operating on target states [D_i] of target language [T_i]
-    (note that it's not required that S_i = S_j for i<>j.)
+    (note that it's not required that [S_i = S_j] for [i<>j].)
 - Assume we also have, for each [0 <= i < N], a simulation relation
        from [S_i] to [T_i]. *)
 
@@ -41,6 +41,10 @@ Require Import Values.
 
 (** where [><] denotes the semantic linking operation defined in 
   [linking/compcert_linking.v]. *)
+
+(** For an explanation of [nucular_T] (a technical condition that happens to be
+satisfied by all CompCert x86 Asm programs), see
+[linking/CompositionalComplements.v] or footnote 5 on pg. 9 of the paper. *)
 
 Import Wholeprog_sim.
 Import SM_simulation.

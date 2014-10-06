@@ -19,6 +19,19 @@ Require Import mem_welldefined.
 
 Require Import effect_semantics. (*for specialization below*)
 
+(** * Closed (Whole) Program Simulations *)
+
+(** Closed simulations differ from the open simulations of [simulations.v] in
+that they lack clauses for [at_external] and [after_external] (closed programs
+do not call external functions). *)
+
+(** Also, previously, we retained effects even in closed program simulations.
+But this meant we had to paramterize over [EffectSemantics] (specialized to
+CompCert memories), and not over just [CoreSemantics]. Since the paper, we have
+updated closed simulations to remove the effects, which has made it possible to
+use the same simulation structure in a wider variety of situations (e.g., to 
+relate semantics that may not use CompCert memories). *)
+
 Module Wholeprog_sim. Section Wholeprog_sim.
 
 Context {G1 C1 M1 G2 C2 M2 : Type}
