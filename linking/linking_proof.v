@@ -157,7 +157,7 @@ eapply Build_Wholeprog_sim
 
 {(** Case: [core_initial] *)
   move=> j c1 vals1 m1 vals2 m2 init1.
-  case=>inj []vinj []pres []gfi []reach []wd []vgenv vval.
+  case=>inj []vinj []pres []gfi []wd []vgenv vval.
   move: init1. 
   rewrite /= /LinkerSem.initial_core.
   case e: main=> [//|//|//|//|b ofs].
@@ -195,6 +195,21 @@ eapply Build_Wholeprog_sim
   have main_eq: main = Vptr b Integers.Int.zero.
   { move: (Integers.Int.eq_spec ofs Integers.Int.zero).
     by rewrite e; move: h g=> /= -> h ->. }
+
+  have reach: forall b,
+    REACH m2 (fun b0 => isGlobalBlock (ge (cores_T ix)) b0 
+                       || getBlocks vals2 b0) b=true ->
+    Mem.valid_block m2 b.
+  { move=> ? ?; eapply mem_wd_reach_globargs; eauto.
+    suff ->: isGlobalBlock my_ge = isGlobalBlock (ge (cores_T ix)). by [].
+    extensionality b'.
+    suff: is_true (isGlobalBlock my_ge b') <->
+          is_true (isGlobalBlock (ge (cores_T ix)) b').
+    case; rewrite /is_true /=.
+    case: (isGlobalBlock _ _)=> //; case: (isGlobalBlock _ _)=> //.
+    by intuition.
+    by intuition.
+    by apply: isGlob_iffT. }
     
   move: (core_initial (sims sims' ix))=> H1.
   move: (H1 main vals1 c m1 j vals2  m2 dS dT).
@@ -217,10 +232,8 @@ eapply Build_Wholeprog_sim
 
   { move=> b0 R; suff: Mem.valid_block m2 b0.
     by apply: valid_dec.
-    apply: reach; apply: (REACH_mono (fun b' : block =>
-      isGlobalBlock (ge (cores_T ix)) b' || getBlocks vals2 b'))=> //.
-    move=> b1; case/orP; first by rewrite -(isGlob_iffT my_ge_T)=> ->.
-    by move=> ->; apply/orP; right. }
+    apply reach; apply: (REACH_mono (fun b' : block =>
+      isGlobalBlock (ge (cores_T ix)) b' || getBlocks vals2 b'))=> //. }
 
   { by apply: valid_dec'. }
 
@@ -295,10 +308,7 @@ eapply Build_Wholeprog_sim
     by apply Mem.valid_block_inject_1 with (m1:=m1) (m2:=m2) in J.
     move=> b0 F; apply: valid_dec; apply: reach.
     apply: (REACH_mono (fun b1 : block => 
-      isGlobalBlock (ge (cores_T ix)) b1 || getBlocks vals2 b1))=> //.
-    move=> b1; case/orP=> G. 
-    by apply/orP; left; move: G; rewrite -(isGlob_iffT my_ge_T).
-    by apply/orP; right. }
+      isGlobalBlock (ge (cores_T ix)) b1 || getBlocks vals2 b1))=> //. }
 
   set mu_top := Inj.mk mu_top_wd.
   
