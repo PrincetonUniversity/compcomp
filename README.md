@@ -33,7 +33,6 @@ To build, clone the repository, go to the root directory, and type:
 
 ```
   ./configure ia32-linux
-  make depend
   make
 ```
 
