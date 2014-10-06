@@ -2886,6 +2886,7 @@ Proof. intros. clear j23.
 Qed.
 
 Definition ContentsMap_EFF_FUN  (NB2' b:block) : ZMap.t memval.
+Proof.
 destruct (plt b NB2').
   apply (CM_block_EFF_existsT b).
 apply (ZMap.init Undef).
@@ -2912,6 +2913,7 @@ Definition mkEFF
             (Hyp2: forall (b1 b2 : block) (delta : Z),
                        j12' b1 = Some (b2, delta) -> (b2 < NB2')%positive)
            : Mem.mem'.
+Proof.
 destruct (mkAccessMap_EFF_existsT NB2' Hyp1 Hyp2) as [AM [ADefault PAM]].
 destruct (ContentsMap_EFF_existsT NB2') as [CM [CDefault PCM]].  
 eapply Mem.mkmem with (nextblock:=NB2')

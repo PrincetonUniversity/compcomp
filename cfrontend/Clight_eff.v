@@ -446,12 +446,14 @@ Proof. intros. inv H.
 Qed.
 
 Definition CL_eff_sem1: @EffectSem Clight.genv CL_core.
+Proof.
   eapply (clight_eff_sem function_entry1).
   apply function_entry1_forward. 
   apply function_entry1_UNCH.
 Defined.
 
 Definition CL_eff_sem2: @EffectSem Clight.genv CL_core.
+Proof.
   eapply (clight_eff_sem function_entry2).
   apply function_entry2_forward. 
   apply function_entry2_UNCH.

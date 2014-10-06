@@ -170,7 +170,7 @@ Backend compiler phases and proofs:
 
 Proof that CompCert IA32 Asm is a "nucular" semantics:
 
-  * [Asm_nucular.f](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Asm_nucular.html)
+  * [Asm_nucular.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Asm_nucular.html)
 
 ### Intermediate Language Semantics 
 

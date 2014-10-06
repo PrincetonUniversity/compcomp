@@ -300,6 +300,7 @@ Definition CL_coop_sem
            (FE:function -> list val -> mem -> env -> temp_env -> mem -> Prop)
            (HFE: forall f vargs m e le m', FE f vargs m e le m'-> mem_forward m m')
            : CoopCoreSem genv CL_core.
+Proof.
 apply Build_CoopCoreSem with (coopsem := CL_core_sem FE).
   apply CL_forward. apply HFE.
 Defined.
