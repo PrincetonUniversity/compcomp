@@ -115,7 +115,7 @@ suffixed `*_comp.v`, to distinguish from the standard CompCert proofs.
 
     > Proves _Theorem 3 (Section 6)_.
 
-  * [linking/CompositionalComplements.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CompositionalComplements.html)       
+  * [linking/CompositionalComplements.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/CompositionalComplements.html)     
   
     > Proves _Corollary 2 (Section 6)_.
 
@@ -167,6 +167,10 @@ Backend compiler phases and proofs:
   * Asmgen
     - [Compiler Phase](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Asmgen.html)
     - [Compositional Correctness](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Asmgenproof_comp.html)
+
+Proof that CompCert IA32 Asm is a "nucular" semantics:
+
+  * [Asm_nucular.f](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/Asm_nucular.html)
 
 ### Intermediate Language Semantics 
 

@@ -76,7 +76,13 @@ Definition extend_sems (f : 'I_N0 -> Modsem.t) (ix : 'I_N) : Modsem.t :=
     | right _ => C
   end.
 
+(** [sems_S] extends the source semantics with context [C], by mapping all
+functions that are not defined by any of the modules in [sems_S0] to [C]
+(cf. [extend_sems] above). *)
+
 Let sems_S := extend_sems sems_S0.
+
+(** [sems_T] does the same for the target semantics [sems_T0]. *)
 
 Let sems_T := extend_sems sems_T0.
 
@@ -107,6 +113,10 @@ Proof. by rewrite /N /= plus_comm. Qed.
 Lemma leq_SN0_N : ssrnat.leq (S N0) N.
 Proof. by rewrite /N /= plus_comm. Qed.
 
+(** [plt] is the new procedure table equal to [plt0] on [dom(plt0)], but which
+otherwise maps function [id]s to the module index assigned to the context
+[C]. *)
+
 Definition plt (id : ident) := 
   match plt0 id with
     | None => Some (Ordinal leq_SN0_N)
@@ -125,6 +135,9 @@ Proof.
 rewrite /sems_T /extend_sems; case e: (lt_dec ix N0)=> [//|].
 by apply: nuke_C.
 Qed.
+
+(** Prove the existence of pairwise simulations between source and target 
+module semantics in the extended semantics. *)
 
 Lemma sm_inject (ix : 'I_N) :
  let s := sems_S ix in
@@ -147,6 +160,9 @@ rewrite /sems_T /extend_sems; case e: (lt_dec _ _)=> [//|].
 by apply: domeq_C.
 Qed.
 
+(** [lifted_sim] proves a closed simulation on the source and target programs,
+after they are (independently) linked with the context [C]. *)
+
 Lemma lifted_sim (main : val) :
   CompCert_wholeprog_sim linker_S linker_T ge_top ge_top main.
 Proof.
@@ -160,7 +176,7 @@ Qed.
 
 Import Wholeprog_sim.
 
-(** ** Proof of Corollary 1. *)
+(** ** Proof of Corollary 1 *)
 
 Lemma context_equiv 
     (main : val)  
@@ -174,7 +190,7 @@ have target_det: corestep_fun linker_T by apply: linking_det.
 by apply (equitermination _ _ target_det _ _ _ _ _ _ source_safe match12).
 Qed.
 
-(** ** Corollary 1, specialized to initial states. *)
+(** ** Corollary 1, Specialized to Initial States *)
 
 Lemma init_context_equiv l1 m1 m2 j vals1 vals2 
   (main : val)

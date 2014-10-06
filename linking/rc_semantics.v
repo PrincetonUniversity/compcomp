@@ -157,7 +157,7 @@ rewrite (orb_assoc (isGlobalBlock ge b)); auto.
 inversion 1.
 Qed.
 
-(** ** RC Interaction Semantics *)
+(** ** Reach-Closed Interaction Semantics *)
   
 Program Definition coresem : CoreSemantics (Genv.t F V) state mem :=
   Build_CoreSemantics _ _ _
