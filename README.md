@@ -35,13 +35,8 @@ To build, clone the repository, go to the root directory, and type:
   ./configure ia32-linux
   make
 ```
-
-You can install the compiler and runtime libraries using:
-
-```
-  su
-  make install
-```
+To install the `ccomp` binary and runtime libraries system-wide, 
+type `make install` as `root`.
 
 ### Using Custom Ssreflect Installation
 
