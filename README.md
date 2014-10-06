@@ -339,7 +339,3 @@ _Interaction Semantics_ of the intermediate languages used in Compositional Comp
   ./paperLineCount.sh
   ```
 
-  The current line counts are slightly lower than those listed in the paper. We
-  added the line counts to the paper a few days before the deadline and have
-  since removed some dead comments, definitions, and lemmas.
-

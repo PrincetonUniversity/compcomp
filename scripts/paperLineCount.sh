@@ -43,35 +43,35 @@ echo "\emph{Compiler Phases:} & old & new & old & new \\\\"
 
 SIMPLLOCALS_SPEC_FILES="../cfrontend/Clight.v ../cfrontend/Clight_coop.v ../cfrontend/Clight_eff.v"
 SIMPLLOCALS_SPEC_FILES_COMPCERT="../cfrontend/Clight.v"
-SIMPLLOCALS_PROOF_FILES="../cfrontend/SimplLocalsproofEFF.v"
+SIMPLLOCALS_PROOF_FILES="../cfrontend/SimplLocalsproof_comp.v"
 SIMPLLOCALS_PROOF_FILES_COMPCERT="../cfrontend/SimplLocalsproof.v"
 SIMPLLOCALS_UNUSED_SPECS=`./countCompCertOpsem.sh ../cfrontend/Clight.v` #Counts lines not used in Compositional CompCert
 count "SimplLocals" "$SIMPLLOCALS_SPEC_FILES" "$SIMPLLOCALS_SPEC_FILES_COMPCERT" "$SIMPLLOCALS_PROOF_FILES" "$SIMPLLOCALS_PROOF_FILES_COMPCERT" "$SIMPLLOCALS_UNUSED_SPECS"
 
 CMINORGEN_SPEC_FILES="../cfrontend/Csharpminor.v ../cfrontend/Csharpminor_coop.v ../cfrontend/Csharpminor_eff.v ../backend/Cminor.v ../backend/Cminor_coop.v ../backend/Cminor_eff.v"
 CMINORGEN_SPEC_FILES_COMPCERT="../cfrontend/Csharpminor.v ../backend/Cminor.v"
-CMINORGEN_PROOF_FILES="../cfrontend/CminorgenproofSIM.v ../cfrontend/CminorgenproofEFF.v"
+CMINORGEN_PROOF_FILES="../cfrontend/CminorgenproofSIM.v ../cfrontend/Cminorgenproof_comp.v"
 CMINORGEN_PROOF_FILES_COMPCERT="../cfrontend/Cminorgenproof.v"
 #Unused specs counted by hand, equals 1115loc
 count "Cminorgen" "$CMINORGEN_SPEC_FILES" "$CMINORGEN_SPEC_FILES_COMPCERT" "$CMINORGEN_PROOF_FILES" "$CMINORGEN_PROOF_FILES_COMPCERT" "1115"
 
 RTLGEN_SPEC_FILES="../backend/CminorSel.v ../backend/CminorSel_coop.v ../backend/CminorSel_eff.v ../backend/RTL.v ../backend/RTL_coop.v ../backend/RTL_eff.v"
 RTLGEN_SPEC_FILES_COMPCERT="../backend/CminorSel.v ../backend/RTL.v"
-RTLGEN_PROOF_FILES="../backend/RTLgenproofEFF.v"
+RTLGEN_PROOF_FILES="../backend/RTLgenproof_comp.v"
 RTLGEN_PROOF_FILES_COMPCERT="../backend/RTLgenproof.v"
 RTLGEN_UNUSED_SPECS=`./countCompCertOpsem.sh ../backend/CminorSel.v ../backend/RTL.v` #Counts lines not used in Compositional CompCert
 count "RTLgen" "$RTLGEN_SPEC_FILES" "$RTLGEN_SPEC_FILES_COMPCERT" "$RTLGEN_PROOF_FILES" "$RTLGEN_PROOF_FILES_COMPCERT" "$RTLGEN_UNUSED_SPECS"
 
 TAILCALL_SPEC_FILES="../backend/RTL.v ../backend/RTL_coop.v ../backend/RTL_eff.v"
 TAILCALL_SPEC_FILES_COMPCERT="../backend/RTL.v"
-TAILCALL_PROOF_FILES="../backend/TailcallproofEFF.v"
+TAILCALL_PROOF_FILES="../backend/Tailcallproof_comp.v"
 TAILCALL_PROOF_FILES_COMPCERT="../backend/Tailcallproof.v"
 TAILCALL_UNUSED_SPECS=`./countCompCertOpsem.sh ../backend/RTL.v` #Counts lines not used in Compositional CompCert
 count "Tailcall" "$TAILCALL_SPEC_FILES" "$TAILCALL_SPEC_FILES_COMPCERT" "$TAILCALL_PROOF_FILES" "$TAILCALL_PROOF_FILES_COMPCERT" "$TAILCALL_UNUSED_SPECS"
 
 STACKING_SPEC_FILES="../backend/Linear.v ../backend/Linear_coop.v ../backend/Linear_eff.v ../backend/Mach.v ../backend/Mach_coop.v ../backend/Mach_eff.v"
 STACKING_SPEC_FILES_COMPCERT="../backend/Linear.v ../backend/Mach.v"
-STACKING_PROOF_FILES="../backend/StackingproofEFF.v"
+STACKING_PROOF_FILES="../backend/Stackingproof_comp.v"
 STACKING_PROOF_FILES_COMPCERT="../backend/Stackingproof.v"
 STACKING_UNUSED_SPECS=`./countCompCertOpsem.sh ../backend/Linear.v ../backend/Mach.v` #Counts lines not used in Compositional CompCert
 count "Stacking" "$STACKING_SPEC_FILES" "$STACKING_SPEC_FILES_COMPCERT" "$STACKING_PROOF_FILES" "$STACKING_PROOF_FILES_COMPCERT" "$STACKING_UNUSED_SPECS"
@@ -79,15 +79,15 @@ count "Stacking" "$STACKING_SPEC_FILES" "$STACKING_SPEC_FILES_COMPCERT" "$STACKI
 echo "\hline"
 echo "\emph{Theories:} & & & & \\\\"
 
-STRUCTUREDINJ_PROOF_FILES="../core/StructuredInjections.v"
+STRUCTUREDINJ_PROOF_FILES="../core/structured_injections.v"
 count-nocompcert "Structured Injs. (\S\ref{sec:ss})" "55" "$STRUCTUREDINJ_PROOF_FILES" 
 
-STRUCTUREDSIM_SPEC_FILES="../core/effect_simulations.v ../core/effect_semantics.v"
-STRUCTUREDSIM_PROOF_FILES="../core/effect_properties.v ../core/effect_simulations_lemmas.v ../core/reach.v ../core/rg_lemmas.v ../core/StructuredInjections.v"
+STRUCTUREDSIM_SPEC_FILES="../core/simulations.v ../core/semantics.v"
+STRUCTUREDSIM_PROOF_FILES="../core/effect_properties.v ../core/simulations_lemmas.v ../core/reach.v ../core/relyguarantee_lemmas.v ../core/structured_injections.v"
 count-nocompcert "Structured Sims. (\S\ref{sec:ss})" "$STRUCTUREDSIM_SPEC_FILES" "$STRUCTUREDSIM_PROOF_FILES" 
 
-VERTICALCOMP_SPEC_FILES="../core/effect_interpolants.v"
-VERTICALCOMP_PROOF_FILES="../core/effect_corediagram_trans.v ../core/effect_interpolation_II.v ../core/effect_interpolation_proofs.v ../core/effect_simulations_trans.v"
+VERTICALCOMP_SPEC_FILES="../core/interpolants.v"
+VERTICALCOMP_PROOF_FILES="../core/internal_diagram_trans.v ../core/interpolation_II.v ../core/interpolation_proofs.v ../core/simulations_trans.v"
 count-nocompcert "Transitivity (\S\ref{sec:composition})" "$VERTICALCOMP_SPEC_FILES" "$VERTICALCOMP_PROOF_FILES" 
 
 LINKING_SPEC_FILES="../linking/linking_spec.v ../linking/compcert_linking.v ../linking/rc_semantics.v ../linking/context_equiv.v ../linking/pos.v ../core/nucular_semantics.v"
