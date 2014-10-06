@@ -154,7 +154,7 @@ let compile_c_ast sourcename csyntax ofile =
   set_dest PrintMach.destination option_dmach ".mach";
   (* Convert to Asm *)
   let asm =
-    match Compiler.transf_c_program csyntax with
+    match CompositionalCompiler.transf_c_program csyntax with
     | Errors.OK x -> x
     | Errors.Error msg ->
         print_error stderr msg;
@@ -179,7 +179,7 @@ let compile_cminor_file ifile ofile =
   let ic = open_in ifile in
   let lb = Lexing.from_channel ic in
   try
-    match Compiler.transf_cminor_program
+    match CompositionalCompiler.transf_cminor_program
             (CMtypecheck.type_program
               (CMparser.prog CMlexer.token lb)) with
     | Errors.Error msg ->

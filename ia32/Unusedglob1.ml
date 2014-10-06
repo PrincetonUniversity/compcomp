@@ -14,7 +14,7 @@
 
 open Datatypes
 open AST
-open Asm
+open Asm_comp
 
 let referenced_addr (Addrmode(base, ofs, const)) =
   match const with
@@ -40,5 +40,5 @@ let referenced_instr = function
   | Pbuiltin(ef, args, res) -> referenced_builtin ef
   | _ -> []
 
-let code_of_function f = f
+let code_of_function f = f.fn_code
 

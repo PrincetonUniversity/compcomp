@@ -18,7 +18,7 @@ open Camlcoq
 open Sections
 open AST
 open Memdata
-open Asm
+open Asm_comp
 
 module StringSet = Set.Make(String)
 
@@ -350,7 +350,7 @@ let print_builtin_vload_common oc chunk addr res =
       fprintf oc "	movl	%a, %a\n" addressing addr ireg res
   | Mint64, [IR res1; IR res2] ->
       let addr' = offset_addressing addr (coqint_of_camlint 4l) in
-      if not (Asmgen.addressing_mentions addr res2) then begin
+      if not (Asmgen_comp.addressing_mentions addr res2) then begin
         fprintf oc "	movl	%a, %a\n" addressing addr ireg res2;
         fprintf oc "	movl	%a, %a\n" addressing addr' ireg res1
       end else begin
@@ -384,7 +384,7 @@ let print_builtin_vload_global oc chunk id ofs args res =
 let print_builtin_vstore_common oc chunk addr src tmp =
   match chunk, src with
   | (Mint8signed | Mint8unsigned), [IR src] ->
-      if Asmgen.low_ireg src then
+      if Asmgen_comp.low_ireg src then
         fprintf oc "	movb	%a, %a\n" ireg8 src addressing addr
       else begin
         fprintf oc "	movl	%a, %a\n" ireg src ireg tmp;
@@ -775,7 +775,7 @@ let print_function oc name code =
   fprintf oc "%a:\n" symbol name;
   print_location oc (C2C.atom_location name);
   cfi_startproc oc;
-  List.iter (print_instruction oc) code;
+  List.iter (print_instruction oc) code.fn_code;
   cfi_endproc oc;
   if target = ELF then begin
     fprintf oc "	.type	%a, @function\n" symbol name;

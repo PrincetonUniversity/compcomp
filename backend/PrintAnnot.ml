@@ -19,7 +19,7 @@ open Floats
 open Camlcoq
 open AST
 open Memdata
-open Asm
+open Asm_comp
 
 let re_annot_param = Str.regexp "%%\\|%[1-9][0-9]*"
 

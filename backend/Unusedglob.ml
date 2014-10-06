@@ -15,7 +15,7 @@
 open Camlcoq
 open Maps
 open AST
-open Asm
+open Asm_comp
 open Unusedglob1
 
 module IdentSet = Set.Make(struct type t = ident let compare = compare end)
