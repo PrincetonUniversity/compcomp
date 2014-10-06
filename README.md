@@ -36,6 +36,13 @@ To build, clone the repository, go to the root directory, and type:
   make
 ```
 
+You can install the compiler and runtime libraries using:
+
+```
+  su
+  make install
+```
+
 ### Using Custom Ssreflect Installation
 
 If your Ssreflect or MathComp are installed in a nonstandard place (e.g., in
