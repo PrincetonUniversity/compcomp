@@ -96,6 +96,14 @@ only merged into `master` when complete). However, further development on
 `compcomp` after the AEC begins its work could result in transitory build issues
 on `master`.
 
+### Extraction and Builtin Support
+
+The extracted version of the compiler is `driver/CompositionalCompiler.v`.
+Since `CompositionalCompiler.v` does not yet enable inlining, this version of
+the compiler does not currently support certain inlined CompCert intrinsics such
+as `__builtin_bswap`. We plan to add support for inlining and inlined builtins
+in the near future.
+
 ## Files
 
 An HTML rendering of the code is browsable at:
