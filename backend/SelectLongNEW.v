@@ -349,25 +349,26 @@ Definition subl (e1 e2: expr) :=
   | _, _ => default
   end.
 
-(*Definition mull_base (e1 e2: expr) :=
+Definition mull_base (e1 e2: expr) :=
   splitlong2 e1 e2 (fun h1 l1 h2 l2 =>
     Elet (Ebuiltin (EF_builtin hf.(i64_mul) sig_ll_l) (l1 ::: l2 ::: Enil))
       (makelong
         (add (add (Eop Ohighlong (Eletvar O ::: Enil))
                   (mul (lift l1) (lift h2)))
              (mul (lift h1) (lift l2)))
-        (Eop Olowlong (Eletvar O ::: Enil)))).*)
+        (Eop Olowlong (Eletvar O ::: Enil)))).
 
 (*LENB: original CompCert has ignature sig_ii -- 
-but has sig_ll in get_helpers!*)
+but has sig_ll in get_helpers!
 Definition mull_base (e1 e2: expr) :=
   splitlong2 e1 e2 (fun h1 l1 h2 l2 =>
-    Elet (Ebuiltin (EF_builtin hf.(i64_mul) sig_ii_l) (l1 ::: l2 ::: Enil))
+in comment    Elet (Ebuiltin (EF_builtin hf.(i64_mul) sig_ii_l) (l1 ::: l2 ::: Enil))
       (makelong
         (add (add (Eop Ohighlong (Eletvar O ::: Enil))
                   (mul (lift l1) (lift h2)))
              (mul (lift h1) (lift l2)))
         (Eop Olowlong (Eletvar O ::: Enil)))).
+*)
 
 Definition mullimm (e: expr) (n: int64) :=
   if Int64.eq n Int64.zero then longconst Int64.zero else

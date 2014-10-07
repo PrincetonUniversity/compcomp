@@ -107,7 +107,7 @@ Inductive is_I64_helper hf : ident -> signature -> Prop :=
 | ef_neg: is_I64_helper hf hf.(i64_neg) sig_l_l
 | ef_add: is_I64_helper hf hf.(i64_add) sig_ll_l
 | ef_sub: is_I64_helper hf hf.(i64_sub) sig_ll_l
-| ef_mul: is_I64_helper hf hf.(i64_mul) sig_ii_l (*Changed this back to sig_ii_l*)
+| ef_mul: is_I64_helper hf hf.(i64_mul) sig_ll_l
 | ef_sdiv: is_I64_helper hf hf.(i64_sdiv) sig_ll_l
 | ef_udiv: is_I64_helper hf hf.(i64_udiv) sig_ll_l
 | ef_smod: is_I64_helper hf hf.(i64_smod) sig_ll_l
@@ -134,13 +134,10 @@ destruct (signature_eq sg sig_l_s); subst.
 destruct (signature_eq sg sig_l_l); subst.
   destruct (ident_eq name hf.(i64_neg)); subst; try solve[left; constructor].
   right; intros N. inv N; intuition.  
-destruct (signature_eq sg sig_ii_l); subst.
-  destruct (ident_eq name hf.(i64_mul)); subst; try solve[left; constructor].
-  right; intros N. inv N; intuition.  
 destruct (signature_eq sg sig_ll_l); subst.
   destruct (ident_eq name hf.(i64_add)); subst; try solve[left; constructor].
   destruct (ident_eq name hf.(i64_sub)); subst; try solve[left; constructor].
-  (*destruct (ident_eq name hf.(i64_mul)); subst; try solve[left; constructor].*)
+  destruct (ident_eq name hf.(i64_mul)); subst; try solve[left; constructor].
   destruct (ident_eq name hf.(i64_sdiv)); subst; try solve[left; constructor].
   destruct (ident_eq name hf.(i64_udiv)); subst; try solve[left; constructor].
   destruct (ident_eq name hf.(i64_smod)); subst; try solve[left; constructor].
