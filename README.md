@@ -100,9 +100,10 @@ on `master`.
 
 The extracted version of the compiler is `driver/CompositionalCompiler.v`.
 Since `CompositionalCompiler.v` does not yet enable inlining, this version of
-the compiler doesn't currently support inlined CompCert intrinsics such as
-`__builtin_bswap`. We plan to add support for inlining and builtins in the near
-future.
+the executable doesn't currently support inlined CompCert intrinsics such as
+`__builtin_bswap` (we plan to add support for inlining and builtins in the near
+future). On the other hand, the proofs deal fully with both compiler builtins
+and other intrinsics such as 64-bit helper functions.
 
 ## Files
 
