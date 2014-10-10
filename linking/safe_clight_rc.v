@@ -40,8 +40,6 @@ Variable juicy_mem : Type. (* will be instantiated later to the actual [juicy_me
 
 Variable transf : FSem.t mem juicy_mem.
 
-Variable clsem_fun : corestep_fun (FSem.F mem juicy_mem transf genv CL_core clsem). (*TODO*)
-
 Variable Z : Type.
 
 Variable espec : external_specification juicy_mem external_function Z.
@@ -1214,12 +1212,12 @@ move=> Hsub; case=> m1 Hno Halloc Hbind ->; split.
   by move: (create_undef_temps_undef Hundef); discriminate. }
 Qed.
 
-Lemma rc_safe z c m :
+Lemma rc_safe z c m n :
   cl_core_inv c (FSem.E _ _ transf m) -> 
-  (forall n, safeN (FSem.F _ _ transf _ _ clsem) espec ge n z (RC.core c) m) -> 
-  (forall n, safeN (FSem.F _ _ transf _ _ rcsem) espec ge n z c m).
+  safeN (FSem.F _ _ transf _ _ clsem) espec ge n z (RC.core c) m -> 
+  safeN (FSem.F _ _ transf _ _ rcsem) espec ge n z c m.
 Proof.
-move=> Inv H n; move: z c m Inv {H} (H n); elim: n=> // n IH z c m Inv H. 
+move=> Inv H; move: z c m Inv H; elim: n=> // n IH z c m Inv H. 
 rewrite /= !FSem.atext /= /RC.at_external /RC.halted; move: H=> /=.
 rewrite !FSem.atext /=.
 case Hatext: (Clight_coop.CL_at_external _ _)=> // [[[ef sig] args]|].
@@ -2023,23 +2021,17 @@ Lemma rc_init_safe z v vs c m :
     & forall n, safeN (FSem.F _ _ transf _ _ rcsem) espec ge n z c' m].
 Proof.
 rewrite /= /RC.initial_core /= => Heq; rewrite Heq=> Hsafe; split=> // n.
-move: Heq Hsafe; rewrite /CL_initial_core; case: v=> // b ofs.
+move: Heq (Hsafe n.+1); rewrite /= /CL_initial_core; case: v=> // b ofs.
+rewrite FSem.atext FSem.halted /=.
 case: (Integers.Int.eq_dec _ _)=> // Heq; subst ofs.
 case Hg: (Genv.find_funct_ptr _ _)=> // [fd].
 case Hfd: fd=> // [f].
 case Hty: (type_of_fundef _)=> // [tys ty].
 case Hval: (_ && _)=> //.
-case=> <- /= Hsafe. 
-case: n=> //= n.
-rewrite !FSem.atext FSem.halted /= /RC.corestep /RC.effstep /=.
-have [e [te [m' [Hfe Hprop]]]]: 
-  exists e te m', 
-    [/\ function_entry1 f vs (FSem.E _ _ transf m) e te (FSem.E _ _ transf m')
-      & FSem.P _ _ transf m m'].
-{ move: (Hsafe n.+1)=> /=; rewrite FSem.atext FSem.halted /=.
-  case=> c' []m' []; rewrite FSem.step; case; inversion 1; subst=> ?.
-  by exists e, le, m'; split. }
-set c' := {| RC.core := (CL_State f (fn_body f) Kstop e te)
+case=> <- /=; case=> c' []m'; rewrite FSem.step; case; case=> Hstep Hprop Hsafe'.
+case: n Hsafe'=> // n Hsafe' /=.
+rewrite !FSem.atext /= !FSem.halted /= /RC.corestep /RC.effstep /=.
+set c'' := {| RC.core := c'
         ; RC.locs := REACH (FSem.E _ _ transf m')
      (fun b0 : block =>
       freshloc (FSem.E _ _ transf m) (FSem.E _ _ transf m') b0
@@ -2047,26 +2039,21 @@ set c' := {| RC.core := (CL_State f (fn_body f) Kstop e te)
            {|
            RC.core := CL_Callstate (Internal f) vs Kstop;
            RC.locs := getBlocks vs |} (FSem.E _ _ transf m) b0) |}.
-exists c', m'; split.
-rewrite FSem.step; split=> //.
-exists EmptyEffect.
-split; first by constructor.
-split=> //.
-apply: rc_safe.
-split.
-eapply (function_entry1_state_inv (c0 := c')); eauto.
+exists c'', m'; split.
++ rewrite FSem.step; split=> //; exists EmptyEffect. 
+rewrite /RC.effstep /=; split=> //.
+inversion Hstep; subst; constructor=> //.
+apply: rc_safe; rewrite /c'' /=; rewrite /cl_core_inv /=. 
+inversion Hstep; subst=> /=; split=> //. 
+eapply (function_entry1_state_inv (c0 := c'')); eauto.
 by move=> b' Hget; apply: REACH_nil; apply/orP; right.
-rewrite /c' /= => b' Hin; apply/orP; right. 
+rewrite /c'' /= => b' Hin; apply/orP; right. 
 move: Hin; rewrite /RC.reach_set /RC.roots /=.
-move/REACH_split; case.
+move/REACH_split; case. 
 apply: REACH_mono'=> b''. 
 by move=> Hglob; apply/orP; right; apply: REACH_nil; apply/orP; left.
 by move/REACH_is_closed.
-by [].
-move=> n'.
-eapply safe_corestep_forward; eauto.
-rewrite FSem.step; split=> //.
-by econstructor.
+by apply: safe_downward1. 
 Qed.
 
 End SafeClightRC. End SAFE_CLIGHT_RC.
