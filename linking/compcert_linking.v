@@ -5,7 +5,6 @@ Require Import sepcomp. Import SepComp.
 Require Import pos.
 Require Import stack. 
 Require Import cast.
-Require Import semantics_tcs.
 
 Require Import ssreflect ssrbool ssrnat ssrfun eqtype seq fintype finfun.
 Set Implicit Arguments.

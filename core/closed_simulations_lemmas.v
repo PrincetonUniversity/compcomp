@@ -11,7 +11,6 @@ Require Import Axioms.
 
 Require Import mem_lemmas. (*needed for definition of mem_forward etc*)
 Require Import semantics.
-Require Import semantics_tcs.
 Require Import semantics_lemmas.
 Require Import closed_simulations.
 Require Import closed_safety.

@@ -4,7 +4,6 @@ Require Import sepcomp. Import SepComp.
 Require Import arguments.
 
 Require Import pos.
-Require Import semantics_tcs.
 Require Import compcert_linking.
 Require Import rc_semantics.
 Require Import rc_semantics_lemmas.

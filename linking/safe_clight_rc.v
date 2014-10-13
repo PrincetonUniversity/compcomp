@@ -17,7 +17,6 @@ Require Import arguments.
 
 Require Import jstep.
 Require Import pred_lemmas.
-Require Import semantics_tcs.
 Require Import rc_semantics.
 Require Import simulations. Import SM_simulation.
 
