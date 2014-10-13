@@ -169,7 +169,7 @@ LINKING=cast.v pos.v stack.v seq_lemmas.v pred_lemmas.v semantics_tcs.v \
   linking_spec.v linking.v compcert_linking.v compcert_linking_lemmas.v \
   disjointness.v reach_lemmas.v rc_semantics.v rc_semantics_lemmas.v \
   linking_inv.v ret_lemmas.v call_lemmas.v linking_proof.v context_equiv.v \
-  safe_clight_rc.v CompositionalComplements.v 
+  jstep.v safe_clight_rc.v CompositionalComplements.v 
 
 # Putting everything together (in driver/)
 
