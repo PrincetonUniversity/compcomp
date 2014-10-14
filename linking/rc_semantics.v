@@ -9,8 +9,6 @@ Require Import compcert_imports. Import CompcertCommon.
 Require Import sepcomp. Import SepComp.
 Require Import arguments.
 
-Require Import semantics_tcs.
-
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
@@ -217,8 +215,7 @@ Proof.
 destruct 1 as [H [H2 H3]].
 intros b ofs. eapply effstep_valid; eauto.
 Qed.
-
-Definition effsem : @Effsem.t (Genv.t F V) state := 
-  Effsem.Build_t _ _ coopsem effstep my_effax1 my_effax2 my_effstep_valid.
+Definition effsem : @EffectSem (Genv.t F V) state :=
+  Build_EffectSem _ _ coopsem effstep my_effax1 my_effax2 my_effstep_valid.
 
 End rc. End RC.

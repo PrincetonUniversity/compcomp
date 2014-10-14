@@ -10,7 +10,6 @@ Require Import sepcomp. Import SepComp.
 Require Import arguments.
 
 Require Import rc_semantics.
-Require Import semantics_tcs.
 
 Require Import ssreflect ssrbool ssrfun seq eqtype fintype.
 Set Implicit Arguments.

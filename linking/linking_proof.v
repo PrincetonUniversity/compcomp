@@ -18,7 +18,6 @@ Require Import pred_lemmas.
 Require Import seq_lemmas.
 Require Import wf_lemmas.
 Require Import reestablish.
-Require Import semantics_tcs.
 Require Import inj_lemmas.
 Require Import join_sm.
 Require Import reach_lemmas.
@@ -351,8 +350,8 @@ set c2 := peekCore st2.
 
 have [U1 [c1' [STEP0 [ESTEP0 [U1'_EQ [c1_locs ST1']]]]]]:
    exists (U1:block -> Z -> bool) c1',
-       Coresem.corestep 
-         (t := effect_instance (sem (cores_S (Core.i c1)))) 
+       @corestep _ _ _
+         (sem (cores_S (Core.i c1))) 
          (ge (cores_S (Core.i c1))) (Core.c c1) m1 c1' m1' 
    /\  effect_semantics.effstep 
          (sem (cores_S (Core.i c1)))
