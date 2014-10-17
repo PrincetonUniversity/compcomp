@@ -68,6 +68,10 @@ Infix "(+)":= add_inj (at level 90, right associativity).
  * And everything else, mapped only by l, passes through the 
  * extra memory space added in m2 (of size m1).
  *)
+
+
+
+
 Definition mkInjections (sizeM2:block)(j k l: meminj) 
                      :  meminj * meminj := 
    (j (+) (filter_id l >> sizeM2),
@@ -160,7 +164,97 @@ Lemma MKI_norm:
       rewrite pos_be_pos; exists b2, z0; trivial.
 Qed.
 
-Lemma destruct_inj12:
+Definition range_eq (j f:meminj) (sizeM:block):=
+  forall b2 b1 delta, (b2 < sizeM)%positive -> f b1 = Some (b2, delta) -> j b1 = Some(b2, delta).
+
+Lemma MKI_range_eq:
+  forall j k l sizeM2,
+  forall j' k',
+    (j', k') = mkInjections sizeM2 j k l ->
+    range_eq j j' sizeM2.
+  intros j k l sizeM2 j' k' MKI; inversion MKI.
+  unfold range_eq; intros b2 b1 delta range jmap'.
+  unfold add_inj, shiftT in jmap'.
+  destruct (j b1) eqn:jmap; trivial.
+  destruct (filter_id l b1) eqn:lmap; trivial.
+  destruct p; inversion jmap'.
+  rewrite <- H2 in range.
+  xomega.
+Qed.
+
+Lemma MKI_restrict:
+  forall j k l sizeM2,
+  forall j' k',
+    (j', k') = mkInjections sizeM2 j k l ->
+    forall b1 b2 delta, j' b1 = Some (b2, delta) ->
+                        (b2 < sizeM2)%positive ->
+                        j b1 = Some (b2, delta).
+  intros. inversion H. unfold add_inj, shiftT in *; subst j'.
+  destruct (j b1) eqn: jmap; trivial.
+  destruct (filter_id l b1); trivial; destruct p.
+  inversion H0. rewrite <- H3 in H1; xomega.
+Qed.
+
+Lemma MKI_None12:
+  forall j k l sizeM2,
+  forall j' k',
+    (j', k') = mkInjections sizeM2 j k l ->
+    forall b,
+      j b = None ->
+      l b = None ->
+      j' b = None.
+  intros ? ? ? ? ? ? H ? ? ? ; inversion H; 
+  unfold add_inj, shiftT, filter_id, shiftS in *.
+  subst; rewrite H0, H1; auto. 
+Qed.
+
+Lemma MKI_None23:
+  forall j k l sizeM2,
+  forall j' k',
+    (j', k') = mkInjections sizeM2 j k l ->
+    forall b,
+      k b = None ->
+      l (b - sizeM2)%positive = None ->
+      k' b = None.
+  intros ? ? ? ? ? ? H ? ? ? ; inversion H; 
+  unfold add_inj, shiftT, filter_id, shiftS in *.
+  subst; rewrite H0, H1; destruct (b ?= sizeM2)%positive; trivial.
+Qed.
+
+Lemma MKI_Some12:
+  forall j k l sizeM2,
+  forall j' k',
+    (j', k') = mkInjections sizeM2 j k l ->
+    forall b b2 d,
+      j' b = Some (b2, d) ->
+      j b = Some (b2, d) \/ j b = None /\ (exists b2' d', l b = Some (b2', d') /\ b2 = (b + sizeM2)%positive /\ d = 0).
+  intros. inversion H; clear H. 
+  unfold add_inj, shiftT, filter_id, shiftS in *.
+  subst.
+  destruct (j b) eqn:jmap.
+  destruct p; inversion H0; subst. left; auto.
+  destruct (l b) eqn:lmap.
+  destruct p; inversion H0; subst. right; split; trivial; exists b0, z; intuition.
+  inversion H0.
+Qed.
+
+Lemma MKI_Some23:
+  forall j k l sizeM2,
+  forall j' k',
+    (j', k') = mkInjections sizeM2 j k l ->
+    forall b2 b3 d,
+      k' b2 = Some (b3, d) ->
+      k b2 = Some (b3, d) \/ k b2 = None /\ (l (b2 - sizeM2)%positive = Some (b3, d) /\ (b2 ?= sizeM2)%positive = Gt).
+  intros. inversion H; clear H. 
+  unfold add_inj, shiftT, filter_id, shiftS in *.
+  subst.
+  destruct (k b2) eqn:jmap.
+  destruct p; inversion H0; subst. left; auto.
+  destruct ((b2 ?= sizeM2)%positive) eqn:ineq; try solve [inversion H0].
+  right; auto. 
+Qed.
+
+Lemma MKI_Some12':
   forall j k l sizeM2,
     forall j' k',
       (j', k') = mkInjections sizeM2 j k l ->
@@ -180,7 +274,7 @@ Lemma destruct_inj12:
     
 Qed.
 
-Lemma destruct_inj23:
+Lemma MKI_Some23':
   forall j k l sizeM2,
     forall j' k',
       (j', k') = mkInjections sizeM2 j k l ->
@@ -313,6 +407,14 @@ Lemma bconcat_larger2:
   rewrite pos_be_pos; rewrite Pos.add_sub, H; apply orb_true_r.
 Qed.
 
+Lemma ext_change_ext: forall mu extS extT ext_inj,
+                        extern_of (change_ext mu extS extT ext_inj) = ext_inj.
+  intros. unfold extern_of; destruct mu; auto.
+Qed.
+Lemma loc_change_ext: forall mu extS extT ext_inj,
+                        local_of (change_ext mu extS extT ext_inj) = local_of mu.
+  intros. unfold extern_of; destruct mu; auto.
+Qed.
 
 
 Lemma change_ext_partial_wd: 
@@ -422,7 +524,7 @@ Lemma destruct_sminj12:
   destruct nu12; simpl in *.
   destruct (j' b1)  eqn:jb1.
   + destruct p. inversion MKI. 
-    eapply destruct_inj12 in jb1; eauto; destruct jb1.
+    eapply MKI_Some12' in jb1; eauto; destruct jb1.
     - left. rewrite <- jID; rewrite H.
       inversion H2; subst; auto.
     - right. destruct H as [b3 [d3 lb1]]; rewrite <- lID; rewrite lb1.
@@ -451,7 +553,7 @@ Lemma destruct_sminj23:
   destruct nu23; simpl in *.
   destruct (k' b2)  eqn:kb2.
   + destruct p. inversion MKI. 
-    eapply destruct_inj23 in kb2; eauto; destruct kb2.
+    eapply MKI_Some23' in kb2; eauto; destruct kb2.
     - left. rewrite <- jID; rewrite H.
       inversion H2; subst; auto.
     - right. destruct H as [b1 lb1]; rewrite <- lID. 
@@ -462,86 +564,342 @@ Lemma destruct_sminj23:
     - rewrite locNone in H; inversion H.
 Qed.
 
+(*A way to split cases when using change_ext*)
+
 (*************************
  *         MEMORY        *
  *************************)
-Parameter mem_add: mem -> mem -> mem.
+Parameter mem_add: meminj -> mem -> mem -> mem.
 
-Definition mem_add_cont (m1 m2:mem):=
+Definition mem_add_cont' (m1 m2:mem):=
   fun (b: block)=>
-    let n1 := (Mem.nextblock m1) in
-    match (b ?= n1)%positive with
-        | Lt => (Mem.mem_contents m1) !! b
-        | _ => (Mem.mem_contents m1) !! (b - n1)
+    let n2 := (Mem.nextblock m2) in
+    match (b ?= n2)%positive with
+        | Lt => (Mem.mem_contents m2) !! b
+        | _ => (Mem.mem_contents m2) !! (b - n2)
     end.
-Definition mem_add_acc (m1 m2:mem):=
-  fun (b: block)=>
-    let n1 := (Mem.nextblock m1) in
-    match (b ?= n1)%positive with
-        | Lt => (Mem.mem_access m1) !! b
-        | _ => (Mem.mem_access m1) !! (b - n1)
-    end.
+
+Definition has_preimage (f:meminj) (m:mem) (b2:block):=
+  exists b1 delta, Mem.valid_block m b1 /\ 
+                   f b1 = Some (b2, delta).
+Definition loc_preimage (f:meminj) (m:mem) (b2:block) (ofs:Z) :=
+  exists b1 delta, Mem.valid_block m b1 /\ 
+                   f b1 = Some (b2, delta) /\
+                   Mem.perm m b1 (ofs - delta) Max Nonempty.
+
+(*Lemma preimage_source: forall f m b2 ofs,
+                         (exists b1 delta, source f m b2 ofs = Some( b1, delta)) <->
+                         loc_preimage f m b2 ofs.
+  acdmit.
+  (*intros; split; intros. 
+  + destruct H as [b1 [delta soc]]. unfold loc_preimage; exists b1, delta. 
+    split.
+
+acdmit.
+  + destruct *)
+Qed.*)
+
+Definition acc_property (f:meminj) (m1' m2:mem)
+           (AM:ZMap.t (Z -> perm_kind -> option permission)):Prop :=
+  forall b2, 
+    (Mem.valid_block m2 b2 -> 
+     forall k ofs2,
+       match source f m1' b2 ofs2 with
+           Some(b1,ofs1) =>  (AM !! b2) ofs2 k = 
+                             (m1'.(Mem.mem_access) !! b1) ofs1 k
+         | None =>           (AM !! b2) ofs2 k = 
+                             (m2.(Mem.mem_access) !! b2) ofs2 k
+       end) /\
+    (~ Mem.valid_block m2 b2 -> forall k ofs,
+                             (AM !! b2) ofs k =
+                             (m1'.(Mem.mem_access) !! (b2 - m2.(Mem.nextblock))%positive) ofs k).
+
+
+Lemma valid_dec: forall m b, {Mem.valid_block m b} + {~Mem.valid_block m b}.
+  intros. unfold Mem.valid_block. apply plt.
+Qed.
+
+Definition mem_add_acc (f:meminj) (m1' m2:mem):=
+  fun b2 ofs2 k =>
+    if valid_dec m2 b2 then 
+      (match source f m1' b2 ofs2 with
+           Some(b1,ofs1) =>  (m1'.(Mem.mem_access) !! b1) ofs1 k
+         | None =>           (m2.(Mem.mem_access) !! b2) ofs2 k
+       end)
+    else (m1'.(Mem.mem_access) !! (b2 - m2.(Mem.nextblock))%positive) ofs2 k.
+
+Definition mem_add_cont (f:meminj) (m1' m2:mem):=
+  fun b2 ofs2 =>
+    if valid_dec m2 b2 then 
+      (match source f m1' b2 ofs2 with
+           Some(b1,ofs1) =>  ZMap.get ofs1 (m1'.(Mem.mem_contents) !! b1)
+         | None =>           ZMap.get ofs2 ( m2.(Mem.mem_contents) !! b2)
+       end)
+    else ZMap.get ofs2 (m1'.(Mem.mem_contents) !! (b2 - m2.(Mem.nextblock))%positive).
+
+
 Definition mem_add_nb (m1 m2:mem):=
   let n1 := Mem.nextblock m1 in
   let n2 := Mem.nextblock m2 in
-  (n1 + n2)%positive. 
+  (n2 + n1)%positive. 
 
-Axiom mem_add_ax: forall (m1 m2 m3: mem), 
-                    m3 = mem_add m1 m2 ->
-                    (forall b, (Mem.mem_contents m3) !! b = mem_add_cont m1 m2 b) /\
-                    (forall b, (Mem.mem_access m3) !! b  = mem_add_acc m1 m2 b) /\
+Axiom mem_add_ax: forall (f:meminj) (m1 m2 m3: mem), 
+                    m3 = mem_add f m2 m1 ->
+                    (forall b ofs, ZMap.get ofs (Mem.mem_contents m3) !! b = 
+                                   mem_add_cont f m1 m2 b ofs) /\
+                    (forall b, (Mem.mem_access m3) !! b = 
+                               mem_add_acc f m1 m2 b) /\  
                     (Mem.nextblock m3 = mem_add_nb m1 m2).
 
-Lemma mem_add_contx: forall (m1 m2: mem),
-                    (forall b, (Mem.mem_contents (mem_add m1 m2)) !! b = mem_add_cont m1 m2 b).
-  intros; remember (mem_add m1 m2) as m3; apply mem_add_ax; auto.
+Lemma mem_add_contx:
+  forall f m1' m2, 
+    (forall b ofs, 
+       ZMap.get ofs (Mem.mem_contents (mem_add f m2 m1')) !! b = 
+       mem_add_cont f m1' m2 b ofs).
+  intros; remember (mem_add f m2 m1') as m3; destruct (mem_add_ax f m1' m2 m3) as [A [B C]]; auto.
 Qed.
 
-Lemma mem_add_accx: forall (m1 m2: mem),
-                    (forall b, (Mem.mem_access (mem_add m1 m2)) !! b = mem_add_acc m1 m2 b).
-  intros; remember (mem_add m1 m2) as m3; apply mem_add_ax; auto.
+Lemma mem_add_accx:
+  forall f m1' m2, (forall b, (Mem.mem_access (mem_add f m2 m1')) !! b = mem_add_acc f m1' m2 b).
+  intros; remember (mem_add f m2 m1') as m3; destruct (mem_add_ax f m1' m2 m3) as [A [B C]]; auto.
 Qed.
 
-Lemma mem_add_nbx: forall (m1 m2: mem),
-                    (Mem.nextblock (mem_add m1 m2)) = mem_add_nb m1 m2.
-  intros; remember (mem_add m1 m2) as m3; apply mem_add_ax; auto.
+Lemma mem_add_nbx: forall (f:meminj) (m1 m2: mem),
+                    (Mem.nextblock (mem_add f m2 m1)) = mem_add_nb m1 m2.
+  intros; remember (mem_add f m2 m1) as m3; destruct (mem_add_ax f m1 m2 m3) as [A [B C]]; auto.
 Qed.
 
 (*************************
  *    MEMORY PROPRTIES   *
  *************************)
 
-Lemma mem_add_forward: forall m1' m2,
-  mem_forward m2 (mem_add m2 m1').
-  unfold mem_forward. intros m1' m2 b bval_m2.
+(* usefull in the next lemma *)
+Lemma xH_smallest: forall b, ~ Plt b 1.
+  intros.
+  unfold not, Plt, Pos.lt, Pos.compare; intros.
+  destruct b; simpl in H; inversion H.
+Qed.
+
+(*
+Lemma loc_preimage_dec:
+  forall j m b ofs, loc_preimage m j b ofs \/ ~ loc_preimage m j b ofs.
+
+Lemma preimage_dec:
+  forall m b j, has_preimage m j b \/ ~ has_preimage m j b.
+  acdmit.
+  (*intros.
+  unfold has_preimage.
+  unfold Mem.valid_block.
+  remember (Mem.nextblock m) as N; clear HeqN m.
+  generalize N; apply positive_Peano_ind.
+  + right.
+    unfold not; intros. destruct H as [b1 [ delta [H1 H2]]].
+    apply (xH_smallest b1); assumption.
+  + intros.
+    destruct H as [[b1 [delta [H1 H2]]] | H].
+  - left. exists b1, delta. split; trivial.
+    apply Plt_trans_succ; auto.
+  - destruct (j x) eqn:map; try destruct p.
+    * destruct (AST.ident_eq b0 b).
+      left; subst; exists x, z; split; auto.
+      apply Plt_succ.
+      right. unfold not; intros [b1 [delta [H1 H2]]].
+      apply H. apply Plt_succ_inv in H1. destruct H1.
+      exists b1, delta; auto.
+      subst; rewrite map in H2; inversion H2. apply n in H1; inversion H1.
+    * right. intros [b1 [delta [H1 H2]]]; apply H.
+      apply Plt_succ_inv in H1. destruct H1.
+      exists b1, delta; auto.
+      subst; rewrite map in H2; inversion H2. *)
+Qed.
+*)
+
+Definition corresponding_preimage (f:meminj) (sizeM1 sizeM2:block):=
+  forall b1 b2 delta, f b1 = Some (b2, delta) -> (b2 < sizeM2)%positive -> (b1 < sizeM1)%positive.
+
+
+(*Lemma mem_add_unchanged: 
+  forall f m1' m2,
+    forall j m1,
+    corresponding_preimage f (Mem.nextblock m1) (Mem.nextblock m2) ->
+    range_eq j f (Mem.nextblock m2) ->
+    mem_forward m1 m1' ->
+    Mem.mem_inj j m1 m2 ->
+    let in_m2 := fun b z => Plt b (Mem.nextblock m2) in
+    Mem.unchanged_on in_m2 m2 (mem_add f m2 m1').
+  intros f m1' m2 j m1 corpre range mfwrd minj.
+  constructor; intros.
+  (*unfold Mem.valid_block in H0.
+  destruct (preimage_dec m1' b f) as [H1 | H1]; unfold has_preimage in H1.
+  + destruct H1 as [b1 [delta [valb1 fmap]]].
+    assert (jmap:=fmap); apply (incr _ _ _ bval_m2) in jmap.
+    intros. unfold Mem.perm in *.
+    destruct minj as [mi_perm A B ]; clear A B.
+    move mi_perm at bottom.
+    replace ofs with ((ofs - delta) + delta) by omega.
+    eapply mi_perm; eauto.
+    eapply memFwrd. 
+    eapply corrpre; eauto.
+    Lemma mem_add_add_simpl: 
+      forall f m1' m2 b1 b2 delta,
+        Mem.valid_block m1' b1 ->
+        f b1 = Some (b2, delta) ->
+        forall ofs k p,
+        Mem.perm (mem_add f m2 m1') b2 (ofs + delta) k p ->
+        Mem.perm m1' b1 ofs k p.
+      acdmit.
+      (*intros f m1' m2 b1 b2 delta memval fmap ofs k p memperm.
+      destruct (mem_add_accx f m1' m2 b2) as [H1 H2].
+      unfold Mem.perm in H1.
+      unfold Mem.perm. unfold Mem.perm_order'.*)
+    Qed.
+    eapply (mem_add_add_simpl _ _ _ _ _ _ valb1 fmap); eauto.
+    replace ((ofs - delta) + delta) with ofs by omega; eauto.
+    - destruct (mem_add_accx f m1' m2 b) as [H H0].
+      unfold Mem.perm; intros.
+      rewrite (H0 H1); auto.
+Qed.
+
+  + unfold Mem.perm. rewrite mem_add_accx; unfold mem_add_acc. 
+    rewrite H; split; trivial.*) acdmit.
+  + unfold Mem.perm. rewrite mem_add_contx; unfold mem_add_cont. 
+    rewrite H; split; trivial.
+Qed.*)
+
+Definition mi_perm f m1 m2 := forall (b1 b2 : block) (delta ofs : Z) 
+                (k : perm_kind) (p : permission),
+              f b1 = Some (b2, delta) ->
+              Mem.perm m1 b1 ofs k p -> Mem.perm m2 b2 (ofs + delta) k p.
+
+Lemma mem_add_forward: 
+  forall (j':meminj) m1' m2,
+  forall (j:meminj) m1,
+    (forall b1 p, j b1 = Some p -> Mem.valid_block m1 b1) -> 
+    (* range_eq j j' (Mem.nextblock m2) -> *)
+    mem_forward m1 m1' ->
+    mi_perm j m1 m2 ->
+  mem_forward m2 (mem_add j m2 m1').
+  unfold mem_forward. intros j' m1' m2 j m1 corrpre (*incr*) memFwrd miperm b bval_m2.
   split.
   + unfold Mem.valid_block in *.
     rewrite mem_add_nbx.
     unfold mem_add_nb.
     apply (Plt_trans _ _ _ bval_m2). 
     apply Pos.lt_iff_add; exists ( Mem.nextblock m1'); auto.
-  + unfold Mem.valid_block, Plt, Pos.lt in bval_m2.
-    unfold Mem.perm. rewrite mem_add_accx; unfold mem_add_acc.
-    rewrite bval_m2; auto.
+  + intros ofs per.
+    unfold Mem.perm. rewrite (mem_add_accx j m1' m2  b); unfold mem_add_acc.
+    destruct (valid_dec m2 b); try contradiction.
+    destruct (source j m1' b ofs) eqn: sour; trivial.
+    destruct p; intros.
+    symmetry in sour; eapply source_SomeE in sour. 
+    destruct sour as [b1 [delta [ofs1 [invertible [leq [mapj [mperm ofs_add]]]]]]].
+    inversion invertible.
+    (*specialize (incr _ _ _ bval_m2 mapj').*)
+    subst ofs.
+    apply (miperm _ _ _ _ _ _ mapj).
+    unfold Mem.perm in H; rewrite H1 in H.
+    apply memFwrd; auto.
+    apply (corrpre _ _ mapj).
+    unfold Mem.perm; subst z b0; auto.
 Qed.
 
-Lemma mem_add_unchanged: 
-  forall m1' m2,
-    let in_m2 := fun b z => Plt b (Mem.nextblock m2) in
-    Mem.unchanged_on in_m2 m2 (mem_add m2 m1').
-  intros; constructor; intros.
-  unfold in_m2 in H. 
-  + unfold Mem.perm. rewrite mem_add_accx; unfold mem_add_acc. 
-    rewrite H; split; trivial.
-  + unfold Mem.perm. rewrite mem_add_contx; unfold mem_add_cont. 
-    rewrite H; split; trivial.
+
+
+(*
+Lemma MKI_meminj12:
+  forall j k l mu12,
+    SM_wd mu12 ->
+    j = extern_of mu12 ->
+    forall j' k' sizeM2,
+      (j', k') = mkInjections sizeM2 j k l ->
+      forall m1 m2,
+        Mem.inject (as_inj mu12) m1 m2 -> 
+        forall m1',
+          mem_forward m1 m1'->
+          forall nu12' extS extT,
+            nu12' = change_ext mu12 extS extT j' ->
+      Mem.inject (as_inj nu12') m1' (mem_add m2 m1').
+  intros. constructor.
+  { constructor.
+    intros.
+    assert (disj:  (as_inj mu12 b1 = Some (b2, delta)) \/  as_inj mu12 b1 = None /\ 
+                   j' b1 = Some (b2, delta)) by acdmit. 
+    destruct disj as [mu12b1 | jb1].
+    destruct H2. destruct mi_inj.
+    assert (mu12b1':=mu12b1).
+    eapply mi_perm in mu12b1.
+    Lemma mperm_subset: forall m m' b ofs k p,
+      Mem.perm m b ofs k p ->
+      Mem.perm (mem_add m m') b ofs k p.
+      unfold Mem.perm; intros.
+      assert (HH:= H); apply Mem.perm_valid_block in HH.
+      rewrite mem_add_accx; unfold mem_add_acc.
+      rewrite HH; auto.
+    Qed.
+    apply mperm_subset; eauto.
+    
+    assert (Mem.valid_block m1 b1). 
+    { destruct (plt b1 (Mem.nextblock m1)); auto.
+      apply mi_freeblocks in n; rewrite n in mu12b1'; inversion mu12b1'. }
+    apply H3 in H2. destruct H2. apply aH7.
+    apply mi_mappedblocks.
+      
+Acdmitted.*)
+
+
+(***********************************
+ *      Other Properties           *
+ ***********************************)
+
+Lemma as_in_SomeE: forall mu b1 b2 delta,
+                     as_inj mu b1 = Some (b2, delta) ->
+                     extern_of mu b1 = Some (b2, delta) \/
+                     local_of mu b1 = Some (b2, delta).
+  unfold as_inj, join; intros.
+  destruct (extern_of mu b1) eqn:ext; try (destruct p); inversion H; auto.
+Qed.
+
+Lemma no_overlap_forward: forall mu m1 m1' m2, 
+                            sm_valid mu m1 m2 ->
+                            SM_wd mu ->
+                            mem_forward m1 m1' ->
+                            Mem.meminj_no_overlap (as_inj mu) m1 ->
+                            Mem.meminj_no_overlap (as_inj mu) m1'.
+  unfold Mem.meminj_no_overlap; intros mu m1 m1' m2 sval SMWD mfwd minj; intros.
+  eapply minj; eauto;
+  (apply mfwd; auto); 
+  [destruct (as_inj_DomRng _ _ _ _ H0 SMWD) as [DOMtrue RNGtrue] |
+   destruct (as_inj_DomRng _ _ _ _ H1 SMWD) as [DOMtrue RNGtrue]];
+  ( destruct sval as [DOMval RNGval]; apply DOMval; auto; apply mfwd; auto).
 Qed.
 
 
-(*mem_unchanged_on_sub*)
+Lemma perm_order_trans': forall a b c,
+                           Mem.perm_order' a b ->
+                           perm_order b c ->
+                           Mem.perm_order' a c.
+  unfold Mem.perm_order'; intros.
+  destruct a; trivial. eapply perm_order_trans; eauto.
+Qed.
+
+Lemma any_Max_Nonempty: forall m b ofs k p,
+                          Mem.perm m b ofs k p ->
+                          Mem.perm m b ofs Max Nonempty.
+  unfold Mem.perm;  intros.
   
+  destruct k.
+  eapply perm_order_trans'; eauto. apply perm_any_N. 
+  unfold Mem.mem_access in *; destruct m.
+  rewrite po_oo. eapply po_trans; eauto.
+  rewrite po_oo in H. eapply po_trans; eauto.
+  unfold Mem.perm_order''. apply perm_any_N.
+Qed.
 
-(*Lemma MKI_meminj12:
-  forall j k l m1' m2,
-    Mem.inject j 
-    forall *)
+Lemma forward_nextblock_not: forall m m',
+                               mem_forward m m' ->
+                               forall b,
+                               ~ Mem.valid_block m' b ->
+                               ~ Mem.valid_block m b.
+  unfold not, Mem.valid_block.
+  intros m m' mfwd b nvalid valid; apply nvalid; apply (Pos.lt_le_trans _ _ _ valid). apply forward_nextblock; assumption.
+Qed.

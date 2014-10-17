@@ -646,11 +646,12 @@ rewrite ConvertL_J12' in *.
          convertL_pubBlocksTgt, convertL_locBlocksTgt, 
          convertL_extBlocksTgt.
 assert (Inj12': Mem.inject j12' m1' m2'). 
+{
     clear ConvertL_J12'.
     assert (Perm12': forall b1 b2 delta ofs k p,
              j12' b1 = Some (b2, delta) ->
              Mem.perm m1' b1 ofs k p -> Mem.perm m2' b2 (ofs + delta) k p).
-        intros.
+        {intros.
         apply (valid_split _ _ _ _ (ACCESS b2)); intros; clear ACCESS.
         (*case valid_block m2 b2*)
           specialize (H2 k (ofs+delta)).
@@ -1013,7 +1014,7 @@ assert (Inj12': Mem.inject j12' m1' m2').
               destruct HH as [M [A [B [C [D E]]]]]; subst.
                  split. omega. 
                         rewrite Zplus_0_r. apply Int.unsigned_range_2.
-       inv H. 
+       inv H. } 
 assert (ConvertR_J23': as_inj
      (convertR nu23 j23' (FreshDom (as_inj nu23) j23')
         (fun b : block => DomTgt nu' b && negb (DomTgt nu23 b))) = j23').
@@ -2609,7 +2610,7 @@ split. (*This is GOAL9: SM_wd
 split. intros. (*Proof of NORM*) clear GOAL1 ConvertR_J23'.
    subst.
    destruct (joinD_Some _ _ _ _ _ H) as [EXT | [EXT LOC]]; clear H.
-      destruct (Norm12 _ _ _ EXT) as [b3 [d2 EXT2]].
+   destruct (Norm12 _ _ _ EXT) as [b3 [d2 EXT2]].
       exists b3, d2. apply joinI; left. assumption. 
    remember (local_of nu12 b1) as q.
    destruct q; apply eq_sym in Heqq. inv LOC.
@@ -2626,7 +2627,7 @@ split. intros. (*Proof of NORM*) clear GOAL1 ConvertR_J23'.
    unfold removeUndefs in LOC. rewrite AsInj12 in LOC.
    remember (as_inj nu' b1) as t.
    destruct t; try inv LOC. destruct p; apply eq_sym in Heqt. 
-   remember (j23' b2) as u.
+   remember (j23' b2) as u. 
    destruct u; apply eq_sym in Hequ.
      destruct p. exists b0, z0; trivial.  
    destruct (mkiVal3 _ _ _ H2) as [[X _] | [X | X]]; clear mkiVal3.
