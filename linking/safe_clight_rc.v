@@ -39,6 +39,8 @@ Variable juicy_mem : Type. (* will be instantiated later to the actual [juicy_me
 
 Variable transf : FSem.t mem juicy_mem.
 
+Section Z.
+
 Variable Z : Type.
 
 Variable espec : external_specification juicy_mem external_function Z.
@@ -1211,10 +1213,771 @@ move=> Hsub; case=> m1 Hno Halloc Hbind ->; split.
   by move: (create_undef_temps_undef Hundef); discriminate. }
 Qed.
 
+Notation E := (@FSem.E _ _ transf).
+
+Notation F := (@FSem.F _ _ transf _ _).
+
+Lemma rc_step c m c' m' :
+  cl_core_inv c (E m) ->
+  corestep (F clsem) ge (RC.core c) m c' m' -> 
+  let: c'' := RC.mk c' (REACH (E m') (fun b => freshloc (E m) (E m') b 
+                                            || RC.reach_set ge c (E m) b))
+  in [/\ corestep (F rcsem) ge c m c'' m' & cl_core_inv c'' (E m')].
+Proof.
+move=> Inv step.
+rewrite FSem.step in step; case: step=> step Hprop.
+move: step Inv.
+remember (FSem.E mem juicy_mem transf m') as jm'.
+remember (FSem.E mem juicy_mem transf m) as jm.
+move=> step.
+move: step Heqjm Heqjm'.
+case: c=> /= core locs; case.
+
+{ move=> f a1 a2 k e le m0 loc ofs v2 v m0' H H2 H3 H4 Hmeq Hmeq' Inv.
+  set (c'' := Clight_coop.CL_State f Clight.Sskip k e le).
+  set (c := {|
+         RC.core := CL_State f (Sassign a1 a2) k e le;
+         RC.locs := locs |}).
+  set (locs'' :=  REACH m0' (fun b : block =>
+         freshloc m0 m0' b || RC.reach_set ge c m0 b)).
+  
+  split.
+  rewrite FSem.step; split=> //=.
+  exists (assign_loc_Effect (Clight.typeof a1) loc ofs); split. 
+  by rewrite -Hmeq -Hmeq' /=; econstructor; eauto.
+  split=> //.
+
+  { move=> b ofs'; rewrite /assign_loc_Effect.
+  case Hac: (Ctypes.access_mode _)=> // [ch|].
+  + case/andP; case/andP=> Heq _ _.
+    have Heq': loc = b by rewrite /eq_block in Heq; case: (Coqlib.peq loc b) Heq.
+    subst loc; move {Heq}; rewrite /cl_core_inv /= in Inv.
+    case: Inv=> Inv Inv2 Inv3; apply: REACH_nil. 
+    by apply: (eval_lvalue_reach Inv Inv2 H); apply/getBlocksP; exists ofs; constructor.
+  + case/andP; case/andP=> Heq _ _.
+    have Heq': loc = b by rewrite /eq_block in Heq; case: (Coqlib.peq b loc) Heq.
+    subst loc; move {Heq}; rewrite /cl_core_inv /= in Inv.
+    case: Inv=> Inv Inv2 Inv3; apply: REACH_nil.
+    by apply: (eval_lvalue_reach Inv Inv2 H); apply/getBlocksP; exists ofs; constructor. }
+  { by rewrite -Hmeq -Hmeq'. }
+  { by apply: core_inv_freshlocs. } }
+
+{ move=> f id a k e te m0 v H Hmeq Hmeq' Inv.
+  set (c'' := CL_State f Sskip k e (PTree.set id v te)).
+  set (c := {|
+         RC.core := CL_State f (Sset id a) k e te;
+         RC.locs := locs |}).
+  set (locs'' :=  REACH m0 (fun b : block =>
+         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //=.  
+  exists EmptyEffect; split; 
+    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  by rewrite -Hmeq -Hmeq' /=; econstructor; eauto.
+
+  (*reestablish invariant*)
+  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots /=. 
+  case; case=> He Hte Hsub Hk; split=> //=.
+  split.
+  { rewrite /locs''=> x b ty H7.
+    move: (He _ _ _ H7); case/orP; first by move=> ->.
+    move=> X; apply/orP; right; apply: REACH_nil; apply/orP; right.
+    by apply: REACH_nil; apply/orP; right. }
+  { move=> x v0 H7 b H8; case Heq: (ident_eq x id).
+    + subst x; rewrite PTree.gss in H7; case: H7=> Heq'; subst v0.
+      move: (eval_expr_reach _ _ Inv H); move/(_ b H8).
+      rewrite /locs'' /RC.reach_set /RC.roots /= => H10.
+      by apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil. 
+    + rewrite PTree.gso in H7=> //; move: (Hte _ _ H7); move/(_ b H8).
+      rewrite /locs'' /RC.reach_set /RC.roots /= => H10.
+      by apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil. }
+  { rewrite /locs''; move=> b X; apply/orP; right.
+    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
+    rewrite Hmeq'.
+    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
+    by rewrite Hmeq'; apply: REACH_is_closed. }
+  by move: Hk; apply: cont_inv_freshlocs. } 
+
+{ move=> f optid a a1 k e te m0 tyargs tyres vf vargs fd H H2 H3 H4 H5 Hmeq Hmeq' Inv.
+  set (c'' := CL_Callstate fd vargs (Kcall optid f e te k)).
+  set (c := {|
+         RC.core := CL_State f (Scall optid a a1) k e te;
+         RC.locs := locs |}).
+  set (locs'' :=  REACH m0 (fun b : block =>
+         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists EmptyEffect; split; 
+    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  by rewrite -Hmeq -Hmeq' /=; econstructor; eauto.
+
+  (*reestablish invariant*)
+  case: Inv=> Inv Hsub Hk.
+  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots /=.                        
+  case=> He Hte //; split. 
+  move=> b H7; move: (eval_exprlist_reach' Inv Hsub H3).
+  move/(_ b H7); rewrite /locs'' /RC.reach_set /RC.roots /= => H10.
+  by apply: REACH_nil; apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil. 
+  { rewrite /locs''; move=> b X; apply/orP; right.
+    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
+    rewrite Hmeq'.
+    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
+    by rewrite Hmeq'; apply: REACH_is_closed. }
+  split; last by move: Hk; apply: cont_inv_freshlocs. 
+  by move: Inv; apply: state_inv_freshlocs. }
+
+{ (*builtins*)
+  move=> f optid ef tyargs a1 k e te m0 vargs t vres m0' H2 H3 H4 Hmeq Hmeq' Inv.
+  set (c'' := CL_State f Sskip k e (set_opttemp optid vres te)).
+  set (c := {|
+          RC.core := CL_State f (Sbuiltin optid ef tyargs a1) k e te;
+          RC.locs := locs |}).
+  set (locs'' :=  REACH m0' (fun b : block =>
+         freshloc m0 m0' b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists (BuiltinEffects.BuiltinEffect ge ef vargs m0); split; 
+    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  split=> //.
+  move=> b ofs; move/(builtin_effects_reach c)=> Hreach.
+  case: Inv=> Hs Hsub Hk; move: (eval_exprlist_reach' Hs Hsub H2)=> H7.
+  by move: Hreach; rewrite Hmeq; apply: REACH_mono'.
+  by rewrite -Hmeq -Hmeq'.
+
+  (*reestablish invariant*)
+  case: Inv=> Inv Hsub Hk.
+  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots /=. 
+  case=> He Hte; split=> //=.
+  split.
+  { rewrite /locs''=> x b ty H7.
+    move: (He _ _ _ H7); case/orP; first by move=> ->.
+    move=> X; apply/orP; right; apply: REACH_nil; apply/orP; right.
+    by apply: REACH_nil; apply/orP; right. }
+  { rewrite /c'' /locs'' /c /set_opttemp /=; move {locs'' c c''}.
+    move {Hk}; case: optid Inv Hte Hsub.
+    { move=> a Inv Hte Hsub x v.
+      move: (eval_exprlist_reach' Inv Hsub H2)=> H7.
+      have X: {subset getBlocks vargs
+            <= RC.reach_set ge 
+                 {|
+                 RC.core := CL_State f (Sbuiltin (Some a) ef tyargs a1) k e te;
+                 RC.locs := locs |} m0}.
+      { by move=> b Hget; move: (H7 _ Hget)=> H7'; apply: REACH_nil. }
+      have Y: {subset isGlobalBlock ge               
+            <= RC.roots ge
+                {|
+                RC.core := CL_State f (Sbuiltin (Some a) ef tyargs a1) k e te;
+                RC.locs := locs |}}.
+      { by move=> b isGbl; apply/orP; left. }
+      move: (external_call_reach Y H4 H3 X)=> H8.
+      case: (ident_eq a x)=> Heq H9.
+      + subst x; rewrite PTree.gss in H9; case: H9=> Heq'; subst vres.
+        move=> b H9; move: (H8 _ H9); rewrite in_predU; case/orP=> H10.
+        by apply/orP; right; apply: REACH_nil; apply/orP; right.
+        by apply/orP; right; apply: REACH_nil; apply/orP; left.
+      + rewrite PTree.gso in H9.
+        move=> b H10; move: (Hte _ _ H9); move/(_ b H10); case/orP=> H.
+        by apply/orP; left.
+        apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
+        by apply/orP; right.
+        by move=> C; apply: Heq; rewrite C. }
+    { move=> Inv Hte Hsub x v H7 b H8; move: (Hte _ _ H7); move/(_ b H8); case/orP=> H.
+      by apply/orP; left.
+      apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
+      by apply/orP; right. } }
+  { rewrite /locs''; move=> b X; apply/orP; right.
+    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
+    rewrite Hmeq'.
+    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
+    by rewrite Hmeq'; apply: REACH_is_closed. }
+  by move: Hk; apply: cont_inv_freshlocs. }
+
+{ move=> f s1 s2 k e te m0 Hmeq Hmeq' Inv.
+  set (c'' := CL_State f s1 (Kseq s2 k) e te).
+  set (c := {|
+          RC.core := CL_State f (Ssequence s1 s2) k e te;
+          RC.locs := locs |}).
+  set (locs'' :=  REACH m0 (fun b : block =>
+         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists EmptyEffect; split; 
+    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  split=> //.
+  by rewrite -Hmeq -Hmeq'.
+
+  case: Inv=> Inv Hsub Hk.
+  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots /=. 
+  case=> He Hte; split=> //=.
+  split.
+  { rewrite /locs''=> x b ty H7.
+    move: (He _ _ _ H7); case/orP; first by move=> ->.
+    move=> X; apply/orP; right; apply: REACH_nil; apply/orP; right.
+    by apply: REACH_nil; apply/orP; right. }
+  { move=> x v0 H7; move: (Hte _ _ H7)=> H8 b H9; move: (H8 b H9).
+    rewrite /locs'' /RC.reach_set /RC.roots /= => H10. 
+    by apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil. }
+  { rewrite /locs''; move=> b X; apply/orP; right.
+    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
+    rewrite Hmeq'.
+    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
+    by rewrite Hmeq'; apply: REACH_is_closed. }
+  by move: Hk; apply: cont_inv_freshlocs. }
+
+{ move=> f s k e te m0 Hmeq Hmeq' Inv.
+  set (c'' := CL_State f s k e te).
+  set (c := {|
+          RC.core := CL_State f Sskip (Kseq s k) e te;
+          RC.locs := locs |}).
+  set (locs'' :=  REACH m0 (fun b : block =>
+         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists EmptyEffect; split; 
+    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  split=> //.
+  by rewrite -Hmeq -Hmeq'.
+
+  case: Inv=> Inv Hsub Hk.
+  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots /=. 
+  case=> He Hte; split=> //=.
+  split.
+  { rewrite /locs''=> x b ty H7.
+    move: (He _ _ _ H7); case/orP; first by move=> ->.
+    move=> X; apply/orP; right; apply: REACH_nil; apply/orP; right.
+    by apply: REACH_nil; apply/orP; right. }
+  { move=> x v0 H7; move: (Hte _ _ H7)=> H8 b H9; move: (H8 b H9).
+    rewrite /locs'' /RC.reach_set /RC.roots /= => H10. 
+    by apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil. }
+  { rewrite /locs''; move=> b X; apply/orP; right.
+    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
+    rewrite Hmeq'.
+    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
+    by apply: REACH_is_closed. }
+  by move: Hk; apply: cont_inv_freshlocs. }
+
+{ move=> f s k e te m0 Hmeq Hmeq' Inv.
+  set (c'' := CL_State f Scontinue k e te).
+  set (c := {|
+          RC.core := CL_State f Scontinue (Kseq s k) e te;
+          RC.locs := locs |}).
+  set (locs'' :=  REACH m0 (fun b : block =>
+         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists EmptyEffect; split; 
+    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  split=> //.
+  by rewrite -Hmeq -Hmeq'.
+
+  case: Inv=> Inv Hsub Hk.
+  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots /=. 
+  case=> He Hte; split=> //=.
+  split.
+  { rewrite /locs''=> x b ty H7.
+    move: (He _ _ _ H7); case/orP; first by move=> ->.
+    move=> X; apply/orP; right; apply: REACH_nil; apply/orP; right.
+    by apply: REACH_nil; apply/orP; right. }
+  { move=> x v0 H7; move: (Hte _ _ H7)=> H8 b H9; move: (H8 b H9).
+    rewrite /locs'' /RC.reach_set /RC.roots /= => H10. 
+    by apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil. }
+  { rewrite /locs''; move=> b X; apply/orP; right.
+    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
+    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
+    by apply: REACH_is_closed. }
+  by move: Hk; apply: cont_inv_freshlocs. }
+
+{ move=> f s k e te m0 Hmeq Hmeq' Inv.
+  set (c'' := CL_State f Sbreak k e te).
+  set (c := {|
+          RC.core := c'';
+          RC.locs := locs |}).
+  set (locs'' :=  REACH m0 (fun b : block =>
+         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists EmptyEffect; split;
+    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  split=> //; first by rewrite -Hmeq -Hmeq'.
+
+  case: Inv=> Inv Hsub Hk.
+  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots /=. 
+  case=> He Hte; split=> //=.
+  split.
+  { rewrite /locs''=> x b ty H7.
+    move: (He _ _ _ H7); case/orP; first by move=> ->.
+    move=> X; apply/orP; right; apply: REACH_nil; apply/orP; right.
+    by apply: REACH_nil; apply/orP; right. }
+  { move=> x v0 H7; move: (Hte _ _ H7)=> H8 b H9; move: (H8 b H9).
+    rewrite /locs'' /RC.reach_set /RC.roots /= => H10. 
+    by apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil. }
+  { rewrite /locs''; move=> b X; apply/orP; right.
+    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
+    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
+    by apply: REACH_is_closed. }
+  by move: Hk; apply: cont_inv_freshlocs. }
+
+{ move=> f a s1 s2 k e te m0 v1 b Heval H2 Hmeq Hmeq' Inv.
+  set (c'' := CL_State f (if b then s1 else s2) k e te).
+  set (c := {|
+          RC.core := c'';
+          RC.locs := locs |}).
+  set (locs'' :=  REACH m0 (fun b : block =>
+         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists EmptyEffect; split; 
+    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  split=> //; first by rewrite -Hmeq -Hmeq'.
+  by apply: (core_inv_freshlocs _ _ Inv). }
+
+{ move=> f s1 s2 k e te m0 Hmeq Hmeq' Inv.
+  set (c'' := CL_State f s1 (Kloop1 s1 s2 k) e te).
+  set (c := {|
+          RC.core := c'';
+          RC.locs := locs |}).
+  set (locs'' :=  REACH m0 (fun b : block =>
+         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists EmptyEffect; split; 
+    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  split=> //; first by rewrite -Hmeq -Hmeq'.
+
+  case: Inv=> Inv Hsub Hk; split.
+  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots.
+  case=> He Hte; split=> //=.
+  { rewrite /locs''=> x b' ty H7; move: (He _ _ _ H7); case/orP; first by move=> ->.
+    move=> /= H8; apply/orP; right; apply: REACH_nil; apply/orP; right.
+    by apply: REACH_nil; apply/orP; right. }
+  { rewrite /c'' /locs'' /c /= => x v H7 b' H8; move {locs'' c}.
+    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
+    by apply: (Hte _ _ H7 _ H8). } 
+  { rewrite /locs''; move=> b X; apply/orP; right.
+    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
+    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
+    by apply: REACH_is_closed. }
+  by move: Hk; apply: cont_inv_freshlocs. }
+
+{ move=> f s1 s2 k e te m0 x H Hmeq Hmeq' Inv.
+  set (c'' := CL_State f s2 (Kloop2 s1 s2 k) e te).
+  set (c := {|
+          RC.core := c'';
+          RC.locs := locs |}).
+  set (locs'' :=  REACH m0 (fun b : block =>
+         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists EmptyEffect; split; 
+    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  split=> //; first by rewrite -Hmeq -Hmeq'.
+
+  case: Inv=> Inv Hsub Hk; split.
+  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots.
+  case=> He Hte; split=> //=.
+  { rewrite /locs''=> x' b' ty H7; move: (He _ _ _ H7); case/orP; first by move=> ->.
+    move=> /= H8; apply/orP; right; apply: REACH_nil; apply/orP; right.
+    by apply: REACH_nil; apply/orP; right. }
+  { rewrite /c'' /locs'' /c /= => x' v H7 b' H8; move {locs'' c}.
+    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
+    by apply: (Hte _ _ H7 _ H8). } 
+  { rewrite /locs''; move=> b X; apply/orP; right.
+    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
+    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
+    by apply: REACH_is_closed. }
+  by move: Hk; apply: cont_inv_freshlocs. }
+
+{ move=> f s1 s2 k e te m0 Hmeq Hmeq' Inv.
+  set (c'' := CL_State f Sskip k e te).
+  set (c := {|
+          RC.core := c'';
+          RC.locs := locs |}).
+  set (locs'' :=  REACH m0 (fun b : block =>
+         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists EmptyEffect; split; 
+    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  split=> //; first by rewrite -Hmeq -Hmeq'.
+
+  case: Inv=> Inv Hsub Hk; split.
+  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots.
+  case=> He Hte; split=> //=.
+  { rewrite /locs''=> x' b' ty H7; move: (He _ _ _ H7); case/orP; first by move=> ->.
+    move=> /= H8; apply/orP; right; apply: REACH_nil; apply/orP; right.
+    by apply: REACH_nil; apply/orP; right. }
+  { rewrite /c'' /locs'' /c /= => x' v H7 b' H8; move {locs'' c}.
+    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
+    by apply: (Hte _ _ H7 _ H8). } 
+  { rewrite /locs''; move=> b X; apply/orP; right.
+    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
+    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
+    by apply: REACH_is_closed. }
+  by move: Hk; apply: cont_inv_freshlocs. }
+
+{ move=> f s1 s2 k e te m0 Hmeq Hmeq' Inv.
+  set (c'' := CL_State f (Sloop s1 s2) k e te).
+  set (c := {|
+          RC.core := c'';
+          RC.locs := locs |}).
+  set (locs'' :=  REACH m0 (fun b : block =>
+         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists EmptyEffect; split; first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  split=> //; first by rewrite -Hmeq -Hmeq'.
+
+  case: Inv=> Inv Hsub Hk; split.
+  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots.
+  case=> He Hte; split=> //=.
+  { rewrite /locs''=> x' b' ty H7; move: (He _ _ _ H7); case/orP; first by move=> ->.
+    move=> /= H8; apply/orP; right; apply: REACH_nil; apply/orP; right.
+    by apply: REACH_nil; apply/orP; right. }
+  { rewrite /c'' /locs'' /c /= => x' v H7 b' H8; move {locs'' c}.
+    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
+    by apply: (Hte _ _ H7 _ H8). } 
+  { rewrite /locs''; move=> b X; apply/orP; right.
+    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
+    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
+    by apply: REACH_is_closed. }
+  by move: Hk; apply: cont_inv_freshlocs. }
+
+{ move=> f s1 s2 k e te m0 Hmeq Hmeq' Inv.
+  set (c'' := CL_State f Sskip k e te).
+  set (c := {|
+          RC.core := c'';
+          RC.locs := locs |}).
+  set (locs'' :=  REACH m0 (fun b : block =>
+         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists EmptyEffect; split; first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  split=> //; first by rewrite -Hmeq -Hmeq'.
+
+  case: Inv=> Inv Hsub Hk; split.
+  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots.
+  case=> He Hte; split=> //=.
+  { rewrite /locs''=> x' b' ty H7; move: (He _ _ _ H7); case/orP; first by move=> ->.
+    move=> /= H8; apply/orP; right; apply: REACH_nil; apply/orP; right.
+    by apply: REACH_nil; apply/orP; right. }
+  { rewrite /c'' /locs'' /c /= => x' v H7 b' H8; move {locs'' c}.
+    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
+    by apply: (Hte _ _ H7 _ H8). } 
+  { rewrite /locs''; move=> b X; apply/orP; right.
+    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
+    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
+    by apply: REACH_is_closed. }
+  by move: Hk; apply: cont_inv_freshlocs. }
+
+{ move=> f k e te m0 m0' Hfree Hmeq Hmeq' Inv.
+  set (c'' := CL_Returnstate Vundef (call_cont k)).
+  set (c := {|
+          RC.core := c'';
+          RC.locs := locs |}).
+  set (locs'' :=  REACH m0' (fun b : block =>
+         freshloc m0 m0' b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists (FreelistEffect m0 (blocks_of_env e)); split; 
+    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  split=> //.
+  case: Inv=> Inv Hsub Hk.
+  by move=> b ofs Hfree'; rewrite -Hmeq; apply: (freelist_effect_reach Hfree' Inv).
+  by rewrite -Hmeq -Hmeq'.
+  move: Inv; case=> Hs Hsub Hk; split.
+  by move=> ?; move/getBlocksP; case=> ?; case.
+  apply: cont_inv_call_cont.
+  by move: Hk; apply: cont_inv_freshlocs. }
+
+{ move=> f a k e te m0 v v' m0' Heval Hcast Hfree Hmeq Hmeq' Inv.
+  set (c'' := CL_Returnstate v' (call_cont k)).
+  set (c := {|
+          RC.core := c'';
+          RC.locs := locs |}).
+  set (locs'' :=  REACH m0' (fun b : block =>
+         freshloc m0 m0' b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists (FreelistEffect m0 (blocks_of_env e)); split; 
+    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  split=> //.
+  case: Inv=> Inv Hsub Hk.
+  by move=> b ofs Hfree'; rewrite -Hmeq; apply: (freelist_effect_reach Hfree' Inv).
+  by rewrite -Hmeq -Hmeq'.
+  move: Inv; case=> Hs Hsub Hk; split. 
+  move=> b Hget; move: (sem_cast_getBlocks Hcast Hget)=> Hget'.
+  move: (eval_expr_reach' Hs Hsub Heval Hget'); case/orP=> H; apply: REACH_nil; apply/orP.
+  by left.
+  by right; apply: REACH_nil; apply/orP; right; apply: REACH_nil; apply/orP; right.
+  apply: cont_inv_call_cont.
+  by move: Hk; apply: cont_inv_freshlocs. }
+
+{ move=> f k e te m0 m0' Hcall Hfree Hmeq Hmeq' Inv.
+  set (c'' := CL_Returnstate Vundef k).
+  set (c := {|
+          RC.core := c'';
+          RC.locs := locs |}).
+  set (locs'' :=  REACH m0' (fun b : block =>
+         freshloc m0 m0' b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists (FreelistEffect m0 (blocks_of_env e)); split; 
+    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  split=> //.
+  case: Inv=> Inv Hsub Hk.
+  by move=> b ofs Hfree'; rewrite -Hmeq; apply: (freelist_effect_reach Hfree' Inv).
+  by rewrite -Hmeq -Hmeq'.
+  split; first by move=> ?; move/getBlocksP; case=> ?; case.
+  move: Inv; case=> Hs Hsub Hk; apply cont_inv_freshlocs.
+  by move: Hk; apply: cont_inv_ext1. }
+
+{ move=> f s1 s2 k e te m0 n0 Heval Hmeq Hmeq' Inv.
+  set (c'' := CL_State f (seq_of_labeled_statement (select_switch n0 s2))
+               (Kswitch k) e te).
+  set (c := {|
+          RC.core := c'';
+          RC.locs := locs |}).
+  set (locs'' :=  REACH m0 (fun b : block =>
+         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists EmptyEffect; split; first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  split=> //.
+  by rewrite -Hmeq -Hmeq'.
+
+  case: Inv=> Inv Hsub Hk; split.
+  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots.
+  case=> He Hte; split=> //=.
+  { rewrite /locs''=> x' b' ty H7; move: (He _ _ _ H7); case/orP; first by move=> ->.
+    move=> /= H8; apply/orP; right; apply: REACH_nil; apply/orP; right.
+    by apply: REACH_nil; apply/orP; right. }
+  { rewrite /c'' /locs'' /c /= => x' v H7 b' H8; move {locs'' c}.
+    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
+    by apply: (Hte _ _ H7 _ H8). } 
+  { rewrite /locs''; move=> b X; apply/orP; right.
+    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
+    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
+    by apply: REACH_is_closed. }
+  by move: Hk; apply: cont_inv_freshlocs. }
+
+{ move=> f x k e te m0 Hx Hmeq Hmeq' Inv.
+  set (c'' := CL_State f Sskip k e te).
+  set (c := {|
+          RC.core := c'';
+          RC.locs := locs |}).
+  set (locs'' :=  REACH m0 (fun b : block =>
+         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists EmptyEffect; split; first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  split=> //.
+  by rewrite -Hmeq -Hmeq'.
+
+  case: Inv=> Inv Hsub Hk; split.
+  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots.
+  case=> He Hte; split=> //=.
+  { rewrite /locs''=> x' b' ty H7; move: (He _ _ _ H7); case/orP; first by move=> ->.
+    move=> /= H8; apply/orP; right; apply: REACH_nil; apply/orP; right.
+    by apply: REACH_nil; apply/orP; right. }
+  { rewrite /c'' /locs'' /c /= => x' v H7 b' H8; move {locs'' c}.
+    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
+    by apply: (Hte _ _ H7 _ H8). } 
+  { rewrite /locs''; move=> b X; apply/orP; right.
+    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
+    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
+    by apply: REACH_is_closed. }
+  by move: Hk; apply: cont_inv_freshlocs. }
+
+{ move=> f k e te m0 Hmeq Hmeq' Inv.
+  set (c'' := CL_State f Scontinue k e te).
+  set (c := {|
+          RC.core := c'';
+          RC.locs := locs |}).
+  set (locs'' :=  REACH m0 (fun b : block =>
+         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists EmptyEffect; split; first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  split=> //.
+  by rewrite -Hmeq -Hmeq'.
+
+  case: Inv=> Inv Hsub Hk; split.
+  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots.
+  case=> He Hte; split=> //=.
+  { rewrite /locs''=> x' b' ty H7; move: (He _ _ _ H7); case/orP; first by move=> ->.
+    move=> /= H8; apply/orP; right; apply: REACH_nil; apply/orP; right.
+    by apply: REACH_nil; apply/orP; right. }
+  { rewrite /c'' /locs'' /c /= => x' v H7 b' H8; move {locs'' c}.
+    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
+    by apply: (Hte _ _ H7 _ H8). } 
+  { rewrite /locs''; move=> b X; apply/orP; right.
+    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
+    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
+    by apply: REACH_is_closed. }
+  by move: Hk; apply: cont_inv_freshlocs. }
+
+{ move=> f lbl s k e te m0 Hmeq Hmeq' Inv.
+  set (c'' := CL_State f s k e te).
+  set (c := {|
+          RC.core := c'';
+          RC.locs := locs |}).
+  set (locs'' :=  REACH m0 (fun b : block =>
+         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists EmptyEffect; split; first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  split=> //.
+  by rewrite -Hmeq -Hmeq'.
+
+  case: Inv=> Inv Hsub Hk; split.
+  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots.
+  case=> He Hte; split=> //=.
+  { rewrite /locs''=> x' b' ty H7; move: (He _ _ _ H7); case/orP; first by move=> ->.
+    move=> /= H8; apply/orP; right; apply: REACH_nil; apply/orP; right.
+    by apply: REACH_nil; apply/orP; right. }
+  { rewrite /c'' /locs'' /c /= => x' v H7 b' H8; move {locs'' c}.
+    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
+    by apply: (Hte _ _ H7 _ H8). } 
+  { rewrite /locs''; move=> b X; apply/orP; right.
+    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
+    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
+    by apply: REACH_is_closed. }
+  by move: Hk; apply: cont_inv_freshlocs. }
+
+{ move=> f lbl k e te m0 s' k' Hfnd Hmeq Hmeq' Inv.
+  set (c'' := CL_State f s' k' e te).
+  set (c := {|
+          RC.core := c'';
+          RC.locs := locs |}).
+  set (locs'' :=  REACH m0 (fun b : block =>
+         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists EmptyEffect; split; first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  split=> //.
+  by rewrite -Hmeq -Hmeq'.
+
+  case: Inv=> Inv Hsub Hk; split.
+  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots.
+  case=> He Hte; split=> //=.
+  { rewrite /locs''=> x' b' ty H7; move: (He _ _ _ H7); case/orP; first by move=> ->.
+    move=> /= H8; apply/orP; right; apply: REACH_nil; apply/orP; right.
+    by apply: REACH_nil; apply/orP; right. }
+  { rewrite /c'' /locs'' /c /= => x' v H7 b' H8; move {locs'' c}.
+    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
+    by apply: (Hte _ _ H7 _ H8). } 
+  { rewrite /locs''; move=> b X; apply/orP; right.
+    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
+    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
+    by apply: REACH_is_closed. }
+  move: Hfnd; apply: cont_inv_find_label.
+  by move: Hk; apply: cont_inv_freshlocs. }
+
+{ move=> f vargs k m0 e te m0' Hentry Hmeq Hmeq' Inv.
+  set (c'' := CL_State f (fn_body f) k e te).
+  set (c := {|
+          RC.core := c'';
+          RC.locs := locs |}).
+  set (locs'' :=  REACH m0' (fun b : block =>
+         freshloc m0 m0' b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists EmptyEffect; split; first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  split=> //.
+  by rewrite -Hmeq -Hmeq'.
+
+  case: Inv=> Inv Hsub Hk; split.
+  split.
+  { move=> x b ty H.
+    set (c''' := {| RC.core := c''; RC.locs := locs'' |}).
+    case: (@function_entry1_state_inv c''' (CL_Callstate (Internal f) vargs k) 
+                                  _ _ _ _ _ _ _ Inv Hentry)=> /=.
+    by move=> He Hte; apply: (He _ _ _ H). }
+  { move=> x v H. 
+    set (c''' := {| RC.core := c''; RC.locs := locs'' |}).
+    case: (@function_entry1_state_inv c''' (CL_Callstate (Internal f) vargs k) 
+                                  _ _ _ _ _ _ _ Inv Hentry)=> /=.
+    by move=> He Hte; apply: (Hte _ _ H). }
+  { rewrite /locs''; move=> b X; apply/orP; right.
+    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
+    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
+    by apply: REACH_is_closed. }
+  by move: Hk; apply: cont_inv_freshlocs. }
+
+{ move=> v optid f e te k m0 Hmeq Hmeq' Inv.
+  set (c'' := CL_State f Sskip k e (set_opttemp optid v te)).
+  set (c := {|
+          RC.core := c'';
+          RC.locs := locs |}).
+  set (locs'' :=  REACH m0 (fun b : block =>
+         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
+  split.
+  rewrite FSem.step; split=> //.
+  exists EmptyEffect; split; first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
+  split=> //.
+  by rewrite -Hmeq -Hmeq'.
+
+  case: Inv=> Hsub Inv.
+  rewrite /cl_core_inv /= in Inv; case: Inv; case=> He Hte Hk; split.
+
+  split.
+  { move=> x b ty H; apply/orP; right; rewrite /locs'' /=.
+    by apply: REACH_nil; move: H; move/He=> X; apply/orP; right; apply: REACH_nil. }
+  { move=> x v0; rewrite /set_opttemp /locs'' /c /c''; move {locs'' c'' c}.
+    case: optid Hsub Hk He Hte=> a. 
+    case: (ident_eq a x).
+    + move=> Heq Hsub Hk He Hte; subst x; rewrite PTree.gss.
+      case=> ?; subst v0=> b Hget; apply/orP; right.
+      by apply: REACH_nil; apply/orP; right; apply: (Hsub _ Hget).
+    + move=> Hneq Hsub Hk He Hte; rewrite PTree.gso=> H.
+      move=> b Hget; apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
+      by apply: (Hte _ _ H _ Hget).
+      by subst x. 
+    move=> Inv He Hte H b Hget. 
+    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
+    by apply: (Hte _ _ H _ Hget). } 
+  { rewrite /locs''; move=> b X; apply/orP; right.
+    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
+    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
+    by apply: REACH_is_closed. }
+  by move: Hk; apply: cont_inv_freshlocs. }
+
+Qed.
+
+Lemma rc_aftext c m ef sg vs c' m' ov :
+  cl_core_inv c (E m) -> 
+  at_external (F rcsem) c = Some (ef,sg,vs) ->
+  after_external (F rcsem) ov c = Some c' ->
+  cl_core_inv c' (E m').
+Proof.
+move=> Inv; rewrite /= FSem.atext FSem.aftext /= /RC.at_external /RC.after_external /= => H.
+have Hhlt: Clight_coop.CL_halted (RC.core c) = None.
+{ move: H; case: (CL_at_external_halted_excl hf (RC.core c))=> // ->.
+  discriminate. }
+case Haft: (CL_after_external _ _)=> // [c''].
+case Hov: ov=> [v|]; case=> <-.
+{ move: Inv; rewrite /cl_core_inv /=.    
+  move: Haft; rewrite /CL_after_external Hov. 
+  case: (RC.core c)=> // fd vs' k.
+  case: fd=> // ef' tys ty; case=> <-; case=> H0 H2 H3 /=. 
+  split. 
+  + by move=> b Hget; apply: REACH_nil; apply/orP; right; apply/orP; left.
+  + move: (@cont_inv_mem c k (FSem.E _ _ transf m) (FSem.E _ _ transf m') H3); clear.
+    by apply: cont_inv_retv. }
+{ move: Inv; rewrite /cl_core_inv.
+  move: Haft; rewrite /CL_after_external Hov.
+  case: (RC.core c)=> // fd args' k.
+  case: fd=> // ef' tys ty; case=> <- /=; case=> H0 H2 H3.
+  move: (@cont_inv_mem c k (FSem.E _ _ transf m) (FSem.E _ _ transf m') H3).
+  split. 
+  + by move=> b; move/getBlocksP; case=> ?; case.
+  + by apply: cont_inv_retv. }   
+Qed.
+
 Lemma rc_safe z c m n :
-  cl_core_inv c (FSem.E _ _ transf m) -> 
-  safeN (FSem.F _ _ transf _ _ clsem) espec ge n z (RC.core c) m -> 
-  safeN (FSem.F _ _ transf _ _ rcsem) espec ge n z c m.
+  cl_core_inv c (E m) -> 
+  safeN (F clsem) espec ge n z (RC.core c) m -> 
+  safeN (F rcsem) espec ge n z c m.
 Proof.
 move=> Inv H; move: z c m Inv H; elim: n=> // n IH z c m Inv H. 
 rewrite /= !FSem.atext /= /RC.at_external /RC.halted; move: H=> /=.
@@ -1256,761 +2019,25 @@ case Hhlt: (Clight_coop.CL_halted (RC.core c))=> [v|].
   have Hdef: ~~is_vundef v by (eapply espec_exit; eauto).
   by rewrite Hdef. }
 case=> c' []m' []step Hsafe.
-rewrite FSem.step in step; case: step=> step Hprop.
-move: step Inv Hsafe Hatext Hhlt.
-remember (FSem.E mem juicy_mem transf m') as jm'.
-remember (FSem.E mem juicy_mem transf m) as jm.
-move=> step.
-move: step Heqjm Heqjm'.
-case: c=> /= core locs; case.
-
-{ move=> f a1 a2 k e le m0 loc ofs v2 v m0' H H2 H3 H4 Hmeq Hmeq' Inv Hsafe _ _.
-  set (c'' := Clight_coop.CL_State f Clight.Sskip k e le).
-  set (c := {|
-         RC.core := CL_State f (Sassign a1 a2) k e le;
-         RC.locs := locs |}).
-  set (locs'' :=  REACH m0' (fun b : block =>
-         freshloc m0 m0' b || RC.reach_set ge c m0 b)).
-  
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //=.
-  exists (assign_loc_Effect (Clight.typeof a1) loc ofs); split. 
-  by rewrite -Hmeq -Hmeq' /=; econstructor; eauto.
-  split=> //.
-
-  { move=> b ofs'; rewrite /assign_loc_Effect.
-  case Hac: (Ctypes.access_mode _)=> // [ch|].
-  + case/andP; case/andP=> Heq _ _.
-    have Heq': loc = b by rewrite /eq_block in Heq; case: (Coqlib.peq loc b) Heq.
-    subst loc; move {Heq}; rewrite /cl_core_inv /= in Inv.
-    case: Inv=> Inv Inv2 Inv3; apply: REACH_nil. 
-    by apply: (eval_lvalue_reach Inv Inv2 H); apply/getBlocksP; exists ofs; constructor.
-  + case/andP; case/andP=> Heq _ _.
-    have Heq': loc = b by rewrite /eq_block in Heq; case: (Coqlib.peq b loc) Heq.
-    subst loc; move {Heq}; rewrite /cl_core_inv /= in Inv.
-    case: Inv=> Inv Inv2 Inv3; apply: REACH_nil.
-    by apply: (eval_lvalue_reach Inv Inv2 H); apply/getBlocksP; exists ofs; constructor. }
-  { by rewrite -Hmeq -Hmeq'. }
-  { by apply: IH=> //; rewrite -Hmeq'; apply: core_inv_freshlocs. } }
-
-{ move=> f id a k e te m0 v H Hmeq Hmeq' Inv H2 _ _.
-  set (c'' := CL_State f Sskip k e (PTree.set id v te)).
-  set (c := {|
-         RC.core := CL_State f (Sset id a) k e te;
-         RC.locs := locs |}).
-  set (locs'' :=  REACH m0 (fun b : block =>
-         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //=.  
-  exists EmptyEffect; split; 
-    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  by rewrite -Hmeq -Hmeq' /=; econstructor; eauto.
-
-  apply: IH=> //.
-  (*reestablish invariant*)
-  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots /=. 
-  case; case=> He Hte Hsub Hk; split=> //=.
-  split.
-  { rewrite /locs''=> x b ty H7.
-    move: (He _ _ _ H7); case/orP; first by move=> ->.
-    move=> X; apply/orP; right; apply: REACH_nil; apply/orP; right.
-    by apply: REACH_nil; apply/orP; right. }
-  { move=> x v0 H7 b H8; case Heq: (ident_eq x id).
-    + subst x; rewrite PTree.gss in H7; case: H7=> Heq'; subst v0.
-      move: (eval_expr_reach _ _ Inv H); move/(_ b H8).
-      rewrite /locs'' /RC.reach_set /RC.roots /= => H10.
-      by apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil. 
-    + rewrite PTree.gso in H7=> //; move: (Hte _ _ H7); move/(_ b H8).
-      rewrite /locs'' /RC.reach_set /RC.roots /= => H10.
-      by apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil. }
-  { rewrite /locs''; move=> b X; apply/orP; right.
-    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
-    rewrite Hmeq'.
-    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
-    by rewrite Hmeq'; apply: REACH_is_closed. }
-  by rewrite -Hmeq'; move: Hk; apply: cont_inv_freshlocs. } 
-
-{ move=> f optid a a1 k e te m0 tyargs tyres vf vargs fd H H2 H3 H4 H5 Hmeq Hmeq' Inv H6 _ _.
-  set (c'' := CL_Callstate fd vargs (Kcall optid f e te k)).
-  set (c := {|
-         RC.core := CL_State f (Scall optid a a1) k e te;
-         RC.locs := locs |}).
-  set (locs'' :=  REACH m0 (fun b : block =>
-         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists EmptyEffect; split; 
-    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  by rewrite -Hmeq -Hmeq' /=; econstructor; eauto.
-
-  apply: IH=> //.
-  (*reestablish invariant*)
-  case: Inv=> Inv Hsub Hk.
-  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots /=.                        
-  case=> He Hte //; split. 
-  move=> b H7; move: (eval_exprlist_reach' Inv Hsub H3).
-  move/(_ b H7); rewrite /locs'' /RC.reach_set /RC.roots /= => H10.
-  by apply: REACH_nil; apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil. 
-  { rewrite /locs''; move=> b X; apply/orP; right.
-    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
-    rewrite Hmeq'.
-    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
-    by rewrite Hmeq'; apply: REACH_is_closed. }
-  split; last by rewrite -Hmeq'; move: Hk; apply: cont_inv_freshlocs. 
-  by move: Inv; apply: state_inv_freshlocs. }
-
-{ (*builtins*)
-  move=> f optid ef tyargs a1 k e te m0 vargs t vres m0' H2 H3 H4 Hmeq Hmeq' Inv H6 _ _.
-  set (c'' := CL_State f Sskip k e (set_opttemp optid vres te)).
-  set (c := {|
-          RC.core := CL_State f (Sbuiltin optid ef tyargs a1) k e te;
-          RC.locs := locs |}).
-  set (locs'' :=  REACH m0' (fun b : block =>
-         freshloc m0 m0' b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists (BuiltinEffects.BuiltinEffect ge ef vargs m0); split; 
-    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  split=> //.
-  move=> b ofs; move/(builtin_effects_reach c)=> Hreach.
-  case: Inv=> Hs Hsub Hk; move: (eval_exprlist_reach' Hs Hsub H2)=> H7.
-  by move: Hreach; rewrite Hmeq; apply: REACH_mono'.
-  by rewrite -Hmeq -Hmeq'.
-
-  apply: IH=> //.
-  (*reestablish invariant*)
-  case: Inv=> Inv Hsub Hk.
-  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots /=. 
-  case=> He Hte; split=> //=.
-  split.
-  { rewrite /locs''=> x b ty H7.
-    move: (He _ _ _ H7); case/orP; first by move=> ->.
-    move=> X; apply/orP; right; apply: REACH_nil; apply/orP; right.
-    by apply: REACH_nil; apply/orP; right. }
-  { rewrite /c'' /locs'' /c /set_opttemp /=; move {locs'' c c''}.
-    move {Hk}; case: optid Inv H6 Hte Hsub.
-    { move=> a Inv H6 Hte Hsub x v.
-      move: (eval_exprlist_reach' Inv Hsub H2)=> H7.
-      have X: {subset getBlocks vargs
-            <= RC.reach_set ge 
-                 {|
-                 RC.core := CL_State f (Sbuiltin (Some a) ef tyargs a1) k e te;
-                 RC.locs := locs |} m0}.
-      { by move=> b Hget; move: (H7 _ Hget)=> H7'; apply: REACH_nil. }
-      have Y: {subset isGlobalBlock ge               
-            <= RC.roots ge
-                {|
-                RC.core := CL_State f (Sbuiltin (Some a) ef tyargs a1) k e te;
-                RC.locs := locs |}}.
-      { by move=> b isGbl; apply/orP; left. }
-      move: (external_call_reach Y H4 H3 X)=> H8.
-      case: (ident_eq a x)=> Heq H9.
-      + subst x; rewrite PTree.gss in H9; case: H9=> Heq'; subst vres.
-        move=> b H9; move: (H8 _ H9); rewrite in_predU; case/orP=> H10.
-        by apply/orP; right; apply: REACH_nil; apply/orP; right.
-        by apply/orP; right; apply: REACH_nil; apply/orP; left.
-      + rewrite PTree.gso in H9.
-        move=> b H10; move: (Hte _ _ H9); move/(_ b H10); case/orP=> H.
-        by apply/orP; left.
-        apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
-        by apply/orP; right.
-        by move=> C; apply: Heq; rewrite C. }
-    { move=> Inv H6 Hte Hsub x v H7 b H8; move: (Hte _ _ H7); move/(_ b H8); case/orP=> H.
-      by apply/orP; left.
-      apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
-      by apply/orP; right. } }
-  { rewrite /locs''; move=> b X; apply/orP; right.
-    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
-    rewrite Hmeq'.
-    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
-    by rewrite Hmeq'; apply: REACH_is_closed. }
-  by move: Hk; rewrite -Hmeq'; apply: cont_inv_freshlocs. }
-
-{ move=> f s1 s2 k e te m0 Hmeq Hmeq' Inv Hsafe _ _.
-  set (c'' := CL_State f s1 (Kseq s2 k) e te).
-  set (c := {|
-          RC.core := CL_State f (Ssequence s1 s2) k e te;
-          RC.locs := locs |}).
-  set (locs'' :=  REACH m0 (fun b : block =>
-         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists EmptyEffect; split; 
-    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  split=> //.
-  by rewrite -Hmeq -Hmeq'.
-
-  apply: IH=> //.
-  case: Inv=> Inv Hsub Hk.
-  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots /=. 
-  case=> He Hte; split=> //=.
-  split.
-  { rewrite /locs''=> x b ty H7.
-    move: (He _ _ _ H7); case/orP; first by move=> ->.
-    move=> X; apply/orP; right; apply: REACH_nil; apply/orP; right.
-    by apply: REACH_nil; apply/orP; right. }
-  { move=> x v0 H7; move: (Hte _ _ H7)=> H8 b H9; move: (H8 b H9).
-    rewrite /locs'' /RC.reach_set /RC.roots /= => H10. 
-    by apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil. }
-  { rewrite /locs''; move=> b X; apply/orP; right.
-    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
-    rewrite Hmeq'.
-    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
-    by rewrite Hmeq'; apply: REACH_is_closed. }
-  by move: Hk; rewrite -Hmeq'; apply: cont_inv_freshlocs. }
-
-{ move=> f s k e te m0 Hmeq Hmeq' Inv Hsafe _ _.
-  set (c'' := CL_State f s k e te).
-  set (c := {|
-          RC.core := CL_State f Sskip (Kseq s k) e te;
-          RC.locs := locs |}).
-  set (locs'' :=  REACH m0 (fun b : block =>
-         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists EmptyEffect; split; 
-    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  split=> //.
-  by rewrite -Hmeq -Hmeq'.
-
-  apply: IH=> //.
-  case: Inv=> Inv Hsub Hk.
-  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots /=. 
-  case=> He Hte; split=> //=.
-  split.
-  { rewrite /locs''=> x b ty H7.
-    move: (He _ _ _ H7); case/orP; first by move=> ->.
-    move=> X; apply/orP; right; apply: REACH_nil; apply/orP; right.
-    by apply: REACH_nil; apply/orP; right. }
-  { move=> x v0 H7; move: (Hte _ _ H7)=> H8 b H9; move: (H8 b H9).
-    rewrite /locs'' /RC.reach_set /RC.roots /= => H10. 
-    by apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil. }
-  { rewrite /locs''; move=> b X; apply/orP; right.
-    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
-    rewrite Hmeq'.
-    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
-    by rewrite -Hmeq'; apply: REACH_is_closed. }
-  by move: Hk; rewrite -Hmeq'; apply: cont_inv_freshlocs. }
-
-{ move=> f s k e te m0 Hmeq Hmeq' Inv Hsafe _ _.
-  set (c'' := CL_State f Scontinue k e te).
-  set (c := {|
-          RC.core := CL_State f Scontinue (Kseq s k) e te;
-          RC.locs := locs |}).
-  set (locs'' :=  REACH m0 (fun b : block =>
-         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists EmptyEffect; split; 
-    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  split=> //.
-  by rewrite -Hmeq -Hmeq'.
-
-  apply: IH=> //.
-  case: Inv=> Inv Hsub Hk.
-  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots /=. 
-  case=> He Hte; split=> //=.
-  split.
-  { rewrite /locs''=> x b ty H7.
-    move: (He _ _ _ H7); case/orP; first by move=> ->.
-    move=> X; apply/orP; right; apply: REACH_nil; apply/orP; right.
-    by apply: REACH_nil; apply/orP; right. }
-  { move=> x v0 H7; move: (Hte _ _ H7)=> H8 b H9; move: (H8 b H9).
-    rewrite /locs'' /RC.reach_set /RC.roots /= => H10. 
-    by apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil. }
-  { rewrite /locs''; move=> b X; apply/orP; right.
-    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
-    rewrite -Hmeq'.
-    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
-    by rewrite -Hmeq'; apply: REACH_is_closed. }
-  by move: Hk; rewrite -Hmeq'; apply: cont_inv_freshlocs. }
-
-{ move=> f s k e te m0 Hmeq Hmeq' Inv Hsafe _ _.
-  set (c'' := CL_State f Sbreak k e te).
-  set (c := {|
-          RC.core := c'';
-          RC.locs := locs |}).
-  set (locs'' :=  REACH m0 (fun b : block =>
-         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists EmptyEffect; split;
-    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  split=> //; first by rewrite -Hmeq -Hmeq'.
-
-  apply: IH=> //. 
-  case: Inv=> Inv Hsub Hk.
-
-  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots /=. 
-  case=> He Hte; split=> //=.
-  split.
-  { rewrite /locs''=> x b ty H7.
-    move: (He _ _ _ H7); case/orP; first by move=> ->.
-    move=> X; apply/orP; right; apply: REACH_nil; apply/orP; right.
-    by apply: REACH_nil; apply/orP; right. }
-  { move=> x v0 H7; move: (Hte _ _ H7)=> H8 b H9; move: (H8 b H9).
-    rewrite /locs'' /RC.reach_set /RC.roots /= => H10. 
-    by apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil. }
-  { rewrite /locs''; move=> b X; apply/orP; right.
-    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
-    rewrite -Hmeq'.
-    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
-    by rewrite -Hmeq'; apply: REACH_is_closed. }
-  by move: Hk; rewrite -Hmeq'; apply: cont_inv_freshlocs. }
-
-{ move=> f a s1 s2 k e te m0 v1 b Heval H2 Hmeq Hmeq' Inv Hsafe _ _.
-  set (c'' := CL_State f (if b then s1 else s2) k e te).
-  set (c := {|
-          RC.core := c'';
-          RC.locs := locs |}).
-  set (locs'' :=  REACH m0 (fun b : block =>
-         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists EmptyEffect; split; 
-    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  split=> //; first by rewrite -Hmeq -Hmeq'.
-  by apply: IH=> //; rewrite -Hmeq'; apply: (core_inv_freshlocs _ _ Inv). }
-
-{ move=> f s1 s2 k e te m0 Hmeq Hmeq' Inv Hsafe _ _.
-  set (c'' := CL_State f s1 (Kloop1 s1 s2 k) e te).
-  set (c := {|
-          RC.core := c'';
-          RC.locs := locs |}).
-  set (locs'' :=  REACH m0 (fun b : block =>
-         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists EmptyEffect; split; 
-    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  split=> //; first by rewrite -Hmeq -Hmeq'.
-
-  apply: IH=> //. 
-  case: Inv=> Inv Hsub Hk; split.
-  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots.
-  case=> He Hte; split=> //=.
-  { rewrite /locs''=> x b' ty H7; move: (He _ _ _ H7); case/orP; first by move=> ->.
-    move=> /= H8; apply/orP; right; apply: REACH_nil; apply/orP; right.
-    by apply: REACH_nil; apply/orP; right. }
-  { rewrite /c'' /locs'' /c /= => x v H7 b' H8; move {locs'' c}.
-    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
-    by apply: (Hte _ _ H7 _ H8). } 
-  { rewrite /locs''; move=> b X; apply/orP; right.
-    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
-    rewrite -Hmeq'.
-    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
-    by rewrite -Hmeq'; apply: REACH_is_closed. }
-  by move: Hk; rewrite -Hmeq'; apply: cont_inv_freshlocs. }
-
-{ move=> f s1 s2 k e te m0 x H Hmeq Hmeq' Inv Hsafe _ _.
-  set (c'' := CL_State f s2 (Kloop2 s1 s2 k) e te).
-  set (c := {|
-          RC.core := c'';
-          RC.locs := locs |}).
-  set (locs'' :=  REACH m0 (fun b : block =>
-         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists EmptyEffect; split; 
-    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  split=> //; first by rewrite -Hmeq -Hmeq'.
-
-  apply: IH=> //. 
-  case: Inv=> Inv Hsub Hk; split.
-  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots.
-  case=> He Hte; split=> //=.
-  { rewrite /locs''=> x' b' ty H7; move: (He _ _ _ H7); case/orP; first by move=> ->.
-    move=> /= H8; apply/orP; right; apply: REACH_nil; apply/orP; right.
-    by apply: REACH_nil; apply/orP; right. }
-  { rewrite /c'' /locs'' /c /= => x' v H7 b' H8; move {locs'' c}.
-    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
-    by apply: (Hte _ _ H7 _ H8). } 
-  { rewrite /locs''; move=> b X; apply/orP; right.
-    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
-    rewrite -Hmeq'.
-    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
-    by rewrite -Hmeq'; apply: REACH_is_closed. }
-  by move: Hk; rewrite -Hmeq'; apply: cont_inv_freshlocs. }
-
-{ move=> f s1 s2 k e te m0 Hmeq Hmeq' Inv Hsafe _ _.
-  set (c'' := CL_State f Sskip k e te).
-  set (c := {|
-          RC.core := c'';
-          RC.locs := locs |}).
-  set (locs'' :=  REACH m0 (fun b : block =>
-         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists EmptyEffect; split; 
-    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  split=> //; first by rewrite -Hmeq -Hmeq'.
-
-  apply: IH=> //. 
-  case: Inv=> Inv Hsub Hk; split.
-  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots.
-  case=> He Hte; split=> //=.
-  { rewrite /locs''=> x' b' ty H7; move: (He _ _ _ H7); case/orP; first by move=> ->.
-    move=> /= H8; apply/orP; right; apply: REACH_nil; apply/orP; right.
-    by apply: REACH_nil; apply/orP; right. }
-  { rewrite /c'' /locs'' /c /= => x' v H7 b' H8; move {locs'' c}.
-    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
-    by apply: (Hte _ _ H7 _ H8). } 
-  { rewrite /locs''; move=> b X; apply/orP; right.
-    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
-    rewrite -Hmeq'.
-    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
-    by rewrite -Hmeq'; apply: REACH_is_closed. }
-  by move: Hk; rewrite -Hmeq'; apply: cont_inv_freshlocs. }
-
-{ move=> f s1 s2 k e te m0 Hmeq Hmeq' Inv Hsafe _ _.
-  set (c'' := CL_State f (Sloop s1 s2) k e te).
-  set (c := {|
-          RC.core := c'';
-          RC.locs := locs |}).
-  set (locs'' :=  REACH m0 (fun b : block =>
-         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists EmptyEffect; split; first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  split=> //; first by rewrite -Hmeq -Hmeq'.
-
-  apply: IH=> //. 
-  case: Inv=> Inv Hsub Hk; split.
-  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots.
-  case=> He Hte; split=> //=.
-  { rewrite /locs''=> x' b' ty H7; move: (He _ _ _ H7); case/orP; first by move=> ->.
-    move=> /= H8; apply/orP; right; apply: REACH_nil; apply/orP; right.
-    by apply: REACH_nil; apply/orP; right. }
-  { rewrite /c'' /locs'' /c /= => x' v H7 b' H8; move {locs'' c}.
-    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
-    by apply: (Hte _ _ H7 _ H8). } 
-  { rewrite /locs''; move=> b X; apply/orP; right.
-    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
-    rewrite -Hmeq'.
-    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
-    by rewrite -Hmeq'; apply: REACH_is_closed. }
-  by move: Hk; rewrite -Hmeq'; apply: cont_inv_freshlocs. }
-
-{ move=> f s1 s2 k e te m0 Hmeq Hmeq' Inv Hsafe _ _.
-  set (c'' := CL_State f Sskip k e te).
-  set (c := {|
-          RC.core := c'';
-          RC.locs := locs |}).
-  set (locs'' :=  REACH m0 (fun b : block =>
-         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists EmptyEffect; split; first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  split=> //; first by rewrite -Hmeq -Hmeq'.
-
-  apply: IH=> //. 
-  case: Inv=> Inv Hsub Hk; split.
-  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots.
-  case=> He Hte; split=> //=.
-  { rewrite /locs''=> x' b' ty H7; move: (He _ _ _ H7); case/orP; first by move=> ->.
-    move=> /= H8; apply/orP; right; apply: REACH_nil; apply/orP; right.
-    by apply: REACH_nil; apply/orP; right. }
-  { rewrite /c'' /locs'' /c /= => x' v H7 b' H8; move {locs'' c}.
-    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
-    by apply: (Hte _ _ H7 _ H8). } 
-  { rewrite /locs''; move=> b X; apply/orP; right.
-    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
-    rewrite -Hmeq'.
-    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
-    by rewrite -Hmeq'; apply: REACH_is_closed. }
-  by move: Hk; rewrite -Hmeq'; apply: cont_inv_freshlocs. }
-
-{ move=> f k e te m0 m0' Hfree Hmeq Hmeq' Inv Hsafe _ _.
-  set (c'' := CL_Returnstate Vundef (call_cont k)).
-  set (c := {|
-          RC.core := c'';
-          RC.locs := locs |}).
-  set (locs'' :=  REACH m0' (fun b : block =>
-         freshloc m0 m0' b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists (FreelistEffect m0 (blocks_of_env e)); split; 
-    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  split=> //.
-  case: Inv=> Inv Hsub Hk.
-  by move=> b ofs Hfree'; rewrite -Hmeq; apply: (freelist_effect_reach Hfree' Inv).
-  by rewrite -Hmeq -Hmeq'.
-  apply: IH=> //.
-  move: Inv; case=> Hs Hsub Hk; split.
-  by move=> ?; move/getBlocksP; case=> ?; case.
-  apply: cont_inv_call_cont.
-  by move: Hk; rewrite -Hmeq'; apply: cont_inv_freshlocs. }
-
-{ move=> f a k e te m0 v v' m0' Heval Hcast Hfree Hmeq Hmeq' Inv Hsafe _ _.
-  set (c'' := CL_Returnstate v' (call_cont k)).
-  set (c := {|
-          RC.core := c'';
-          RC.locs := locs |}).
-  set (locs'' :=  REACH m0' (fun b : block =>
-         freshloc m0 m0' b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists (FreelistEffect m0 (blocks_of_env e)); split; 
-    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  split=> //.
-  case: Inv=> Inv Hsub Hk.
-  by move=> b ofs Hfree'; rewrite -Hmeq; apply: (freelist_effect_reach Hfree' Inv).
-  by rewrite -Hmeq -Hmeq'.
-  apply: IH=> //.
-  move: Inv; case=> Hs Hsub Hk; split. 
-  move=> b Hget; move: (sem_cast_getBlocks Hcast Hget)=> Hget'.
-  move: (eval_expr_reach' Hs Hsub Heval Hget'); case/orP=> H; apply: REACH_nil; apply/orP.
-  by left.
-  by right; apply: REACH_nil; apply/orP; right; apply: REACH_nil; apply/orP; right.
-  apply: cont_inv_call_cont.
-  by move: Hk; rewrite -Hmeq'; apply: cont_inv_freshlocs. }
-
-{ move=> f k e te m0 m0' Hcall Hfree Hmeq Hmeq' Inv Hsafe _ _.
-  set (c'' := CL_Returnstate Vundef k).
-  set (c := {|
-          RC.core := c'';
-          RC.locs := locs |}).
-  set (locs'' :=  REACH m0' (fun b : block =>
-         freshloc m0 m0' b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists (FreelistEffect m0 (blocks_of_env e)); split; 
-    first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  split=> //.
-  case: Inv=> Inv Hsub Hk.
-  by move=> b ofs Hfree'; rewrite -Hmeq; apply: (freelist_effect_reach Hfree' Inv).
-  by rewrite -Hmeq -Hmeq'.
-  apply: IH=> //.
-  split; first by move=> ?; move/getBlocksP; case=> ?; case.
-  move: Inv; case=> Hs Hsub Hk; rewrite -Hmeq'; apply cont_inv_freshlocs.
-  by move: Hk; apply: cont_inv_ext1. }
-
-{ move=> f s1 s2 k e te m0 n0 Heval Hmeq Hmeq' Inv Hsafe _ _.
-  set (c'' := CL_State f (seq_of_labeled_statement (select_switch n0 s2))
-               (Kswitch k) e te).
-  set (c := {|
-          RC.core := c'';
-          RC.locs := locs |}).
-  set (locs'' :=  REACH m0 (fun b : block =>
-         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists EmptyEffect; split; first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  split=> //.
-  by rewrite -Hmeq -Hmeq'.
-
-  apply: IH=> //. 
-  case: Inv=> Inv Hsub Hk; split.
-  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots.
-  case=> He Hte; split=> //=.
-  { rewrite /locs''=> x' b' ty H7; move: (He _ _ _ H7); case/orP; first by move=> ->.
-    move=> /= H8; apply/orP; right; apply: REACH_nil; apply/orP; right.
-    by apply: REACH_nil; apply/orP; right. }
-  { rewrite /c'' /locs'' /c /= => x' v H7 b' H8; move {locs'' c}.
-    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
-    by apply: (Hte _ _ H7 _ H8). } 
-  { rewrite /locs''; move=> b X; apply/orP; right.
-    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
-    rewrite -Hmeq'.
-    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
-    by rewrite -Hmeq'; apply: REACH_is_closed. }
-  by move: Hk; rewrite -Hmeq'; apply: cont_inv_freshlocs. }
-
-{ move=> f x k e te m0 Hx Hmeq Hmeq' Inv Hsafe _ _.
-  set (c'' := CL_State f Sskip k e te).
-  set (c := {|
-          RC.core := c'';
-          RC.locs := locs |}).
-  set (locs'' :=  REACH m0 (fun b : block =>
-         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists EmptyEffect; split; first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  split=> //.
-  by rewrite -Hmeq -Hmeq'.
-
-  apply: IH=> //. 
-  case: Inv=> Inv Hsub Hk; split.
-  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots.
-  case=> He Hte; split=> //=.
-  { rewrite /locs''=> x' b' ty H7; move: (He _ _ _ H7); case/orP; first by move=> ->.
-    move=> /= H8; apply/orP; right; apply: REACH_nil; apply/orP; right.
-    by apply: REACH_nil; apply/orP; right. }
-  { rewrite /c'' /locs'' /c /= => x' v H7 b' H8; move {locs'' c}.
-    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
-    by apply: (Hte _ _ H7 _ H8). } 
-  { rewrite /locs''; move=> b X; apply/orP; right.
-    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
-    rewrite -Hmeq'.
-    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
-    by rewrite -Hmeq'; apply: REACH_is_closed. }
-  by move: Hk; rewrite -Hmeq'; apply: cont_inv_freshlocs. }
-
-{ move=> f k e te m0 Hmeq Hmeq' Inv Hsafe _ _.
-  set (c'' := CL_State f Scontinue k e te).
-  set (c := {|
-          RC.core := c'';
-          RC.locs := locs |}).
-  set (locs'' :=  REACH m0 (fun b : block =>
-         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists EmptyEffect; split; first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  split=> //.
-  by rewrite -Hmeq -Hmeq'.
-
-  apply: IH=> //. 
-  case: Inv=> Inv Hsub Hk; split.
-  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots.
-  case=> He Hte; split=> //=.
-  { rewrite /locs''=> x' b' ty H7; move: (He _ _ _ H7); case/orP; first by move=> ->.
-    move=> /= H8; apply/orP; right; apply: REACH_nil; apply/orP; right.
-    by apply: REACH_nil; apply/orP; right. }
-  { rewrite /c'' /locs'' /c /= => x' v H7 b' H8; move {locs'' c}.
-    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
-    by apply: (Hte _ _ H7 _ H8). } 
-  { rewrite /locs''; move=> b X; apply/orP; right.
-    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
-    rewrite -Hmeq'.
-    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
-    by rewrite -Hmeq'; apply: REACH_is_closed. }
-  by move: Hk; rewrite -Hmeq'; apply: cont_inv_freshlocs. }
-
-{ move=> f lbl s k e te m0 Hmeq Hmeq' Inv Hsafe _ _.
-  set (c'' := CL_State f s k e te).
-  set (c := {|
-          RC.core := c'';
-          RC.locs := locs |}).
-  set (locs'' :=  REACH m0 (fun b : block =>
-         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists EmptyEffect; split; first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  split=> //.
-  by rewrite -Hmeq -Hmeq'.
-
-  apply: IH=> //. 
-  case: Inv=> Inv Hsub Hk; split.
-  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots.
-  case=> He Hte; split=> //=.
-  { rewrite /locs''=> x' b' ty H7; move: (He _ _ _ H7); case/orP; first by move=> ->.
-    move=> /= H8; apply/orP; right; apply: REACH_nil; apply/orP; right.
-    by apply: REACH_nil; apply/orP; right. }
-  { rewrite /c'' /locs'' /c /= => x' v H7 b' H8; move {locs'' c}.
-    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
-    by apply: (Hte _ _ H7 _ H8). } 
-  { rewrite /locs''; move=> b X; apply/orP; right.
-    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
-    rewrite -Hmeq'.
-    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
-    by rewrite -Hmeq'; apply: REACH_is_closed. }
-  by move: Hk; rewrite -Hmeq'; apply: cont_inv_freshlocs. }
-
-{ move=> f lbl k e te m0 s' k' Hfnd Hmeq Hmeq' Inv Hsafe _ _.
-  set (c'' := CL_State f s' k' e te).
-  set (c := {|
-          RC.core := c'';
-          RC.locs := locs |}).
-  set (locs'' :=  REACH m0 (fun b : block =>
-         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists EmptyEffect; split; first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  split=> //.
-  by rewrite -Hmeq -Hmeq'.
-
-  apply: IH=> //. 
-  case: Inv=> Inv Hsub Hk; split.
-  move: (Inv); rewrite /cl_core_inv /cl_state_inv /RC.roots.
-  case=> He Hte; split=> //=.
-  { rewrite /locs''=> x' b' ty H7; move: (He _ _ _ H7); case/orP; first by move=> ->.
-    move=> /= H8; apply/orP; right; apply: REACH_nil; apply/orP; right.
-    by apply: REACH_nil; apply/orP; right. }
-  { rewrite /c'' /locs'' /c /= => x' v H7 b' H8; move {locs'' c}.
-    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
-    by apply: (Hte _ _ H7 _ H8). } 
-  { rewrite /locs''; move=> b X; apply/orP; right.
-    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
-    rewrite -Hmeq'.
-    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
-    by rewrite -Hmeq'; apply: REACH_is_closed. }
-  move: Hfnd; apply: cont_inv_find_label.
-  by move: Hk; rewrite -Hmeq'; apply: cont_inv_freshlocs. }
-
-{ move=> f vargs k m0 e te m0' Hentry Hmeq Hmeq' Inv Hsafe _ _.
-  set (c'' := CL_State f (fn_body f) k e te).
-  set (c := {|
-          RC.core := c'';
-          RC.locs := locs |}).
-  set (locs'' :=  REACH m0' (fun b : block =>
-         freshloc m0 m0' b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists EmptyEffect; split; first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  split=> //.
-  by rewrite -Hmeq -Hmeq'.
-
-  apply: IH=> //. 
-  case: Inv=> Inv Hsub Hk; split.
-  split.
-  { move=> x b ty H.
-    set (c''' := {| RC.core := c''; RC.locs := locs'' |}).
-    case: (@function_entry1_state_inv c''' (CL_Callstate (Internal f) vargs k) 
-                                  _ _ _ _ _ _ _ Inv Hentry)=> /=.
-    by move=> He Hte; apply: (He _ _ _ H). }
-  { move=> x v H. 
-    set (c''' := {| RC.core := c''; RC.locs := locs'' |}).
-    case: (@function_entry1_state_inv c''' (CL_Callstate (Internal f) vargs k) 
-                                  _ _ _ _ _ _ _ Inv Hentry)=> /=.
-    by move=> He Hte; apply: (Hte _ _ H). }
-  { rewrite /locs''; move=> b X; apply/orP; right.
-    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
-    rewrite -Hmeq'.
-    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
-    by rewrite -Hmeq'; apply: REACH_is_closed. }
-  by move: Hk; rewrite -Hmeq'; apply: cont_inv_freshlocs. }
-
-{ move=> v optid f e te k m0 Hmeq Hmeq' Inv Hsafe _ _.
-  set (c'' := CL_State f Sskip k e (set_opttemp optid v te)).
-  set (c := {|
-          RC.core := c'';
-          RC.locs := locs |}).
-  set (locs'' :=  REACH m0 (fun b : block =>
-         freshloc m0 m0 b || RC.reach_set ge c m0 b)).
-  exists (RC.mk c'' locs''), m'=> /=; split.
-  rewrite FSem.step; split=> //.
-  exists EmptyEffect; split; first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
-  split=> //.
-  by rewrite -Hmeq -Hmeq'.
-
-  apply: IH=> //. 
-  case: Inv=> Hsub Inv.
-  rewrite /cl_core_inv /= in Inv; case: Inv; case=> He Hte Hk; split.
-
-  split.
-  { move=> x b ty H; apply/orP; right; rewrite /locs'' /=.
-    by apply: REACH_nil; move: H; move/He=> X; apply/orP; right; apply: REACH_nil. }
-  { move=> x v0; rewrite /set_opttemp /locs'' /c /c''; move {locs'' c'' c}.
-    case: optid Hsub Hsafe Hk He Hte=> a. 
-    case: (ident_eq a x).
-    + move=> Heq Hsub Hsafe Hk He Hte; subst x; rewrite PTree.gss.
-      case=> ?; subst v0=> b Hget; apply/orP; right.
-      by apply: REACH_nil; apply/orP; right; apply: (Hsub _ Hget).
-    + move=> Hneq Hsafe Hsub Hk He Hte; rewrite PTree.gso=> H.
-      move=> b Hget; apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
-      by apply: (Hte _ _ H _ Hget).
-      by subst x. 
-    move=> Inv Hk He Hte H b Hget. 
-    apply/orP; right; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
-    by apply: (Hte _ _ H _ Hget). } 
-  { rewrite /locs''; move=> b X; apply/orP; right.
-    rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
-    rewrite -Hmeq'.
-    by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
-    by rewrite -Hmeq'; apply: REACH_is_closed. }
-  by move: Hk; rewrite -Hmeq'; apply: cont_inv_freshlocs. }
-
+case: (rc_step Inv step)=> Hstep Hinv.
+by eexists; exists m'; split; eauto.
 Qed.
+
+End Z.
+
+Notation E := (@FSem.E _ _ transf).
+
+Notation F := (@FSem.F _ _ transf _ _).
+
+Lemma cl_core_inv_step ge c m c' m' :
+  cl_core_inv ge c (E m) -> 
+  corestep (F clsem) ge (RC.core c) m c' m' -> 
+  [/\ corestep (F rcsem) ge 
+        c m (RC.mk c' (REACH (E m') (fun b => freshloc (E m) (E m') b 
+                                           || RC.reach_set ge c (E m) b))) m'
+    & cl_core_inv ge (c' (E m')].
+Proof.
+move: (rc_safe 
 
 Lemma rc_init_safe z v vs c m :
   initial_core clsem ge v vs = Some c -> 

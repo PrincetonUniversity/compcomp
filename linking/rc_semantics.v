@@ -8,6 +8,7 @@ Require Import compcert_imports. Import CompcertCommon.
 
 Require Import sepcomp. Import SepComp.
 Require Import arguments.
+Require Import structured_injections.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -119,8 +120,7 @@ Definition reach_set (ge : Genv.t F V) (c : state) (m : mem) :=
 Definition effstep ge U c m c' m' :=
   effstep sem ge U (core c) m (core c') m' 
   /\ (forall b ofs, U b ofs=true -> reach_set ge c m b=true)
-  /\ locs c' = REACH m' (fun b => structured_injections.freshloc m m' b
-                               || reach_set ge c m b).
+  /\ locs c' = REACH m' (fun b => freshloc m m' b || reach_set ge c m b).
 
 Arguments effstep /.
 
@@ -219,3 +219,39 @@ Definition effsem : @EffectSem (Genv.t F V) state :=
   Build_EffectSem _ _ coopsem effstep my_effax1 my_effax2 my_effstep_valid.
 
 End rc. End RC.
+
+Module RCSem. Section RCSem.
+          
+Variables F V C : Type.
+
+Variable sem : @EffectSem (Genv.t F V) C.
+
+Let rcsem := RC.effsem sem.
+      
+Record t : Type := {
+  I : C -> (block -> bool) -> Prop
+
+; init_ax : 
+  forall ge v vs c,
+  initial_core sem ge v vs = Some c -> 
+  I c (getBlocks vs)
+
+; step_ax : 
+  forall ge c m c' m' B,
+  I c B -> 
+  corestep sem ge c m c' m' ->
+  corestep rcsem ge
+    (RC.mk c B) m 
+    (RC.mk c' (REACH m' (fun b => freshloc m m' b 
+                               || RC.reach_set ge (RC.mk c B) m b))) m'
+; aftext_ax :
+  forall c B ef sg vs ov c',
+  I c B ->
+  at_external sem c = Some (ef,sg,vs) -> 
+  after_external sem ov c = Some c' -> 
+  I c' (fun b => match ov with None => B b
+                   | Some v => getBlocks (v::nil) b || B b
+                 end)
+}.
+
+End RCSem. End RCSem.
