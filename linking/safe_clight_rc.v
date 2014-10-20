@@ -29,6 +29,7 @@ Unset Printing Implicit Defensive.
 (** This file proves that safe Clight programs are also reach-closed. *)
 
 Module SAFE_CLIGHT_RC. Section SafeClightRC.
+
 Variable hf : I64Helpers.helper_functions.
 
 Notation clsem := (CL_eff_sem1 hf).
@@ -1945,10 +1946,10 @@ case: c=> /= core locs; case.
 Qed.
 
 Lemma rc_aftext c m ef sg vs c' m' ov :
-  cl_core_inv c (E m) -> 
-  at_external (F rcsem) c = Some (ef,sg,vs) ->
+  cl_core_inv c m -> 
+  at_external (F clsem) (RC.core c) = Some (ef,sg,vs) ->
   after_external (F rcsem) ov c = Some c' ->
-  cl_core_inv c' (E m').
+  cl_core_inv c' m'.
 Proof.
 move=> Inv; rewrite /= FSem.atext FSem.aftext /= /RC.at_external /RC.after_external /= => H.
 have Hhlt: Clight_coop.CL_halted (RC.core c) = None.
@@ -1962,13 +1963,13 @@ case Hov: ov=> [v|]; case=> <-.
   case: fd=> // ef' tys ty; case=> <-; case=> H0 H2 H3 /=. 
   split. 
   + by move=> b Hget; apply: REACH_nil; apply/orP; right; apply/orP; left.
-  + move: (@cont_inv_mem c k (FSem.E _ _ transf m) (FSem.E _ _ transf m') H3); clear.
+  + move: (@cont_inv_mem c k m m' H3); clear.
     by apply: cont_inv_retv. }
 { move: Inv; rewrite /cl_core_inv.
   move: Haft; rewrite /CL_after_external Hov.
   case: (RC.core c)=> // fd args' k.
   case: fd=> // ef' tys ty; case=> <- /=; case=> H0 H2 H3.
-  move: (@cont_inv_mem c k (FSem.E _ _ transf m) (FSem.E _ _ transf m') H3).
+  move: (@cont_inv_mem c k m m' H3).
   split. 
   + by move=> b; move/getBlocksP; case=> ?; case.
   + by apply: cont_inv_retv. }   
@@ -2023,22 +2024,6 @@ case: (rc_step Inv step)=> Hstep Hinv.
 by eexists; exists m'; split; eauto.
 Qed.
 
-End Z.
-
-Notation E := (@FSem.E _ _ transf).
-
-Notation F := (@FSem.F _ _ transf _ _).
-
-Lemma cl_core_inv_step ge c m c' m' :
-  cl_core_inv ge c (E m) -> 
-  corestep (F clsem) ge (RC.core c) m c' m' -> 
-  [/\ corestep (F rcsem) ge 
-        c m (RC.mk c' (REACH (E m') (fun b => freshloc (E m) (E m') b 
-                                           || RC.reach_set ge c (E m) b))) m'
-    & cl_core_inv ge (c' (E m')].
-Proof.
-move: (rc_safe 
-
 Lemma rc_init_safe z v vs c m :
   initial_core clsem ge v vs = Some c -> 
   (forall n, safeN (FSem.F _ _ transf _ _ clsem) espec ge n z c m) -> 
@@ -2082,4 +2067,134 @@ by move/REACH_is_closed.
 by apply: safe_downward1. 
 Qed.
 
-End SafeClightRC. End SAFE_CLIGHT_RC.
+End Z. End SafeClightRC. End SAFE_CLIGHT_RC.
+
+Import SAFE_CLIGHT_RC.
+
+Program Definition id_transf (T : Type) : FSem.t T T :=
+  FSem.mk T T (fun G C sem => sem) id (fun _ _ => True) _ _ _ _ _.
+Next Obligation.
+apply: prop_ext.
+split=> //.
+case=> //.
+Qed.
+
+Section Clight_RC.
+
+Variable hf : I64Helpers.helper_functions.
+
+Notation clsem := (CL_eff_sem1 hf).
+
+Variable ge : Genv.t fundef Ctypes.type.
+
+Definition I c m B := 
+  (exists v vs, B = getBlocks vs /\ initial_core clsem ge v vs = Some c)
+  \/ cl_core_inv ge (RC.mk c B) m.
+
+Lemma init_I v vs c m :
+  initial_core clsem ge v vs = Some c -> 
+  I c m (getBlocks vs).
+Proof.
+by left; exists v, vs.
+Qed.
+
+Let rcsem := RC.effsem clsem.
+
+Lemma step_I c m c' m' B :
+  I c m B -> 
+  corestep clsem ge c m c' m' ->
+  let B'  := REACH m' (fun b => freshloc m m' b || RC.reach_set ge (RC.mk c B) m b) in
+  let c'' := RC.mk c' B' in corestep rcsem ge (RC.mk c B) m c'' m' /\ I c' m' B'.
+Proof.
+move=> H Hstep.
+case: H=> [[v [vs H]]|H].
+{ move: H; rewrite /CL_initial_core.
+  case=> Hget.
+  case: v=> // b ofs /=.
+  case Heq: (Integers.Int.eq_dec _ _)=> // [pf].
+  case Hgenv: (Genv.find_funct_ptr _ _)=> // [fd].
+  case Hfd: fd=> // [f].
+  case Hty: (type_of_fundef _)=> // [targs tret].
+  case Hcst: (_ && _)=> //.
+  case=> Hceq; split; subst c.
+  inversion Hstep; subst.
+  exists EmptyEffect; split=> //.
+  constructor=> //.
+  right.
+  inversion Hstep; subst; split=> //.
+  set c'' := {|
+     RC.core := CL_State f (fn_body f) Kstop e le;
+     RC.locs := REACH m'
+                  (fun b0 : block =>
+                   freshloc m m' b0
+                   || RC.reach_set ge
+                        {|
+                        RC.core := CL_Callstate (Internal f) vs Kstop;
+                        RC.locs := getBlocks vs |} m b0) |}.
+  eapply function_entry1_state_inv with (c0 := c''); eauto.
+  by move=> b' Hget; apply: REACH_nil; apply/orP; right.  
+  rewrite /= => b' Hin; apply/orP; right. 
+  move: Hin; rewrite /RC.reach_set /RC.roots /=.
+  move/REACH_split; case. 
+  apply: REACH_mono'=> b''. 
+  by move=> Hglob; apply/orP; right; apply: REACH_nil; apply/orP; left.
+  by move/REACH_is_closed. }
+{ case: (@rc_step hf mem (id_transf mem) _ _ _ _ _ H Hstep)=> H2 H3.
+  split=> //.
+  by right. }
+Qed.
+
+Lemma atext_I c m B ef sg vs :
+  I c B m -> 
+  at_external clsem c = Some (ef,sg,vs) ->
+  vals_def vs = true.
+Proof.
+rewrite /= /CL_at_external; case: c=> //; case=> // ????? _.
+by case Hand: (_ && _)=> //; case: (andP Hand)=> ??; case=> _ _ <-.
+Qed.
+
+Lemma aftext_I c m B ef sg vs ov c' m' :
+  I c m B ->
+  at_external clsem c = Some (ef,sg,vs) -> 
+  after_external clsem ov c = Some c' -> 
+  I c' m' (fun b => match ov with None => B b
+                      | Some v => getBlocks (v::nil) b || B b
+                    end).
+Proof.
+case.
+{ case=> v' []vs' []Hget; rewrite /=.
+  case: c=> // fd args k /=.
+  rewrite /CL_initial_core.
+  case: v'=> // b ofs.
+  case: (Integers.Int.eq_dec _ _)=> // Heq; subst ofs.
+  case Hg: (Genv.find_funct_ptr _ _)=> // [fd'].
+  case Hfd': fd'=> // [f].
+  case Hty: (type_of_fundef _)=> // [tys ty].
+  case Hval: (_ && _)=> //.
+  case=> <- /= *; subst; congruence. }
+move=> ?? Haft.
+right.
+eapply rc_aftext; eauto.
+erewrite FSem.atext; eauto.
+erewrite FSem.aftext; eauto.
+simpl.
+rewrite /RC.after_external Haft.
+case: ov Haft=> //.
+Grab Existential Variables.
+refine ov.
+refine (id_transf mem).
+Qed.
+
+Lemma halted_I c m B v :
+  I c m B -> 
+  halted clsem c = Some v -> 
+  vals_def (v :: nil) = true.
+Proof.
+rewrite /= /CL_halted => _; case: c=> // ?; case=> //. 
+by case Hvd: (vals_def _)=> //; case=> <-.
+Qed.
+
+Definition Clight_RC : RCSem.t clsem ge := 
+  @RCSem.Build_t _ _ _ clsem ge I init_I step_I atext_I aftext_I halted_I.
+
+End Clight_RC.

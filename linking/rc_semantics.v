@@ -226,32 +226,45 @@ Variables F V C : Type.
 
 Variable sem : @EffectSem (Genv.t F V) C.
 
+Variable ge : Genv.t F V.
+
 Let rcsem := RC.effsem sem.
       
 Record t : Type := {
-  I : C -> (block -> bool) -> Prop
+  I : C -> mem -> (block -> bool) -> Prop
 
 ; init_ax : 
-  forall ge v vs c,
+  forall v vs c m,
   initial_core sem ge v vs = Some c -> 
-  I c (getBlocks vs)
+  I c m (getBlocks vs)
 
 ; step_ax : 
-  forall ge c m c' m' B,
-  I c B -> 
+  forall c m c' m' B,
+  I c m B -> 
   corestep sem ge c m c' m' ->
-  corestep rcsem ge
-    (RC.mk c B) m 
-    (RC.mk c' (REACH m' (fun b => freshloc m m' b 
-                               || RC.reach_set ge (RC.mk c B) m b))) m'
+  let B'  := REACH m' (fun b => freshloc m m' b || RC.reach_set ge (RC.mk c B) m b) in
+  let c'' := RC.mk c' B' in corestep rcsem ge (RC.mk c B) m c'' m' /\ I c' m' B'
+
+; atext_ax :
+  forall c m B ef sg vs,
+  I c B m -> 
+  at_external sem c = Some (ef,sg,vs) ->
+  vals_def vs = true
+
 ; aftext_ax :
-  forall c B ef sg vs ov c',
-  I c B ->
+  forall c m B ef sg vs ov c' m',
+  I c m B ->
   at_external sem c = Some (ef,sg,vs) -> 
   after_external sem ov c = Some c' -> 
-  I c' (fun b => match ov with None => B b
-                   | Some v => getBlocks (v::nil) b || B b
-                 end)
+  I c' m' (fun b => match ov with None => B b
+                      | Some v => getBlocks (v::nil) b || B b
+                    end)
+
+; halted_ax : 
+  forall c m B v,
+  I c m B -> 
+  halted sem c = Some v -> 
+  vals_def (v :: nil) = true
 }.
 
 End RCSem. End RCSem.

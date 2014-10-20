@@ -57,30 +57,27 @@ Section return_lems.
 
 Variable N : pos.
 
-Variable cores_S' cores_T : 'I_N -> Modsem.t. 
-
+Variable cores_S cores_T : 'I_N -> Modsem.t. 
+Variable rclosed_S : forall i : 'I_N, RCSem.t (cores_S i).(sem) (cores_S i).(ge).
 Variable nucular_T : forall i : 'I_N, Nuke_sem.t (cores_T i).(sem).
 
 Variable fun_tbl : ident -> option 'I_N.
 
-Variable sims' : forall i : 'I_N, 
-  let s := cores_S' i in
+Variable sims : forall i : 'I_N, 
+  let s := cores_S i in
   let t := cores_T i in
   SM_simulation_inject s.(sem) t.(sem) s.(ge) t.(ge).
 
 Variable my_ge : ge_ty.
-Variable my_ge_S : forall (i : 'I_N), genvs_domain_eq my_ge (cores_S' i).(ge).
+Variable my_ge_S : forall (i : 'I_N), genvs_domain_eq my_ge (cores_S i).(ge).
 Variable my_ge_T : forall (i : 'I_N), genvs_domain_eq my_ge (cores_T i).(ge).
-
-Let cores_S (ix : 'I_N) := 
-  Modsem.mk (cores_S' ix).(ge) (RC.effsem (cores_S' ix).(sem)).
 
 Notation cast'  pf x := (cast (C \o cores_T) pf x).
 Notation cast'' pf x := (cast (C \o cores_T) (sym_eq pf) x).
 Notation rc_cast'  pf x := (cast (RC.state \o C \o cores_T) pf x).
 Notation rc_cast'' pf x := (cast (RC.state \o C \o cores_T) (sym_eq pf) x).
 
-Notation R := (@R N cores_S' cores_T nucular_T sims' my_ge). 
+Notation R := (@R N cores_S cores_T rclosed_S nucular_T sims my_ge). 
 
 Context
 (mu : Inj.t) m1 m2 rv1 st1''
@@ -98,7 +95,7 @@ move: hlt1; rewrite /LinkerSem.halted0.
 case hlt10: (halted _ _)=> //[rv].
 case hasty: (val_casted.val_has_type_func _ _)=> //. 
 case=> Heq; subst rv1.
-case: (core_halted (sims sims' (Core.i (peekCore st1)))
+case: (core_halted (sims (Core.i (peekCore st1)))
        _ _ _ _ _ _ (head_match hdinv) hlt10)
        => rv2 []inj12 []vinj hlt2.
 exists rv2.
@@ -117,7 +114,6 @@ change (P (Core.sg (peekCore st2))
           (Core.i (peekCore st2)) (Core.c (peekCore st2))).
 apply: (cast_indnatdep'' (j := Core.i (peekCore st1))).
 rewrite /P; move: hlt2; rewrite /= /RC.halted /= => ->. 
-
 have H: val_casted.val_has_type_func rv2 (proj_sig_res (Core.sg (peekCore st2))).
 { move: hlt1; rewrite /LinkerSem.halted0.
   case: (halted _ _)=> //[rv'].
@@ -126,12 +122,9 @@ have H: val_casted.val_has_type_func rv2 (proj_sig_res (Core.sg (peekCore st2)))
   { by clear -pf_sig; move: pf_sig; rewrite /c /d /s1 /s2 /peekCore /= => ->. }
   move: hasty'; move/val_casted.val_has_type_funcP=> hasty'.
   apply/val_casted.val_has_type_funcP.
-  apply: (val_casted.valinject_hastype' _ _ _ vinj)=> //. 
-  move: hlt10; rewrite /halted /= /RC.halted.
-  case: (halted _ _)=> //a; case def: (vals_def _)=> //.
-  case=> <-; move: def=> /=; rewrite andb_comm=> /=; move/negP.
-  by rewrite /is_vundef; case: a. }
-
+  apply: (val_casted.valinject_hastype' _ _ _ vinj)=> //.
+  case: hdinv=> _ _; case=> B []_ I _ _ _.
+  by move=> C; move: (RCSem.halted_ax I hlt10); rewrite C. }
 by rewrite H.
 Qed.
 
@@ -169,7 +162,7 @@ case hasty1: (val_casted.val_has_type_func _ _)=> //; case=> X; subst rv1'.
 move: (R_tys1 inv); rewrite /s1=> tys1.
 move: (R_tys2 inv); rewrite /s2=> tys2.
 
-case: (core_halted (sims sims' (Core.i (peekCore st1)))
+case: (core_halted (sims (Core.i (peekCore st1)))
        _ _ _ _ _ _ (head_match hdinv) hlt10)
        => rv2 []inj12 []vinj hlt2.
 
@@ -178,10 +171,8 @@ have hasty2: (val_casted.val_has_type_func rv2 (proj_sig_res (Core.sg (peekCore 
   move/val_casted.val_has_type_funcP=> hasty1.
   apply/val_casted.val_has_type_funcP.
   apply: (val_casted.valinject_hastype' _ _ _ vinj)=> //.
-  move: hlt10; rewrite /halted /= /RC.halted.
-  case: (halted _ _)=> //a; case def: (vals_def _)=> //.
-  case=> <-; move: def=> /=; rewrite andb_comm=> /=; move/negP.
-  by rewrite /is_vundef; case: a. }
+  case: hdinv=> _ _; case=> B []_ I _ _ _.
+  by move=> C; move: (RCSem.halted_ax I hlt10); rewrite C. }
 
 exists rv2.
 case: pop2=> st2'' pop2.
@@ -421,7 +412,7 @@ have [hd2' [pf_eq22' [pf_sig22' [pf_eq12' [pf_sig12' [cd' [aft2' mtch12']]]]]]]:
   [/\ after_external (sem (cores_T (Core.i hd2)))
         (Some rv2) (Core.c hd2) 
       = Some (cast'' pf_eq22' (Core.c hd2'))
-    & match_state (sims sims' (Core.i hd1')) cd' mu' 
+    & match_state (sims (Core.i hd1')) cd' mu' 
       (Core.c hd1') m1 (cast'' pf_eq12' (Core.c hd2')) m2].
 { case: (popCoreE _ pop2)=> wf_pf []inCtx2 st2''_eq'.
   rewrite st2''_eq' in st2''_eq.
@@ -429,7 +420,7 @@ have [hd2' [pf_eq22' [pf_sig22' [pf_eq12' [pf_sig12' [cd' [aft2' mtch12']]]]]]]:
   move: (@eff_after_external 
   _ _ _ _ _ _ _ _ 
   _ _  
-  (sims sims' (Core.i hd1))
+  (sims (Core.i hd1))
   _ _ _ _ _ _ _ _ _ _ _ _
   inj0 mtch0 at01 at02' vinj0
 
@@ -450,7 +441,7 @@ have [hd2' [pf_eq22' [pf_sig22' [pf_eq12' [pf_sig12' [cd' [aft2' mtch12']]]]]]]:
   exists (sym_eq pf_sig0).
   exists (sym_eq e1)=> /=.
   exists (sym_eq esig).
-  exists (cast (fun ix => core_data (sims sims' ix)) e1 cd'); split=> //.
+  exists (cast (fun ix => core_data (sims ix)) e1 cd'); split=> //.
   
   move: aft2''.
   set T := C \o cores_T.  
@@ -464,11 +455,11 @@ have [hd2' [pf_eq22' [pf_sig22' [pf_eq12' [pf_sig12' [cd' [aft2' mtch12']]]]]]]:
   move: mtch12'.
   have ->: sym_eq (sym_eq e1) = e1 by apply: proof_irr.
   rewrite aft1' in aft1''; case: aft1''=> <-.
-  set T := (fun ix => core_data (sims sims' ix)).
+  set T := (fun ix => core_data (sims ix)).
   set U := C \o cores_S.
   set V := C \o cores_T.
   set P := fun ix (x : T ix) (y : U ix) (z : V ix) => 
-    match_state (sims sims' ix) x mu' y m1 z m2.
+    match_state (sims ix) x mu' y m1 z m2.
   change (P (Core.i hd1) cd' (cast U (sym_eq e1) (Core.c hd1')) d0'
        -> P (Core.i hd1') (cast T e1 cd') (Core.c hd1') (cast V e1 d0')).
   by apply: cast_indnatdep33. }
@@ -809,6 +800,8 @@ apply: Build_head_inv=> //.
   }(*END All (rel_inv_pred ...) mus'*)
 
 {(*vis_inv*) 
+(* HERE HERE HERE *)
+case: fr0 unch1 unch2=.
 apply: Build_vis_inv.
 rewrite /vis /=.
 rewrite /mu'.
@@ -916,8 +909,8 @@ have subF: {subset frgnBlocksSrc mu0 <= frgnSrc'}.
   apply: (head_domt hdinv)=> //. 
   by apply: loctgt_nu_top.
 }(*END domt*)
-{(*Label: nucular*)
 
+{(*Label: nucular*)
   have [rv2_val wd2]: [/\ oval_valid (Some rv2) m2 & mem_wd m2]. 
   { have nuke: Nuke_sem.I (nucular_T (Core.i (peekCore st1))) 
                (cast'' pf (Core.c (d inv))) m2. 

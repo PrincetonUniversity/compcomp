@@ -53,35 +53,33 @@ Section call_lems.
 
 Variable N : pos.
 
-Variable cores_S' cores_T : 'I_N -> Modsem.t. 
+Variable cores_S cores_T : 'I_N -> Modsem.t. 
 
 Variable find_symbol_ST : 
   forall (i : 'I_N) id bf, 
-  Genv.find_symbol (ge (cores_S' i)) id = Some bf -> 
+  Genv.find_symbol (ge (cores_S i)) id = Some bf -> 
   Genv.find_symbol (ge (cores_T i)) id = Some bf.
 
+Variable rclosed_S : forall i : 'I_N, RCSem.t (cores_S i).(sem) (cores_S i).(ge).
 Variable nucular_T : forall i : 'I_N, Nuke_sem.t (cores_T i).(sem).
 
 Variable fun_tbl : ident -> option 'I_N.
 
-Variable sims' : forall i : 'I_N, 
-  let s := cores_S' i in
+Variable sims : forall i : 'I_N, 
+  let s := cores_S i in
   let t := cores_T i in
   SM_simulation_inject s.(sem) t.(sem) s.(ge) t.(ge).
 
 Variable my_ge : ge_ty.
-Variable my_ge_S : forall (i : 'I_N), genvs_domain_eq my_ge (cores_S' i).(ge).
+Variable my_ge_S : forall (i : 'I_N), genvs_domain_eq my_ge (cores_S i).(ge).
 Variable my_ge_T : forall (i : 'I_N), genvs_domain_eq my_ge (cores_T i).(ge).
-
-Let cores_S (ix : 'I_N) := 
-  Modsem.mk (cores_S' ix).(ge) (RC.effsem (cores_S' ix).(sem)).
 
 Notation cast'  pf x := (cast (C \o cores_T) pf x).
 Notation cast'' pf x := (cast (C \o cores_T) (sym_eq pf) x).
 Notation rc_cast'  pf x := (cast (RC.state \o C \o cores_T) pf x).
 Notation rc_cast'' pf x := (cast (RC.state \o C \o cores_T) (sym_eq pf) x).
 
-Notation R := (@R N cores_S' cores_T nucular_T sims' my_ge). 
+Notation R := (@R N cores_S cores_T rclosed_S nucular_T sims my_ge). 
 
 Context
 (mu : Inj.t) m1 m2 ef sig args1 
@@ -104,7 +102,7 @@ have atext1':
     (Core.c (peekCore st1)) =
   Some (ef,sig,args1) by rewrite /RC.at_external.
 move=> hd_match _.
-case: (core_at_external (sims sims' (Core.i (c inv))) 
+case: (core_at_external (sims (Core.i (c inv))) 
       _ _ _ _ _ _ hd_match atext1').
 move=> inj []args2 []valinj []atext2 extends; exists args2.
 set T := C \o cores_T.
@@ -186,7 +184,7 @@ have atext2'':
      by rewrite /LinkerSem.at_external0.
    by apply: cast_indnatdep. }
 
-case: (core_at_external (sims sims' (Core.i (c inv))) 
+case: (core_at_external (sims (Core.i (c inv))) 
       _ _ _ _ _ _ (head_match hdinv) atext1').
 move=> inj []args2' []vinj []atext2''' extends.
 
@@ -227,9 +225,10 @@ have DomTgt_rc: REACH_closed m2 (DomTgt mu_top).
   by apply: valid_dec; apply: mem_wd_reach. }
 
 have defs1: vals_def args1.
-{ clear - atext1'; move: atext1'; rewrite /= /RC.at_external.
+{ clear - hdinv atext1'; move: atext1'; rewrite /= /RC.at_external.
   case e: (at_external _ _)=> [[[ef0 dep_sig0] args0]|//].
-  by case f: (vals_def args0)=> //; case=> _ _ <-. }
+  case: hdinv=> _ _; case=> B []_ I _ _ _.
+  by case=> _ _ <-; apply: (RCSem.atext_ax I e). }
 
 have frgnT_sub_domT: {subset frgnT <= domT}.
 { move=> b H; apply: DomTgt_rc. 
@@ -278,7 +277,6 @@ have globs_frgnS:
   have eq: genvs_domain_eq (ge (cores_S ix)) (ge (cores_S (Core.i (c inv)))).
     apply genvs_domain_eq_trans with (ge2 := my_ge)=> //.
     by apply: (genvs_domain_eq_sym _ _ (my_ge_S ix)).
-    by apply: my_ge_S.
   by rewrite /= (genvs_domain_eq_isGlobal _ _ eq). }
 
 have presglobs: meminj_preserves_globals (ge (cores_S (Core.i c1))) j.
@@ -299,7 +297,6 @@ have globs_frgnT:
     have eq: genvs_domain_eq (ge (cores_T ix)) (ge (cores_S (Core.i (c inv)))).
       apply genvs_domain_eq_trans with (ge2 := my_ge)=> //.
       by apply: (genvs_domain_eq_sym _ _ (my_ge_T ix)).
-      by apply: my_ge_S.
     by rewrite (genvs_domain_eq_isGlobal _ _ eq). }
   case: (frgnSrc _ (Inj_wd _) _ fS)=> b' []d []fOf fT.
   have eq: b=b'. 
@@ -328,18 +325,18 @@ have domT_valid:
 { by move: (match_validblocks _ (head_match hdinv)); case=> H I; apply: I. }
 
 have [cd_new [c2 [pf_new [init2 mtch12]]]]:
-  exists (cd_new : core_data (sims sims' (Core.i c1))) 
+  exists (cd_new : core_data (sims (Core.i c1))) 
          (c2 : Core.t cores_T)
          (pf : Core.i c1 = Core.i c2),
     [/\ initCore cores_T (ef_sig ef) ix (Vptr bf Integers.Int.zero) args2 = Some c2
-      & match_state (sims sims' (Core.i c1)) cd_new
+      & match_state (sims (Core.i c1)) cd_new
         (initial_SM domS domT frgnS frgnT j) 
         (Core.c c1) m1 (cast'' pf (Core.c c2)) m2].
 { move: init1; rewrite /initCore.
   case init1: (semantics.initial_core _ _ _ _)=> //[c1']; case=> X.
   generalize dependent c1; case=> c1_i c1; intros.
   move: (X) init1; case=> eq _ _ init1; subst ix=> /=.
-  case: (core_initial _ _ _ _ (sims sims' c1_i) _ 
+  case: (core_initial _ _ _ _ (sims c1_i) _ 
          args1 _ m1 j args2 m2 domS domT init1 inj vinj')=> //.
   case: hdinv=> ? ? ? ? ? genvs /=; rewrite /j.
   by apply: (genvs_domain_eq_globalptr_inject (my_ge_S c1_i) genvs). 
@@ -412,11 +409,11 @@ have mu_pkg_as_inj: as_inj mu_pkg = as_inj mu_top.
 { by rewrite /mu_pkg /= replace_locals_as_inj. }
 
 have pkg_hdinv: 
-  head_inv nucular_T my_ge pf
-  (cast (fun ix : 'I_N => core_data (sims sims' ix)) pf2 (projT2 cd))
+  head_inv rclosed_S nucular_T my_ge pf
+  (cast (fun ix : 'I_N => core_data (sims ix)) pf2 (projT2 cd))
   pkg mus m1 m2.
-{ move: (@lo_head_inv _ _ _ _ _ _ (c inv) (d inv) pf 
-    (cast (fun ix0 : 'I_N => core_data (sims sims' ix0)) pf2 (projT2 cd))
+{ move: (@lo_head_inv _ _ _ _ _ _ _ (c inv) (d inv) pf 
+    (cast (fun ix0 : 'I_N => core_data (sims ix0)) pf2 (projT2 cd))
     mu_top mus m1 m2 hdinv _ _ args1 args2 inj vinj erefl erefl mtch_pkg).
   rewrite /pkg /= /mu_pkg.
   have ->: lo_wd _ _ _ _ _ = mu_pkg_wd by move=> *; apply: proof_irr.
@@ -426,7 +423,7 @@ have mu_new_rel_inv_pkg: rel_inv_pred m1 mu_new pkg.
 { by apply init_rel_inv_mu
     with (c := c inv) (d := d inv) (pf := pf) 
          (cd := (cast (fun ix : 'I_N => 
-           core_data (sims sims' ix)) pf2 (projT2 cd))) 
+           core_data (sims ix)) pf2 (projT2 cd))) 
          (mus := mus)
          (inv := hdinv) (inj := inj) (vinj := vinj)
          (eq1 := erefl) (eq2 := erefl). }
@@ -436,28 +433,29 @@ have mu_new_rel_inv_all:
 { apply init_rel_inv_rest 
     with (c := c inv) (d := d inv) (pf := pf) 
          (cd := (cast (fun ix : 'I_N => 
-           core_data (sims sims' ix)) pf2 (projT2 cd))) 
+           core_data (sims ix)) pf2 (projT2 cd))) 
          (mus := mus) 
          (my_ge := my_ge)
+         (rclosed_S := rclosed_S)
          (nucular_T := nucular_T)=> //.
   by move: (head_match hdinv)=> mtch; apply match_visible in mtch. }
 
-have mu_new_vis_inv: vis_inv my_ge c1 mu_new'.
+have mu_new_vis_inv: vis_inv my_ge c1 (getBlocks args1) mu_new'.
 { apply: Build_vis_inv=> // b; rewrite /in_mem /= => Y.
   rewrite /vis /mu_new /frgnS /exportedSrc /=.
   move: Y; rewrite /RC.roots; case/orP.
   move=> H1.
-  have H1': isGlobalBlock (ge (cores_S' (Core.i c1))) b.
+  have H1': isGlobalBlock (ge (cores_S (Core.i c1))) b.
   { by rewrite -(isGlob_iffS my_ge_S). }
   by apply: REACH_nil; apply/orP; left.
-  move=> getB; apply: REACH_nil; apply/orP; right.
-  have eq: RC.locs (Core.c c1) = getBlocks args1.
-  { erewrite initCore_locs; eauto. }
-  by rewrite -eq. }
+  by move=> getB; apply: REACH_nil; apply/orP; right. }
 
 have hdinv_new:
-  head_inv nucular_T my_ge pf_new cd_new mu_new' (pkg :: mus) m1 m2.
-{ apply: Build_head_inv=> //.
+  head_inv rclosed_S nucular_T my_ge pf_new cd_new mu_new' (pkg :: mus) m1 m2.
+{ apply: Build_head_inv=> //. 
+  exists (getBlocks args1); split=> //.
+  move: init1; rewrite /initCore; case Hinit: (initial_core _ _ _ _)=> //. 
+  by case=> <-; apply RCSem.init_ax with (v := Vptr bf Int.zero).
   by rewrite /= /mu_new initial_SM_DomTgt /domT; apply: (head_domt hdinv). 
   have vgenv1: valid_genv (ge (cores_T (Core.i (c inv)))) m2.
   { by move: (R_ge inv)=> val_ges; apply: (val_ges (Core.i (c inv))). }
