@@ -3118,6 +3118,17 @@ Qed.
 
 End FIND_LABEL.  
 
+(*TODO: move elsewhere *)
+Lemma vals_def_defined vs : vals_def vs = vals_defined vs.
+Proof.
+induction vs; auto.
+simpl.
+destruct a; auto.
+Qed.
+
+Require Import val_casted.
+(*END move*)
+
 Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
        (MTCH: MATCH c1 mu c1 m1 c2 m2)
        (AtExtSrc: at_external (CL_eff_sem1 hf) c1 = Some (e, ef_sig, vals1)),
@@ -3136,10 +3147,14 @@ destruct MTCH as [MC [RC [PG [Glob [SMV WD]]]]].
     destruct fd; simpl in *; inv H0.
     split; trivial. monadInv TRFD.
     destruct (observableEF_dec hf e0); inv H1.
-    exists tvargs; split; trivial. 
+    destruct (vals_def vargs) eqn:Heqv; inv H0.
+    exists tvargs; split; trivial.
     eapply val_list_inject_forall_inject; try eassumption.
     split; trivial.
-    intros.
+    intros. simpl. 
+    rewrite vals_def_defined in *. 
+    eapply vals_inject_defined in Heqv; eauto.
+    rewrite Heqv; auto.
     exploit replace_locals_wd_AtExternal; try eassumption.
                 apply val_list_inject_forall_inject in AINJ.
                 apply forall_vals_inject_restrictD in AINJ. eassumption.
@@ -3218,6 +3233,13 @@ Proof. intros.
   destruct tfd; inv AtExtTgt. 
   simpl in TRFD. inv TRFD. 
   destruct (observableEF_dec hf e1); inv H1; inv H0. 
+  rename H1 into H0.
+  rename H2 into H1.
+  destruct (vals_def vargs) eqn:Heqv; inv H1.
+  assert (Htvals: vals_def tvargs = true).
+  { rewrite vals_def_defined in *.
+    eapply vals_inject_defined in Heqv; eauto. }
+  rewrite Htvals in H0; inv H0.
   rename o into OBS.  
   eexists; eexists.
     split. reflexivity.
@@ -4616,8 +4638,15 @@ assert (GDE: genvs_domain_eq ge tge).
     intros. destruct H as [MC [RC [PG [Glob [VAL WD]]]]].
     inv MC; simpl in H0. inv H0. inv H0.
     destruct k; simpl in *; inv H0.
+    destruct (negb (is_vundef v)) eqn:Heqv; inv H1.
     specialize (MCONT VSet.empty). inv MCONT.
-    exists tv. intuition. }
+    exists tv. 
+    assert (Htv: negb (is_vundef tv) = true).
+    { clear - Heqv RINJ.
+      inv RINJ; auto.
+      simpl in Heqv. congruence. }
+    rewrite Htv.
+    intuition. }
 { (*at_external *) 
     apply MATCH_atExternal. }
 { (*after_external *)

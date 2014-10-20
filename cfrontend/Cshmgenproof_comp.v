@@ -1982,6 +1982,7 @@ simpl.
  destruct tfd; inv AtExtTgt.
  destruct (observableEF_dec hf e0); inv H1.
  destruct (observableEF_dec hf e1); inv H0.
+ destruct (vals_def args1) eqn:Heqv; inv H2.
  simpl in *.
  remember (list_typ_eq (sig_args (ef_sig e)) (typlist_of_typelist targs) &&
            opt_typ_eq (sig_res (ef_sig e)) (opttyp_of_type tres)) as dd.
@@ -2004,9 +2005,9 @@ simpl.
       unfold vis. rewrite replace_externs_frgnBlocksSrc, replace_externs_locBlocksSrc.
       apply restrict_incr. 
 assert (RC': REACH_closed m1' (mapped (as_inj nu'))).
-        eapply inject_REACH_closed; eassumption.
+{ eapply inject_REACH_closed; eassumption. }
 assert (PHnu': meminj_preserves_globals (Genv.globalenv prog) (as_inj nu')).
-    subst. clear - INC SEP PG Glob WDmu WDnu'.
+{    subst. clear - INC SEP PG Glob WDmu WDnu'.
     apply meminj_preserves_genv2blocks in PG.
     destruct PG as [PGa [PGb PGc]].
     apply meminj_preserves_genv2blocks.
@@ -2041,13 +2042,14 @@ assert (PHnu': meminj_preserves_globals (Genv.globalenv prog) (as_inj nu')).
         destruct (SEPa _ _ _ Heqd H0).
         destruct (as_inj_DomRng _ _ _ _ PGb WDmu).
         congruence.
+}
 assert (RR1: REACH_closed m1'
   (fun b : Values.block =>
    locBlocksSrc nu' b
    || DomSrc nu' b &&
       (negb (locBlocksSrc nu' b) &&
        REACH m1' (exportedSrc nu' (ret1 :: nil)) b))).
-  intros b Hb. rewrite REACHAX in Hb. destruct Hb as [L HL].
+{ intros b Hb. rewrite REACHAX in Hb. destruct Hb as [L HL].
   generalize dependent b.
   induction L; simpl; intros; inv HL.
      assumption.
@@ -2101,9 +2103,6 @@ assert (RR1: REACH_closed m1'
         split. unfold DomSrc. rewrite (frgnBlocksSrc_extBlocksSrc _ WDnu' _ RC). intuition.
         apply REACH_nil. unfold exportedSrc.
           rewrite (frgnSrc_shared _ WDnu' _ RC). intuition.
-  (*case DomSrc nu' b' &&
-    (negb (locBlocksSrc nu' b') &&
-     REACH m1' (exportedSrc nu' (ret1 :: nil)) b') = true*)
     destruct IHL. congruence.
     apply andb_true_iff in H. simpl in H. 
     destruct H as [DomNu' Rb']. 
@@ -2122,18 +2121,18 @@ assert (RR1: REACH_closed m1'
            destruct (mappedD_true _ _ RC') as [[? ?] ?].
            eapply as_inj_DomRng; eassumption.
     eapply REACH_cons; try eassumption.
-    
+}    
 assert (RRC: REACH_closed m1' (fun b : Values.block =>
                          mapped (as_inj nu') b &&
                            (locBlocksSrc nu' b
                             || DomSrc nu' b &&
                                (negb (locBlocksSrc nu' b) &&
                            REACH m1' (exportedSrc nu' (ret1 :: nil)) b)))).
-  eapply REACH_closed_intersection; eassumption.
+{ eapply REACH_closed_intersection; eassumption. }
 assert (GFnu': forall b, isGlobalBlock (Genv.globalenv prog) b = true ->
                DomSrc nu' b &&
                (negb (locBlocksSrc nu' b) && REACH m1' (exportedSrc nu' (ret1 :: nil)) b) = true).
-     intros. specialize (Glob _ H).
+{  intros. specialize (Glob _ H).
        assert (FSRC:= extern_incr_frgnBlocksSrc _ _ INC).
           rewrite replace_locals_frgnBlocksSrc in FSRC.
        rewrite FSRC in Glob.
@@ -2142,7 +2141,7 @@ assert (GFnu': forall b, isGlobalBlock (Genv.globalenv prog) b = true ->
         split.
           unfold DomSrc. rewrite (frgnBlocksSrc_extBlocksSrc _ WDnu' _ Glob). intuition.
           apply REACH_nil. unfold exportedSrc.
-          rewrite (frgnSrc_shared _ WDnu' _ Glob). intuition.
+          rewrite (frgnSrc_shared _ WDnu' _ Glob). intuition. }
 split. 
   unfold vis in *.
   rewrite replace_externs_frgnBlocksSrc, replace_externs_locBlocksSrc in *.
@@ -3138,6 +3137,7 @@ Proof. intros. destruct H as [MC [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
     intros WDr.
     remember (observableEF_dec hf e0) as d. 
     destruct d; inv H0.
+    destruct (vals_def args) eqn:Heqv; inv H2.
     rename o into OBS.
     exists args2; intuition.
       destruct tfd; simpl in *.
@@ -3189,6 +3189,7 @@ intros.
 (*halted*) 
   { intros. destruct H as [MC [RC [PG [GF [Glob [VAL [WD INJ]]]]]]]. 
     destruct c1; inv H0. destruct k; inv H1.
+    destruct (negb (is_vundef res)); inv H0.
     inv MC. exists res2.
     split. assumption.
     split. eassumption.

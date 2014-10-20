@@ -15,6 +15,7 @@ Require Import Cop.
 Require Import Clight. 
 Require Import mem_lemmas. (*for mem_forward*)
 Require Import semantics.
+Require Import mem_lemmas.
 Require Import BuiltinEffects.
 
 Require Import val_casted.
@@ -44,7 +45,7 @@ Definition CL_at_external (c: CL_core) : option (external_function * signature *
       match fd with
         Internal f => None
       | External ef targs tres => 
-          if observableEF_dec hf ef 
+          if observableEF_dec hf ef && vals_def args
           then Some (ef, ef_sig ef, args)
           else None
       end
@@ -97,7 +98,9 @@ Definition CL_after_external (vret: option val) (c: CL_core) : option CL_core :=
 *)       
 Definition CL_halted (q : CL_core): option val :=
     match q with 
-       CL_Returnstate v Kstop => Some v
+       CL_Returnstate v Kstop => 
+         if vals_def (v::nil) then Some v
+         else None
      | _ => None
     end.
    
