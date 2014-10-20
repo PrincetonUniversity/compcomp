@@ -41,6 +41,8 @@ Definition pos_incr (p : pos) := mkPos (pos_incr' p).
 Section ContextEquiv.
 
 Variable (N0 : pos) (sems_S0 sems_T0 : 'I_N0 -> Modsem.t).
+
+Variable rclosed_S0 : forall ix : 'I_N0, RCSem.t (sems_S0 ix).(sem) (sems_S0 ix).(ge).
 Variable nucular_T0 : forall ix : 'I_N0, Nuke_sem.t (sems_T0 ix).(sem).
 
 Variable plt0 : ident -> option 'I_N0.
@@ -50,7 +52,6 @@ Variable sims0 : forall ix : 'I_N0,
                  SM_simulation_inject s.(sem) t.(sem) s.(ge) t.(ge).
 
 Variable ge_top : ge_ty.                                                     
-
 Variable domeq_S0 : forall ix : 'I_N0, genvs_domain_eq ge_top (sems_S0 ix).(ge).
 Variable domeq_T0 : forall ix : 'I_N0, genvs_domain_eq ge_top (sems_T0 ix).(ge). 
 
@@ -62,6 +63,7 @@ Variable find_symbol_ST :
 Variable C : Modsem.t.   
 Variable sim_C : SM_simulation_inject C.(sem) C.(sem) C.(ge) C.(ge).
 Variable domeq_C : genvs_domain_eq ge_top C.(ge).
+Variable rclosed_C : RCSem.t (sem C) (ge C).
 Variable nuke_C : Nuke_sem.t (sem C).
 
 Let N := pos_incr N0.
@@ -103,9 +105,6 @@ rewrite /sems_S /sems_T /extend_sems; case e: (lt_dec ix N0)=> [pf|//].
 by apply: (sims0 (Ordinal (lt_ssrnatlt pf))).
 Qed.
 
-Let sems_S' (ix : 'I_N) :=        
-  Modsem.mk (sems_S ix).(ge) (RC.effsem (sems_S ix).(sem)).
-
 Lemma leq_N0_N : ssrnat.leq N0 N.
 Proof. by rewrite /N /= plus_comm. Qed.
 
@@ -125,15 +124,15 @@ Definition plt (id : ident) :=
 (** [linker_S] and [linker_T] define the extended source--target semantics,
 resp., in which [sems_S0] and [sems_T0] are linked with the context [C]. *)
 
-Definition linker_S := effsem N sems_S' plt.
+Definition linker_S := effsem N sems_S plt.
 
 Definition linker_T := effsem N sems_T plt.
 
+Lemma rclosed_S (ix : 'I_N) : RCSem.t (sem (sems_S ix)) (ge (sems_S ix)).
+Proof. by rewrite /sems_S /extend_sems; case e: (lt_dec ix N0). Qed.
+
 Lemma nucular_T (ix : 'I_N) : Nuke_sem.t (sem (sems_T ix)).
-Proof.
-rewrite /sems_T /extend_sems; case e: (lt_dec ix N0)=> [//|].
-by apply: nuke_C.
-Qed.
+Proof. by rewrite /sems_T /extend_sems; case e: (lt_dec ix N0). Qed.
 
 (** Prove the existence of pairwise simulations between source and target 
 module semantics in the extended semantics. *)
@@ -167,6 +166,7 @@ Lemma lifted_sim (main : val) :
 Proof.
 apply: link=> //. 
 by apply: find_symbol_ST'.
+by apply: rclosed_S.
 by apply: nucular_T.
 by apply: sm_inject.
 by apply: genvs_domeq_S.

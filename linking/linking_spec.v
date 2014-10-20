@@ -59,6 +59,7 @@ Axiom link : forall
      forall (i : 'I_N) id bf, 
      Genv.find_symbol (ge (sems_S i)) id = Some bf -> 
      Genv.find_symbol (ge (sems_T i)) id = Some bf)
+  (rclosed_S : forall ix : 'I_N, RCSem.t (sems_S ix).(sem) (sems_S ix).(ge))
   (nucular_T : forall ix : 'I_N, Nuke_sem.t (sems_T ix).(sem))
   (plt : ident -> option 'I_N)
   (sims : forall ix : 'I_N, 
@@ -68,8 +69,6 @@ Axiom link : forall
   (ge_top : ge_ty)
   (domeq_S : forall ix : 'I_N, genvs_domain_eq ge_top (sems_S ix).(ge))
   (domeq_T : forall ix : 'I_N, genvs_domain_eq ge_top (sems_T ix).(ge)),
-  let sems_S (ix : 'I_N) := 
-    Modsem.mk (sems_S ix).(ge) (RC.effsem (sems_S ix).(sem)) in 
   let linker_S := effsem N sems_S plt in
   let linker_T := effsem N sems_T plt in forall
   (main : val), 

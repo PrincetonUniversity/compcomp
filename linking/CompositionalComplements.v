@@ -3,8 +3,10 @@ Require Import compcert_linking.
 Require Import linking_proof.
 Require Import context_equiv.
 Require Import simulations.
+Require Import rc_semantics.
 Require Import nucular_semantics.
 Require Import closed_simulations_lemmas.
+Require Import safe_clight_rc.
 Require Import Asm_coop.
 Require Import Asm_nucular.
 Require Import CompositionalCompiler.
@@ -92,6 +94,7 @@ Qed.
 - [sim_C]: C self-simulates ([C <= C]) (cf. Definition 2, pg. 10). 
 - [det_C]: C is deterministic (cf. Definition 2, pg. 10). This is true,
       e.g., of all Clight and assembly contexts. 
+- [rclosed_C] restricts to reach-closed contexts (cf. linking/rc_semantics.v).
 - [nuke_C] restricts contexts to those that store only valid blocks.  This is
       footnote 5 on pg. 9 of the paper (one reviewer suggested we describe this
       condition in a bit more detail in the paper; we tend to agree and plan to
@@ -100,29 +103,26 @@ Qed.
 - [domeq_C]: The global environment attached to the [C] module semantics 
       has the same domain (set of blocks marked "global") as [ge_top]. *)
 
-(** NOTE: many of these side conditions fall away nicely if we abandon 
-    'semantic' contexts, and instead express [C] in, e.g., CompCert Asm.
-    But the current statement of the theorem is more general; for example,
-    it supports contexts that are just mathematical relations expressed 
-    in Coq's Gallina. *) 
-
 Variable C : Modsem.t.   
 Variable sim_C : 
   SM_simulation.SM_simulation_inject 
   C.(Modsem.sem) C.(Modsem.sem) C.(Modsem.ge) C.(Modsem.ge).
+Variable rclosed_C : RCSem.t (Modsem.sem C) (Modsem.ge C).
 Variable nuke_C : Nuke_sem.t (Modsem.sem C).
 Variable det_C : semantics_lemmas.corestep_fun (Modsem.sem C).
 Variable domeq_C : genvs_domain_eq ge_top C.(Modsem.ge).
 
-(** [CE.linker_S] ensures that both the context [C] the source
-  modules [sems_S] are reach-closed. See file linking/context_equiv.v for
-  details. Since the POPL deadline, we have proved that all safe Clight programs
-  are reach-closed in this way. *)
-
 Notation source_linked_semantics := (CE.linker_S sems_S plt C).
 Notation target_linked_semantics := (CE.linker_T sems_T plt C).
+
 Definition safe ge l m := 
   forall n, closed_safety.safeN source_linked_semantics ge n l m.
+
+
+
+Lemma clight_modules_rclosed (ix : 'I_N) : 
+  RCSem.t (Modsem.sem (sems_S ix)) (Modsem.ge (sems_S ix)).
+Proof. solve[apply (Clight_RC hf)]. Qed.
 
 Lemma asm_modules_nucular (ix : 'I_N) : Nuke_sem.t (Modsem.sem (sems_T ix)).
 Proof. solve[apply Asm_is_nuc]. Qed.
@@ -157,8 +157,9 @@ Variable main : Values.val.
  and reach-closed (see above).  This is Corollary 2 on pg. 11 of the paper. *)
 
 Notation lifted_sim := 
-  (CE.lifted_sim asm_modules_nucular plt modules_inject domeq_S domeq_T 
-   find_syms sim_C domeq_C nuke_C main).
+  (CE.lifted_sim clight_modules_rclosed asm_modules_nucular 
+   plt modules_inject domeq_S domeq_T 
+   find_syms sim_C domeq_C rclosed_C nuke_C main).
 
 Theorem context_equiv cd mu l1 m1 l2 m2 
   (source_safe : safe ge_top l1 m1) 
@@ -187,6 +188,7 @@ Theorem init_context_equiv l1 m1 m2 j vals1 vals2
    <-> terminates target_linked_semantics ge_top l2 m2)].
 Proof. 
 eapply CE.init_context_equiv; eauto.
+apply: clight_modules_rclosed.
 apply: asm_modules_nucular.
 apply: modules_inject.
 apply: find_syms.

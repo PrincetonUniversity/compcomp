@@ -60,32 +60,30 @@ Section linkingSimulation.
 
 Variable N : pos.
 
-Variable cores_S' cores_T : 'I_N -> Modsem.t. 
+Variable cores_S cores_T : 'I_N -> Modsem.t. 
 
 Variable find_symbol_ST : 
   forall (i : 'I_N) id bf, 
-  Genv.find_symbol (ge (cores_S' i)) id = Some bf -> 
+  Genv.find_symbol (ge (cores_S i)) id = Some bf -> 
   Genv.find_symbol (ge (cores_T i)) id = Some bf.
 
+Variable rclosed_S : forall i : 'I_N, RCSem.t (cores_S i).(sem) (cores_S i).(ge).
 Variable nucular_T : forall i : 'I_N, Nuke_sem.t (cores_T i).(sem).
 
 Variable fun_tbl : ident -> option 'I_N.
 
-Variable sims' : forall i : 'I_N, 
-  let s := cores_S' i in
+Variable sims : forall i : 'I_N, 
+  let s := cores_S i in
   let t := cores_T i in
   SM_simulation_inject s.(sem) t.(sem) s.(ge) t.(ge).
 
 Variable my_ge : ge_ty.
-Variable my_ge_S : forall (i : 'I_N), genvs_domain_eq my_ge (cores_S' i).(ge).
+Variable my_ge_S : forall (i : 'I_N), genvs_domain_eq my_ge (cores_S i).(ge).
 Variable my_ge_T : forall (i : 'I_N), genvs_domain_eq my_ge (cores_T i).(ge).
 
-Let types := fun i : 'I_N => (sims' i).(core_data).
+Let types := fun i : 'I_N => (sims i).(core_data).
 Let ords : forall i : 'I_N, types i -> types i -> Prop 
-  := fun i : 'I_N => (sims' i).(core_ord).
-
-Let cores_S (ix : 'I_N) := 
-  Modsem.mk (cores_S' ix).(ge) (RC.effsem (cores_S' ix).(sem)).
+  := fun i : 'I_N => (sims i).(core_ord).
 
 Let linker_S := effsem N cores_S fun_tbl.
 Let linker_T := effsem N cores_T fun_tbl.
@@ -97,7 +95,7 @@ Notation cast'' pf x := (cast (C \o cores_T) (sym_eq pf) x).
 Notation rc_cast'  pf x := (cast (RC.state \o C \o cores_T) pf x).
 Notation rc_cast'' pf x := (cast (RC.state \o C \o cores_T) (sym_eq pf) x).
 
-Notation R := (@R N cores_S' cores_T nucular_T sims' my_ge). 
+Notation R := (@R N cores_S cores_T rclosed_S nucular_T sims my_ge). 
 
 Section halted_lems.
 
@@ -144,12 +142,12 @@ Qed.
 Lemma link (main : val) : CompCert_wholeprog_sim linker_S linker_T my_ge my_ge main.
 Proof.
 eapply Build_Wholeprog_sim
-  with (core_data   := sig_data N (fun ix : 'I_N => (sims sims' ix).(core_data)))
-       (core_ord    := sig_ord (fun ix : 'I_N => (sims sims' ix).(core_ord)))
+  with (core_data   := sig_data N (fun ix : 'I_N => (sims ix).(core_data)))
+       (core_ord    := sig_ord (fun ix : 'I_N => (sims ix).(core_ord)))
        (match_state := R).
 
 (** well_founded ord *)
-{ by apply: wf_sig_ord=> ix; case: (sims sims' ix). }
+{ by apply: wf_sig_ord=> ix; case: (sims ix). }
 
 (** genvs_domain_eq *)
 { by apply: genvs_domain_eq_refl. }
@@ -210,7 +208,7 @@ eapply Build_Wholeprog_sim
     by intuition.
     by apply: isGlob_iffT. }
     
-  move: (core_initial (sims sims' ix))=> H1.
+  move: (core_initial (sims ix))=> H1.
   move: (H1 main vals1 c m1 j vals2  m2 dS dT).
   case=> //.
 
@@ -320,16 +318,16 @@ eapply Build_Wholeprog_sim
   exists erefl,erefl,mu_top,[::]=> /=; split=> //.
 
   exists erefl; apply: Build_head_inv=> //.
+  exists (getBlocks vals1); split.
   apply: Build_vis_inv; rewrite /= /RC.roots /vis /mu_top0 /= /fS.
-
-  have ->: RC.locs c = getBlocks vals1.
-  { by apply: (RC.initial_core_locs g). }
 
   move=> /=; rewrite /in_mem {2}/getBlocks /= => b1 H.
   suff [H2|H2]: isGlobalBlock my_ge b1 \/ getBlocks vals1 b1.
   by apply: REACH_nil; apply/orP; left; rewrite -(isGlob_iffS my_ge_S).
   by apply: REACH_nil; apply/orP; right.
   by move: (orP H).
+
+  by apply RCSem.init_ax with (v := Vptr b Int.zero).
 
   have vgenv_ix: valid_genv (ge (cores_T ix)) m2.
   { by apply: (valid_genvs_domain_eq (my_ge_T ix) vgenv). }
@@ -348,7 +346,13 @@ move=> STEP.
 set c1 := peekCore st1.
 set c2 := peekCore st2.
 
-have [U1 [c1' [STEP0 [ESTEP0 [U1'_EQ [c1_locs ST1']]]]]]:
+have [c1_B [c1_vis c1_I]]: 
+  exists B, [/\ vis_inv my_ge c1 B mu 
+              & RCSem.I (rclosed_S c1.(Core.i)) c1.(Core.c) m1 B].
+{ case: INV; rewrite /c1 /c2 /=; case=> ? []? []? []? []Hmueq []?.
+  by case=> _ _ []B []c1_vis c1_I; exists B; split=> //; subst. }
+
+have [U1 [c1' [STEP0 [ESTEP0 [U1'_EQ ST1']]]]]:
    exists (U1:block -> Z -> bool) c1',
        @corestep _ _ _
          (sem (cores_S (Core.i c1))) 
@@ -357,21 +361,19 @@ have [U1 [c1' [STEP0 [ESTEP0 [U1'_EQ [c1_locs ST1']]]]]]:
          (sem (cores_S (Core.i c1)))
          (ge (cores_S (Core.i c1))) U1 (Core.c c1) m1 c1' m1'
    /\ (forall b ofs, U1 b ofs -> 
-       RC.reach_set (ge (cores_S (Core.i c1))) (Core.c c1) m1 b)
-   /\ RC.locs c1' 
-      = REACH m1' (fun b => freshloc m1 m1' b 
-                   || RC.reach_set (ge (cores_S (Core.i c1))) (Core.c (c INV)) m1 b)
+       RC.reach_set (ge (cores_S (Core.i c1))) (RC.mk (Core.c c1) c1_B) m1 b)
    /\ st1' = updCore st1 (Core.upd c1 c1').
   { move: (STEP_EFFSTEP STEP)=> EFFSTEP.
     move: STEP; rewrite/LinkerSem.corestep0=> [][]c1' []B C. 
     move: EFFSTEP; rewrite/effstep0.
-    move=> []U1 []/=; rewrite/RC.effstep=> x [][]EFFSTEP []u1 locs D.
-    exists U1, c1'. split=> //. split=> //.
-    by move: C D=> ->; move/updCore_inj_upd=> ->; split. 
-    by move: C D=> ->; move/updCore_inj_upd=> ->; split. }
+    move=> []U1 []/= => x []EFFSTEP u1.
+    eapply RCSem.step_ax in B; eauto; case: B=> /= D E.
+    case: D=> B; rewrite /RC.effstep => /= [][]Hstep []Hin _.
+    exists B, c1'; split=> //.
+    by apply effect_semantics.effax1 in Hstep; case: Hstep. }
 
 (** Specialize core diagram at module (Core.i c1). *)
-move: (effcore_diagram _ _ _ _ (sims sims' (Core.i c1))).  
+move: (effcore_diagram _ _ _ _ (sims (Core.i c1))).  
 move/(_ _ _ _ _ _ ESTEP0).
 case: (R_inv INV)=> pf []pf_sig []mupkg []mus []mu_eq.
 move=> []pf2 hdinv tlinv.
@@ -382,11 +384,9 @@ have U1_DEF': forall b ofs, U1 b ofs -> vis mupkg b.
 { move=> b ofs U; move: (U1'_EQ b ofs U)=> H.
   apply match_visible in MATCH; apply: MATCH.
   apply (REACH_mono (fun b => 
-    b \in RC.roots (ge (cores_S (Core.i c1))) (Core.c c1)))=> //.
-  move=> b0 roots; case: (head_vis hdinv); apply.
-  have ->: Core.c (c INV) = Core.c c1.
-  { by rewrite /c /c1 /peekCore /s1. }
-  apply: (RC.roots_domains_eq 
+    b \in RC.roots (ge (cores_S (Core.i c1))) (RC.mk (Core.c c1) c1_B)))=> //.
+  move=> b0 roots; case: c1_vis; subst; apply. 
+  move: roots; apply: (RC.roots_domains_eq 
     (ge1 := ge (cores_S (Core.i c1))) (ge2 := my_ge))=> //.
   by apply: genvs_domain_eq_sym; apply: my_ge_S. }
 
@@ -407,7 +407,7 @@ set mupkg' := Build_frame_pkg mu_top'_valid.
 (* instantiate existentials *)
 set c2''   := cast' (peek_ieq INV) c2'.
 set st2'   := updCore st2 (Core.upd c2 c2'').
-set data'  := (existT (fun ix => core_data (sims sims' ix)) (Core.i c1) cd'). 
+set data'  := (existT (fun ix => core_data (sims ix)) (Core.i c1) cd'). 
 set mu'    := mu_top'.
 exists st2', m2', data', mu'. 
 
@@ -443,7 +443,7 @@ split.
    exists erefl=> /=.
    have rcvis: REACH_closed m1' (vis mu').
    { by apply match_visible in MATCH'; apply: MATCH'. }
-   apply (@head_inv_step _ _ _ _ sims' my_ge my_ge_S 
+   apply (@head_inv_step _ _ _ _ _ sims my_ge my_ge_S 
      mupkg m1 m2 mu_top' m1' m2' fwd2 (head_valid hdinv) INCR SEP LOCALLOC rcvis
      (c INV) (d INV) pf c1' c2'' _ _ mus
      (STACK.pop (CallStack.callStack (s1 INV))) 
@@ -605,10 +605,9 @@ have hlt10:
   case hlt10: (LinkerSem.halted0 c1)=> [v1'|//]; case=> <-.
   move: hlt10; rewrite /LinkerSem.halted0 /c /= /RC.halted.
   case hlt100: (halted _ _)=> //.
-  case defs: (vals_def _)=> //.
   case hasty: (val_casted.val_has_type_func _ _)=> //. }
 
-case: (core_halted (sims sims' (Core.i (c inv'))) _ _ _ _ _ _ mtch0 hlt10).
+case: (core_halted (sims (Core.i (c inv'))) _ _ _ _ _ _ mtch0 hlt10).
 move=> v2' []inj []vinj hlt2'.
 
 exists mupkg,v2'; split.
@@ -653,32 +652,24 @@ Require Import linking_spec.
 Module LinkingSimulation : LINKING_SIMULATION.
 
 Lemma link : 
-  forall (N : pos) (sems_S sems_T : 'I_N -> t)
-         (find_symbol_ST : 
-          forall (i : 'I_N) id bf, 
-          Genv.find_symbol (ge (sems_S i)) id = Some bf -> 
-          Genv.find_symbol (ge (sems_T i)) id = Some bf),
-  (forall ix : 'I_N, Nuke_sem.t (sem (sems_T ix))) ->
-  forall (plt : ident -> option 'I_N)
-    (sims : forall ix : 'I_N,
-            let s := sems_S ix in
-            let t := sems_T ix in
-            SM_simulation_inject (sem s) (sem t) (ge s) (ge t))
-    (ge_top : ge_ty),
-  (forall ix : 'I_N, genvs_domain_eq ge_top (ge (sems_S ix))) ->
-  (forall ix : 'I_N, genvs_domain_eq ge_top (ge (sems_T ix))) ->
-  let sems_S0 :=
-    fun ix : 'I_N =>
-    {|
-    F := F (sems_S ix);
-    V := V (sems_S ix);
-    ge := ge (sems_S ix);
-    C := RC.state (C (sems_S ix));
-    sem := RC.effsem (sem (sems_S ix)) |} in
-  let linker_S := effsem N sems_S0 plt in
-  let linker_T := effsem N sems_T plt in
-  forall main : val, 
-  CompCert_wholeprog_sim linker_S linker_T ge_top ge_top main.
+  forall (N : pos) (sems_S sems_T : 'I_N -> t),
+  (forall (i : 'I_N) (id : ident) (bf : block),
+  Genv.find_symbol (ge (sems_S i)) id = Some bf ->
+  Genv.find_symbol (ge (sems_T i)) id = Some bf) ->
+ (forall ix : 'I_N, RCSem.t (sem (sems_S ix)) (ge (sems_S ix))) ->
+ (forall ix : 'I_N, Nuke_sem.t (sem (sems_T ix))) ->
+ forall plt : ident -> option 'I_N,
+ (forall ix : 'I_N,
+  let s := sems_S ix in
+  let t := sems_T ix in
+  SM_simulation_inject (sem s) (sem t) (ge s) (ge t)) ->
+ forall ge_top : ge_ty,
+ (forall ix : 'I_N, genvs_domain_eq ge_top (ge (sems_S ix))) ->
+ (forall ix : 'I_N, genvs_domain_eq ge_top (ge (sems_T ix))) ->
+ let linker_S := effsem N sems_S plt in
+ let linker_T := effsem N sems_T plt in
+ forall main : val,
+ CompCert_wholeprog_sim linker_S linker_T ge_top ge_top main.
 Proof. by move=> *; apply: link. Qed.
 
 End LinkingSimulation.
