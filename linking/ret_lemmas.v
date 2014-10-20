@@ -800,8 +800,15 @@ apply: Build_head_inv=> //.
   }(*END All (rel_inv_pred ...) mus'*)
 
 {(*vis_inv*) 
-(* HERE HERE HERE *)
-case: fr0 unch1 unch2=.
+
+have [hd1_B [hd1_vis hd1_I]]: 
+  exists B, [/\ vis_inv my_ge hd1 B mu0 
+              & RCSem.I (rclosed_S hd1.(Core.i)) hd1.(Core.c) m10 B].
+{ move: frameall; rewrite mus_eq /=; case; case=> pft []sgt []cd1 []e1t []efs1.
+  case=> vals1 []e2t []efs2 []vals2; case=> ?????????; case=> B []vis I _ _ _ _ _ _ _.
+  by exists B; split. }
+
+exists [predU getBlocks [:: rv1] & hd1_B]; split.
 apply: Build_vis_inv.
 rewrite /vis /=.
 rewrite /mu'.
@@ -834,28 +841,37 @@ have subF: {subset frgnBlocksSrc mu0 <= frgnSrc'}.
   by apply: nu'_wd. }
 {(*{subset RC.roots ...}*)
   move: aft1'=> /= aft1'.
-  move: (RC.after_external_rc_basis (ge (cores_S (Core.i hd1))) aft1').
+  have rc_aft1': 
+    RC.after_external (sem (cores_S (Core.i hd1))) (Some rv1) (RC.mk (Core.c hd1) hd1_B)
+    = Some (RC.mk (cast (C \o cores_S) (Logic.eq_sym e1) (Core.c hd1'))
+                  [predU getBlocks [:: rv1] & hd1_B]).
+  { by rewrite /RC.after_external aft1'. }
+  move: (RC.after_external_rc_basis (ge (cores_S (Core.i hd1))) rc_aft1').
   move=> eq_hd1' b; rewrite /in_mem /= => H.
   have eq_hd1'': 
-    RC.roots (ge (cores_S (Core.i hd1'))) (Core.c hd1')
+    RC.roots (ge (cores_S (Core.i hd1'))) 
+             (RC.mk (Core.c hd1') [predU getBlocks [:: rv1] & hd1_B])
     = (fun b => 
          getBlocks [:: rv1] b
-      || RC.roots (ge (cores_S (Core.i hd1))) (Core.c hd1) b).
+      || RC.roots (ge (cores_S (Core.i hd1))) 
+                  (RC.mk (Core.c hd1) hd1_B) b).
   { move: eq_hd1'. 
     set T := C \o cores_S.
     set P := fun ix (x : T ix) => 
-               RC.roots (ge (cores_S ix)) x 
+               RC.roots (ge (cores_S ix)) (RC.mk x [predU getBlocks [:: rv1] & hd1_B]) 
            = (fun b0 => 
               getBlocks [:: rv1] b0
-              || RC.roots (ge (cores_S (Core.i hd1))) (Core.c hd1) b0).
+              || RC.roots (ge (cores_S (Core.i hd1))) 
+                          (RC.mk (Core.c hd1) hd1_B) b0).
     change (P (Core.i hd1) (cast T (sym_eq e1) (Core.c hd1'))
          -> P (Core.i hd1') (Core.c hd1')).
     by apply: cast_indnatdep'. }
   have eq_hd1''': 
-    RC.roots my_ge (Core.c hd1') 
+    RC.roots my_ge (RC.mk (Core.c hd1') [predU getBlocks [:: rv1] & hd1_B])
     = (fun b =>
          getBlocks [:: rv1] b
-         || RC.roots (ge (cores_S (Core.i hd1))) (Core.c hd1) b).
+         || RC.roots (ge (cores_S (Core.i hd1))) 
+                     (RC.mk (Core.c hd1) hd1_B) b).
   { rewrite -eq_hd1'' /RC.roots; extensionality b0.
     have glob_eq: isGlobalBlock my_ge b0
                 = isGlobalBlock (ge (cores_S (Core.i hd1'))) b0. 
@@ -883,7 +899,7 @@ have subF: {subset frgnBlocksSrc mu0 <= frgnSrc'}.
     by apply/orP; left.
     apply/andP; split; first by rewrite eqL l.
     by apply: REACH_nil; apply/orP; left. }
-  { move=> RB; case: (frame_vis fr0)=> vis_sub. 
+  { move=> RB; case: hd1_vis=> vis_sub.
     have vis0_b: vis mu0 b.
     { apply: vis_sub.
       rewrite /in_mem /=; move: RB; rewrite /RC.roots.
@@ -898,12 +914,23 @@ have subF: {subset frgnBlocksSrc mu0 <= frgnSrc'}.
         case: (isGlobalBlock _ _)=> //.
         case=> //.
         by move=> _; move/(_ erefl).               
-        by rewrite -(isGlob_iffS my_ge_S). }
+        by rewrite -(isGlob_iffS my_ge_S). } 
       by rewrite -glob_eq. }
     { case: (orP vis0_b); first by move=> ->.
       by move=> L; apply/orP; right; apply: subF. } } 
 }(*END {subset RC.roots ...}*)
+
+  { (* RCSem.I *)
+    clear -at01 aft1' hd1_I; eapply RCSem.aftext_ax with (m' := m1) in at01; eauto.
+    move: at01. 
+    set T := C \o cores_S.
+    set P := fun ix (x : T ix) => 
+      RCSem.I (rclosed_S ix) x m1 (fun b : block => getBlocks [:: rv1] b || hd1_B b).
+    change (P (Core.i hd1) (cast T (Logic.eq_sym e1) (Core.c hd1')) ->
+            P (Core.i hd1') (Core.c hd1')).
+    by apply: cast_indnatdep'. }
 }(*END vis_inv*)
+
 {(*Label: domt*)
   rewrite /= /mu' replace_externs_DomTgt /nu' reestablish_DomTgt.
   apply: (head_domt hdinv)=> //. 
