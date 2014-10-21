@@ -440,7 +440,7 @@ have mu_new_rel_inv_all:
          (nucular_T := nucular_T)=> //.
   by move: (head_match hdinv)=> mtch; apply match_visible in mtch. }
 
-have mu_new_vis_inv: vis_inv my_ge c1 (getBlocks args1) mu_new'.
+have mu_new_vis_inv: vis_inv my_ge c1 (REACH m1 (getBlocks args1)) mu_new'.
 { apply: Build_vis_inv=> // b; rewrite /in_mem /= => Y.
   rewrite /vis /mu_new /frgnS /exportedSrc /=.
   move: Y; rewrite /RC.roots; case/orP.
@@ -448,12 +448,12 @@ have mu_new_vis_inv: vis_inv my_ge c1 (getBlocks args1) mu_new'.
   have H1': isGlobalBlock (ge (cores_S (Core.i c1))) b.
   { by rewrite -(isGlob_iffS my_ge_S). }
   by apply: REACH_nil; apply/orP; left.
-  by move=> getB; apply: REACH_nil; apply/orP; right. }
+  by apply: REACH_mono=> b0 ->; rewrite orbC. }
 
 have hdinv_new:
   head_inv rclosed_S nucular_T my_ge pf_new cd_new mu_new' (pkg :: mus) m1 m2.
 { apply: Build_head_inv=> //. 
-  exists (getBlocks args1); split=> //.
+  exists (REACH m1 (getBlocks args1)); split=> //.
   move: init1; rewrite /initCore; case Hinit: (initial_core _ _ _ _)=> //. 
   by case=> <-; apply RCSem.init_ax with (v := Vptr bf Int.zero).
   by rewrite /= /mu_new initial_SM_DomTgt /domT; apply: (head_domt hdinv). 

@@ -2088,12 +2088,12 @@ Notation clsem := (CL_eff_sem1 hf).
 Variable ge : Genv.t fundef Ctypes.type.
 
 Definition I c m B := 
-  (exists v vs, B = getBlocks vs /\ initial_core clsem ge v vs = Some c)
+  (exists v vs, B = REACH m (getBlocks vs) /\ initial_core clsem ge v vs = Some c)
   \/ cl_core_inv ge (RC.mk c B) m.
 
 Lemma init_I v vs c m :
   initial_core clsem ge v vs = Some c -> 
-  I c m (getBlocks vs).
+  I c m (REACH m (getBlocks vs)).
 Proof.
 by left; exists v, vs.
 Qed.
@@ -2132,7 +2132,7 @@ case: H=> [[v [vs H]]|H].
                         RC.core := CL_Callstate (Internal f) vs Kstop;
                         RC.locs := getBlocks vs |} m b0) |}.
   eapply function_entry1_state_inv with (c0 := c''); eauto.
-  by move=> b' Hget; apply: REACH_nil; apply/orP; right.  
+  by move=> b' Hget; apply: REACH_nil; apply/orP; right; apply: REACH_nil.
   rewrite /= => b' Hin; apply/orP; right. 
   move: Hin; rewrite /RC.reach_set /RC.roots /=.
   move/REACH_split; case. 
