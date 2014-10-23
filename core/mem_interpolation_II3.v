@@ -628,14 +628,18 @@ Definition mem_add_acc (f:meminj) (m1' m2:mem):=
        end)
     else (m1'.(Mem.mem_access) !! (b2 - m2.(Mem.nextblock))%positive) ofs2 k.
 
+Print Mem.inject'.
+Print Mem.mem_inj.
+Print memval_inject.
+
 Definition mem_add_cont (f:meminj) (m1' m2:mem):=
   fun b2 ofs2 =>
     if valid_dec m2 b2 then 
       (match source f m1' b2 ofs2 with
-           Some(b1,ofs1) =>  ZMap.get ofs1 (m1'.(Mem.mem_contents) !! b1)
+           Some(b1,ofs1) =>  inject_memval f (ZMap.get ofs1 (PMap.get b1 m1'.(Mem.mem_contents)))
          | None =>           ZMap.get ofs2 ( m2.(Mem.mem_contents) !! b2)
        end)
-    else ZMap.get ofs2 (m1'.(Mem.mem_contents) !! (b2 - m2.(Mem.nextblock))%positive).
+    else inject_memval f (ZMap.get ofs2 (m1'.(Mem.mem_contents) !! (b2 - m2.(Mem.nextblock)))).
 
 
 Definition mem_add_nb (m1 m2:mem):=

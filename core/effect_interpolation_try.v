@@ -21,6 +21,7 @@ Require Import pure.
 Require Import full_composition.
 
 
+
 Lemma EFF_interp_II_strong: 
   forall m1 m2 nu12 
          (MInj12 : Mem.inject (as_inj nu12) m1 m2) m1'
@@ -314,7 +315,196 @@ Proof. intros.
            apply disjoint_extern_local.
            apply GlueInvNu.
            eauto.
-         - intros. rewrite mem_add_contx.          
+         - (*TRYING SOMETHING*)
+           { intros b1 ofs b2 delta map12' mperm1'.
+             rewrite (mem_add_contx jp m1' m2); unfold mem_add_cont.
+             
+             (* New trying things*)
+             unfold as_inj in map12'; apply joinD_Some in map12'; destruct map12' as [extmap | [extNone locmap]].
+             + subst nu12'; rewrite ext_change_ext in extmap.
+               unfold as_inj, join; rewrite ext_change_ext, loc_change_ext.
+               assert (extmap2:=extmap).
+               eapply MKI_Some12 in extmap2; eauto. 
+               destruct extmap2 as [jmap | [jmap [b2' [d' [lmap' [b2eq deltaeq]]]]]].
+             - assert (Mem.valid_block m2 b2).
+               { apply SMV12. unfold RNG, DomTgt. subst j; apply GlueInvNu in jmap. 
+                 destruct jmap as [extS extT]; rewrite extT; apply orb_true_r. }
+               destruct (valid_dec m2 b2); try solve[contradict n; auto].
+               erewrite source_SomeI.
+               (* Here is were the proof gets harder than just the perm.*)
+               destruct MemInjNu'. destruct mi_inj.
+               (*Prepare to use mi_memval of nu'*)
+               assert (map13': exists b3 d3, as_inj nu' b1 = Some (b3, d3)).
+               {assert (kmap:=jmap).
+               apply Norm12 in kmap; destruct kmap as [b3 [d2 kmap]].
+               exists b3, (delta + d2).
+               unfold as_inj, join. destruct ExtIncr as [ext_incr other_incr]. 
+               erewrite ext_incr; eauto.
+               rewrite compose_sm_extern. subst j.
+               unfold compose_meminj.
+               rewrite jmap.
+               subst k. rewrite kmap; auto.
+               }
+               destruct map13' as [b3 [d3 map13']].
+               apply (mi_memval b1 ofs b3 d3 map13') in mperm1'.
+               instantiate(1:=b1).
+               inversion mperm1'; try constructor.
+               remember ( change_ext nu12 extS12 extT12 j') as nu12'.
+               assert (compose: nu' = compose_sm nu12' nu23').
+               {       rewrite Heqnu12', Heqnu23'. (*clear - ExtIncr full. *)
+                       destruct ExtIncr as [extincr [? [? [? [? [? [? [? [? ? ]]]]]]]]].
+                       unfold compose_sm, change_ext; destruct nu12, nu23, nu'; simpl in *; 
+                       f_equal; auto.
+                       eapply (MKIcomposition j k (extern_of1)); subst; eauto.
+                       intros b p HH.  destruct p.
+                       eapply SMV23. eapply as_inj_DomRng.
+                       unfold as_inj, join; simpl; rewrite HH; eauto.
+                       apply GlueInvNu. }
+               rewrite compose in H2.
+               unfold as_inj in H2.
+               { (*Two cases, whether b0 is external or local*)
+                 destruct (joinD_Some _ _ _ _ _ H2) as [extcomp | [extcomp loccomp]].
+                 + (* b0 is external*)
+                   rewrite compose_sm_extern in extcomp.
+                   apply compose_meminjD_Some in extcomp.
+                   destruct extcomp as [b1' [ofs1' [ofs' [ext12 [ext23 eq]]]]].
+                   subst nu12'. rewrite ext_change_ext in ext12.
+                   subst jp; unfold inject_memval, join .
+                   assert (j b0 = Some(b1', ofs1')) by admit.
+                   rewrite H4.
+                   econstructor; auto.
+                   rewrite ext12.
+                   reflexivity.
+                 + (* b0 is local / need to show it's public!*)
+                   rewrite compose_sm_local in loccomp.
+                   apply compose_meminjD_Some in loccomp.
+                   destruct loccomp as [b1' [ofs1' [ofs' [loc12 [loc23 eq]]]]].
+                   subst nu12'. rewrite loc_change_ext in loc12.
+                   (* Now let us prove that j b0 = None, to prove jp b0 = b1', ofs1'*)
+                   assert (jmap0': j' b0 = None) by admit.
+                   assert (j b0 = None) by admit.
+                   subst jp; unfold inject_memval, join. 
+                   rewrite H4. unfold restrict. rewrite loc12.
+                   assert (b0ispub : pubBlocksSrc nu12 b0 = true) by admit.
+                   rewrite b0ispub. econstructor.
+                   rewrite jmap0'; eauto.
+                   auto. }
+               * eapply meminj_no_overlap_inject_incr.
+                 eapply (no_overlap_forward _ _ _ _ SMV12); eauto.
+                 apply GlueInvNu.
+                 apply MInj12.
+                 subst jp. apply inject_incr_join.
+                 subst j; apply inject_incr_refl.
+                 eapply inject_incr_trans; [eapply restrict_incr | apply inject_incr_refl].
+                 apply disjoint_extern_local; eauto.
+                 apply GlueInvNu.
+               *  subst jp; unfold join; rewrite jmap; auto.
+               * eapply any_Max_Nonempty; eauto.
+             - destruct (valid_dec m2 b2); (*first discharge the impossible case*)
+               try solve[subst b2; contradict v; unfold Mem.valid_block; xomega].
+               subst b2 delta. rewrite Pos.add_sub; auto.
+               replace (ofs + 0) with ofs by omega; trivial.
+               unfold inject_memval.
+               destruct (ZMap.get ofs (Mem.mem_contents m1') !! b1); try econstructor.
+               
+               
+             + subst nu12'; rewrite loc_change_ext in locmap.
+               rewrite ext_change_ext in extNone.
+               assert (Mem.valid_block m2 b2).
+               { apply SMV12. unfold RNG, DomTgt. apply GlueInvNu in locmap. 
+                 destruct locmap as [locS locT]; rewrite locT; apply orb_true_l. }
+               destruct (valid_dec m2 b2); try solve[contradict n; auto].
+               destruct (source jp m1' b2 (ofs + delta)) eqn:sour.
+               - destruct p; symmetry in sour.
+                 destruct (source_SomeE _ _ _ _ _ sour) 
+                               as [b1' [delta' [ofs1 [pairs [bval [jpmap [mperm ofss]]]]]]].
+                 inversion pairs; subst b z jp.
+                 (*b2 is local so j can't map to it *)
+                 unfold join in jpmap.
+                 destruct (j b1') eqn:jmap; try destruct p.
+                 {inversion jpmap; subst b z j.
+                 apply GlueInvNu in jmap; destruct jmap as [extS extT].
+                 apply GlueInvNu in locmap; destruct locmap as [locS locT].
+                 destruct GlueInvNu as [SMWD12 rest]; clear rest.
+                 destruct SMWD12. destruct (disjoint_extern_local_Tgt b2) as [LT | ET];
+                 [rewrite LT in locT | rewrite ET in extT]; discriminate. }
+                 apply restrictD_Some in jpmap; destruct jpmap as [locmap' pubtrue].
+                 Lemma no_overlap_no_doublemap: 
+                   forall j b1 b1' b2 d d' m,
+                     Mem.meminj_no_overlap j m ->
+                     j b1 = Some (b2, d) ->
+                     j b1' = Some (b2, d') ->
+                     forall ofs ofs',
+                       Mem.perm m b1 ofs Max Nonempty ->
+                       Mem.perm m b1' ofs' Max Nonempty ->
+                       ofs + d = ofs' + d' ->
+                       b1' = b1 /\ ofs = ofs' /\ d = d'.
+                   intros.
+                   destruct (peq b1 b1'). 
+                   { subst b1. rewrite H1 in H0; inversion H0. 
+                     subst d'; assert (ofs = ofs') by xomega. intuition. }
+                   destruct (H b1 b2 d b1' b2 d' ofs ofs') as [H5 | H5]; eauto;
+                   contradiction H5; auto.
+                 Qed.
+                 edestruct (no_overlap_no_doublemap (local_of nu12) b1 b1') as 
+                     [b1_eq [ofs_eq d_eq]]; eauto.
+                 { eapply meminj_no_overlap_inject_incr.
+                   eapply no_overlap_forward. 
+                   apply SMV12.
+                   apply GlueInvNu.
+                   auto.
+                   apply MInj12.
+                   apply local_in_all. apply GlueInvNu. }
+                 eapply any_Max_Nonempty; eauto.
+                 subst b1' ofs1; auto.
+               - destruct MInj12.
+                 destruct mi_inj.
+                 eapply mi_perm0.
+                 apply local_in_all; eauto.
+                 apply GlueInvNu. 
+                 apply UnchPrivSrc.
+                 unfold compose_sm; simpl.
+                 assert (locmap':=locmap).
+                 apply GlueInvNu in locmap'; destruct locmap' as [locS locT].
+                 rewrite locS; simpl; split; auto.
+                 destruct (pubBlocksSrc nu12 b1) eqn:pubTrue; trivial.
+                 assert (pubS:=pubTrue).
+                 apply GlueInvNu in pubTrue. destruct pubTrue as [b2' [z [locmap' pubT]]].
+                 rewrite locmap in locmap'; inversion locmap'; subst b2 delta. clear locmap'.
+                 assert (jp b1 = Some (b2', z)).
+                 { subst jp. unfold join. 
+                   rewrite (inject_incr_inv j j'); eauto.
+                   unfold restrict. rewrite pubS.
+                   auto.
+                   eapply MKI_incr12; eauto. }
+                 symmetry in sour.
+                 eapply any_Max_Nonempty in H0.
+                 contradict H0.
+                 replace ofs with ((ofs + z) - z) by omega.
+                 eapply source_NoneE; eauto.
+                 (*The three remaining goals follow the same logic*)
+                 assert (Mem.valid_block m1 b1).
+                 { destruct SMV12 as [Dv Rv]; clear Rv.
+                   apply Dv. unfold DOM, DomSrc.
+                   rewrite locS; auto.
+                 }
+                 apply Fwd1 in H0; destruct H0 as [H0 ?].
+                 apply H0.
+
+                 destruct SMV12 as [Dv Rv]; clear Rv.
+                 apply Dv. unfold DOM, DomSrc.
+                 apply GlueInvNu in locmap; destruct locmap as [locS locT].
+                 rewrite locS; auto.
+                 
+                 auto.
+               }
+           (*END TRY*)
+
+
+
+
+
+intros. rewrite mem_add_contx; unfold mem_add_cont.          
            subst nu12'. unfold as_inj in H. rewrite ext_change_ext, loc_change_ext in H.
            apply joinD_Some in H; destruct H as [ jmap' | [jmap' locmap] ].
            apply (MKI_Some12 _ _ _ _ _ _ Heqoutput) in jmap'.
@@ -324,6 +514,9 @@ Proof. intros.
            { eapply mapped_valid. destruct GlueInvNu as [SMWD12 rest]; apply SMWD12.
              subst j; unfold as_inj, join; rewrite jmap. reflexivity.
              eauto. }
+           
+           
+           
            apply Fwd1 in b1val. destruct b1val as [b1val' mpermm].
            apply mpermm in H0.
            inversion (mi_memval b1 ofs b2 delta).

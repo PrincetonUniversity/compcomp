@@ -766,7 +766,7 @@ assert (Inj12': Mem.inject j12' m1' m2').
                     MInj23 _ _ _ _ _ HeqMKI).
               assumption.
               eapply Mem.perm_implies. eapply Mem.perm_max. 
-                    apply H0. apply perm_any_N.
+                    apply H0. apply perm_any_N. }
     assert (INJ:Mem.mem_inj j12' m1' m2'). 
       split. apply Perm12'.
       (*valid_access*) 
