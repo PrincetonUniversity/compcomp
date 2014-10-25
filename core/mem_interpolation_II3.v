@@ -569,7 +569,7 @@ Qed.
 (*************************
  *         MEMORY        *
  *************************)
-Parameter mem_add: meminj -> mem -> mem -> mem.
+Parameter mem_add: meminj -> meminj -> mem -> mem -> mem.
 
 Definition mem_add_cont' (m1 m2:mem):=
   fun (b: block)=>
@@ -628,18 +628,61 @@ Definition mem_add_acc (f:meminj) (m1' m2:mem):=
        end)
     else (m1'.(Mem.mem_access) !! (b2 - m2.(Mem.nextblock))%positive) ofs2 k.
 
-Print Mem.inject'.
-Print Mem.mem_inj.
-Print memval_inject.
+(* Short section about injecting memvals*)
 
-Definition mem_add_cont (f:meminj) (m1' m2:mem):=
+Definition inject_memval (j:meminj) (v:memval): memval := 
+     match v with 
+         Pointer b ofs n =>
+             match j b with 
+                None => Undef
+              | Some(b',delta) => Pointer b' (Int.add ofs (Int.repr delta)) n 
+             end
+       | _ => v
+     end.
+
+Lemma inject_memval_memval_inject: forall j v v' 
+  (IM: inject_memval j v = v') (U: v' <> Undef), memval_inject j v v'.
+Proof.
+  intros.
+  destruct v; destruct v'; simpl in *; try inv IM; try constructor. 
+     exfalso. apply U. trivial.
+     rewrite H0.
+        remember (j b) as d. destruct d. destruct p. inv H0. inv H0.
+     rewrite H0. 
+        remember (j b) as d.
+        destruct d. 
+          destruct p. inv H0.
+            eapply memval_inject_ptr. rewrite <- Heqd. reflexivity. 
+          trivial. 
+        inv H0.
+Qed.
+
+Lemma inject_memval_memval_inject1: forall j v 
+               (H: forall b ofs n, v = Pointer b ofs n -> 
+                                   exists p, j b = Some p),
+               memval_inject j v (inject_memval j v). 
+Proof.
+  intros.
+  destruct v; simpl in *; try constructor.
+  specialize (H _ _ _ (eq_refl _)). 
+  destruct H. rewrite H. destruct x. econstructor. apply H. trivial.
+Qed.
+(* End of inject_memval *)
+
+
+
+
+(* The first injection maps blocks and pointers, 
+ * the second one defines what is mapped and what
+ * is coppied from m2. *)
+Definition mem_add_cont (j:meminj)(f:meminj) (m1' m2:mem):=
   fun b2 ofs2 =>
     if valid_dec m2 b2 then 
       (match source f m1' b2 ofs2 with
-           Some(b1,ofs1) =>  inject_memval f (ZMap.get ofs1 (PMap.get b1 m1'.(Mem.mem_contents)))
+           Some(b1,ofs1) =>  inject_memval j (ZMap.get ofs1 (PMap.get b1 m1'.(Mem.mem_contents)))
          | None =>           ZMap.get ofs2 ( m2.(Mem.mem_contents) !! b2)
        end)
-    else inject_memval f (ZMap.get ofs2 (m1'.(Mem.mem_contents) !! (b2 - m2.(Mem.nextblock)))).
+    else inject_memval j (ZMap.get ofs2 (m1'.(Mem.mem_contents) !! (b2 - m2.(Mem.nextblock)))).
 
 
 Definition mem_add_nb (m1 m2:mem):=
@@ -647,30 +690,30 @@ Definition mem_add_nb (m1 m2:mem):=
   let n2 := Mem.nextblock m2 in
   (n2 + n1)%positive. 
 
-Axiom mem_add_ax: forall (f:meminj) (m1 m2 m3: mem), 
-                    m3 = mem_add f m2 m1 ->
+Axiom mem_add_ax: forall (j:meminj)(f:meminj) (m1 m2 m3: mem), 
+                    m3 = mem_add j f m2 m1 ->
                     (forall b ofs, ZMap.get ofs (Mem.mem_contents m3) !! b = 
-                                   mem_add_cont f m1 m2 b ofs) /\
+                                   mem_add_cont j f m1 m2 b ofs) /\
                     (forall b, (Mem.mem_access m3) !! b = 
                                mem_add_acc f m1 m2 b) /\  
                     (Mem.nextblock m3 = mem_add_nb m1 m2).
 
 Lemma mem_add_contx:
-  forall f m1' m2, 
+  forall j f m1' m2, 
     (forall b ofs, 
-       ZMap.get ofs (Mem.mem_contents (mem_add f m2 m1')) !! b = 
-       mem_add_cont f m1' m2 b ofs).
-  intros; remember (mem_add f m2 m1') as m3; destruct (mem_add_ax f m1' m2 m3) as [A [B C]]; auto.
+       ZMap.get ofs (Mem.mem_contents (mem_add j f m2 m1')) !! b = 
+       mem_add_cont j f m1' m2 b ofs).
+  intros; remember (mem_add j f m2 m1') as m3; destruct (mem_add_ax j f m1' m2 m3) as [A [B C]]; auto.
 Qed.
 
 Lemma mem_add_accx:
-  forall f m1' m2, (forall b, (Mem.mem_access (mem_add f m2 m1')) !! b = mem_add_acc f m1' m2 b).
-  intros; remember (mem_add f m2 m1') as m3; destruct (mem_add_ax f m1' m2 m3) as [A [B C]]; auto.
+  forall j f m1' m2, (forall b, (Mem.mem_access (mem_add j f m2 m1')) !! b = mem_add_acc f m1' m2 b).
+  intros; remember (mem_add j f m2 m1') as m3; destruct (mem_add_ax j f m1' m2 m3) as [A [B C]]; auto.
 Qed.
 
-Lemma mem_add_nbx: forall (f:meminj) (m1 m2: mem),
-                    (Mem.nextblock (mem_add f m2 m1)) = mem_add_nb m1 m2.
-  intros; remember (mem_add f m2 m1) as m3; destruct (mem_add_ax f m1 m2 m3) as [A [B C]]; auto.
+Lemma mem_add_nbx: forall (j f:meminj) (m1 m2: mem),
+                    (Mem.nextblock (mem_add j f m2 m1)) = mem_add_nb m1 m2.
+  intros; remember (mem_add j f m2 m1) as m3; destruct (mem_add_ax j f m1 m2 m3) as [A [B C]]; auto.
 Qed.
 
 (*************************
@@ -776,22 +819,21 @@ Definition mi_perm f m1 m2 := forall (b1 b2 : block) (delta ofs : Z)
               Mem.perm m1 b1 ofs k p -> Mem.perm m2 b2 (ofs + delta) k p.
 
 Lemma mem_add_forward: 
-  forall (j':meminj) m1' m2,
+  forall (k j':meminj) m1' m2,
   forall (j:meminj) m1,
     (forall b1 p, j b1 = Some p -> Mem.valid_block m1 b1) -> 
     (* range_eq j j' (Mem.nextblock m2) -> *)
     mem_forward m1 m1' ->
     mi_perm j m1 m2 ->
-  mem_forward m2 (mem_add j m2 m1').
-  unfold mem_forward. intros j' m1' m2 j m1 corrpre (*incr*) memFwrd miperm b bval_m2.
+  mem_forward m2 (mem_add k j m2 m1').
+  unfold mem_forward. intros k j' m1' m2 j m1 corrpre (*incr*) memFwrd miperm b bval_m2.
   split.
   + unfold Mem.valid_block in *.
     rewrite mem_add_nbx.
     unfold mem_add_nb.
-    apply (Plt_trans _ _ _ bval_m2). 
-    apply Pos.lt_iff_add; exists ( Mem.nextblock m1'); auto.
+    xomega.
   + intros ofs per.
-    unfold Mem.perm. rewrite (mem_add_accx j m1' m2  b); unfold mem_add_acc.
+    unfold Mem.perm. rewrite (mem_add_accx k j m1' m2  b); unfold mem_add_acc.
     destruct (valid_dec m2 b); try contradiction.
     destruct (source j m1' b ofs) eqn: sour; trivial.
     destruct p; intros.
