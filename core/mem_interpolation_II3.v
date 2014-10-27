@@ -49,6 +49,23 @@ Definition filter_id (j:meminj): meminj:=
         | None => None
     end.
 
+(* filter *)  
+Definition filter (j:meminj) (screen: block -> bool): meminj:=
+  fun b =>
+    if screen b then
+      match j b with
+        | Some _ => Some (b, 0)
+        | None => None
+      end
+    else None.
+
+Definition pure_filter (filt j: meminj): meminj :=
+  fun b => 
+    match filt b, j b with
+        None, Some p => Some p
+      | _, _ => None
+    end.
+        
 (* size is the size of the memory being mapped
  * The new target memory should be (size) large than 
  * the original memory.
@@ -75,7 +92,7 @@ Infix "(+)":= add_inj (at level 90, right associativity).
 Definition mkInjections (sizeM2:block)(j k l: meminj) 
                      :  meminj * meminj := 
    (j (+) (filter_id l >> sizeM2),
-    k (+) ( l << sizeM2)).
+    k (+) ( pure_filter j l << sizeM2)).
 
 (* Legacy: mkInjection that matches the type of the old version *)
 Definition mkInjections' (m1 m1' m2 :mem)(j k l: meminj) 
@@ -114,7 +131,8 @@ Lemma MKIcomposition:
     destruct (k (b + sizeM2)%positive) eqn: ksmthng. 
     - apply valid in ksmthng.
       clear - ksmthng; contradict ksmthng. rewrite Pos.add_comm; apply Pos.lt_not_add_l.
-    - rewrite (Pos.add_sub), lb. rewrite pos_be_pos; destruct p; auto.
+    - rewrite (Pos.add_sub). rewrite pos_be_pos; destruct p; auto.
+      unfold pure_filter; rewrite jb; rewrite lb; auto.
 Qed.
 
 Lemma  MKI_incr12:
@@ -161,7 +179,8 @@ Lemma MKI_norm:
       contradict mapk. rewrite Pos.add_comm; apply Pos.lt_not_add_l.
     - unfold filter_id in filter_l. destruct (l b0) eqn:lb0; try solve [inversion filter_l].
       destruct p. rewrite Pos.add_sub. inversion filter_l. subst b0.
-      rewrite pos_be_pos; exists b2, z0; trivial.
+      rewrite pos_be_pos; exists b2, z0.
+      unfold pure_filter; rewrite jb0, lb0; trivial.
 Qed.
 
 Definition range_eq (j f:meminj) (sizeM:block):=
@@ -218,7 +237,8 @@ Lemma MKI_None23:
       k' b = None.
   intros ? ? ? ? ? ? H ? ? ? ; inversion H; 
   unfold add_inj, shiftT, filter_id, shiftS in *.
-  subst; rewrite H0, H1; destruct (b ?= sizeM2)%positive; trivial.
+  unfold pure_filter; rewrite H0, H1; 
+  destruct (b ?= sizeM2)%positive; destruct (j (b - sizeM2)%positive); trivial.
 Qed.
 
 Lemma MKI_Some12:
@@ -238,6 +258,13 @@ Lemma MKI_Some12:
   inversion H0.
 Qed.
 
+Lemma pure_filter_Some: forall filt j b1 p,
+                          pure_filter filt j b1 = Some p ->
+                          filt b1 = None /\ j b1 = Some p.
+intros. unfold pure_filter in H. destruct (filt b1); inversion H.
+destruct (j b1); inversion H1; auto.
+Qed.
+
 Lemma MKI_Some23:
   forall j k l sizeM2,
   forall j' k',
@@ -251,7 +278,7 @@ Lemma MKI_Some23:
   destruct (k b2) eqn:jmap.
   destruct p; inversion H0; subst. left; auto.
   destruct ((b2 ?= sizeM2)%positive) eqn:ineq; try solve [inversion H0].
-  right; auto. 
+  right. apply pure_filter_Some in H0; destruct H0. auto. 
 Qed.
 
 Lemma MKI_Some12':
@@ -289,6 +316,7 @@ Lemma MKI_Some23':
   + left. destruct p; inversion H0; auto.
   + right. destruct ((b2 ?= sizeM2)%positive); try solve[inversion H0].
     exists (b2 - sizeM2)%positive; trivial.
+    apply pure_filter_Some in H0; destruct H0; auto.
 Qed.
 
 (* Legacy: The following lemmas mathc some old lemmas. Probably useless now. *)
@@ -569,15 +597,8 @@ Qed.
 (*************************
  *         MEMORY        *
  *************************)
-Parameter mem_add: meminj -> meminj -> mem -> mem -> mem.
-
-Definition mem_add_cont' (m1 m2:mem):=
-  fun (b: block)=>
-    let n2 := (Mem.nextblock m2) in
-    match (b ?= n2)%positive with
-        | Lt => (Mem.mem_contents m2) !! b
-        | _ => (Mem.mem_contents m2) !! (b - n2)
-    end.
+(*mem_add j k jp m1' m2 *)
+Parameter mem_add: meminj -> meminj -> meminj -> mem -> mem -> mem.
 
 Definition has_preimage (f:meminj) (m:mem) (b2:block):=
   exists b1 delta, Mem.valid_block m b1 /\ 
@@ -587,19 +608,7 @@ Definition loc_preimage (f:meminj) (m:mem) (b2:block) (ofs:Z) :=
                    f b1 = Some (b2, delta) /\
                    Mem.perm m b1 (ofs - delta) Max Nonempty.
 
-(*Lemma preimage_source: forall f m b2 ofs,
-                         (exists b1 delta, source f m b2 ofs = Some( b1, delta)) <->
-                         loc_preimage f m b2 ofs.
-  acdmit.
-  (*intros; split; intros. 
-  + destruct H as [b1 [delta soc]]. unfold loc_preimage; exists b1, delta. 
-    split.
-
-acdmit.
-  + destruct *)
-Qed.*)
-
-Definition acc_property (f:meminj) (m1' m2:mem)
+Definition acc_property2 (f:meminj) (m1' m2:mem)
            (AM:ZMap.t (Z -> perm_kind -> option permission)):Prop :=
   forall b2, 
     (Mem.valid_block m2 b2 -> 
@@ -614,19 +623,57 @@ Definition acc_property (f:meminj) (m1' m2:mem)
                              (AM !! b2) ofs k =
                              (m1'.(Mem.mem_access) !! (b2 - m2.(Mem.nextblock))%positive) ofs k).
 
+Definition AccessEffProperty nu23 nu12 (j12' :meminj) (m1 m1' m2 : mem)
+           (AM:ZMap.t (Z -> perm_kind -> option permission)):Prop :=
+  forall b2, 
+    (Mem.valid_block m2 b2 -> forall k ofs2,
+       if (locBlocksSrc nu23 b2) 
+       then if (pubBlocksSrc nu23 b2)
+            then match source (local_of nu12) m1 b2 ofs2 with
+                   Some(b1,ofs1) => if pubBlocksSrc nu12 b1 
+                                    then PMap.get b2 AM ofs2 k = 
+                                         PMap.get b1 m1'.(Mem.mem_access) ofs1 k
+                                    else PMap.get b2 AM ofs2 k = 
+                                         PMap.get b2 m2.(Mem.mem_access) ofs2 k
+                 | None =>  PMap.get b2 AM ofs2 k = 
+                            PMap.get b2 m2.(Mem.mem_access) ofs2 k
+                 end
+            else PMap.get b2 AM ofs2 k = 
+                 PMap.get b2 m2.(Mem.mem_access) ofs2 k
+       else match source (as_inj nu12) m1 b2 ofs2 with
+                   Some(b1,ofs1) =>  PMap.get b2 AM ofs2 k = 
+                                     PMap.get b1 m1'.(Mem.mem_access) ofs1 k
+                 | None => match (*j23*) (as_inj nu23) b2 with 
+                             None => PMap.get b2 AM ofs2 k  = PMap.get b2 m2.(Mem.mem_access) ofs2 k
+                           | Some (b3,d3) =>  PMap.get b2 AM ofs2 k = None (* mem_interpolation_II.v has PMap.get b2 m2.(Mem.mem_access) ofs2 k here 
+                                            -- see the comment in the proof script below to see where None is needed*)
+                           end
+
+                 
+               end)
+     /\ (~ Mem.valid_block m2 b2 -> forall k ofs2,
+           match source j12' m1' b2 ofs2 with 
+              Some(b1,ofs1) => PMap.get b2 AM ofs2 k =
+                               PMap.get b1 m1'.(Mem.mem_access) ofs1 k
+            | None =>  PMap.get b2 AM ofs2 k = None
+          end).
+
+
+
 
 Lemma valid_dec: forall m b, {Mem.valid_block m b} + {~Mem.valid_block m b}.
   intros. unfold Mem.valid_block. apply plt.
 Qed.
 
-Definition mem_add_acc (f:meminj) (m1' m2:mem):=
-  fun b2 ofs2 k =>
+Definition mem_add_acc (j k:meminj) (m1' m2:mem):=
+  fun b2 ofs2 kind =>
     if valid_dec m2 b2 then 
-      (match source f m1' b2 ofs2 with
-           Some(b1,ofs1) =>  (m1'.(Mem.mem_access) !! b1) ofs1 k
-         | None =>           (m2.(Mem.mem_access) !! b2) ofs2 k
+      (match source j m1' b2 ofs2, k b2 with
+           Some(b1,ofs1), _ =>  (m1'.(Mem.mem_access) !! b1) ofs1 kind
+         | None, None =>        (m2.(Mem.mem_access) !! b2) ofs2 kind
+         | None, _ => None
        end)
-    else (m1'.(Mem.mem_access) !! (b2 - m2.(Mem.nextblock))%positive) ofs2 k.
+    else (m1'.(Mem.mem_access) !! (b2 - m2.(Mem.nextblock))%positive) ofs2 kind.
 
 (* Short section about injecting memvals*)
 
@@ -675,12 +722,12 @@ Qed.
 (* The first injection maps blocks and pointers, 
  * the second one defines what is mapped and what
  * is coppied from m2. *)
-Definition mem_add_cont (j:meminj)(f:meminj) (m1' m2:mem):=
+Definition mem_add_cont (j k:meminj)(f:meminj) (m1' m2:mem):=
   fun b2 ofs2 =>
     if valid_dec m2 b2 then 
       (match source f m1' b2 ofs2 with
-           Some(b1,ofs1) =>  inject_memval j (ZMap.get ofs1 (PMap.get b1 m1'.(Mem.mem_contents)))
-         | None =>           ZMap.get ofs2 ( m2.(Mem.mem_contents) !! b2)
+           Some(b1,ofs1) =>inject_memval j (ZMap.get ofs1 (PMap.get b1 m1'.(Mem.mem_contents)))
+         | None =>      ZMap.get ofs2 ( m2.(Mem.mem_contents) !! b2)
        end)
     else inject_memval j (ZMap.get ofs2 (m1'.(Mem.mem_contents) !! (b2 - m2.(Mem.nextblock)))).
 
@@ -690,30 +737,30 @@ Definition mem_add_nb (m1 m2:mem):=
   let n2 := Mem.nextblock m2 in
   (n2 + n1)%positive. 
 
-Axiom mem_add_ax: forall (j:meminj)(f:meminj) (m1 m2 m3: mem), 
-                    m3 = mem_add j f m2 m1 ->
+Axiom mem_add_ax: forall (j k:meminj)(jp:meminj) (m1 m2 m3: mem), 
+                    m3 = mem_add j k jp m2 m1 ->
                     (forall b ofs, ZMap.get ofs (Mem.mem_contents m3) !! b = 
-                                   mem_add_cont j f m1 m2 b ofs) /\
+                                   mem_add_cont j k jp m1 m2 b ofs) /\
                     (forall b, (Mem.mem_access m3) !! b = 
-                               mem_add_acc f m1 m2 b) /\  
+                               mem_add_acc j k m1 m2 b) /\  
                     (Mem.nextblock m3 = mem_add_nb m1 m2).
 
 Lemma mem_add_contx:
-  forall j f m1' m2, 
+  forall j k jp m1' m2, 
     (forall b ofs, 
-       ZMap.get ofs (Mem.mem_contents (mem_add j f m2 m1')) !! b = 
-       mem_add_cont j f m1' m2 b ofs).
-  intros; remember (mem_add j f m2 m1') as m3; destruct (mem_add_ax j f m1' m2 m3) as [A [B C]]; auto.
+       ZMap.get ofs (Mem.mem_contents (mem_add j k jp m2 m1')) !! b = 
+       mem_add_cont j k jp m1' m2 b ofs).
+  intros; remember (mem_add j k jp m2 m1') as m3; destruct (mem_add_ax j k jp m1' m2 m3) as [A [B C]]; auto.
 Qed.
 
 Lemma mem_add_accx:
-  forall j f m1' m2, (forall b, (Mem.mem_access (mem_add j f m2 m1')) !! b = mem_add_acc f m1' m2 b).
-  intros; remember (mem_add j f m2 m1') as m3; destruct (mem_add_ax j f m1' m2 m3) as [A [B C]]; auto.
+  forall j k jp m1' m2, (forall b, (Mem.mem_access (mem_add j k jp m2 m1')) !! b = mem_add_acc j k m1' m2 b).
+  intros; remember (mem_add j k jp m2 m1') as m3; destruct (mem_add_ax j k jp m1' m2 m3) as [A [B C]]; auto.
 Qed.
 
-Lemma mem_add_nbx: forall (j f:meminj) (m1 m2: mem),
-                    (Mem.nextblock (mem_add j f m2 m1)) = mem_add_nb m1 m2.
-  intros; remember (mem_add j f m2 m1) as m3; destruct (mem_add_ax j f m1 m2 m3) as [A [B C]]; auto.
+Lemma mem_add_nbx: forall (j k jp:meminj) (m1 m2: mem),
+                    (Mem.nextblock (mem_add j k jp m2 m1)) = mem_add_nb m1 m2.
+  intros; remember (mem_add j k jp m2 m1) as m3; destruct (mem_add_ax j k jp m1 m2 m3) as [A [B C]]; auto.
 Qed.
 
 (*************************
@@ -727,97 +774,15 @@ Lemma xH_smallest: forall b, ~ Plt b 1.
   destruct b; simpl in H; inversion H.
 Qed.
 
-(*
-Lemma loc_preimage_dec:
-  forall j m b ofs, loc_preimage m j b ofs \/ ~ loc_preimage m j b ofs.
-
-Lemma preimage_dec:
-  forall m b j, has_preimage m j b \/ ~ has_preimage m j b.
-  acdmit.
-  (*intros.
-  unfold has_preimage.
-  unfold Mem.valid_block.
-  remember (Mem.nextblock m) as N; clear HeqN m.
-  generalize N; apply positive_Peano_ind.
-  + right.
-    unfold not; intros. destruct H as [b1 [ delta [H1 H2]]].
-    apply (xH_smallest b1); assumption.
-  + intros.
-    destruct H as [[b1 [delta [H1 H2]]] | H].
-  - left. exists b1, delta. split; trivial.
-    apply Plt_trans_succ; auto.
-  - destruct (j x) eqn:map; try destruct p.
-    * destruct (AST.ident_eq b0 b).
-      left; subst; exists x, z; split; auto.
-      apply Plt_succ.
-      right. unfold not; intros [b1 [delta [H1 H2]]].
-      apply H. apply Plt_succ_inv in H1. destruct H1.
-      exists b1, delta; auto.
-      subst; rewrite map in H2; inversion H2. apply n in H1; inversion H1.
-    * right. intros [b1 [delta [H1 H2]]]; apply H.
-      apply Plt_succ_inv in H1. destruct H1.
-      exists b1, delta; auto.
-      subst; rewrite map in H2; inversion H2. *)
-Qed.
-*)
-
 Definition corresponding_preimage (f:meminj) (sizeM1 sizeM2:block):=
   forall b1 b2 delta, f b1 = Some (b2, delta) -> (b2 < sizeM2)%positive -> (b1 < sizeM1)%positive.
-
-
-(*Lemma mem_add_unchanged: 
-  forall f m1' m2,
-    forall j m1,
-    corresponding_preimage f (Mem.nextblock m1) (Mem.nextblock m2) ->
-    range_eq j f (Mem.nextblock m2) ->
-    mem_forward m1 m1' ->
-    Mem.mem_inj j m1 m2 ->
-    let in_m2 := fun b z => Plt b (Mem.nextblock m2) in
-    Mem.unchanged_on in_m2 m2 (mem_add f m2 m1').
-  intros f m1' m2 j m1 corpre range mfwrd minj.
-  constructor; intros.
-  (*unfold Mem.valid_block in H0.
-  destruct (preimage_dec m1' b f) as [H1 | H1]; unfold has_preimage in H1.
-  + destruct H1 as [b1 [delta [valb1 fmap]]].
-    assert (jmap:=fmap); apply (incr _ _ _ bval_m2) in jmap.
-    intros. unfold Mem.perm in *.
-    destruct minj as [mi_perm A B ]; clear A B.
-    move mi_perm at bottom.
-    replace ofs with ((ofs - delta) + delta) by omega.
-    eapply mi_perm; eauto.
-    eapply memFwrd. 
-    eapply corrpre; eauto.
-    Lemma mem_add_add_simpl: 
-      forall f m1' m2 b1 b2 delta,
-        Mem.valid_block m1' b1 ->
-        f b1 = Some (b2, delta) ->
-        forall ofs k p,
-        Mem.perm (mem_add f m2 m1') b2 (ofs + delta) k p ->
-        Mem.perm m1' b1 ofs k p.
-      acdmit.
-      (*intros f m1' m2 b1 b2 delta memval fmap ofs k p memperm.
-      destruct (mem_add_accx f m1' m2 b2) as [H1 H2].
-      unfold Mem.perm in H1.
-      unfold Mem.perm. unfold Mem.perm_order'.*)
-    Qed.
-    eapply (mem_add_add_simpl _ _ _ _ _ _ valb1 fmap); eauto.
-    replace ((ofs - delta) + delta) with ofs by omega; eauto.
-    - destruct (mem_add_accx f m1' m2 b) as [H H0].
-      unfold Mem.perm; intros.
-      rewrite (H0 H1); auto.
-Qed.
-
-  + unfold Mem.perm. rewrite mem_add_accx; unfold mem_add_acc. 
-    rewrite H; split; trivial.*) acdmit.
-  + unfold Mem.perm. rewrite mem_add_contx; unfold mem_add_cont. 
-    rewrite H; split; trivial.
-Qed.*)
 
 Definition mi_perm f m1 m2 := forall (b1 b2 : block) (delta ofs : Z) 
                 (k : perm_kind) (p : permission),
               f b1 = Some (b2, delta) ->
               Mem.perm m1 b1 ofs k p -> Mem.perm m2 b2 (ofs + delta) k p.
 
+(* THIS is important leave it for later... 
 Lemma mem_add_forward: 
   forall (k j':meminj) m1' m2,
   forall (j:meminj) m1,
@@ -848,49 +813,7 @@ Lemma mem_add_forward:
     apply (corrpre _ _ mapj).
     unfold Mem.perm; subst z b0; auto.
 Qed.
-
-
-
-(*
-Lemma MKI_meminj12:
-  forall j k l mu12,
-    SM_wd mu12 ->
-    j = extern_of mu12 ->
-    forall j' k' sizeM2,
-      (j', k') = mkInjections sizeM2 j k l ->
-      forall m1 m2,
-        Mem.inject (as_inj mu12) m1 m2 -> 
-        forall m1',
-          mem_forward m1 m1'->
-          forall nu12' extS extT,
-            nu12' = change_ext mu12 extS extT j' ->
-      Mem.inject (as_inj nu12') m1' (mem_add m2 m1').
-  intros. constructor.
-  { constructor.
-    intros.
-    assert (disj:  (as_inj mu12 b1 = Some (b2, delta)) \/  as_inj mu12 b1 = None /\ 
-                   j' b1 = Some (b2, delta)) by acdmit. 
-    destruct disj as [mu12b1 | jb1].
-    destruct H2. destruct mi_inj.
-    assert (mu12b1':=mu12b1).
-    eapply mi_perm in mu12b1.
-    Lemma mperm_subset: forall m m' b ofs k p,
-      Mem.perm m b ofs k p ->
-      Mem.perm (mem_add m m') b ofs k p.
-      unfold Mem.perm; intros.
-      assert (HH:= H); apply Mem.perm_valid_block in HH.
-      rewrite mem_add_accx; unfold mem_add_acc.
-      rewrite HH; auto.
-    Qed.
-    apply mperm_subset; eauto.
-    
-    assert (Mem.valid_block m1 b1). 
-    { destruct (plt b1 (Mem.nextblock m1)); auto.
-      apply mi_freeblocks in n; rewrite n in mu12b1'; inversion mu12b1'. }
-    apply H3 in H2. destruct H2. apply aH7.
-    apply mi_mappedblocks.
-      
-Acdmitted.*)
+*)
 
 
 (***********************************

@@ -20,8 +20,6 @@ Require Import StructuredInjections.
 Require Import pure.
 Require Import full_composition.
 
-
-
 Lemma EFF_interp_II_strong: 
   forall m1 m2 nu12 
          (MInj12 : Mem.inject (as_inj nu12) m1 m2) m1'
@@ -32,6 +30,7 @@ Lemma EFF_interp_II_strong:
          (SMvalNu' : sm_valid nu' m1' m3')
          (MemInjNu' : Mem.inject (as_inj nu') m1' m3')
          (ExtIncr: extern_incr (compose_sm nu12 nu23) nu')
+         (Pure: pure_comp_ext nu12 nu23 m1 m2)
          (SMV12: sm_valid nu12 m1 m2)
          (SMV23: sm_valid nu23 m2 m3)
          (UnchPrivSrc: Mem.unchanged_on 
@@ -50,6 +49,7 @@ Lemma EFF_interp_II_strong:
          (full: full_ext nu12 nu23),
   exists m2', exists nu12', exists nu23', nu'=compose_sm nu12' nu23' /\
                                           extern_incr nu12 nu12' /\ extern_incr nu23 nu23' /\
+                                          pure_comp_ext nu12' nu23' m1' m2' /\
                                           Mem.inject (as_inj nu12') m1' m2' /\ mem_forward m2 m2' /\
                                           Mem.inject (as_inj nu23') m2' m3' /\
                                           sm_valid nu12' m1' m2' /\ sm_valid nu23' m2' m3' /\
@@ -104,7 +104,7 @@ Proof. intros.
        remember (change_ext nu12 extS12 extT12 j') as nu12';
          remember (change_ext nu23 extS23 extT23 k') as nu23'.
        remember (as_inj nu12') as j12'.
-       exists (mem_add j12' jp m2 m1'), nu12', nu23'.
+       exists (mem_add j12' k jp m2 m1'), nu12', nu23'.
        
        (************************************************
         * Proving some properties of my construction   *
@@ -145,7 +145,79 @@ Proof. intros.
          eapply MKI_incr23; eauto.
          apply bconcat_larger1; auto.
        }
-         
+       
+       (* pure_comp_ext nu12' nu23' m1' m2 *)
+       assert (Pure': pure_comp_ext nu12' nu23' m1' (mem_add j12' k jp m2 m1')).
+       { unfold pure_comp_ext.
+         subst nu12' nu23'. rewrite ext_change_ext, ext_change_ext.
+         split.
+         + unfold pure_composition_locat.
+           clear - Heqoutput Pure Heqj Heqj12' Heqk SMV12 SMV23 SMWD23 SMWD12 MemInjNu'.
+           inversion Heqoutput. intros. 
+           unfold add_inj in H.
+           destruct (k b2) eqn:kmap.
+           - destruct p. inversion H. subst b z. 
+             rewrite Heqk in kmap. 
+             unfold valid_location in H2.
+             unfold Mem.perm in H2. rewrite mem_add_accx in H2.
+             unfold mem_add_acc in H2. 
+             destruct (valid_dec m2 b2).
+             destruct (source j12' m1' b2 delta) eqn:sour.
+             * symmetry in sour; apply source_SomeE in sour.
+               destruct sour as [b1 [delta0 [ofs1 [pair [bval1 [jmap12' [mperm' d_eq]]]]]]].
+               exists b1, delta0.
+               subst p j12'.
+               assert (jmap: j b1 = Some (b2, delta0))by admit. (* because k maps b2 and jmap12'*)
+               unfold add_inj. rewrite jmap; split; auto.
+               unfold valid_location. 
+               subst delta. replace (ofs1 + delta0 - delta0) with ofs1 by omega. auto.
+             * subst k; rewrite kmap in H2.
+               inversion H2.
+             * contradict n. apply SMV23. unfold DOM, DomSrc. apply SMWD23 in kmap.
+               destruct kmap as [extS extT]; rewrite extS; apply orb_true_r.
+           - idtac.
+             Lemma shiftS_Some: forall j sh b1 p,
+                                  (j << sh) b1 = Some p ->
+                                  (b1 > sh)%positive /\ j (b1 - sh)%positive = Some p.
+               unfold shiftS. intros.
+               destruct (b1 ?= sh)%positive eqn:ineq; inversion H.
+               split; trivial.
+             Qed.
+             apply shiftS_Some in H; destruct H as [ineq lmap'].
+             apply pure_filter_Some in lmap'; destruct lmap' as [jNone lmap'].
+              generalize H2; unfold valid_location; intros.
+             unfold Mem.perm in H3.
+             rewrite mem_add_accx in H3. unfold mem_add_acc in H3.
+             destruct (valid_dec m2 b2).
+             contradict v. clear - ineq. unfold Mem.valid_block. xomega.
+             exists (b2 - Mem.nextblock m2)%positive, 0.
+             split. unfold add_inj.
+             rewrite jNone.
+             unfold shiftT, filter_id. rewrite lmap'.
+             replace (b2 - Mem.nextblock m2 + Mem.nextblock m2)%positive with b2; auto. 
+             symmetry; apply Pos.sub_add; xomega.
+             replace (delta - 0) with delta by omega; auto.
+         + unfold pure_composition_block.
+           inversion Heqoutput.
+           subst j' k'.
+           intros.
+           unfold add_inj in H.
+           destruct (k b2) eqn:kmap.
+           - destruct p. inversion H. subst b z. 
+             rewrite Heqk in kmap. 
+             apply Pure in kmap; destruct kmap as [b1 [ofs12 jmap]].
+             exists b1, ofs12.
+             unfold add_inj. subst j; rewrite jmap; auto.
+           - apply shiftS_Some in H; destruct H as [ineq lmap'].
+             apply pure_filter_Some in lmap'; destruct lmap' as [jNone lmap'].
+             exists (b2 - Mem.nextblock m2)%positive, 0.
+             unfold add_inj.
+             rewrite jNone.
+             unfold shiftT, filter_id. rewrite lmap'.
+             replace (b2 - Mem.nextblock m2 + Mem.nextblock m2)%positive with b2; auto. 
+             symmetry; apply Pos.sub_add; xomega.
+       }
+       
        (* SM_wd 12 *)
        assert (SMWD12': SM_wd nu12').
        { subst nu12'. eapply MKI_wd12; eauto.
@@ -222,6 +294,7 @@ Proof. intros.
            destruct ((b1 ?= Mem.nextblock m2)%positive) eqn:ineq; try solve [inversion H2].
            subst extS23 extT23. subst l'.
            destruct WDnu'.
+           apply pure_filter_Some in lb1; destruct lb1 as [jmap lb1].
            apply extern_DomRng in lb1.
            destruct lb1 as [extStrue extTtrue].
            split; auto.             
@@ -248,11 +321,14 @@ Proof. intros.
        (* extern_incr23 *)
        { exact ExtIncr23. }
        split.
-       (* Mem.inject *)
+       (* pure compositoin *)
+       { exact Pure'. }
+       split.
+       (* Mem.inject 12*)
        { constructor.
          + constructor.
          - { intros b1 b2 delta ofs k0 per H H0.
-             unfold Mem.perm; rewrite (mem_add_accx j12' jp m1' m2); unfold mem_add_acc.
+             unfold Mem.perm; rewrite (mem_add_accx j12' k jp m1' m2); unfold mem_add_acc.
              (* New trying things*)
              unfold as_inj in H; apply joinD_Some in H; destruct H as [extmap | [extNone locmap]].
              + subst nu12'; rewrite ext_change_ext in extmap.
@@ -263,14 +339,18 @@ Proof. intros.
                  destruct jmap as [extS extT]; rewrite extT; apply orb_true_r. }
                destruct (valid_dec m2 b2); try solve[contradict n; auto].
                erewrite source_SomeI. apply H0.
-               * eapply meminj_no_overlap_inject_incr.
+               * admit. (*This is proven somewhere else.*)
+                 (*eapply meminj_no_overlap_inject_incr.
                  eapply (no_overlap_forward _ _ _ _ SMV12); eauto.
                  apply MInj12.
                  subst jp. apply inject_incr_join.
                  subst j; apply inject_incr_refl.
                  eapply inject_incr_trans; [eapply restrict_incr | apply inject_incr_refl].
-                 apply disjoint_extern_local; eauto.
-               *  subst jp; unfold join; rewrite jmap; auto.
+                 apply disjoint_extern_local; eauto. *)
+               *  subst j12'. unfold as_inj, join. 
+                  rewrite ext_change_ext. 
+                  subst j; apply ExtIncr12 in jmap. rewrite ext_change_ext in jmap.
+                  rewrite jmap; auto.
                * eapply any_Max_Nonempty; eauto.
              - destruct (valid_dec m2 b2); (*first discharge the impossible case*)
                try solve[subst b2; contradict v; unfold Mem.valid_block; xomega].
@@ -282,20 +362,29 @@ Proof. intros.
                { apply SMV12. unfold RNG, DomTgt. apply SMWD12 in locmap. 
                  destruct locmap as [locS locT]; rewrite locT; apply orb_true_l. }
                destruct (valid_dec m2 b2); try solve[contradict n; auto].
-               destruct (source jp m1' b2 (ofs + delta)) eqn:sour.
+               destruct (source j12' m1' b2 (ofs + delta)) eqn:sour.
                - destruct p; symmetry in sour.
                  destruct (source_SomeE _ _ _ _ _ sour) 
                                as [b1' [delta' [ofs1 [pairs [bval [jpmap [mperm ofss]]]]]]].
-                 inversion pairs; subst b z jp.
-                 (*b2 is local so j can't map to it *)
-                 unfold join in jpmap.
-                 destruct (j b1') eqn:jmap; try destruct p.
+                 inversion pairs; subst b z jp. clear pairs.
+                 subst j12'.
+                 unfold as_inj, join in jpmap. rewrite ext_change_ext, loc_change_ext in jpmap.
+                 (*b2 is local so j' can't map to it *)
+                 destruct (j' b1') eqn:jmap; try destruct p.
                  {inversion jpmap; subst b z j.
-                 apply SMWD12 in jmap; destruct jmap as [extS extT].
-                 apply SMWD12 in locmap; destruct locmap as [locS locT].
-                 destruct SMWD12. destruct (disjoint_extern_local_Tgt b2) as [LT | ET];
-                 [rewrite LT in locT | rewrite ET in extT]; discriminate. }
-                 apply restrictD_Some in jpmap; destruct jpmap as [locmap' pubtrue].
+                  rewrite <- (ext_change_ext nu12 extS12 extT12 j') in jmap.
+                  apply SMWD12' in jmap; destruct jmap as [extS extT].
+                  apply SMWD12 in locmap; destruct locmap as [locS locT].
+                  destruct SMWD12. destruct (disjoint_extern_local_Tgt b2) as [LT | ET].
+                  rewrite LT in locT; discriminate.
+                  unfold change_ext in extT; destruct nu12; simpl in *.
+                  subst extT12. unfold bconcat, buni, bshift in extT. 
+                  rewrite ET in extT; simpl in extT.
+                  clear - H extT HeqsizeM2.
+                  destruct (b2 ?= sizeM2)%positive eqn:ineq; try solve [
+                  subst sizeM2; unfold Mem.valid_block, Plt, Pos.lt in H;
+                  rewrite H in ineq; discriminate]. }
+                 (* apply restrictD_Some in jpmap; destruct jpmap as [locmap' pubtrue]. *)
                  Lemma no_overlap_no_doublemap: 
                    forall j b1 b1' b2 d d' m,
                      Mem.meminj_no_overlap j m ->
@@ -323,8 +412,13 @@ Proof. intros.
                    apply MInj12.
                    apply local_in_all. apply SMWD12. }
                  eapply any_Max_Nonempty; eauto.
-                 subst b1' ofs1; auto.
-               - destruct MInj12.
+                 subst b1' ofs1. apply H0.
+               - (*prove that (k b2 = None) by contradiction*)
+                 destruct (k b2) eqn: kmap. subst k.
+                 { destruct p; apply Pure in kmap.
+                   destruct kmap as [b1' [ofs12 extmap12]].
+                   admit. (* local and ext map to the same block => contradiction *) }
+                 destruct MInj12.
                  destruct mi_inj.
                  eapply mi_perm0.
                  apply local_in_all; eauto.
@@ -343,6 +437,10 @@ Proof. intros.
                    unfold restrict. rewrite pubS.
                    auto.
                    eapply MKI_incr12; eauto. }
+                 assert (j12' b1 = Some (b2', z)).
+                 { subst j12'. unfold as_inj, join; rewrite ext_change_ext, loc_change_ext. 
+                   rewrite extNone; auto.
+                 }
                  symmetry in sour.
                  eapply any_Max_Nonempty in H0.
                  contradict H0.
@@ -426,7 +524,7 @@ Proof. intros.
            eauto.
          - (*TRYING SOMETHING*)
            { intros b1 ofs b2 delta map12' mperm1'.
-             rewrite (mem_add_contx j12' jp m1' m2); unfold mem_add_cont.
+             rewrite (mem_add_contx j12' k jp m1' m2); unfold mem_add_cont.
              
              (* New trying things*)
              unfold as_inj in map12'; apply joinD_Some in map12'; destruct map12' as [extmap | [extNone locmap]].
@@ -909,75 +1007,176 @@ Proof. intros.
            }
        split.
        (* mem_forward *)
-       { apply (mem_add_forward j12' j' m1' m2 jp m1); auto.
-         + destruct SMV12 as [DOMv RNGv].
-           intros; apply DOMv; unfold DOM, DomSrc.
-           subst j. destruct SMWD12. destruct p; subst jp. 
-           apply joinD_Some in H; destruct H as [ext1 | [jnone resloc]].
-           - apply extern_DomRng in ext1.
-             destruct ext1 as [extS extT]; rewrite extS; apply orb_true_r.
-           - apply restrictD_Some in resloc; destruct resloc as [loc1 pucTrue].
-             apply local_DomRng in loc1; destruct loc1 as [locS locT]; rewrite locS; auto.
-         (*+ apply (MKI_range_eq _ _ _ _ _ _ Heqoutput).*)
-         + unfold mi_perm; destruct MInj12; destruct mi_inj; auto. 
-           intros; eapply mi_perm0; eauto. 
-           subst j jp; unfold as_inj, join. 
-           apply joinD_Some in H; destruct H as [ext1 | [ext1 loc1]].
-           - rewrite ext1; auto.
-           - apply restrictD_Some in loc1; destruct loc1 as [loc1 pubTrue].
-             rewrite ext1; rewrite loc1; auto.
+       { unfold mem_forward; split.
+         + unfold Mem.valid_block in *.
+           rewrite mem_add_nbx.
+           unfold mem_add_nb.
+           xomega.
+         + intros ofs per. 
+           unfold Mem.perm. rewrite (mem_add_accx j12' k jp m1' m2  b); unfold mem_add_acc.
+           destruct (valid_dec m2 b); try contradiction.
+           destruct (source j12' m1' b ofs) eqn: sour.
+           - intros. destruct p. 
+             symmetry in sour; eapply source_SomeE in sour. 
+             destruct sour as [b1 [delta [ofs1 [invertible [leq [mapj [mperm ofs_add]]]]]]].
+             inversion invertible; subst b0 z; clear invertible.
+             assert (map12: as_inj nu12 b1 = Some (b, delta) ) by admit.
+             (*know this because j12' maps it and b is valid in m2*)
+             destruct MInj12.
+             destruct mi_inj.
+             subst ofs.
+             eapply mi_perm0; eauto.
+             apply Fwd1; auto.
+             admit. (*Mapped by nu, sm_valid*)
+           - destruct (k b) eqn:kmap; trivial.
+             intros. contradiction H0.
        }
        split.
-       (* Mem.inject *)
+       (* Mem.inject 23*)
        { constructor.
          + constructor.
          - { intros b1 b2 delta ofs k0 per H.
-             unfold Mem.perm; rewrite (mem_add_accx j12' jp m1' m2); unfold mem_add_acc.
+             unfold Mem.perm; rewrite (mem_add_accx j12' k jp m1' m2); unfold mem_add_acc.
+             intros H0.
+             (* New trying things*)
              unfold as_inj in H; apply joinD_Some in H; destruct H as [extmap | [extNone locmap]].
-             + subst nu23'; rewrite ext_change_ext in extmap.
-               eapply MKI_Some23 in extmap; eauto. 
-               destruct extmap as [kmap | [kmap lmap]].
-             - assert (Mem.valid_block m2 b1).
-               { apply SMV23. unfold DOM, DomSrc. subst k; apply SMWD23 in kmap. 
-                 destruct kmap as [extS extT]. rewrite extS; apply orb_true_r. }
-               destruct (valid_dec m2 b1); try solve[contradict n; auto].
-               destruct (source jp m1' b1 ofs) eqn:sour.
-               * symmetry in sour; apply source_SomeE in sour.
-                 destruct sour as [b0 [d0 [ofs0 [ pair [valid0 [ jpmap [ mperm0 ofs_eq]]]]]]].
-                 subst p ofs.
-                 replace (ofs0 + d0 + delta) with (ofs0 + (d0 + delta)) by xomega.
-                 apply MemInjNu'.
-                 assert (mapnu': as_inj nu' b0 = Some (b2, d0 + delta)).
-                 (*k pas b1 so its extern, and jp maps b0 to b1, so j does. 
-                   by extern_incr, nu does*)
-                 { admit. }
-                 apply mapnu'.
-               * intros HH. 
-                 destruct MInj23. destruct mi_inj.
-                 assert (bval: Mem.valid_block m3 b2).
-                 (*know this because is mapped by k, which is sm_valid*)
-                 { admit. }
-                 apply Fwd3 in bval.
-                 destruct bval as [bval' perm_forward].
-                 apply perm_forward.
-                 move mi_perm0 at bottom.
-                 eapply mi_perm0 in HH.
-                 destruct Fwd3.
-                 apply Fwd3.
-                 apply MInj23 in HH.
-symmetry in sour; eapply source_NoneE in sour.
-                 
-               destruct SMvalNu'. destruct mi_inj0.
-               
+             + assert (extmap':= extmap).
+               subst nu23'. apply Pure' in extmap'.
+               destruct extmap' as [b0 [ofs12 extmap12]].
+               destruct (valid_dec m2 b1).
+               - destruct (source j12' m1' b1 ofs) eqn:sour.
+                  (*Case source = Some *)
+                 symmetry in sour. destruct (source_SomeE _ _ _ _ _ sour) 
+                                   as [b0' [delta0 [ofs1 [pairs [bval [jmap12 [mperm ofss]]]]]]].
+                 assert (extmap12': extern_of nu12' b0' = Some (b1, delta0)) by admit.
+                 (*because b1 is external.*)
+                 destruct p; inversion pairs.
+                 subst ofs b0' z.
+                 replace (ofs1 + delta0 + delta) with (ofs1 + (delta0 + delta)) by omega.
+                 eapply MemInjNu'.
+                 rewrite compose.
+                 unfold compose_sm, compose_meminj; unfold as_inj, join; simpl.
+                 instantiate(1:=b). rewrite extmap12'. rewrite extmap.
+                  auto. auto.
+                  (*Case source = None *)
+                  destruct (k b1) eqn:kmap.
+                  inversion H0.
+                  subst nu12'. rewrite ext_change_ext in extmap12.
+                  assert (extmap12':= extmap12).
+                  eapply (MKI_Some12 j k l' (Mem.nextblock m2) j' k' Heqoutput) in extmap12. 
+                  destruct extmap12 as [jmap | [jmapN [b2' [d' [lmap' [b_eq ozero]]]]]].
+                  subst j; apply full in jmap.
+                  destruct jmap as [b3 [delta2 extmap23]].
+                  subst k. rewrite kmap in extmap23. discriminate extmap23.
+                  (*Now j doesn't map, so b2 can't be m2-valid.*)
+                  contradict v. subst b1. unfold Mem.valid_block. xomega.
+               - (* in this case, b1 is not m2-valid, so all boils down to l'*)
+                 rewrite ext_change_ext in extmap.
+                 subst nu12'. rewrite ext_change_ext in extmap12.
+                 eapply (MKI_Some12 j k l' (Mem.nextblock m2) j' k' Heqoutput) in extmap12. 
+                 destruct extmap12 as [jmap | [jmapN [b2' [d' [lmap' [b_eq ozero]]]]]].
+                 * contradict n. apply SMV12. unfold RNG, DomTgt. 
+                   subst j; apply SMWD12 in jmap. destruct jmap as [extS extT].
+                   rewrite extT; apply orb_true_r.
+                 * subst b1 ofs12. 
+                   eapply MemInjNu'.
+                   unfold as_inj, join. subst l'. instantiate(1:= b0). rewrite lmap'.
+                   rewrite compose in lmap'.
+                   unfold compose_sm in lmap'; simpl in lmap'.
+                   rewrite ext_change_ext, ext_change_ext in lmap'.
+                   apply compose_meminjD_Some in lmap'; 
+                     destruct lmap' as [b22 [ofs2 [ofs3 [jmap' [kmap' ofs_eq]]]]].
+                   subst d'.
+                   apply (MKI_Some12 j k  (extern_of nu') (Mem.nextblock m2) j' k' Heqoutput) in jmap'.
+                   destruct jmap' as [jmap | [jmap [b22' [delta' [extnu [b22_eq  ofs_eq]]]]]].
+                   rewrite jmap in jmapN; inversion jmapN.
+                   apply (MKI_Some23 j k  (extern_of nu') (Mem.nextblock m2) j' k' Heqoutput) in kmap'.
+                   destruct kmap' as [kmap | [kmap [ext_nu Gt_eq]]].
+                   subst b22. admit.
+                   subst b22.
+                   replace (b0 + Mem.nextblock m2 - Mem.nextblock m2)%positive with b0 in ext_nu.
+                   rewrite ext_nu in extnu. inversion extnu. 
+                   subst b2' ofs3.
+                   
+                   apply (MKI_Some23 j k  (extern_of nu') (Mem.nextblock m2) j' k' Heqoutput) in extmap.
+                   destruct extmap as [kmap2 | [kmap2 [ext_nu2 Gt_eq2]]].
+                   admit. (*b +sizeM2 can't be valid *)
+                   replace (b0 + Mem.nextblock m2 - Mem.nextblock m2)%positive with b0 in ext_nu2.
+                   rewrite ext_nu2 in ext_nu.
+                   inversion ext_nu. subst b2 delta' ofs2.
+                   replace (0 + delta) with delta by omega; trivial.
+                   symmetry; apply Pos.add_sub.
+                   symmetry; apply Pos.add_sub.
+                   
+                   replace (b0 + Mem.nextblock m2 - Mem.nextblock m2)%positive with b0 in H0.
+                   apply H0.
+                   symmetry; apply Pos.add_sub.
+             + (*Local case! *)
+               subst nu23'. rewrite loc_change_ext in locmap.
+               assert (mval: Mem.valid_block m2 b1) by admit. (*because localmap*)
+               destruct (valid_dec m2 b1); try solve [contradiction n].
+               assert (kmap: k b1 = None ) by admit. (*because local or extincr extNone*)
+               rewrite kmap in H0. 
+               destruct (source j12' m1' b1 ofs) eqn:sour.
+               - symmetry in sour; apply source_SomeE in sour.
+                 destruct sour as [b0 [delta0 [ofs1 [invertible [leq [mapj [mperm ofs_add]]]]]]].
+                 destruct p. subst ofs.
+                 replace (ofs1 + delta0 + delta) with (ofs1 + (delta0 + delta)) by omega.
+                 eapply MemInjNu'.
+                 instantiate(1:=b0).
+                 rewrite compose.
+                 unfold as_inj, join, compose_sm, compose_meminj;
+                 rewrite ext_change_ext, loc_change_ext; simpl.
+                 rewrite ext_change_ext in extNone.
+                 assert (extmap12: extern_of nu12' b0 = None) by admit.
+                 rewrite extmap12. 
+                 subst j12' nu12'.
+                 unfold as_inj, join in mapj; rewrite ext_change_ext, loc_change_ext in mapj.
+                 assert (j' b0 = None ) by admit.
+                 rewrite H in mapj.
+                 rewrite loc_change_ext; rewrite mapj.
+                 rewrite locmap.
+                 trivial.
+                 inversion invertible; subst b z; auto.
+               - 
+
+               unfold shiftS, shiftT, add_inj in jmap'.
+               unfold shiftS, shiftT, add_inj in kmap'.
+               unfold shiftS, shiftT, add_inj in extmap. 
+               subst d'.
+               rewrite jmapN in jmap'; simpl in jmap'. move jmap' at bottom.
+                   destruct (filter_id (extern_of nu') b0) eqn:mapnu; try solve [inversion jmap'].
+                   destruct p. inversion jmap'; subst b22 z.
+                   clear jmap'.
+                   assert (kmap: k (b + Mem.nextblock m2)%positive = None ) by admit.
+                   rewrite kmap in kmap'.
+                   assert (kgt: (b + Mem.nextblock m2 ?= Mem.nextblock m2)%positive = Gt).
+                   { admit. }
+                   rewrite kgt in kmap'.
+                   apply pure_filter_Some in kmap'.
+                   destruct kmap' as [jmap extnu'].
+                   assert (kmap2: forall b, k (b + Mem.nextblock m2)%positive = None) by admit.
+                   rewrite (kmap2 b0) in extmap 
+                   { destruct (k (b + Mem.nextblock m2)%positive).
+                     destruct p. inversion kmap'. subst b2' z.
+                     clear kmap'.
+               - assert (Mem.valid_block m2 b2).
+               { apply SMV12. unfold RNG, DomTgt. subst j; apply SMWD12 in jmap. 
+                 destruct jmap as [extS extT]; rewrite extT; apply orb_true_r. }
+               destruct (valid_dec m2 b2); try solve[contradict n; auto].
                erewrite source_SomeI. apply H0.
-               * eapply meminj_no_overlap_inject_incr.
+               * admit. (*This is proven somewhere else.*)
+                 (*eapply meminj_no_overlap_inject_incr.
                  eapply (no_overlap_forward _ _ _ _ SMV12); eauto.
                  apply MInj12.
                  subst jp. apply inject_incr_join.
                  subst j; apply inject_incr_refl.
                  eapply inject_incr_trans; [eapply restrict_incr | apply inject_incr_refl].
-                 apply disjoint_extern_local; eauto.
-               *  subst jp; unfold join; rewrite jmap; auto.
+                 apply disjoint_extern_local; eauto. *)
+               *  subst j12'. unfold as_inj, join. 
+                  rewrite ext_change_ext. 
+                  subst j; apply ExtIncr12 in jmap. rewrite ext_change_ext in jmap.
+                  rewrite jmap; auto.
                * eapply any_Max_Nonempty; eauto.
              - destruct (valid_dec m2 b2); (*first discharge the impossible case*)
                try solve[subst b2; contradict v; unfold Mem.valid_block; xomega].
@@ -989,20 +1188,29 @@ symmetry in sour; eapply source_NoneE in sour.
                { apply SMV12. unfold RNG, DomTgt. apply SMWD12 in locmap. 
                  destruct locmap as [locS locT]; rewrite locT; apply orb_true_l. }
                destruct (valid_dec m2 b2); try solve[contradict n; auto].
-               destruct (source jp m1' b2 (ofs + delta)) eqn:sour.
+               destruct (source j12' m1' b2 (ofs + delta)) eqn:sour.
                - destruct p; symmetry in sour.
                  destruct (source_SomeE _ _ _ _ _ sour) 
                                as [b1' [delta' [ofs1 [pairs [bval [jpmap [mperm ofss]]]]]]].
-                 inversion pairs; subst b z jp.
-                 (*b2 is local so j can't map to it *)
-                 unfold join in jpmap.
-                 destruct (j b1') eqn:jmap; try destruct p.
+                 inversion pairs; subst b z jp. clear pairs.
+                 subst j12'.
+                 unfold as_inj, join in jpmap. rewrite ext_change_ext, loc_change_ext in jpmap.
+                 (*b2 is local so j' can't map to it *)
+                 destruct (j' b1') eqn:jmap; try destruct p.
                  {inversion jpmap; subst b z j.
-                 apply SMWD12 in jmap; destruct jmap as [extS extT].
-                 apply SMWD12 in locmap; destruct locmap as [locS locT].
-                 destruct SMWD12. destruct (disjoint_extern_local_Tgt b2) as [LT | ET];
-                 [rewrite LT in locT | rewrite ET in extT]; discriminate. }
-                 apply restrictD_Some in jpmap; destruct jpmap as [locmap' pubtrue].
+                  rewrite <- (ext_change_ext nu12 extS12 extT12 j') in jmap.
+                  apply SMWD12' in jmap; destruct jmap as [extS extT].
+                  apply SMWD12 in locmap; destruct locmap as [locS locT].
+                  destruct SMWD12. destruct (disjoint_extern_local_Tgt b2) as [LT | ET].
+                  rewrite LT in locT; discriminate.
+                  unfold change_ext in extT; destruct nu12; simpl in *.
+                  subst extT12. unfold bconcat, buni, bshift in extT. 
+                  rewrite ET in extT; simpl in extT.
+                  clear - H extT HeqsizeM2.
+                  destruct (b2 ?= sizeM2)%positive eqn:ineq; try solve [
+                  subst sizeM2; unfold Mem.valid_block, Plt, Pos.lt in H;
+                  rewrite H in ineq; discriminate]. }
+                 (* apply restrictD_Some in jpmap; destruct jpmap as [locmap' pubtrue]. *)
                  Lemma no_overlap_no_doublemap: 
                    forall j b1 b1' b2 d d' m,
                      Mem.meminj_no_overlap j m ->
@@ -1030,8 +1238,13 @@ symmetry in sour; eapply source_NoneE in sour.
                    apply MInj12.
                    apply local_in_all. apply SMWD12. }
                  eapply any_Max_Nonempty; eauto.
-                 subst b1' ofs1; auto.
-               - destruct MInj12.
+                 subst b1' ofs1. apply H0.
+               - (*prove that (k b2 = None) by contradiction*)
+                 destruct (k b2) eqn: kmap. subst k.
+                 { destruct p; apply Pure in kmap.
+                   destruct kmap as [b1' [ofs12 extmap12]].
+                   admit. (* local and ext map to the same block => contradiction *) }
+                 destruct MInj12.
                  destruct mi_inj.
                  eapply mi_perm0.
                  apply local_in_all; eauto.
@@ -1050,6 +1263,10 @@ symmetry in sour; eapply source_NoneE in sour.
                    unfold restrict. rewrite pubS.
                    auto.
                    eapply MKI_incr12; eauto. }
+                 assert (j12' b1 = Some (b2', z)).
+                 { subst j12'. unfold as_inj, join; rewrite ext_change_ext, loc_change_ext. 
+                   rewrite extNone; auto.
+                 }
                  symmetry in sour.
                  eapply any_Max_Nonempty in H0.
                  contradict H0.
@@ -1133,7 +1350,7 @@ symmetry in sour; eapply source_NoneE in sour.
            eauto.
          - (*TRYING SOMETHING*)
            { intros b1 ofs b2 delta map12' mperm1'.
-             rewrite (mem_add_contx j12' jp m1' m2); unfold mem_add_cont.
+             rewrite (mem_add_contx j12' k jp m1' m2); unfold mem_add_cont.
              
              (* New trying things*)
              unfold as_inj in map12'; apply joinD_Some in map12'; destruct map12' as [extmap | [extNone locmap]].
@@ -1385,13 +1602,12 @@ symmetry in sour; eapply source_NoneE in sour.
                    rewrite loc12; auto.
                    trivial.
                  }
-                 {  apply extern_incr_as_inj.
-                    admit.
-                    auto.
+                 {  apply extern_incr_as_inj; auto.
+                    (* Both subgoals were proven earlier in the theorem *)
                  }
                  { unfold compose_sm; simpl; split; auto.
                    apply SMWD12 in locmap; destruct locmap; auto. }
-                 {  apply unchanged_on_perm.
+                 { apply unchanged_on_perm.
                    unfold compose_sm; simpl; split; auto.
                    apply SMWD12 in locmap. destruct locmap; trivial. 
                    destruct SMV12 as [validD validR].
@@ -1613,27 +1829,8 @@ symmetry in sour; eapply source_NoneE in sour.
            eapply Fwd1; eauto.
            eapply (valid_from_map nu12); eauto.
            eapply Fwd1; eauto.
-           eapply (valid_from_map nu12); eauto.
-           }
-       split.
-       (* mem_forward *)
-       { apply (mem_add_forward j12' j' m1' m2 jp m1); auto.
-         + destruct SMV12 as [DOMv RNGv].
-           intros; apply DOMv; unfold DOM, DomSrc.
-           subst j. destruct SMWD12. destruct p; subst jp. 
-           apply joinD_Some in H; destruct H as [ext1 | [jnone resloc]].
-           - apply extern_DomRng in ext1.
-             destruct ext1 as [extS extT]; rewrite extS; apply orb_true_r.
-           - apply restrictD_Some in resloc; destruct resloc as [loc1 pucTrue].
-             apply local_DomRng in loc1; destruct loc1 as [locS locT]; rewrite locS; auto.
-         (*+ apply (MKI_range_eq _ _ _ _ _ _ Heqoutput).*)
-         + unfold mi_perm; destruct MInj12; destruct mi_inj; auto. 
-           intros; eapply mi_perm0; eauto. 
-           subst j jp; unfold as_inj, join. 
-           apply joinD_Some in H; destruct H as [ext1 | [ext1 loc1]].
-           - rewrite ext1; auto.
-           - apply restrictD_Some in loc1; destruct loc1 as [loc1 pubTrue].
-             rewrite ext1; rewrite loc1; auto.
+           eapply (valid_from_map nu12); eauto. 
+         
        }
        split.
        (* sm_valid 12'*)
@@ -1733,127 +1930,43 @@ symmetry in sour; eapply source_NoneE in sour.
        split.
        split.
        (* SM_wd 12*)
-       { subst nu12'; eapply MKI_wd12; eauto.
-         + subst extS12. apply SMWD12.
-         + subst extS12. intros.
-           destruct (locBlocksSrc nu12 b) eqn:locBS12; auto.
-           right. destruct ExtIncr as [? [? [extS [? [locS ?]]]]].
-           simpl in locS; rewrite locS in locBS12.
-           destruct WDnu'. destruct (disjoint_extern_local_Src b) as [locFalse | extFalse].
-           rewrite locBS12 in locFalse; inversion locFalse.
-           exact extFalse.
-         + subst extT12. intros.
-           destruct (locBlocksTgt nu12 b) eqn:locBT12; auto.
-           right. 
-           unfold bconcat, buni, bshift.
-           destruct ExtIncr as [? [? [extS [? [locS [locT ?]]]]]].
-           destruct GlueInvNu as [SMWD GlueInvNu].
-           destruct SMWD. destruct (disjoint_extern_local_Tgt b) as [locFalse | extFalse].
-           rewrite locBT12 in locFalse; inversion locFalse.
-           rewrite extFalse; simpl.
-           destruct SMV12 as [DOM12 RNG12].
-           subst sizeM2;
-             rewrite RNG12; auto.
-           unfold RNG, DomTgt.
-           rewrite locBT12; auto.
-         + inversion Heqoutput. unfold add_inj, shiftT; intros.
-           destruct (j b1) eqn:jb1. 
-         - rewrite H in jb1. subst j. destruct GlueInvNu as [SMWD GlueInvNu].
-           destruct SMWD. apply extern_DomRng in jb1. destruct jb1 as [extS12true extT12true].
-           subst extS12 extT12. apply ExtIncr in extS12true.
-           rewrite extS12true; split; trivial.
-           apply bconcat_larger1; auto.
-         - unfold filter_id in H. destruct (l' b1) eqn:lb1; inversion H.
-           subst extS12 extT12. subst l'.
-           destruct WDnu', p;
-             apply extern_DomRng in lb1.
-           destruct lb1 as [extStrue extTtrue].
-           split; auto.
-           subst sizeM2; apply bconcat_larger2; auto.
-           + intros. subst extT12. apply bconcat_larger1; auto.
-             destruct GlueInvNu as [SMWD12 GlueInvNu]; apply SMWD12 in H.
-             exact H.
-       }
+       { exact SMWD12'. }
        split.
        (* SM_wd 23*)
-       { subst nu23'; eapply MKI_wd23; eauto.
-         + apply GlueInvNu.
-         + subst extS23; intros.
-           destruct (locBlocksSrc nu23 b) eqn:locBS23; auto.
-           right. 
-           unfold bconcat, buni, bshift.
-           destruct GlueInvNu as [SMWD12 [SMWD23 GlueInvNu]];
-             destruct SMWD23; destruct (disjoint_extern_local_Src b) as [locSfalse | extSfalse].
-           rewrite locBS23 in locSfalse; inversion locSfalse.
-           rewrite extSfalse; simpl.
-           destruct ExtIncr as [? [? [extS [extT [locS [locT ?]]]]]].
-           destruct SMV23 as [DOM23 RNG23].
-           subst sizeM2; rewrite DOM23; auto.
-           unfold DOM, DomSrc. rewrite locBS23; auto.
-         + subst extT23. intros.
-           destruct (locBlocksTgt nu23 b) eqn:locBT23; auto.
-           right. destruct ExtIncr as [? [? [extS [? [locS [locT ?]]]]]].
-           simpl in locT; rewrite locT in locBT23.
-           destruct WDnu'. destruct (disjoint_extern_local_Tgt b) as [locFalse | extFalse].
-           rewrite locBT23 in locFalse; inversion locFalse.
-           exact extFalse.
-         + inversion Heqoutput. unfold add_inj, shiftS; intros.
-           destruct (k b1) eqn:kb1. 
-         - rewrite H in kb1. subst k. destruct GlueInvNu as [SMWD12 [SMWD23 GlueInvNu]].
-           destruct SMWD23. apply extern_DomRng in kb1. destruct kb1 as [extS23true extT23true].
-           subst extS23 extT23. destruct ExtIncr as [? [? [extS [extT [locS [locT ?]]]]]].
-           simpl in extT; apply extT in extT23true.
-           rewrite extT23true; split; trivial.
-           apply bconcat_larger1; auto.
-         - rename H into lb1. inversion lb1.
-           destruct ((b1 ?= Mem.nextblock m2)%positive) eqn:ineq; try solve [inversion H2].
-           subst extS23 extT23. subst l'.
-           destruct WDnu'.
-           apply extern_DomRng in lb1.
-           destruct lb1 as [extStrue extTtrue].
-           split; auto.             
-           replace b1 with ((b1 - sizeM2) + sizeM2)%positive; 
-             subst sizeM2. apply bconcat_larger2; auto.
-           apply Pos.sub_add; destruct (Pos.compare_gt_iff b1 (Mem.nextblock m2)). 
-           apply H; auto.
-           + intros. subst extT23. destruct ExtIncr as [? [? [extS [extT [locS [locT ?]]]]]].
-             apply extT; simpl; auto.
-             destruct GlueInvNu as [SMWD12 [SMWD23 GlueInvNu]]; apply SMWD23 in H; auto.
-       }
+       { exact SMWD23'. }
        split.
        (* locBlocksTgt = locBlocksSrc *)
-       { subst. unfold change_ext; destruct nu12, nu23; simpl.  
-         apply GlueInvNu.
+       { subst nu12' nu23'. unfold change_ext; destruct nu12, nu23; simpl.  
+         apply GlueInv.
        }
        (* locBlocksTgt = locBlocksSrc *)
        split.
        {
-         destruct GlueInvNu as [? [? [? [extEq [? ?]]]]].
+         destruct GlueInv as [? [extEq [? ?]]].
          subst nu23' nu12'; unfold change_ext; destruct nu23, nu12; subst extS23 extT12; simpl.
          simpl in extEq; rewrite extEq; auto.
        }
        split.
        (* pubBlocksTgt -> pubBlocksSrc *)
-       { subst. unfold change_ext; destruct nu12, nu23; simpl.  
-         apply GlueInvNu.
+       { subst nu12' nu23'. unfold change_ext; destruct nu12, nu23; simpl.  
+         apply GlueInv.
        }
        (* frgnBlocksTgt -> frgnBlocksSrc *)
-       { subst. unfold change_ext; destruct nu12, nu23; simpl.  
-         apply GlueInvNu.
+       { subst nu12' nu23'. unfold change_ext; destruct nu12, nu23; simpl.  
+         apply GlueInv.
        }
        split.
        (* Norm *)
        { subst nu12' nu23'. unfold change_ext; destruct nu12, nu23; simpl. 
-         eapply MKI_norm; subst; eauto.
-         
-         
+         eapply MKI_norm; subst j k; eauto. 
+
          (* Proveing 
           * forall (b : block) (p : block * Z),
           * extern_of0 b = Some p -> (b < Mem.nextblock m2)%positive *)
          intros b p H.  destruct p.
          eapply SMV23. eapply as_inj_DomRng.
-         unfold as_inj, join; simpl. simpl in *; rewrite H; eauto.
-         apply GlueInvNu.
+         unfold as_inj, join; simpl. simpl in *; erewrite H; eauto.
+         assumption.
        }
        split.
        (* Mem.unchanged_on *)
@@ -1865,7 +1978,7 @@ symmetry in sour; eapply source_NoneE in sour.
              destruct preimage as [b1 [delta [ofs1 [po [mvalid [jmap ?]]]]]].
              subst jp j.
              apply joinD_Some in jmap; destruct jmap as [jmap | restPub].
-             destruct GlueInvNu as [SMWD12 [SMWD23 [loceq rest]]]; clear SMWD23 rest.
+             destruct GlueInv as [loceq rest]; clear SMWD23 rest.
              apply SMWD12 in jmap; destruct jmap.
              destruct SMWD12. destruct (disjoint_extern_local_Tgt b).
              - rewrite loceq in H4.
@@ -1877,7 +1990,7 @@ symmetry in sour; eapply source_NoneE in sour.
                destruct (pubBlocksSrc nu12 b1) eqn:pubS12; try solve[inversion H3].
                destruct (local_of nu12 b1) eqn:loc12; inversion H3.
                destruct p1 as [bn dn]; inversion H3.
-               destruct GlueInvNu as [SMWD12 [? [loc [ext [pub frg]]]]].
+               destruct GlueInv as [loc [ext [pub frg]]].
                assert (loc12':=loc12).
                apply SMWD12 in loc12.
                apply SMWD12 in pubS12. destruct pubS12 as [b2 [z [locmap pubT]]].
@@ -1900,7 +2013,7 @@ symmetry in sour; eapply source_NoneE in sour.
              destruct preimage as [b1 [delta [ofs1 [po [mvalid [jmap ?]]]]]].
              subst jp j.
              apply joinD_Some in jmap; destruct jmap as [jmap | restPub].
-             destruct GlueInvNu as [SMWD12 [SMWD23 [loceq rest]]]; clear SMWD23 rest.
+             destruct GlueInv as [loceq rest]; clear SMWD23 rest.
              apply SMWD12 in jmap; destruct jmap.
              destruct SMWD12. destruct (disjoint_extern_local_Tgt b).
              - rewrite loceq in H4.
@@ -1912,7 +2025,7 @@ symmetry in sour; eapply source_NoneE in sour.
                destruct (pubBlocksSrc nu12 b1) eqn:pubS12; try solve[inversion H3].
                destruct (local_of nu12 b1) eqn:loc12; inversion H3.
                destruct p0 as [bn dn]; inversion H3.
-               destruct GlueInvNu as [SMWD12 [? [loc [ext [pub frg]]]]].
+               destruct GlueInv as  [loc [ext [pub frg]]].
                assert (loc12':=loc12).
                apply SMWD12 in loc12.
                apply SMWD12 in pubS12. destruct pubS12 as [b2 [z [locmap pubT]]].
@@ -1947,10 +2060,10 @@ symmetry in sour; eapply source_NoneE in sour.
            (* This will show that local_of nu12 maps b1->b (bc. locBlocksTgt nu12 b = true)*)
            unfold join in jpmap. destruct (j b1) eqn:jmap.
            destruct p0; simpl in *.
-           subst j. apply GlueInvNu in jmap; destruct jmap as [extS extT].
-           destruct GlueInvNu as [SMWD12 rest]; clear rest; destruct SMWD12.
+           subst j. apply SMWD12 in jmap; destruct jmap as [extS extT].
+           destruct SMWD12.
            destruct (disjoint_extern_local_Tgt b2).
-           inversion invertibles; inversion jpmap; subst.
+           inversion invertibles; inversion jpmap. subst b0 z b2 z0.
            rewrite H in H2; inversion H2.
            rewrite extT in H2; inversion H2.
            apply restrictD_Some in jpmap; destruct jpmap as [locmap publ].
@@ -1963,7 +2076,7 @@ symmetry in sour; eapply source_NoneE in sour.
            unfold mem_forward in Fwd1.
            assert (Mem.valid_block m1 b1).
            { destruct SMV12 as [DOMv RNGv]; clear RNGv; apply DOMv.
-             unfold DOM, DomSrc. apply GlueInvNu in locmap.
+             unfold DOM, DomSrc. apply SMWD12 in locmap.
              destruct locmap as [locS locT]. rewrite locS; auto.
            }
            apply Fwd1 in H2; destruct H2 as [bval mperms].
@@ -1985,10 +2098,10 @@ symmetry in sour; eapply source_NoneE in sour.
            (* This will show that local_of nu12 maps b1->b (bc. locBlocksTgt nu12 b = true)*)
            unfold join in jpmap. destruct (j b1) eqn:jmap.
            destruct p; simpl in *.
-           subst j. apply GlueInvNu in jmap; destruct jmap as [extS extT].
-           destruct GlueInvNu as [SMWD12 rest]; clear rest; destruct SMWD12.
+           subst j. apply SMWD12 in jmap; destruct jmap as [extS extT].
+           destruct SMWD12.
            destruct (disjoint_extern_local_Tgt b2).
-           inversion invertibles; inversion jpmap; subst.
+           inversion invertibles; inversion jpmap. subst b0 z b2 z0.
            rewrite H in H2; inversion H2.
            rewrite extT in H2; inversion H2.
            apply restrictD_Some in jpmap; destruct jpmap as [locmap publ].
@@ -2001,7 +2114,7 @@ symmetry in sour; eapply source_NoneE in sour.
            unfold mem_forward in Fwd1.
            assert (Mem.valid_block m1 b1).
            { destruct SMV12 as [DOMv RNGv]; clear RNGv; apply DOMv.
-             unfold DOM, DomSrc. apply GlueInvNu in locmap.
+             unfold DOM, DomSrc. apply SMWD12 in locmap.
              destruct locmap as [locS locT]. rewrite locS; auto.
            }
            apply Fwd1 in H2; destruct H2 as [bval mperms].
@@ -2010,13 +2123,12 @@ symmetry in sour; eapply source_NoneE in sour.
            assumption.
        }
        split.
-       { intros; subst;
+       { intros; subst nu12';
          eapply destruct_sminj12; eauto.
-         apply GlueInvNu.
        }
-       { intros; subst;
+       { intros; subst nu23' j k l';
          edestruct destruct_sminj23.
-         destruct GlueInvNu as [? GIN]; apply GIN.
+         apply SMWD23.
          auto.
          auto.
          eauto.
