@@ -318,14 +318,15 @@ eapply Build_Wholeprog_sim
   exists erefl,erefl,mu_top,[::]=> /=; split=> //.
 
   exists erefl; apply: Build_head_inv=> //.
-  exists (REACH m1 (getBlocks vals1)); split.
+  exists (getBlocks vals1); split.
   apply: Build_vis_inv; rewrite /= /RC.roots /vis /mu_top0 /= /fS.
 
   move=> /=; rewrite /in_mem {2}/getBlocks /= => b1 H.
-  suff [H2|H2]: isGlobalBlock my_ge b1 \/ REACH m1 (getBlocks vals1) b1.
+  suff [H2|H2]: isGlobalBlock my_ge b1 \/ getBlocks vals1 b1.
   by apply: REACH_nil; apply/orP; left; rewrite -(isGlob_iffS my_ge_S).
-  by move: H2; apply: REACH_mono=> b0 Hget; apply/orP; right. 
+  by apply: REACH_nil; apply/orP; right.
   by move: (orP H).
+
   by apply RCSem.init_ax with (v := Vptr b Int.zero).
 
   have vgenv_ix: valid_genv (ge (cores_T ix)) m2.

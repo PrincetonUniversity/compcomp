@@ -236,7 +236,7 @@ Record t : Type := {
 ; init_ax : 
   forall v vs c m,
   initial_core sem ge v vs = Some c -> 
-  I c m (REACH m (getBlocks vs))
+  I c m (getBlocks vs)
 
 ; step_ax : 
   forall c m c' m' B,
