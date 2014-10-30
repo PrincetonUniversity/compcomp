@@ -45,76 +45,11 @@ your home directory rather than system-wide), edit variables `SSREFLECT` and
 `MATHCOMP` in the Makefile to point to the appropriate installation directories.
 Otherwise, leave both `SSREFLECT` and `MATHCOMP` equal the empty string `""`.
 
-## Special Instructions for AEC Members
-
-### Virtual Machine Image 
-
-To assist the AEC members, we've built a VirtualBox virtual machine image that
-comes preinstalled with the required dependencies.
-
-* VirtualBox is available for free here: https://www.virtualbox.org/.
-* The CompComp Debian virtual machine image is here: 
-
-  > http://www.cs.princeton.edu/~jsseven/papers/compcomp/compcomp-debian.tgz.
-
-Credentials for the virtual machine:
-
-| User          | Password |
-| ------------: | :------: |
-| popl15        | popl15   |
-| root          | popl15   |
-
-When you download the virtual machine, you'll find the Compositional CompCert
-`compcomp` repository precloned in directory `/home/popl15/Repos/compcomp`.
-
-**WARNING:** On the virtual machine, the repository could take up to **2 hours**
-to build. Make sure to configure the virtual machine to use at least **2GB of
-memory.**
-
-### The Paper
-
-The accepted version of the paper (but now with author names) is available here:
-
-> http://www.cs.princeton.edu/~jsseven/papers/compcomp/paper.pdf. 
-
-### `popl15aec` Branch
-
-The evaluation branch of `compcomp` is `popl15aec`. This branch should already 
-be checked out in the `compcomp` repository installed on the virtual 
-machine. If it isn't for some reason, or you would like to clone the repository
-yourself, you can switch to the `popl15aec` branch as follows:
-
-```
-git clone https://github.com/PrincetonUniversity/compcomp.git <compcomp-dir>
-cd <compcomp-dir>
-git checkout popl15aec
-```
-
-The `compcomp` developers try to make sure that `master` always builds and
-contains no admits (incomplete proofs are developed in separate branches and
-only merged into `master` when complete). However, further development on
-`compcomp` after the AEC begins its work could result in transitory build issues
-on `master`.
-
-### Extraction and Builtin Support
-
-The extracted version of the compiler is `driver/CompositionalCompiler.v`.  This
-version of the executable doesn't yet support certain inlined CompCert
-intrinsics such as `__builtin_bswap` (we plan to add support for these builtins
-in the near future). The issue, we believe, stems from the fact that inlining
-has not yet been enabled in `CompositionalCompiler.v`.
-
-On the other hand, the proofs deal fully with both compiler builtins and other
-intrinsics such as 64-bit helper functions. 
-
 ## Files
 
 An HTML rendering of the code is browsable at:
 
 > http://www.cs.princeton.edu/~jsseven/papers/compcomp/html. 
-
-Below is a description, with HTML links, of the main files and their relation to
-the POPL results.
 
 In the `cfrontend/` and `backend/` directories, source and target language
 definitions used in each phase are generally suffixed `*_eff.v` (often importing
@@ -331,24 +266,4 @@ _Interaction Semantics_ of the intermediate languages used in Compositional Comp
   * [wf_lemmas.v](http://www.cs.princeton.edu/~jsseven/papers/compcomp/html/wf_lemmas.html)       
 
     > Lemmas about well-founded orders.
-
-### scripts/
-
-  Contains the shell scripts used to calculate the line counts in Section 6. In
-  general, we calculate lines of spec. vs. proof by first classifying whole
-  files as either spec. or proof, and then just use wc. The coqwc tool is an
-  alternative, but it often seems to undercount proof lines and overcount
-  spec. lines.
-
-  For some specification files (e.g., `backend/RTL.v`), we do not count in our
-  "new" line counts those parts of the file, such as definitions of operational
-  semantics, that are duplicated in our own files (e.g., `backend/RTL_coop.v`).
-
-  To run the script we used to generate the line counts in the paper, from 
-  the root directory of the repository, do: 
-
-  ```
-  cd scripts
-  ./paperLineCount.sh
-  ```
 
