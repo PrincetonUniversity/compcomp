@@ -11,7 +11,16 @@
 */#*#
 */*/#*#
 .depend
+bins/
 test/regression/*.out
+test/*/*.s
+test/*/*.compcert
+test/spass/spass
+test/compression/arcode
+test/compression/lzss
+test/compression/lzw
+test/raytracer/render
+test/raytracer/kal.ppm
 updates
 runtime/*.o
 runtime/*.a
