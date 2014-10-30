@@ -24,7 +24,10 @@ TESTS_COMP=attribs1 bitfields1 bitfields2 bitfields3 bitfields4 \
 # Can run, both in compiled mode and in interpreter mode,
 # but produce processor-dependent results, so no reference output in Results
 
-TESTS_DIFF=NaNs
+TESTS_DIFF=
+## As per an email from Xavier, the NaN test should not be enabled until 
+## we've enabled function inlining. It's not expected to pass otherwise.
+#TESTS_DIFF=NaNs
 
 # Other tests: should compile to .s without errors (but expect warnings)
 
