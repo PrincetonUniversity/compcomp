@@ -17,10 +17,10 @@ Unset Printing Implicit Defensive.
 Require Import nucular_semantics.
 Require Import Values.   
 
-(** * Congruence *)
+(** * Forward Simulation is Compatible with Linking *)
 
 (** This file states one of the primary linking results, essentially, 
-    that simulation is a congruence wrt. \mathcal{L}. *)
+    that simulation compatible with \mathcal{L}. *)
 
 (** Informally, 
 - Assume a multi-module program with N translation units:
