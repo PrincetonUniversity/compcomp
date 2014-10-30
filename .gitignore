@@ -1,4 +1,8 @@
 *~
+\#*
+.\#*
+*.o
+*.c
 */*.vo
 */*/*.vo
 */*~
@@ -7,6 +11,8 @@
 */#*#
 */*/#*#
 .depend
+test/regression/*.out
+updates
 runtime/*.o
 runtime/*.a
 tools/ndfun
