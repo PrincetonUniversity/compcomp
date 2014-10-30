@@ -76,18 +76,15 @@ Definition link_ctx (ge : ge_ty) (C : Ctx.t ge) (N : pos) (p : Prog.t N) plt : E
     end
   in effsem (pos_incr N) (Prog.sems (apply_ctx C p)) extended_plt.
 
-Definition Terminates G C M (sem : CoreSemantics G C M) (ge : G) (m : M) 
-                      (main : val) (args : list val) :=
-  forall c, initial_core sem ge main args = Some c -> terminates sem ge c m.
-
 Definition Equiv_ctx (ge : ge_ty) (N : pos) plt (p1 p2 : Prog.t N) :=
   forall C : Ctx.t ge,
   forall (main : val) (args1 args2 : list val) m1 m2,
-  forall c1, initial_core (link_ctx C p1 plt) ge main args1 = Some c1 -> 
   forall j, cc_init_inv j ge args1 m1 ge args2 m2 -> 
+  forall c1, initial_core (link_ctx C p1 plt) ge main args1 = Some c1 -> 
+  forall c2, initial_core (link_ctx C p2 plt) ge main args2 = Some c2 -> 
   (forall n, safeN (link_ctx C p1 plt) ge n c1 m1) -> 
-      (Terminates (link_ctx C p1 plt) ge m1 main args1 
-   <-> Terminates (link_ctx C p2 plt) ge m2 main args2).
+      (terminates (link_ctx C p1 plt) ge c1 m1 
+   <-> terminates (link_ctx C p2 plt) ge c2 m2).
 
 (** Prove that Simulation implies Equiv_ctx *)
 
@@ -118,7 +115,7 @@ Variable find_symbol_ST :
 
 Lemma equiv : Equiv_ctx ge_top plt pS pT.
 Proof.
-rewrite /Equiv_ctx=> C main args1 args2 m1 m2 c1 Init1 j Inv. 
+rewrite /Equiv_ctx=> C main args1 args2 m1 m2 j Inv c1 Init1 c2 Init2 Hsafe.
 have sim: CompCert_wholeprog_sim (link_ctx C pS plt) (link_ctx C pT plt) ge_top ge_top main.
 { apply: link=> ix; rewrite /Prog.sems/apply_ctx/extend_sems. 
   by move=> ??; case e: (lt_dec ix N)=> [pf|pf] //; apply find_symbol_ST.
@@ -130,17 +127,14 @@ have sim: CompCert_wholeprog_sim (link_ctx C pS plt) (link_ctx C pT plt) ge_top 
 have target_det: corestep_fun (link_ctx C pT plt). 
 { apply: linking_det=> ix; rewrite /Prog.sems/apply_ctx/extend_sems.
   by case e: (lt_dec ix N)=> [pf|pf] //; apply Ctx.det_C. }
-move: (Init1)=> Init1' Hsafe.
 eapply @core_initial 
   with (Sem1 := link_ctx C pS plt) (Sem2 := link_ctx C pT plt) 
        (ge1 := ge_top) (ge2 := ge_top) (halt_inv := cc_halt_inv)
        (j := j) (main := main) (m1 := m1) (m2 := m2) (w := sim)
   in Init1; eauto.
-case: Init1=> mu []cd []c2 []_ []Init2 Hmatch.
-apply equitermination in Hmatch=> //. 
-split=> Hterm x Init.
-{ by rewrite Init2 in Init; case: Init=> <-; rewrite -Hmatch; apply: Hterm. }
-{ by rewrite Init1' in Init; case: Init=> <-; rewrite Hmatch; apply: Hterm. }
+case: Init1=> mu []cd []x []_ []Init2' Hmatch.
+rewrite Init2 in Init2'; case: Init2'=> ->.
+by apply equitermination in Hmatch.
 Qed.
 
 End ContextEquiv.
