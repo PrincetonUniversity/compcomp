@@ -448,6 +448,7 @@ assert (Fwd2: mem_forward m2 m2').
              eapply Fwd1.
                apply ValB1.
                apply H0. 
+         
          rewrite (perm_subst _ _ _ _ _ _ _ Val2) in H0; apply H0.
        rewrite (perm_subst _ _ _ _ _ _ _ Val2) in H0; apply H0.
      (*case locBlocksSrc nu23 b2 = false*)
@@ -1553,6 +1554,7 @@ assert (Inj23':Mem.inject j23' m2' m3').
            eapply MemInjNu'. apply J'.
    (*no_overlap*)
       intros b; intros.
+
       destruct (mkInjections_4Val _ _ _ _ _ _ _ _ _ _ HeqMKI
         VBj23_1 _ _ _ H0) as [HH | [HH | HH]].
       destruct HH as [j23b vbb].
