@@ -41,6 +41,14 @@ Definition shiftS (j: meminj) (n:block):meminj :=
            end.
 Infix "<<":= shiftS (at level 80, right associativity).
 
+Lemma shiftS_Some: forall j sh b1 p,
+                     (j << sh) b1 = Some p ->
+                     (b1 > sh)%positive /\ j (b1 - sh)%positive = Some p.
+  unfold shiftS. intros.
+  destruct (b1 ?= sh)%positive eqn:ineq; inversion H.
+  split; trivial.
+Qed.
+
 (* fID satisfies (fID .*. f) = f and it's pure *)  
 Definition filter_id (j:meminj): meminj:=
   fun b =>
@@ -212,6 +220,63 @@ Lemma MKI_restrict:
   destruct (j b1) eqn: jmap; trivial.
   destruct (filter_id l b1); trivial; destruct p.
   inversion H0. rewrite <- H3 in H1; xomega.
+Qed.
+
+Lemma MKI_no_overlap12:
+  forall j k l sizeM2,
+  forall j' k',
+    (j', k') = mkInjections sizeM2 j k l ->
+    forall m1 m1',
+      Mem.meminj_no_overlap j m1 ->
+      Mem.meminj_no_overlap l m1' ->
+      mem_forward m1 m1' ->
+      (forall b1 b2 d, j b1 = Some (b2, d) -> Mem.valid_block m1 b1) ->
+      (forall b1 b2 d, j b1 = Some (b2, d) -> Plt b2 sizeM2) ->
+      Mem.meminj_no_overlap j' m1'.
+  unfold Mem.meminj_no_overlap; intros.
+  inversion H. subst j'.
+  Lemma add_inj_Some: forall j k b1 b2 d,
+                        (j (+) k) b1 = Some (b2, d) ->
+                        j b1 = Some (b2, d) \/
+                        k b1 = Some (b2, d).
+    unfold add_inj; intros. destruct (j b1).
+    + destruct p; left; auto.
+    + right; auto.
+  Qed.
+  apply add_inj_Some in H6; destruct H6 as [jmap1 | lmap1];
+  apply add_inj_Some in H7; destruct H7 as [jmap2 | lmap2].
+  (*1: Good case*)
+  + eapply H0; eauto.
+  - assert (Mem.valid_block m1 b1) by (eapply H3; eauto).
+    eapply H2 in H6. destruct H6 as [Memval mperm].
+    apply mperm; auto.
+  - assert (Mem.valid_block m1 b2) by (eapply H3; eauto).
+    eapply H2 in H6. destruct H6 as [Memval mperm].
+    apply mperm; auto.
+    (*2: Bad case/ contradiction*)
+    + apply H4 in jmap1.
+      unfold shiftT in lmap2. destruct ( filter_id l b2); try solve[inversion lmap2].
+      destruct p. inversion lmap2.
+      left. unfold not; intros.
+      subst b1'. contradict jmap1. xomega.
+    (*3: Bad case/ contradiction*)
+    + apply H4 in jmap2.
+      unfold shiftT in lmap1. destruct ( filter_id l b1); try solve[inversion lmap1].
+      destruct p. inversion lmap1.
+      left. unfold not; intros.
+      subst b2'. contradict jmap2. xomega.
+    (*4: Good case/ lmap*)
+    + unfold shiftT in *.
+      unfold filter_id in *.
+      destruct (l b1) eqn:lmap1'; try solve [inversion lmap1]. destruct p.
+      destruct (l b2) eqn:lmap2'; try solve [inversion lmap2]. destruct p.
+      destruct (H1 _ _ _ _ _ _ _ _ H5 lmap1' lmap2' H8 H9) as [ineq1 | ineq2].
+  - inversion lmap1; inversion lmap2. subst.
+    left; clear - H5. unfold not; intros. 
+    apply H5. eapply Pos.add_reg_r; eauto.
+  - inversion lmap1; inversion lmap2. subst.
+    left; clear - H5. unfold not; intros. 
+    apply H5. eapply Pos.add_reg_r; eauto.
 Qed.
 
 Lemma MKI_None12:
@@ -730,14 +795,14 @@ Definition mem_add_cont nu12 nu23 (j12' :meminj) (m1 m1' m2 : mem) :=
           match source (local_of nu12) m1 b2 ofs2 with
             | Some(b1,ofs1) => 
               if pubBlocksSrc nu12 b1 
-              then inject_memval j12 (ZMap.get ofs1 (PMap.get b1 m1'.(Mem.mem_contents)))
+              then inject_memval j12' (ZMap.get ofs1 (PMap.get b1 m1'.(Mem.mem_contents)))
               else ZMap.get ofs2 ( m2.(Mem.mem_contents) !! b2)
             | None =>  ZMap.get ofs2 ( m2.(Mem.mem_contents) !! b2)
           end
         else ZMap.get ofs2 ( m2.(Mem.mem_contents) !! b2)
       else 
         match source (as_inj nu12) m1 b2 ofs2 with
-          | Some(b1,ofs1) =>inject_memval j12 (ZMap.get ofs1 (PMap.get b1 m1'.(Mem.mem_contents)))
+          | Some(b1,ofs1) =>inject_memval j12' (ZMap.get ofs1 (PMap.get b1 m1'.(Mem.mem_contents)))
           | None => 
             match (as_inj nu23) b2 with 
                 None =>  ZMap.get ofs2 ( m2.(Mem.mem_contents) !! b2)
@@ -746,7 +811,7 @@ Definition mem_add_cont nu12 nu23 (j12' :meminj) (m1 m1' m2 : mem) :=
         end
     else 
       match source j12' m1' b2 ofs2 with 
-        | Some(b1,ofs1) => inject_memval j12 (ZMap.get ofs1 (PMap.get b1 m1'.(Mem.mem_contents)))
+        | Some(b1,ofs1) => inject_memval j12' (ZMap.get ofs1 (PMap.get b1 m1'.(Mem.mem_contents)))
         | None =>  Undef
       end.
 

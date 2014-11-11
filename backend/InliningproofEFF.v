@@ -19,7 +19,8 @@ Require Import core_semantics.
 Require Import reach.
 Require Import effect_semantics.
 Require Import StructuredInjections.
-Require Import effect_simulations.
+(*Require Import effect_simulations.*)
+Load effect_simulation.
 Require Import effect_properties.
 Require Import effect_simulations_lemmas.
 
