@@ -12,7 +12,7 @@ Require Import effect_simulations.
 Require Import effect_simulations_lemmas.
 Require Import mem_lemmas.
 Require Import mem_interpolation_defs.
-Require Import mem_interpolation_II.
+(*Require Import mem_interpolation_II.*)
 Load mem_interpolation_II3.
 Require Import FiniteMaps.
 Require Import StructuredInjections.
@@ -57,6 +57,14 @@ Lemma mapped_valid: forall mu m1 m2 b1 b2 d,
   apply joinD_Some in H0; destruct H0 as [map | [extNone map]];
   apply H in map; destruct map as [src tgt]; rewrite src; auto.
   apply orb_true_r.
+Qed.
+Lemma meminj_no_overlap_inject_incr: 
+   forall j m (NOV: Mem.meminj_no_overlap j m) k (K:inject_incr k j),
+  Mem.meminj_no_overlap k m.
+Proof. intros.
+  intros b; intros.
+  apply K in H0. apply K in H1.
+  eapply (NOV _ _ _ _ _ _ _ _  H H0 H1 H2 H3).
 Qed.
 Lemma no_overlap_asinj: 
   forall mu m, 

@@ -18,11 +18,11 @@ Require Import effect_semantics.
 (*Load effect_simulations2.*)
 (*Load no_junk.*)
 (*Require Import effect_simulations.*)
-Require Import effect_simulations2.
+Require Import effect_simulations.
 Require Import effect_simulations_lemmas.
 Require Import Wellfounded.
 Require Import Relations.
-Require Import effect_corediagram_trans2.
+Require Import effect_corediagram_trans.
 (*Require Import effect_corediagram_trans.*)
 Require Import effect_interpolants.
 Require Import mem_interpolation_defs.

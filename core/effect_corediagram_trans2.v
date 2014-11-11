@@ -17,7 +17,7 @@ Require Import effect_semantics.
 Require Import StructuredInjections.
 Require Import reach.
 (*Require Import effect_simulations.*)
-Require Import effect_simulations2.
+Require Import effect_simulations.
 Require Import effect_simulations_lemmas.
 Require Import effect_properties.
 
@@ -245,7 +245,7 @@ Proof.
          split; trivial.
          split; assumption.
      do 3 (try split; try assumption).
-     { clear - pure InjIncr12 InjIncr23.
+     { (*clear - pure InjIncr12 InjIncr23.*)
        unfold pure_comp_ext, pure_composition, pure_composition_locat, pure_composition_block, 
        replace_locals, DomSrc, exportedSrc, sharedSrc, shared_of,
        intern_incr in *;
@@ -257,6 +257,11 @@ Proof.
        destruct pure.
        split.
        + intros.
+         eapply H in H1.
+         destruct H1 as [b1 [ofs12 [extmap valloc]]].
+         exists b1, ofs12; split.
+         auto. admit.
+
          admit.
        + apply H0.
      }

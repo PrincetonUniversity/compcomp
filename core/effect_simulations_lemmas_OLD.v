@@ -128,7 +128,7 @@ Hypothesis order_wf: well_founded order.
 
       forall nu' ret1 m1' ret2 m2'
         (INC: extern_incr nu nu')  
-        (*(SEP: sm_inject_separated nu nu' m1 m2)*)
+        (SEP: sm_inject_separated nu nu' m1 m2)
 
         (WDnu': SM_wd nu') (SMvalNu': sm_valid nu' m1' m2')
 
@@ -164,7 +164,7 @@ Hypothesis order_wf: well_founded order.
         match_states st1 mu st1 m1 st2 m2 ->
         exists st2', exists m2', exists mu',
           intern_incr mu mu' /\
-          (*sm_inject_separated mu mu' m1 m2 /\*)
+          sm_inject_separated mu mu' m1 m2 /\
           sm_locally_allocated mu mu' m1 m2 m1' m2' /\ 
 
           match_states st1' mu' st1' m1' st2' m2' /\
@@ -194,7 +194,7 @@ clear - match_sm_wd. intros. destruct H; subst. eauto.
 assumption.
 clear - match_genv. intros. destruct MC; subst. eauto.
 clear - match_visible. intros. destruct H; subst. eauto.
-(* clear - match_restrict. intros. destruct H; subst. eauto. *)
+clear - match_restrict. intros. destruct H; subst. eauto.
 clear - match_validblocks. intros.
     destruct H; subst. eauto.
 clear - inj_initial_cores. intros.
@@ -205,11 +205,11 @@ clear - inj_initial_cores. intros.
 clear - inj_effcore_diagram. 
   intros. destruct H0; subst.
   destruct (inj_effcore_diagram _ _ _ _ _ H _ _ _ H1) as 
-    [c2' [m2' [mu' [INC  [LAC [MC' [U2 [STEP' PROP]]]]]]]]. 
+    [c2' [m2' [mu' [INC [SEP [LAC [MC' [U2 [STEP' PROP]]]]]]]]]. 
   exists c2'. exists m2'. exists st1'. exists mu'.
   split; try assumption. 
   split; try assumption. 
-  (* split; try assumption. *)(* inject_separated... *)
+  split; try assumption. 
   split. split; trivial. 
   exists U2. split; assumption. 
 clear - inj_halted. intros. destruct H; subst.
@@ -224,7 +224,7 @@ clear - inj_after_external. intros.
   destruct MatchMu as [ZZ matchMu]. subst cd.
   destruct (inj_after_external _ _ _ _ _ _ _ _ _ _ _
       MemInjMu matchMu AtExtSrc AtExtTgt ValInjMu _
-      pubSrcHyp _ pubTgtHyp _ NuHyp _ _ _ _ _ INC
+      pubSrcHyp _ pubTgtHyp _ NuHyp _ _ _ _ _ INC SEP
       WDnu' SMvalNu' MemInjNu' RValInjNu' FwdSrc FwdTgt 
       _ frgnSrcHyp _ frgnTgtHyp _ Mu'Hyp 
       UnchPrivSrc UnchLOOR)
@@ -260,7 +260,7 @@ Hypothesis order_wf: well_founded order.
         (HasTy1: Val.has_type ret1 (proj_sig_res (AST.ef_sig e)))
         (HasTy2: Val.has_type ret2 (proj_sig_res (AST.ef_sig e')))
         (INC: extern_incr nu nu')  
-        (*(SEP: sm_inject_separated nu nu' m1 m2)*)
+        (SEP: sm_inject_separated nu nu' m1 m2)
 
         (WDnu': SM_wd nu') (SMvalNu': sm_valid nu' m1' m2')
 
@@ -296,7 +296,7 @@ Hypothesis order_wf: well_founded order.
         match_states st1 mu st1 m1 st2 m2 ->
         exists st2', exists m2', exists mu',
           intern_incr mu mu' /\
-          (*sm_inject_separated mu mu' m1 m2 /\*)
+          sm_inject_separated mu mu' m1 m2 /\
           sm_locally_allocated mu mu' m1 m2 m1' m2' /\ 
 
           match_states st1' mu' st1' m1' st2' m2' /\
@@ -326,7 +326,7 @@ clear - match_sm_wd. intros. destruct H; subst. eauto.
 assumption.
 clear - match_genv. intros. destruct MC; subst. eauto.
 clear - match_visible. intros. destruct H; subst. eauto.
-(*clear - match_restrict. intros. destruct H; subst. eauto.*)
+clear - match_restrict. intros. destruct H; subst. eauto.
 clear - match_validblocks. intros.
     destruct H; subst. eauto.
 clear - inj_initial_cores. intros.
@@ -336,11 +336,11 @@ clear - inj_initial_cores. intros.
 clear - inj_effcore_diagram. 
   intros. destruct H0; subst.
   destruct (inj_effcore_diagram _ _ _ _ _ H _ _ _ H1) as 
-    [c2' [m2' [mu' [INC [LAC [MC' [U2 [STEP' PROP]]]]]]]]. 
+    [c2' [m2' [mu' [INC [SEP [LAC [MC' [U2 [STEP' PROP]]]]]]]]]. 
   exists c2'. exists m2'. exists st1'. exists mu'. 
   split; try assumption.
   split; try assumption.
-  (* split; try assumption. *)
+  split; try assumption.
   split. split; trivial. 
   exists U2. split; assumption.
 clear - inj_halted. intros. destruct H; subst.
@@ -355,7 +355,7 @@ clear - inj_after_external. intros.
   destruct MatchMu as [ZZ matchMu]. subst cd.
   destruct (inj_after_external _ _ _ _ _ _ _ _ _ _ _
       MemInjMu matchMu AtExtSrc AtExtTgt ValInjMu _
-      pubSrcHyp _ pubTgtHyp _ NuHyp _ _ _ _ _ HasTy1 HasTy2 INC
+      pubSrcHyp _ pubTgtHyp _ NuHyp _ _ _ _ _ HasTy1 HasTy2 INC SEP
       WDnu' SMvalNu' MemInjNu' RValInjNu' FwdSrc FwdTgt 
       _ frgnSrcHyp _ frgnTgtHyp _ Mu'Hyp 
       UnchPrivSrc UnchLOOR)
@@ -388,7 +388,7 @@ Section EFF_INJ_SIMULATION_STAR.
 
       forall nu' ret1 m1' ret2 m2'
         (INC: extern_incr nu nu')  
-        (*(SEP: sm_inject_separated nu nu' m1 m2)*)
+        (SEP: sm_inject_separated nu nu' m1 m2)
 
         (WDnu': SM_wd nu') (SMvalNu': sm_valid nu' m1' m2')
 
@@ -424,7 +424,7 @@ Section EFF_INJ_SIMULATION_STAR.
         match_states st1 mu st1 m1 st2 m2 ->
         exists st2', exists m2', exists mu',
           intern_incr mu mu' /\
-          (*sm_inject_separated mu mu' m1 m2 /\*)
+          sm_inject_separated mu mu' m1 m2 /\
           sm_locally_allocated mu mu' m1 m2 m1' m2' /\ 
 
           match_states st1' mu' st1' m1' st2' m2' /\
@@ -450,12 +450,12 @@ Proof.
   apply inj_after_external.
   clear - inj_effcore_diagram. intros.
   destruct (inj_effcore_diagram _ _ _ _ _ H _ _ _ H0) 
-    as [c2' [m2' [mu' [INC [LAC [MC' [U2 [STEP' PROP]]]]]]]].
+    as [c2' [m2' [mu' [INC [SEP [LAC [MC' [U2 [STEP' PROP]]]]]]]]].
   exists c2'. exists m2'. exists mu'. 
   split; try assumption. 
   split; try assumption.
   split; try assumption. 
-  (*split; try assumption.*)  
+  split; try assumption.  
   exists U2. intuition.
 Qed.
 
@@ -486,7 +486,7 @@ Section EFF_INJ_SIMULATION_STAR_TYPED.
         (HasTy1: Val.has_type ret1 (proj_sig_res (AST.ef_sig e)))
         (HasTy2: Val.has_type ret2 (proj_sig_res (AST.ef_sig e')))
         (INC: extern_incr nu nu')  
-        (*SEP: sm_inject_separated nu nu' m1 m2*)
+        (SEP: sm_inject_separated nu nu' m1 m2)
 
         (WDnu': SM_wd nu') (SMvalNu': sm_valid nu' m1' m2')
 
@@ -522,7 +522,7 @@ Section EFF_INJ_SIMULATION_STAR_TYPED.
         match_states st1 mu st1 m1 st2 m2 ->
         exists st2', exists m2', exists mu',
           intern_incr mu mu' /\
-          (*sm_inject_separated mu mu' m1 m2 /\*)
+          sm_inject_separated mu mu' m1 m2 /\
           sm_locally_allocated mu mu' m1 m2 m1' m2' /\ 
 
           match_states st1' mu' st1' m1' st2' m2' /\
@@ -548,12 +548,12 @@ Proof.
   intros. eapply inj_after_external with (mu := mu); eauto.
   clear - inj_effcore_diagram. intros.
   destruct (inj_effcore_diagram _ _ _ _ _ H _ _ _ H0) 
-    as [c2' [m2' [mu' [INC [LAC [MC' [U2 [STEP' PROP]]]]]]]].
+    as [c2' [m2' [mu' [INC [SEP [LAC [MC' [U2 [STEP' PROP]]]]]]]]].
   exists c2'. exists m2'. exists mu'. 
   split; try assumption. 
   split; try assumption. 
   split; try assumption.
-  (*split; try assumption.  *)
+  split; try assumption.  
   exists U2. intuition.
 Qed.
 
@@ -582,7 +582,7 @@ Section EFF_INJ_SIMULATION_PLUS.
 
       forall nu' ret1 m1' ret2 m2'
         (INC: extern_incr nu nu')  
-        (*SEP: sm_inject_separated nu nu' m1 m2*)
+        (SEP: sm_inject_separated nu nu' m1 m2)
 
         (WDnu': SM_wd nu') (SMvalNu': sm_valid nu' m1' m2')
 
@@ -618,7 +618,7 @@ Section EFF_INJ_SIMULATION_PLUS.
         match_states st1 mu st1 m1 st2 m2 ->
         exists st2', exists m2', exists mu',
           intern_incr mu mu' /\
-          (*sm_inject_separated mu mu' m1 m2 /\*)
+          sm_inject_separated mu mu' m1 m2 /\
           sm_locally_allocated mu mu' m1 m2 m1' m2' /\ 
 
           match_states st1' mu' st1' m1' st2' m2' /\
@@ -668,7 +668,7 @@ Section EFF_INJ_SIMULATION_PLUS_TYPED.
         (HasTy1: Val.has_type ret1 (proj_sig_res (AST.ef_sig e)))
         (HasTy2: Val.has_type ret2 (proj_sig_res (AST.ef_sig e')))
         (INC: extern_incr nu nu')  
-        (*SEP: sm_inject_separated nu nu' m1 m2*)
+        (SEP: sm_inject_separated nu nu' m1 m2)
 
         (WDnu': SM_wd nu') (SMvalNu': sm_valid nu' m1' m2')
 
@@ -704,7 +704,7 @@ Section EFF_INJ_SIMULATION_PLUS_TYPED.
         match_states st1 mu st1 m1 st2 m2 ->
         exists st2', exists m2', exists mu',
           intern_incr mu mu' /\
-          (*sm_inject_separated mu mu' m1 m2 /\*)
+          sm_inject_separated mu mu' m1 m2 /\
           sm_locally_allocated mu mu' m1 m2 m1' m2' /\ 
 
           match_states st1' mu' st1' m1' st2' m2' /\
@@ -1063,7 +1063,6 @@ destruct (joinD_Some _ _ _ _ _ I); clear I.
          assumption.
 Qed. 
 
-(*
 Lemma compose_sm_intern_separated:
       forall mu12 mu12' mu23 mu23' m1 m2 m3 
         (inc12: intern_incr mu12 mu12') 
@@ -1187,7 +1186,7 @@ split.
      eapply AsInj23. eassumption. eassumption.
 simpl.
   split. apply DomTgt12. apply Sep23.
-Qed.*)
+Qed.
 
 Lemma vis_compose_sm: forall mu nu, vis (compose_sm mu nu) = vis mu.
 Proof. intros. unfold vis. destruct mu; simpl. reflexivity. Qed.
