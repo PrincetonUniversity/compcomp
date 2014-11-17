@@ -61,6 +61,14 @@ Proof. intros m b Vb.
    unfold Mem.valid_block in Vb. simpl in Vb. exfalso. xomega.
 Qed.
 
+(* fID satisfies (fID .*. f) = f and it's pure *)  
+Definition filter_id (j:meminj): meminj:=
+  fun b =>
+    match j b with
+        | Some _ => Some (b, 0)
+        | None => None
+    end.
+
 Lemma initial_inject_split: forall j m1 m3 (Inj:Mem.inject j m1 m3),
   exists m2 j1 j2, j = compose_meminj j1 j2 /\
        Mem.inject j1 m1 m2 /\ Mem.inject j2 m2 m3 /\
@@ -76,9 +84,88 @@ Lemma initial_inject_split: forall j m1 m3 (Inj:Mem.inject j m1 m3),
                (exists m : positive,
                    b2 = (Mem.nextblock Mem.empty + m)%positive /\
                    compose_meminj j1 j2 (Mem.nextblock Mem.empty + m)%positive =
-                   Some (b3, ofs3))) /\ pure_composition j1 j2 m1 m2.
-Proof. intros.
-  destruct (EFFAX.interpolate_II_strongHeqMKI _ _ _ 
+                   Some (b3, ofs3))) (*/\ pure_composition j1 j2 m1 m2*).
+Proof. 
+  intros. 
+  rename j into l.
+  (* The constructions *)
+  remember (filter_id l) as j;
+  remember l as k;
+  remember m1 as m2.
+  
+  (*The proof *)
+  exists m2, j, k.
+  split.
+  { subst. unfold compose_meminj, filter_id.
+    extensionality b.
+    destruct (l b) eqn:lmap; trivial.
+    rewrite lmap. destruct p; auto. }
+  split.
+  (*Mem.inject j m2 m2*) (*Should be a stand alone lemma of filter_id *)
+  {constructor.
+   + { constructor.
+       + subst; intros.
+         unfold filter_id in H; destruct (l b1); try solve [inversion H].
+         inversion H; subst. replace (ofs + 0) with ofs by omega.
+         auto.
+       + subst; intros.
+         unfold filter_id in H; destruct (l b1); try solve [inversion H].
+         inversion H; subst. unfold Pos.divide; exists 0; omega. 
+       + subst; intros.
+         unfold filter_id in H; destruct (l b1); try solve [inversion H].
+         inversion H; subst. replace (ofs + 0) with ofs by omega.
+         destruct (ZMap.get ofs (Mem.mem_contents m1) !! b2) eqn:IDK; try constructor.
+         admit. }
+   + subst; intros. apply Inj in H. 
+     unfold filter_id. rewrite H; auto.
+   + subst; intros. destruct Inj.
+     destruct (valid_block_dec m1 b'); trivial.
+     apply mi_freeblocks in n. 
+     unfold filter_id in H; destruct (l b) eqn:lmap; try solve [inversion H].
+     inversion H; subst. rewrite n in lmap; inversion lmap.
+   + subst; intros.
+     unfold Mem.meminj_no_overlap, filter_id. intros.
+     destruct (l b1); inversion H0.
+     destruct (l b2); inversion H1.
+     subst. left; exact H.
+   + subst; intros. unfold filter_id in H. destruct (l b) eqn: lmap; inversion H.
+     subst. split; try omega. replace (Int.unsigned ofs + 0) with (Int.unsigned ofs) by omega.
+     apply Int.unsigned_range_2. }
+  split.
+  (*Mem.inject k m2 m3*)
+  { exact Inj. }
+  split.
+  {intros; subst. unfold compose_meminj, filter_id. 
+   destruct (l b1) eqn:lmap. 
+   + rewrite lmap. destruct p. split; intros.
+     - exists b1, 0; reflexivity.
+     - exists b, (0 + z); reflexivity.
+   + split; intros H; destruct H as [b3 [d H]]; inversion H.
+  }
+  split.
+  { intros. subst. unfold compose_meminj, filter_id. 
+    exists b2, d2; rewrite H, H. f_equal; omega. }
+  split.
+  { subst; intros.
+    unfold filter_id in H; destruct (l b1); try solve [inversion H].
+    inversion H; subst. auto. }
+  { intros; subst. 
+    unfold Mem.empty in *; simpl in *.
+    destruct (Pcompare b2 1%positive Eq) eqn:eqn.
+    + subst. destruct b2; try solve[inversion eqn].
+      right; left; split; auto; subst.
+      unfold compose_meminj, filter_id. rewrite H, H. f_equal; omega.
+    + destruct b2; inversion eqn. (*Impossible: b2 < 1 *)
+    + assert (Gtb: Pgt b2 1) by apply eqn.
+      right; right.
+      apply Pos.gt_iff_add in Gtb. destruct Gtb as [m b2eq].
+      exists m. split. 
+      - subst; auto.
+      - simpl in b2eq. rewrite b2eq.
+        unfold compose_meminj, filter_id.
+        rewrite H, H. f_equal; omega. }
+  (* OLD version*)
+  (*destruct (EFFAX.interpolate_II_strongHeqMKI _ _ _ 
      empty_inj _ (empty_fwd m1) _ _ empty_inj _ (empty_fwd m3) _ Inj)
   as [m2 [j1 [j2 [J [X [Y [Inc1 [Inc2 [Inj12 [_ [Inj23 AA]]]]]]]]]]].
 intros b; intros. 
@@ -95,7 +182,7 @@ subst. exists m2, j1, j2.
 split; trivial.
 split; trivial.
 split; trivial.
-destruct AA as [_ [Pure [_ [_ [XX YY]]]]].
+destruct AA as [_ (* [Pure*) [_ [_ [XX YY]]]].
 split. intros.
   split; intros. destruct H as [b3 [d COMP]].
     destruct (compose_meminjD_Some _ _ _ _ _ COMP) as
@@ -115,7 +202,8 @@ split. intros.
       destruct AA as [? [? ?]]; subst. intuition.
     destruct AA as [? [? ?]]; subst. intuition.
     destruct AA as [mm [[? ?] ?]]; subst. intuition.
-split; auto.
+    auto.
+    (*split; auto.*)*)
 Qed.
 
 Lemma compose_sm_sharedSrc mu12 mu23: forall
@@ -220,7 +308,7 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
            (forall b, pubBlocksTgt mu1 b = true -> pubBlocksSrc mu2 b = true) /\
            (forall b, frgnBlocksTgt mu1 b = true -> frgnBlocksSrc mu2 b = true)) /\ 
           match_core12 d1 mu1 c1 m1 c2 m2 /\ match_core23 d2 mu2 c2 m2 c3 m3 /\
-          pure_comp_ext mu1 mu2 m1 m2 /\ full_ext mu1 mu2
+          (*pure_comp_ext mu1 mu2 m1 m2 /\*) full_ext mu1 mu2
       end).
 { (*well_founded*)
   eapply wf_clos_trans. 
@@ -372,7 +460,7 @@ eqn: Xb; auto.
     (*assert (HT: Forall2 Val.has_type vals1 (sig_args sig)). 
       eapply forall_valinject_hastype; eassumption.*)
     destruct (initial_inject_split _ _ _ H0) 
-       as [m2 [j1 [j2 [J [Inj12 [Inj23 [X [Y [XX [YY Pure]]]]]]]]]].
+       as [m2 [j1 [j2 [J [Inj12 [Inj23 [X [Y [XX YY (*Pure*)]]]]]]]]].
     subst.
     destruct (forall_val_inject_split _ _ _ _ H1)
        as [vals2 [ValsInj12 ValsInj23]].
@@ -393,6 +481,7 @@ eqn: Xb; auto.
          destruct (XX _ _ _ J1); subst. trivial.
       destruct (XX _ _ _ H0); subst. trivial.
   assert (PG2: meminj_preserves_globals g2 j2).
+  {
     clear - XX YY X Y PG1 H2 genvs_dom_eq12.
     apply meminj_preserves_genv2blocks.
      apply meminj_preserves_genv2blocks in H2.
@@ -423,7 +512,7 @@ eqn: Xb; auto.
            destruct XX as [? ?]; subst.
              apply (CC _ _ _ H1 H4).
            destruct XX as [mm [? ?]]; subst.
-             apply (CC _ _ _ H1 H4).
+             apply (CC _ _ _ H1 H4). }
     destruct (core_initial12 _ _ _ _ _ vals2 _ 
        DomS (fun b => match j2 b with None => false
                       | Some (b3,d) => DomT b3 end) H Inj12)
@@ -493,11 +582,11 @@ eqn: Xb; auto.
   split; trivial.
   split; trivial.
   subst.
-  split.
-  
+
+  (*split.  
   (* PURE *)
   { unfold pure_comp_ext, pure_composition, pure_composition_locat, pure_composition_block, initial_SM; simpl. apply Pure.
-  }
+  }*)
   
   (* FULL *)
   { unfold full_ext, full_comp, initial_SM; simpl.
@@ -517,13 +606,14 @@ eqn: Xb; auto.
             match_sm_wd23 match_sm_valid23 effcore_diagram23.
    intros. rename st2 into st3. rename m2 into m3.
    destruct cd as [[d12 cc2] d23].
-   destruct H0 as [c2 [m2 [mu12 [mu23 [X [J [INV [MC12 [MC23 [pure full]]]]]]]]]]; subst.
-   eapply effcore_diagram_trans; eassumption. }
+   destruct H0 as [c2 [m2 [mu12 [mu23 [X [J [INV [MC12 [MC23 full]]]]]]]]]; subst.
+   eapply effcore_diagram_trans; eassumption.
+}
 { (*halted*)
   clear - match_sm_wd12 core_halted12 match_sm_wd23 core_halted23.
   intros. rename c2 into c3. rename m2 into m3.  
   destruct cd as [[d12 cc2] d23].
-  destruct H as [c2 [m2 [mu12 [mu23 [X [J [INV [MC12 [MC23 [pure full]]]]]]]]]]; subst.
+  destruct H as [c2 [m2 [mu12 [mu23 [X [J [INV [MC12 [MC23 full]]]]]]]]]; subst.
   destruct (core_halted12 _ _ _ _ _ _ _ MC12 H0) as
      [v2 [MInj12 [RValsInject12 HaltedMid]]]. 
   destruct (core_halted23 _ _ _ _ _ _ _ MC23 HaltedMid) as
@@ -545,7 +635,7 @@ eqn: Xb; auto.
   intros. rename c2 into c3. rename m2 into m3.
   rename H0 into AtExtSrc. 
   destruct cd as [[d12 cc2] d23]. 
-  destruct H as [st2 [m2 [mu12 [mu23 [Hst2 [HMu [GLUEINV [MC12 [MC23 [pure full]]]]]]]]]]. 
+  destruct H as [st2 [m2 [mu12 [mu23 [Hst2 [HMu [GLUEINV [MC12 [MC23 full]]]]]]]]]. 
   subst.
   destruct (core_at_external12 _ _ _ _ _ _ _ _ _ MC12 AtExtSrc)
     as [MInj12 [vals2 [ArgsInj12 [AtExt2 SH12]]]]; 
@@ -595,13 +685,13 @@ eqn: Xb; auto.
                      intros. do 2 (rewrite orb_true_iff in H1).
                              destruct H1. rewrite H1; trivial.
                              destruct H1. apply GlueF in H1. intuition. apply GlueP in H1. intuition. eauto.
-        (* PURE HERE *)
+       (* (* PURE HERE *)
         { clear - pure.
           unfold pure_comp_ext, pure_composition, pure_composition_locat, 
           pure_composition_block, replace_locals in *;
           destruct mu12, mu23; simpl in *.
           apply pure.
-        }
+        }*)
         (* Full here *)
         { unfold full_ext, full_comp, replace_locals; simpl.
           destruct mu12; destruct mu23; simpl.
@@ -651,7 +741,7 @@ eqn: Xb; auto.
           rename vals2 into vals3'. rename m2' into m3'.
           rename UnchLOOR into UnchLOOR13.
   destruct cd as [[d12 cc2] d23].
-  destruct MatchMu as [st2 [m2 [mu12 [mu23 [Hst2 [HMu [GLUEINV [MC12 [MC23 [pure full]]]]]]]]]].
+  destruct MatchMu as [st2 [m2 [mu12 [mu23 [Hst2 [HMu [GLUEINV [MC12 [MC23 full]]]]]]]]].
   assert (WDmu12:= match_sm_wd12 _ _ _ _ _ _ MC12).
   assert (WDmu23:= match_sm_wd23 _ _ _ _ _ _ MC23).
   remember (fun b => locBlocksSrc mu12 b || frgnBlocksSrc mu12 b || mapped (as_inj (compose_sm mu12 mu23)) b ) as RESTR.
@@ -879,7 +969,7 @@ eqn: Xb; auto.
      split. rewrite replace_locals_DOM. eapply mu23_valid.
      rewrite replace_locals_RNG. eapply mu23_valid.
   rewrite NU in INC(*, SEP*).
-  (*Discharge PURE HERE *)
+  (*(*Discharge PURE HERE *)
   assert (Pure: pure_comp_ext (replace_locals nmu12 pubSrc' pubTgtMid')
     (replace_locals mu23 pubSrcMid' pubTgt') m1 m2).
   { clear - pure.
@@ -887,13 +977,13 @@ eqn: Xb; auto.
     pure_composition_block, replace_locals, DomSrc, exportedSrc, sharedSrc, shared_of in *;
       destruct nmu12, mu23; simpl in *. 
     apply pure.
-  }
+  }*)
   destruct (EFFAX.effect_interp_II _ _ _ MinjNu12 _ FwdSrc
       _ _ MinjNu23 _ FwdTgt nu' WDnu' SMvalNu' MemInjNu'
-      INC Pure nu12_valid nu23_valid)
-     as [m2' [nu12' [nu23' [X [Incr12 [Incr23 [Pure' [MInj12'
+      INC (*Pure*) nu12_valid nu23_valid)
+     as [m2' [nu12' [nu23' [X [Incr12 [Incr23 (*[Pure'*) [MInj12'
         [Fwd2 [MInj23' [nu12'valid
-        [nu23'valid [GLUEINV' [full' [UnchMidA UnchMidB ]]]]]]]]]]]]]]]; simpl in *.
+        [nu23'valid [GLUEINV' [full' [UnchMidA UnchMidB ]]]]]]]]]]]]]]; simpl in *.
     (*discharge the unchOn application conditions*)
        subst; apply UnchPrivSrc.
        subst. apply UnchLOOR13. 
@@ -1144,13 +1234,13 @@ eqn: Xb; auto.
                             right. intuition.
                assumption.
    intuition.
-   (* PURE HERE *)
+   (*(* PURE HERE *)
    { clear - Pure'.
      unfold pure_comp_ext, pure_composition, pure_composition_locat, 
      pure_composition_block, replace_locals, DomSrc, exportedSrc, sharedSrc, shared_of in *;
        destruct nu12', nu23'; simpl in *. 
      apply Pure'.
-   }
+   }*)
    (* NORM HERE*)
    { unfold full_ext, full_comp, replace_externs; simpl.
      destruct nu12'; destruct nu23'; simpl.

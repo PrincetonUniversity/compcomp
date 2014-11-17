@@ -233,7 +233,7 @@ Lemma EFF_interp_II_strong:
          (SMvalNu' : sm_valid nu' m1' m3')
          (MemInjNu' : Mem.inject (as_inj nu') m1' m3')
          (ExtIncr: extern_incr (compose_sm nu12 nu23) nu')
-         (Pure: pure_comp_ext nu12 nu23 m1 m2)
+         (*Pure: pure_comp_ext nu12 nu23 m1 m2*)
          (SMV12: sm_valid nu12 m1 m2)
          (SMV23: sm_valid nu23 m2 m3)
          (UnchPrivSrc: Mem.unchanged_on 
@@ -252,7 +252,7 @@ Lemma EFF_interp_II_strong:
          (full: full_ext nu12 nu23),
   exists m2', exists nu12', exists nu23', nu'=compose_sm nu12' nu23' /\
                                           extern_incr nu12 nu12' /\ extern_incr nu23 nu23' /\
-                                          pure_comp_ext nu12' nu23' m1' m2' /\
+                                          (*pure_comp_ext nu12' nu23' m1' m2' /\*)
                                           Mem.inject (as_inj nu12') m1' m2' /\ mem_forward m2 m2' /\
                                           Mem.inject (as_inj nu23') m2' m3' /\
                                           sm_valid nu12' m1' m2' /\ sm_valid nu23' m2' m3' /\
@@ -482,7 +482,7 @@ Proof. intros.
                apply GlueInv in pubT12. rewrite pubT12 in H2; inversion H2.
        }
        
-       (* pure_comp_ext nu12' nu23' m1' m2 *)
+       (*(* pure_comp_ext nu12' nu23' m1' m2 *)
        assert (Pure': pure_comp_ext nu12' nu23' m1' m2').
        { unfold pure_comp_ext.
          subst nu12' nu23' m2'. rewrite ext_change_ext, ext_change_ext.
@@ -572,7 +572,7 @@ Proof. intros.
              unfold shiftT, filter_id. rewrite lmap'.
              replace (b2 - Mem.nextblock m2 + Mem.nextblock m2)%positive with b2; auto. 
              symmetry; apply Pos.sub_add. xomega.
-       }
+       }*)
        
        (* SM_wd 12 *)
        assert (SMWD12': SM_wd nu12').
@@ -676,9 +676,9 @@ Proof. intros.
        split.
        (* extern_incr23 *)
        { exact ExtIncr23. }
-       split.
+       (*split.
        (* pure compositoin *)
-       { exact Pure'. }
+       { exact Pure'. }*)
        split.
        (* Mem.inject 12*)
        { (* Prove no overlapping of nu12' first *)
@@ -2299,7 +2299,7 @@ Lemma EFF_interp_II: forall m1 m2 nu12
                              (MemInjNu' : Mem.inject (as_inj nu') m1' m3')
                              
                              (ExtIncr: extern_incr (compose_sm nu12 nu23) nu')
-                             (Pure: pure_comp_ext nu12 nu23 m1 m2)
+                             (*Pure: pure_comp_ext nu12 nu23 m1 m2*)
                              (SMV12: sm_valid nu12 m1 m2)
                              (SMV23: sm_valid nu23 m2 m3)
                              (UnchPrivSrc: Mem.unchanged_on (fun b ofs => locBlocksSrc (compose_sm nu12 nu23) b = true /\ 
@@ -2337,7 +2337,7 @@ Lemma EFF_interp_II: forall m1 m2 nu12
 Proof. intros.
   destruct (EFF_interp_II_strong _ _ _ MInj12 _ Fwd1 _ _ MInj23 _ 
               Fwd3 _ WDnu' SMvalNu' MemInjNu' ExtIncr
-              Pure SMV12 SMV23 UnchPrivSrc UnchLOOR13 GlueInvNu Norm12 full)
+              (*Pure*) SMV12 SMV23 UnchPrivSrc UnchLOOR13 GlueInvNu Norm12 full)
   as [m2' [nu12' [nu23' [A [B [C [D [E [F [G [H [I [J [K [L [M ]]]]]]]]]]]]]]]].
   exists m2', nu12', nu23'. intuition.
 Qed.

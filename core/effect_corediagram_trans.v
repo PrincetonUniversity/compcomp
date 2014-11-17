@@ -142,7 +142,7 @@ Lemma effcore_diagram_trans: forall
          frgnBlocksTgt mu12 b = true -> frgnBlocksSrc mu23 b = true))
   (MC12 : match_core12 d12 mu12 st1 m1 st2 m2)
   (MC23 : match_core23 d23 mu23 st2 m2 st3 m3)
-  (pure : pure_comp_ext mu12 mu23 m1 m2)
+  (*pure : pure_comp_ext mu12 mu23 m1 m2*)
   (full : full_ext mu12 mu23),
 exists
   (st2' : C3) (m2' : mem) (cd' : core_data12 * option C2 * core_data23) (mu' : SM_Injection),
@@ -162,7 +162,7 @@ exists
        frgnBlocksTgt mu1 b = true -> frgnBlocksSrc mu2 b = true)) /\
      match_core12 d1 mu1 st1' m1' c0 m0 /\ 
      match_core23 d2 mu2 c0 m0 st2' m2' /\
-      pure_comp_ext mu1 mu2 m1' m0 /\
+      (*pure_comp_ext mu1 mu2 m1' m0 /\*)
       full_ext mu1 mu2) /\
   (exists U3 : block -> Z -> bool,
      (effstep_plus Sem3 g3 U3 st3 m3 st2' m2' \/
@@ -245,7 +245,7 @@ Proof.
          split; trivial.
          split; assumption.
      do 3 (try split; try assumption).
-     { (*clear - pure InjIncr12 InjIncr23.*)
+     (*{ (*clear - pure InjIncr12 InjIncr23.*)
        unfold pure_comp_ext, pure_composition, pure_composition_locat, pure_composition_block, 
        replace_locals, DomSrc, exportedSrc, sharedSrc, shared_of,
        intern_incr in *;
@@ -258,7 +258,7 @@ Proof.
        split.
        + admit.
        + apply H0.
-     }
+     }*)
      (* Full HERE *)
      { apply intern_incr_extern in InjIncr12.
        apply intern_incr_extern in InjIncr23.
@@ -316,7 +316,7 @@ Proof.
   rewrite lBlocks2, eBlocks2 in *. 
   subst.
   clear MC12 InjIncr12 MC12' match_sm_wd12 match_validblock12. 
-  clear LocAlloc12 pure full.
+  clear LocAlloc12 (*pure*) full.
   clear st1 m1 st1' m1' (*UHyp*) MOD21.
   rewrite pubAlloc12' in *; clear pubAlloc12'.
   rewrite frgnAlloc12' in *; clear frgnAlloc12'.
@@ -517,7 +517,7 @@ Proof.
        assert (frgnBlocksTgt mu12 = frgnBlocksTgt mu12') by eapply InjIncr12.
               rewrite H0 in *; clear H0.
               apply INVd. trivial.
-    { clear - pure InjIncr12.
+    (*{ clear - pure InjIncr12.
        unfold pure_comp_ext, pure_composition, pure_composition_locat, pure_composition_block, 
        replace_locals, DomSrc, exportedSrc, sharedSrc, shared_of,
        intern_incr in *;
@@ -530,7 +530,7 @@ Proof.
        + intros.
          admit.
        + apply H0.
-     }
+     }*)
     (* Full HERE *)
     { apply intern_incr_extern in InjIncr12.
       unfold full_ext, full_comp.
