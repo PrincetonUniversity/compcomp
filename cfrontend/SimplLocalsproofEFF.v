@@ -43,9 +43,9 @@ Require Import effect_simulations_lemmas.
 Require Import BuiltinEffects.
 
 Require Export Axioms.
+Require Import val_casted.
 Require Import Clight_coop.
 Require Import Clight_eff.
-Require Import val_casted.
 
 Lemma blocks_of_bindingD: forall l b lo hi 
       (I: In (b,lo,hi) (map block_of_binding l)),
@@ -264,9 +264,9 @@ Record match_envs (*(f: meminj)*) mu (cenv: compilenv)
     me_inj:
       forall id1 b1 ty1 id2 b2 ty2, e!id1 = Some(b1, ty1) -> e!id2 = Some(b2, ty2) -> id1 <> id2 -> b1 <> b2;
     me_range:
-      forall id b ty, e!id = Some(b, ty) -> Ple lo b /\ Plt b hi;
+      forall id b ty, e!id = Some(b, ty) -> Ple lo b /\ Plt b hi /\ locBlocksSrc mu b =true;
     me_trange:
-      forall id b ty, te!id = Some(b, ty) -> Ple tlo b /\ Plt b thi;
+      forall id b ty, te!id = Some(b, ty) -> Ple tlo b /\ Plt b thi /\ locBlocksTgt mu b =true;
     me_mapped:
       forall id b' ty,
       te!id = Some(b', ty) -> exists b, restrict (as_inj mu) (vis mu) b = Some(b', 0) /\ e!id = Some(b, ty);
@@ -301,6 +301,7 @@ Proof.
   destruct ME; constructor; eauto. 
 (* vars *)
   intros. generalize (me_vars0 id); intros MV; inv MV.
+  destruct (me_range0 _ _ _ ENV) as [Rng1 [Rng2 Rng3]].
   eapply match_var_lifted; eauto.
   rewrite <- MAPPED; eauto.
   eapply val_inject_incr; try eassumption.
@@ -314,58 +315,30 @@ Proof.
   exists v'; split; eauto.
   eapply val_inject_incr; try eassumption.
    eapply intern_incr_restrict; eassumption. 
+(* range *)
+  intros. 
+  destruct (me_range0 _ _ _ H) as [Rng1 [Rng2 Rng3]].
+    eapply INCR in Rng3.
+    intuition. 
+(* trange *)
+  intros. 
+  destruct (me_trange0 _ _ _ H) as [Rng1 [Rng2 Rng3]].
+    eapply INCR in Rng3.
+    intuition. 
 (* mapped *)
-  intros. exploit me_mapped0; eauto. intros [b [A B]]. exists b; split; auto.
+  intros. 
+  exploit me_mapped0; eauto. intros [b [A B]]. 
+  exists b; split; auto.
    eapply intern_incr_restrict; eassumption.  
 (* flat *)
-  intros. eapply me_flat0; eauto. rewrite <- H0. symmetry. eapply INV2; eauto.
+  intros. eapply me_flat0; eauto. rewrite <- H0.
+  destruct (me_trange0 _ _ _ H) as [? [? ?]]. 
+  symmetry. eapply INV2; eauto.
   (*destruct (restrictD_Some _ _ _ _ _ H0); clear H0.
   rewrite (INV2 _ _ _ H1) in H1; eauto.
   apply (intern_incr_vis_inv _ _ WD WD' INCR _ _ _ H1) in H2.
   apply restrictI_Some; trivial.*)
 Qed.
-(*probably useless
-Lemma match_envs_extern_invariant:
-  forall mu cenv e le m lo hi te tle tlo thi mu' m',
-  match_envs mu cenv e le m lo hi te tle tlo thi ->
-  (forall b chunk v,
-    as_inj mu b = None -> Ple lo b /\ Plt b hi -> Mem.load chunk m b 0 = Some v -> Mem.load chunk m' b 0 = Some v) ->
-  extern_incr mu mu' ->
-  (forall b, Ple lo b /\ Plt b hi -> as_inj mu' b = as_inj mu b) ->
-  (forall b b' delta, as_inj mu' b = Some(b', delta) -> Ple tlo b' /\ Plt b' thi -> as_inj mu' b = as_inj mu b) ->
-  forall (WD: SM_wd mu) (WD': SM_wd mu'),
-  match_envs mu' cenv e le m' lo hi te tle tlo thi.
-Proof.
-  intros until m'; intros ME LD INCR INV1 INV2. 
-  destruct ME; constructor; eauto. 
-(* vars *)
-  intros. generalize (me_vars0 id); intros MV; inv MV.
-  eapply match_var_lifted; eauto.
-  rewrite <- MAPPED; eauto.
-  eapply val_inject_incr; try eassumption.
-   eapply extern_incr_restrict; eassumption.
-  assert (locBlocksSrc mu = locBlocksSrc mu') by eapply INCR.
-    rewrite <- H; trivial.
-  eapply match_var_not_lifted; eauto.
-    assert (LocMuMu': local_of mu = local_of mu') by eapply INCR.
-    rewrite LocMuMu' in *; trivial.
-  eapply match_var_not_local; eauto.
-(* temps *)
-  intros. exploit me_temps0; eauto. intros [[v' [A B]] C]. split; auto.
-  exists v'; split; eauto.
-  eapply val_inject_incr; try eassumption.
-   eapply extern_incr_restrict; eassumption. 
-(* mapped *)
-  intros. exploit me_mapped0; eauto. intros [b [A B]]. exists b; split; auto.
-   eapply extern_incr_restrict; eassumption.  
-(* flat *)
-  intros. eapply me_flat0; eauto. rewrite <- H0. symmetry. eapply INV2; eauto.
-  (*destruct (restrictD_Some _ _ _ _ _ H0); clear H0.
-  rewrite (INV2 _ _ _ H1) in H1; eauto.
-  rewrite (extern_incr_vis _ _ INCR).
-  apply restrictI_Some; trivial.*)
-Qed.
-*)
 
 Definition privBlocksSrc mu b := locBlocksSrc mu b && negb (pubBlocksSrc mu b).
 
@@ -375,73 +348,69 @@ Lemma match_envs_extern_invariantPriv:
   (forall b chunk v,
     privBlocksSrc mu b = true -> Ple lo b /\ Plt b hi -> Mem.load chunk m b 0 = Some v -> Mem.load chunk m' b 0 = Some v) ->
   extern_incr mu mu' ->
-  (forall b, Ple lo b /\ Plt b hi -> as_inj mu' b = as_inj mu b) ->
-  (forall b b' delta, as_inj mu' b = Some(b', delta) -> Ple tlo b' /\ Plt b' thi -> as_inj mu' b = as_inj mu b) ->
   forall (WD: SM_wd mu) (WD': SM_wd mu'),
   match_envs mu' cenv e le m' lo hi te tle tlo thi.
 Proof.
-  intros until m'; intros ME LD INCR INV1 INV2. 
+  intros until m'; intros ME LD INCR (*INV1 INV2*). 
   destruct ME; constructor; eauto. 
 (* vars *)
   intros. generalize (me_vars0 id); intros MV; inv MV.
+  destruct (me_range0 _ _ _ ENV) as [Rng1 [Rng2 Rng3]].
   eapply match_var_lifted; try eassumption.
-     rewrite INV1; eauto.
-     eapply LD; eauto.
-       unfold privBlocksSrc; rewrite LBS; simpl.
-       remember (pubBlocksSrc mu b) as p; apply eq_sym in Heqp.
-       destruct p; trivial.
-       destruct (pubSrcAx _ WD _ Heqp) as [bb [z [LOC PP]]].
-         apply local_in_all in LOC; trivial. congruence.
+    remember (as_inj mu' b) as d; apply eq_sym in Heqd. 
+      destruct d; trivial. 
+      destruct p.
+      rewrite (extern_incr_locBlocksSrc _ _ INCR) in Rng3.
+      destruct (joinD_Some _ _ _ _ _ Heqd) as [EXT' | [EXT' LOC']].
+        assert (LocBF: locBlocksSrc mu' b = false).
+          eapply extern_DomRng'; eassumption.
+        rewrite LocBF in Rng3; discriminate.
+      rewrite <- (extern_incr_local _ _ INCR) in LOC'.
+        apply local_in_all in LOC'; trivial.
+        rewrite LOC' in MAPPED. discriminate.  
+    eapply LD; eauto.
+      unfold privBlocksSrc; rewrite LBS; simpl.
+      remember (pubBlocksSrc mu b) as p; apply eq_sym in Heqp.
+      destruct p; trivial.
+      destruct (pubSrcAx _ WD _ Heqp) as [bb [z [LOC PP]]].
+        apply local_in_all in LOC; trivial. congruence.
   eapply val_inject_incr; try eassumption.
    eapply extern_incr_restrict; eassumption.
-  assert (locBlocksSrc mu = locBlocksSrc mu') by eapply INCR.
-    rewrite <- H; trivial.
+  rewrite <- (extern_incr_locBlocksSrc _ _ INCR); trivial. 
   eapply match_var_not_lifted; eauto.
-    assert (LocMuMu': local_of mu = local_of mu') by eapply INCR.
-    rewrite LocMuMu' in *; trivial.
+    rewrite <- (extern_incr_local _ _ INCR); trivial.
   eapply match_var_not_local; eauto.
 (* temps *)
   intros. exploit me_temps0; eauto. intros [[v' [A B]] C]. split; auto.
   exists v'; split; eauto.
   eapply val_inject_incr; try eassumption.
-   eapply extern_incr_restrict; eassumption. 
+   eapply extern_incr_restrict; eassumption.  
+(* range *)
+  intros. 
+  destruct (me_range0 _ _ _ H) as [Rng1 [Rng2 Rng3]].
+    rewrite (extern_incr_locBlocksSrc _ _ INCR) in Rng3.
+    intuition. 
+(* trange *)
+  intros. 
+  destruct (me_trange0 _ _ _ H) as [Rng1 [Rng2 Rng3]].
+    rewrite (extern_incr_locBlocksTgt _ _ INCR) in Rng3.
+    intuition. 
 (* mapped *)
-  intros. exploit me_mapped0; eauto. intros [b [A B]]. exists b; split; auto.
+  intros. exploit me_mapped0; eauto. intros [b [A B]].
+   exists b; split; auto.
    eapply extern_incr_restrict; eassumption.  
 (* flat *)
-  intros. eapply me_flat0; eauto. rewrite <- H0. symmetry. eapply INV2; eauto.
-  (*destruct (restrictD_Some _ _ _ _ _ H0); clear H0.
-  rewrite (INV2 _ _ _ H1) in H1; eauto.
-  rewrite (extern_incr_vis _ _ INCR).
-  apply restrictI_Some; trivial.*)
+  intros. eapply me_flat0; eauto. rewrite <- H0.
+  destruct (me_trange0 _ _ _ H) as [Rng1 [Rng2 Rng3]]. 
+  rewrite H0.
+  rewrite (extern_incr_locBlocksTgt _ _ INCR) in Rng3.
+  destruct (joinD_Some _ _ _ _ _ H0) as [EXT' | [EXT' LOC']]; clear H0.
+    assert (LocBF: locBlocksTgt mu' b' = false).
+      eapply extern_DomRng'; eassumption.
+    rewrite LocBF in Rng3; discriminate.
+      rewrite <- (extern_incr_local _ _ INCR) in LOC'.
+        apply local_in_all in LOC'; trivial.
 Qed.
-(*WAS:
-Lemma match_envs_invariant:
-  forall f cenv e le m lo hi te tle tlo thi f' m',
-  match_envs f cenv e le m lo hi te tle tlo thi ->
-  (forall b chunk v,
-    f b = None -> Ple lo b /\ Plt b hi -> Mem.load chunk m b 0 = Some v -> Mem.load chunk m' b 0 = Some v) ->
-  inject_incr f f' ->
-  (forall b, Ple lo b /\ Plt b hi -> f' b = f b) ->
-  (forall b b' delta, f' b = Some(b', delta) -> Ple tlo b' /\ Plt b' thi -> f' b = f b) ->
-  match_envs f' cenv e le m' lo hi te tle tlo thi.
-Proof.
-  intros until m'; intros ME LD INCR INV1 INV2. 
-  destruct ME; constructor; eauto. 
-(* vars *)
-  intros. generalize (me_vars0 id); intros MV; inv MV.
-  eapply match_var_lifted; eauto.
-  rewrite <- MAPPED; eauto. 
-  eapply match_var_not_lifted; eauto.
-  eapply match_var_not_local; eauto.
-(* temps *)
-  intros. exploit me_temps0; eauto. intros [[v' [A B]] C]. split; auto. exists v'; eauto. 
-(* mapped *)
-  intros. exploit me_mapped0; eauto. intros [b [A B]]. exists b; split; auto.  
-(* flat *)
-  intros. eapply me_flat0; eauto. rewrite <- H0. symmetry. eapply INV2; eauto.
-Qed.
-*)
 
 (** Invariance by external call *)
 (*Probably useless
@@ -471,28 +440,19 @@ Proof.
 Qed.
 *)
 Lemma match_envs_extcallPriv:
-  forall mu cenv e le m lo hi te tle tlo thi tm mu' m',
+  forall mu cenv e le m lo hi te tle tlo thi (*tm*) mu' m',
   match_envs mu cenv e le m lo hi te tle tlo thi ->
   Mem.unchanged_on (fun b ofs => privBlocksSrc mu b = true) m m' ->
   extern_incr mu mu' ->
-  sm_inject_separated mu mu' m tm ->
-  Ple hi (Mem.nextblock m) -> Ple thi (Mem.nextblock tm) ->
+(*  sm_inject_separated mu mu' m tm ->*)
+(*  Ple hi (Mem.nextblock m) -> Ple thi (Mem.nextblock tm) ->*)
   forall (WD: SM_wd mu) (WD': SM_wd mu'),
   match_envs mu' cenv e le m' lo hi te tle tlo thi.
 Proof.
   intros. 
-  apply sm_inject_separated_mem in H2; trivial. 
+(*  apply sm_inject_separated_mem in H2; trivial. *)
   eapply match_envs_extern_invariantPriv; eauto. 
   intros. eapply Mem.load_unchanged_on; eauto.
-  red in H2. intros. destruct (as_inj mu b) as [[b' delta]|] eqn:?. 
-  eapply (extern_incr_as_inj _ _ H1); eauto.
-  destruct (as_inj mu' b) as [[b' delta]|] eqn:?; auto.
-  exploit H2; eauto. unfold Mem.valid_block. intros [A B].
-  xomegaContradiction.
-  apply extern_incr_as_inj in H1; trivial.
-  intros. destruct (as_inj mu b) as [[b'' delta']|] eqn:?. eauto. 
-  exploit H2; eauto. unfold Mem.valid_block. intros [A B].
-  xomegaContradiction.
 Qed.
 
 (** Correctness of [make_cast] *)
@@ -537,6 +497,7 @@ Proof.
   constructor; eauto; intros.
 (* vars *)
   destruct (peq id0 id). subst id0.
+  destruct (me_range0 _ _ _ ENV) as [Rng1 [Rng2 Rng3]].
   eapply match_var_lifted with (v := v); eauto. 
   exploit Mem.load_store_same; eauto. erewrite val_casted_load_result; eauto.
   apply PTree.gss. 
@@ -552,39 +513,7 @@ Proof.
   subst id0. exists tv; split; auto. rewrite C; auto.
   exists tv1; auto.
 Qed.
-(*WAS:
-Lemma match_envs_assign_lifted:
-  forall f cenv e le m lo hi te tle tlo thi b ty v m' id tv,
-  match_envs f cenv e le m lo hi te tle tlo thi ->
-  e!id = Some(b, ty) ->
-  val_casted v ty ->
-  val_inject f v tv ->
-  assign_loc ty m b Int.zero v m' ->
-  VSet.mem id cenv = true ->
-  match_envs f cenv e le m' lo hi te (PTree.set id tv tle) tlo thi.
-Proof.
-  intros. destruct H. generalize (me_vars0 id); intros MV; inv MV; try congruence.
-  rewrite ENV in H0; inv H0. inv H3; try congruence.
-  unfold Mem.storev in H0. rewrite Int.unsigned_zero in H0.
-  constructor; eauto; intros.
-(* vars *)
-  destruct (peq id0 id). subst id0.
-  eapply match_var_lifted with (v := v); eauto. 
-  exploit Mem.load_store_same; eauto. erewrite val_casted_load_result; eauto.
-  apply PTree.gss. 
-  generalize (me_vars0 id0); intros MV; inv MV.
-  eapply match_var_lifted; eauto.
-  rewrite <- LOAD0. eapply Mem.load_store_other; eauto. 
-  rewrite PTree.gso; auto.
-  eapply match_var_not_lifted; eauto. 
-  eapply match_var_not_local; eauto.
-(* temps *)
-  exploit me_temps0; eauto. intros [[tv1 [A B]] C]. split; auto.
-  rewrite PTree.gsspec. destruct (peq id0 id). 
-  subst id0. exists tv; split; auto. rewrite C; auto.
-  exists tv1; auto.
-Qed.
-*)
+
 (** Preservation by assignment to a temporary *)
 
 Lemma match_envs_set_temp:
@@ -607,27 +536,6 @@ Proof.
   inv H. split. exists tv; auto. intros; congruence.
   eapply me_temps0; eauto. 
 Qed.
-(*Lemma match_envs_set_temp:
-  forall f cenv e le m lo hi te tle tlo thi id v tv x,
-  match_envs f cenv e le m lo hi te tle tlo thi ->
-  val_inject f v tv ->
-  check_temp cenv id = OK x ->
-  match_envs f cenv e (PTree.set id v le) m lo hi te (PTree.set id tv tle) tlo thi.
-Proof.
-  intros. unfold check_temp in H1. 
-  destruct (VSet.mem id cenv) eqn:?; monadInv H1.
-  destruct H. constructor; eauto; intros.
-(* vars *)
-  generalize (me_vars0 id0); intros MV; inv MV.
-  eapply match_var_lifted; eauto. rewrite PTree.gso. eauto. congruence.
-  eapply match_var_not_lifted; eauto. 
-  eapply match_var_not_local; eauto. 
-(* temps *)
-  rewrite PTree.gsspec in *. destruct (peq id0 id). 
-  inv H. split. exists tv; auto. intros; congruence.
-  eapply me_temps0; eauto. 
-Qed.
-*)
 
 Lemma match_envs_set_opttemp:
   forall mu cenv e le m lo hi te tle tlo thi optid v tv x,
@@ -640,18 +548,6 @@ Proof.
   eapply match_envs_set_temp; eauto.
   auto.
 Qed.
-(*WAS:
-Lemma match_envs_set_opttemp:
-  forall f cenv e le m lo hi te tle tlo thi optid v tv x,
-  match_envs f cenv e le m lo hi te tle tlo thi ->
-  val_inject f v tv ->
-  check_opttemp cenv optid = OK x ->
-  match_envs f cenv e (set_opttemp optid v le) m lo hi te (set_opttemp optid tv tle) tlo thi.
-Proof.
-  intros. unfold set_opttemp. destruct optid; simpl in H1.
-  eapply match_envs_set_temp; eauto.
-  auto.
-Qed.*)
 
 (** Extensionality with respect to temporaries *)
 
@@ -670,22 +566,6 @@ Proof.
   (* temps *)
   rewrite H0. eauto.
 Qed.
-(*WAS:
-Lemma match_envs_temps_exten:
-  forall f cenv e le m lo hi te tle tlo thi tle',
-  match_envs f cenv e le m lo hi te tle tlo thi ->
-  (forall id, tle'!id = tle!id) ->
-  match_envs f cenv e le m lo hi te tle' tlo thi.
-Proof.
-  intros. destruct H. constructor; auto; intros.
-  (* vars *)
-  generalize (me_vars0 id); intros MV; inv MV.
-  eapply match_var_lifted; eauto. rewrite H0; auto.
-  eapply match_var_not_lifted; eauto.
-  eapply match_var_not_local; eauto.
-  (* temps *)
-  rewrite H0. eauto.
-Qed.*)
 
 (** Invariance by assignment to an irrelevant temporary *)
 
@@ -704,22 +584,6 @@ Proof.
   (* temps *)
   rewrite PTree.gso. eauto. congruence.
 Qed.
-(*WAS:
-Lemma match_envs_change_temp:
-  forall f cenv e le m lo hi te tle tlo thi id v,
-  match_envs f cenv e le m lo hi te tle tlo thi ->
-  le!id = None -> VSet.mem id cenv = false ->
-  match_envs f cenv e le m lo hi te (PTree.set id v tle) tlo thi.
-Proof.
-  intros. destruct H. constructor; auto; intros.
-  (* vars *)
-  generalize (me_vars0 id0); intros MV; inv MV.
-  eapply match_var_lifted; eauto. rewrite PTree.gso; auto. congruence. 
-  eapply match_var_not_lifted; eauto.
-  eapply match_var_not_local; eauto.
-  (* temps *)
-  rewrite PTree.gso. eauto. congruence.
-Qed.*)
 
 (** Properties of [cenv_for]. *)
 
@@ -1202,113 +1066,6 @@ Proof.
   apply alloc_variables_forward in J.
   eapply sm_locally_allocated_trans; try eassumption.
 Qed.
-(*WAS: Lemma match_alloc_variables:
-  forall cenv e m vars e' m',
-  alloc_variables e m vars e' m' ->
-  forall j tm te,
-  list_norepet (var_names vars) ->
-  Mem.inject j m tm ->
-  exists j', exists te', exists tm',
-      alloc_variables te tm (remove_lifted cenv vars) te' tm'
-  /\ Mem.inject j' m' tm'
-  /\ inject_incr j j'
-  /\ (forall b, Mem.valid_block m b -> j' b = j b)
-  /\ (forall b b' delta, j' b = Some(b', delta) -> Mem.valid_block tm b' -> j' b = j b)
-  /\ (forall b b' delta, j' b = Some(b', delta) -> ~Mem.valid_block tm b' -> 
-         exists id, exists ty, e'!id = Some(b, ty) /\ te'!id = Some(b', ty) /\ delta = 0)
-  /\ (forall id ty, In (id, ty) vars ->
-      exists b, 
-          e'!id = Some(b, ty)
-       /\ if VSet.mem id cenv
-          then te'!id = te!id /\ j' b = None
-          else exists tb, te'!id = Some(tb, ty) /\ j' b = Some(tb, 0))
-  /\ (forall id, ~In id (var_names vars) -> e'!id = e!id /\ te'!id = te!id).
-Proof.
-  induction 1; intros.
-  (* base case *)
-  exists j; exists te; exists tm. simpl.
-  split. constructor.
-  split. auto. split. auto. split. auto.  split. auto. 
-  split. intros. elim H2. eapply Mem.mi_mappedblocks; eauto.
-  split. tauto. auto. 
-  
-  (* inductive case *)
-  simpl in H1. inv H1. simpl.
-  destruct (VSet.mem id cenv) eqn:?. simpl.
-  (* variable is lifted out of memory *)
-  exploit Mem.alloc_left_unmapped_inject; eauto. 
-  intros [j1 [A [B [C D]]]].
-  exploit IHalloc_variables; eauto. instantiate (1 := te).
-  intros [j' [te' [tm' [J [K [L [M [N [Q [O P]]]]]]]]]].
-  exists j'; exists te'; exists tm'.
-  split. auto.
-  split. auto.
-  split. eapply inject_incr_trans; eauto. 
-  split. intros. transitivity (j1 b). apply M. eapply Mem.valid_block_alloc; eauto. 
-    apply D. apply Mem.valid_not_valid_diff with m; auto. eapply Mem.fresh_block_alloc; eauto. 
-  split. intros. transitivity (j1 b). eapply N; eauto.
-    destruct (eq_block b b1); auto. subst. 
-    assert (j' b1 = j1 b1). apply M. eapply Mem.valid_new_block; eauto. 
-    congruence.
-  split. exact Q.  
-  split. intros. destruct (ident_eq id0 id).
-    (* same var *)
-    subst id0.
-    assert (ty0 = ty).
-      destruct H1. congruence. elim H5. unfold var_names. change id with (fst (id, ty0)). apply in_map; auto.
-    subst ty0. 
-    exploit P; eauto. intros [X Y]. rewrite Heqb. rewrite X. rewrite Y. 
-    exists b1. split. apply PTree.gss.
-    split. auto.
-    rewrite M. auto. eapply Mem.valid_new_block; eauto. 
-    (* other vars *)
-    eapply O; eauto. destruct H1. congruence. auto. 
-  intros. exploit (P id0). tauto. intros [X Y]. rewrite X; rewrite Y. 
-    split; auto. apply PTree.gso. intuition. 
-
-  (* variable is not lifted out of memory *)
-  exploit Mem.alloc_parallel_inject.
-    eauto. eauto. apply Zle_refl. apply Zle_refl. 
-  intros [j1 [tm1 [tb1 [A [B [C [D E]]]]]]].
-  exploit IHalloc_variables; eauto. instantiate (1 := PTree.set id (tb1, ty) te). 
-  intros [j' [te' [tm' [J [K [L [M [N [Q [O P]]]]]]]]]].
-  exists j'; exists te'; exists tm'.
-  split. simpl. econstructor; eauto.
-  split. auto.
-  split. eapply inject_incr_trans; eauto. 
-  split. intros. transitivity (j1 b). apply M. eapply Mem.valid_block_alloc; eauto. 
-    apply E. apply Mem.valid_not_valid_diff with m; auto. eapply Mem.fresh_block_alloc; eauto. 
-  split. intros. transitivity (j1 b). eapply N; eauto. eapply Mem.valid_block_alloc; eauto. 
-    destruct (eq_block b b1); auto. subst. 
-    assert (j' b1 = j1 b1). apply M. eapply Mem.valid_new_block; eauto.
-    rewrite H4 in H1. rewrite D in H1. inv H1. eelim Mem.fresh_block_alloc; eauto.
-  split. intros. destruct (eq_block b' tb1). 
-    subst b'. rewrite (N _ _ _ H1) in H1.
-    destruct (eq_block b b1). subst b. rewrite D in H1; inv H1. 
-    exploit (P id); auto. intros [X Y]. exists id; exists ty.
-    rewrite X; rewrite Y. repeat rewrite PTree.gss. auto.
-    rewrite E in H1; auto. elim H3. eapply Mem.mi_mappedblocks; eauto. 
-    eapply Mem.valid_new_block; eauto.
-    eapply Q; eauto. unfold Mem.valid_block in *.
-    exploit Mem.nextblock_alloc. eexact A. exploit Mem.alloc_result. eexact A. 
-    unfold block; xomega.
-  split. intros. destruct (ident_eq id0 id).
-    (* same var *)
-    subst id0.
-    assert (ty0 = ty).
-      destruct H1. congruence. elim H5. unfold var_names. change id with (fst (id, ty0)). apply in_map; auto.
-    subst ty0. 
-    exploit P; eauto. intros [X Y]. rewrite Heqb. rewrite X. rewrite Y. 
-    exists b1. split. apply PTree.gss.
-    exists tb1; split. 
-    apply PTree.gss.
-    rewrite M. auto. eapply Mem.valid_new_block; eauto. 
-    (* other vars *)
-    exploit (O id0 ty0). destruct H1. congruence. auto. 
-    rewrite PTree.gso; auto.
-  intros. exploit (P id0). tauto. intros [X Y]. rewrite X; rewrite Y.
-    split; apply PTree.gso; intuition.
-Qed.*)
 
 Lemma alloc_variables_load:
   forall e m vars e' m',
@@ -1540,11 +1297,33 @@ Proof.
 
   (* range *)
   exploit alloc_variables_range. eexact H. eauto. 
-  rewrite PTree.gempty. intuition congruence.
+  rewrite PTree.gempty. intros [X | [M M']]. discriminate. 
+  destruct (in_dec peq id (var_names vars)). 
+    unfold var_names in i. apply in_map_iff in i. 
+    destruct i as [[i t] [I IN]]. subst id. 
+    destruct (F _ _ IN) as [bb [? [? _]]]. simpl in H4.
+    rewrite H4 in H5. inv H5. intuition. 
+  destruct (G _ n).
+    rewrite H4 in H5. 
+    rewrite PTree.gempty in H5. congruence. 
 
   (* trange *)
   exploit alloc_variables_range. eexact A. eauto. 
-  rewrite PTree.gempty. intuition congruence.
+  rewrite PTree.gempty. intros [X | [TM TM']]. discriminate.
+  destruct (in_dec peq id (var_names vars)). 
+    unfold var_names in i. apply in_map_iff in i. 
+    destruct i as [[i t] [I IN]]. subst id. simpl in H4.
+    destruct (F _ _ IN) as [bb [? [? ?]]]. 
+    destruct (VSet.mem i cenv). 
+      destruct H7. rewrite H4 in H7; inv H7.
+      rewrite PTree.gempty in H10. congruence. 
+    destruct H7 as [tb [TEi AI']].
+      rewrite H4 in TEi; inv TEi.
+      rewrite (as_inj_locBlocks _ _ _ _ WD' AI') in H6.
+      intuition.      
+  destruct (G _ n).
+    rewrite H4 in H6. 
+    rewrite PTree.gempty in H6. congruence.   
 
   (* mapped *)
   destruct (In_dec ident_eq id (var_names vars)).
@@ -1586,102 +1365,6 @@ Proof.
 
   intuition.
 Qed.
-(*WAS: 
-Theorem match_envs_alloc_variables:
-  forall cenv m vars e m' temps j tm,
-  alloc_variables empty_env m vars e m' ->
-  list_norepet (var_names vars) ->
-  Mem.inject j m tm ->
-  (forall id ty, In (id, ty) vars -> VSet.mem id cenv = true ->
-                     exists chunk, access_mode ty = By_value chunk) ->
-  (forall id, VSet.mem id cenv = true -> In id (var_names vars)) ->
-  exists j', exists te, exists tm',
-     alloc_variables empty_env tm (remove_lifted cenv vars) te tm'
-  /\ match_envs j' cenv e (create_undef_temps temps) m' (Mem.nextblock m) (Mem.nextblock m')
-                        te (create_undef_temps (add_lifted cenv vars temps)) (Mem.nextblock tm) (Mem.nextblock tm')
-  /\ Mem.inject j' m' tm'
-  /\ inject_incr j j'
-  /\ (forall b, Mem.valid_block m b -> j' b = j b)
-  /\ (forall b b' delta, j' b = Some(b', delta) -> Mem.valid_block tm b' -> j' b = j b).
-Proof.
-  intros. 
-  exploit (match_alloc_variables cenv); eauto. instantiate (1 := empty_env). 
-  intros [j' [te [tm' [A [B [C [D [E [K [F G]]]]]]]]]]. 
-  exists j'; exists te; exists tm'.
-  split. auto. split; auto.
-  constructor; intros.
-  (* vars *)
-  destruct (In_dec ident_eq id (var_names vars)).
-  unfold var_names in i. exploit list_in_map_inv; eauto.
-  intros [[id' ty] [EQ IN]]; simpl in EQ; subst id'.
-  exploit F; eauto. intros [b [P R]]. 
-  destruct (VSet.mem id cenv) eqn:?.
-  (* local var, lifted *)
-  destruct R as [U V]. exploit H2; eauto. intros [chunk X]. 
-  eapply match_var_lifted with (v := Vundef) (tv := Vundef); eauto.
-  rewrite U; apply PTree.gempty.
-  eapply alloc_variables_initial_value; eauto. 
-  red. unfold empty_env; intros. rewrite PTree.gempty in H4; congruence.
-  apply create_undef_temps_charact with ty. 
-  unfold add_lifted. apply in_or_app. left.
-  rewrite filter_In. auto.
-  (* local var, not lifted *)
-  destruct R as [tb [U V]].
-  eapply match_var_not_lifted; eauto. 
-  (* non-local var *)
-  exploit G; eauto. unfold empty_env. rewrite PTree.gempty. intros [U V].
-  eapply match_var_not_local; eauto. 
-  destruct (VSet.mem id cenv) eqn:?; auto.
-  elim n; eauto.
-
-  (* temps *)
-  exploit create_undef_temps_inv; eauto. intros [P Q]. subst v.
-  unfold var_names in Q. exploit list_in_map_inv; eauto. 
-  intros [[id1 ty] [EQ IN]]; simpl in EQ; subst id1. 
-  split; auto. exists Vundef; split; auto. 
-  apply create_undef_temps_charact with ty. unfold add_lifted. 
-  apply in_or_app; auto.
-
-  (* injective *)
-  eapply alloc_variables_injective. eexact H. 
-  rewrite PTree.gempty. congruence.
-  intros. rewrite PTree.gempty in H7. congruence.
-  eauto. eauto. auto. 
-
-  (* range *)
-  exploit alloc_variables_range. eexact H. eauto. 
-  rewrite PTree.gempty. intuition congruence.
-
-  (* trange *)
-  exploit alloc_variables_range. eexact A. eauto. 
-  rewrite PTree.gempty. intuition congruence.
-
-  (* mapped *)
-  destruct (In_dec ident_eq id (var_names vars)).
-  unfold var_names in i. exploit list_in_map_inv; eauto. 
-  intros [[id' ty'] [EQ IN]]; simpl in EQ; subst id'.
-  exploit F; eauto. intros [b [P Q]].
-  destruct (VSet.mem id cenv). 
-  rewrite PTree.gempty in Q. destruct Q; congruence.
-  destruct Q as [tb [U V]]. exists b; split; congruence.
-  exploit G; eauto. rewrite PTree.gempty. intuition congruence.
-
-  (* flat *)
-  exploit alloc_variables_range. eexact A. eauto. 
-  rewrite PTree.gempty. intros [P|P]. congruence. 
-  exploit K; eauto. unfold Mem.valid_block. xomega. 
-  intros [id0 [ty0 [U [V W]]]]. split; auto. 
-  destruct (ident_eq id id0). congruence.
-  assert (b' <> b').
-  eapply alloc_variables_injective with (e' := te) (id1 := id) (id2 := id0); eauto.
-  rewrite PTree.gempty; congruence. 
-  intros until ty1; rewrite PTree.gempty; congruence.
-  congruence.
-
-  (* incr *)
-  eapply alloc_variables_nextblock; eauto.
-  eapply alloc_variables_nextblock; eauto.
-Qed.*)
 
 Lemma assign_loc_inject:
   forall f ty m loc ofs v m' tm loc' ofs' v',
@@ -1969,74 +1652,6 @@ Proof.
       elim n. apply (HH _ z). rewrite <- Heqq. intuition.
     subst. rewrite <- Heqd. simpl. trivial.*)
 Qed.
-(*WAS:Theorem store_params_correct:
-  forall j f k cenv le lo hi te tlo thi e m params args m',
-  bind_parameters e m params args m' ->
-  forall s tm tle1 tle2 targs,
-  list_norepet (var_names params) ->
-  list_forall2 val_casted args (map snd params) ->
-  val_list_inject j args targs ->
-  match_envs j cenv e le m lo hi te tle1 tlo thi ->
-  Mem.inject j m tm ->
-  (forall id, ~In id (var_names params) -> tle2!id = tle1!id) ->
-  (forall id, In id (var_names params) -> le!id = None) ->
-  exists tle, exists tm',
-  star step2 tge (State f (store_params cenv params s) k te tle tm)
-             E0 (State f s k te tle tm')
-  /\ bind_parameter_temps params targs tle2 = Some tle
-  /\ Mem.inject j m' tm'
-  /\ match_envs j cenv e le m' lo hi te tle tlo thi
-  /\ Mem.nextblock tm' = Mem.nextblock tm.
-Proof.
-  induction 1; simpl; intros until targs; intros NOREPET CASTED VINJ MENV MINJ TLE LE.
-  (* base case *)
-  inv VINJ. exists tle2; exists tm; split. apply star_refl. split. auto. split. auto.
-  split. apply match_envs_temps_exten with tle1; auto. auto.
-  (* inductive case *)
-  inv NOREPET. inv CASTED. inv VINJ.
-  exploit me_vars; eauto. instantiate (1 := id); intros MV.
-  destruct (VSet.mem id cenv) eqn:?.
-  (* lifted to temp *)
-  eapply IHbind_parameters with (tle1 := PTree.set id v' tle1); eauto.
-  eapply match_envs_assign_lifted; eauto. 
-  inv MV; try congruence. rewrite ENV in H; inv H.
-  inv H0; try congruence.
-  unfold Mem.storev in H2. eapply Mem.store_unmapped_inject; eauto.
-  intros. repeat rewrite PTree.gsspec. destruct (peq id0 id). auto.
-  apply TLE. intuition. 
-  (* still in memory *)
-  inv MV; try congruence. rewrite ENV in H; inv H.
-  exploit assign_loc_inject; eauto. 
-  intros [tm1 [A [B C]]].
-  exploit IHbind_parameters. eauto. eauto. eauto.
-  instantiate (1 := PTree.set id v' tle1).
-  apply match_envs_change_temp.  
-  eapply match_envs_invariant; eauto.
-  apply LE; auto. auto.
-  eauto.
-  instantiate (1 := PTree.set id v' tle2). 
-  intros. repeat rewrite PTree.gsspec. destruct (peq id0 id). auto.
-  apply TLE. intuition.
-  intros. apply LE. auto.
-  instantiate (1 := s). 
-  intros [tle [tm' [U [V [X [Y Z]]]]]].
-  exists tle; exists tm'; split.
-  eapply star_trans.
-  eapply star_left. econstructor.
-  eapply star_left. econstructor. 
-    eapply eval_Evar_local. eauto. 
-    eapply eval_Etempvar. erewrite bind_parameter_temps_inv; eauto.
-    apply PTree.gss. 
-    simpl. instantiate (1 := v'). apply cast_val_casted.
-    eapply val_casted_inject with (v := v1); eauto.
-    simpl. eexact A. 
-  apply star_one. constructor.
-  reflexivity. reflexivity. 
-  eexact U. 
-  traceEq.
-  rewrite (assign_loc_nextblock _ _ _ _ _ _ A) in Z. auto. 
-Qed.
-*)
 
 Lemma bind_parameters_load:
   forall e chunk b ofs,
@@ -2134,7 +1749,6 @@ Theorem match_envs_free_blocks:
   match_envs mu cenv e le m lo hi te tle tlo thi ->
   Mem.inject (as_inj mu) m tm ->
   Mem.free_list m (blocks_of_env e) = Some m' ->
-(*  forall (RC: REACH_closed m (vis mu)),*)
   exists tm',
      Mem.free_list tm (blocks_of_env te) = Some tm'
   /\ Mem.inject (as_inj mu) m' tm'.
@@ -2197,9 +1811,9 @@ Inductive match_globalenvs (f: meminj) (bound: block): Prop :=
   | mk_match_globalenvs
       (DOMAIN: forall b, Plt b bound -> f b = Some(b, 0))
 
-      (*NEW: added assumption Genv.find_var_info. This is also done
-          in Cminorgen and Stacking,  seems to be needed
-          to prove MatchAfterExternal, just as in Stacking*)
+      (*Lenb: added assumption Genv.find_var_info -I seem to have done this in Cminorgen and Stacking, too, and 
+           it seems to be needed
+           here in prove MatchAfterExternal, just as in Stacking*)
       (IMAGE: forall b1 b2 delta gv (GV: Genv.find_var_info ge b2 = Some gv),
                f b1 = Some(b2, delta) -> Plt b2 bound -> b1 = b2)
       (*WAS: (IMAGE: forall b1 b2 delta, f b1 = Some(b2, delta) -> Plt b2 bound -> b1 = b2)*)
@@ -2464,32 +2078,33 @@ Lemma match_cont_extern_invariantPriv:
   (forall b chunk v,
     privBlocksSrc mu b = true -> Plt b bound -> Mem.load chunk m b 0 = Some v -> Mem.load chunk m' b 0 = Some v) ->
   extern_incr mu mu' ->
-  (forall b, Plt b bound -> as_inj mu' b = as_inj mu b) ->
-  (forall b b' delta, as_inj mu' b = Some(b', delta) -> Plt b' tbound -> as_inj mu' b = as_inj mu b) ->
-  forall (WD: SM_wd mu) (WD': SM_wd mu'),
+ forall (GSep : globals_separate tge mu mu')
+        (WD: SM_wd mu) (WD': SM_wd mu'),
   match_cont mu' cenv k tk m' bound tbound.
 Proof.
-  induction 1; intros LOAD INCR INJ1 INJ2; econstructor; eauto.
+  induction 1; intros LOAD INCR SEP; econstructor; eauto.
 (* globalenvs *)
   inv H. constructor; intros; eauto.
     specialize (DOMAIN _ H).
     eapply extern_incr_restrict; try eassumption.
-  assert (restrict (as_inj mu) (vis mu) b1 = Some (b2, delta)). 
+  assert (restrict (as_inj mu) (vis mu) b1 = Some (b2, delta)).
     destruct (restrictD_Some _ _ _ _ _ H); clear H.
-    rewrite (INJ2 _ _ _ H3) in H3.
-     rewrite (extern_incr_vis _ _ INCR).
-     apply restrictI_Some; trivial. xomega.
+    rewrite <- (extern_incr_vis _ _ INCR) in H4.
+    remember (as_inj mu b1) as d; apply eq_sym in Heqd.
+    destruct d.
+      destruct p.
+      rewrite (extern_incr_as_inj _ _ INCR WD' _ _ _ Heqd) in H3; 
+          inv H3. apply restrictI_Some; trivial.
+    specialize (SEP _ _ _ Heqd H3).
+      unfold isGlobalBlock, genv2blocksBool in SEP. simpl in SEP.
+      rewrite varinfo_preserved, GV, orb_true_r in SEP; inv SEP. 
   eapply IMAGE; eauto.
 (* call *)
   eapply match_envs_extern_invariantPriv; eauto. 
   intros. apply LOAD; auto. xomega.
-  intros. apply INJ1; auto; xomega.
-  intros. eapply INJ2; eauto; xomega.
 
   eapply IHmatch_cont; eauto. 
   intros; apply LOAD; auto. inv H0; xomega.
-  intros; apply INJ1. inv H0; xomega.
-  intros; eapply INJ2; eauto. inv H0; xomega.
 Qed.
 
 (** Invariance by assignment to location "above" *)
@@ -2517,28 +2132,15 @@ Lemma match_cont_extcallPriv:
   match_cont mu cenv k tk m bound tbound ->
   Mem.unchanged_on (fun b ofs => privBlocksSrc mu b = true) m m' ->
   extern_incr mu mu' ->
-  sm_inject_separated mu mu' m tm ->
+  forall (GSep : globals_separate tge mu mu'),
   Ple bound (Mem.nextblock m) -> Ple tbound (Mem.nextblock tm) ->
   forall (WD: SM_wd mu) (WD': SM_wd mu') (SMV: sm_valid mu m tm),
   match_cont mu' cenv k tk m' bound tbound.
 Proof.
-  intros. destruct H2 as [H2 [H2Dom H2Tgt]].
+  intros. 
   eapply match_cont_extern_invariantPriv; eauto. 
   intros. eapply Mem.load_unchanged_on; eauto. 
-  intros. destruct (as_inj mu b) as [[b' delta] | ] eqn:?.
-     eapply extern_incr_as_inj; eassumption.
-  destruct SMV as [SMVD _].
-    destruct (as_inj mu' b) as [[b' delta] | ] eqn:?; auto.
-    exploit as_inj_DomRng; try eassumption. intros [D' T'] .
-    exploit H2; eauto. unfold Mem.valid_block in H2Dom. intros [A B]. 
-      specialize (H2Dom _ A D'). xomegaContradiction.
-  intros. destruct (as_inj mu b) as [[b'' delta''] | ] eqn:?.
-      eapply extern_incr_as_inj; eassumption.
-    exploit as_inj_DomRng; try eassumption. intros [D' T'].
-    exploit H2; eauto. intros [A B].  
-    unfold Mem.valid_block in H2Tgt. specialize (H2Tgt _  B T'). xomegaContradiction.
 Qed.
-
 (** Invariance by change of bounds *)
 
 Lemma match_cont_incr_bounds:
@@ -2679,6 +2281,8 @@ inv ME; econstructor; try eassumption.
   intros. specialize (me_vars0 id).
     eapply match_var_replace_locals; eassumption.
   rewrite replace_locals_as_inj, replace_locals_vis; trivial.
+  rewrite replace_locals_locBlocksSrc; trivial.
+  rewrite replace_locals_locBlocksTgt; trivial.
   rewrite replace_locals_as_inj, replace_locals_vis; trivial.
   rewrite replace_locals_as_inj; trivial.
 Qed. 
@@ -2758,6 +2362,8 @@ inv ME; econstructor; try eassumption.
     eapply val_inject_incr; try eassumption.
     red; intros. destruct (restrictD_Some _ _ _ _ _ H); clear H.
     eapply restrictI_Some; trivial. apply HFS; trivial. 
+  rewrite replace_externs_locBlocksSrc; trivial.
+  rewrite replace_externs_locBlocksTgt; trivial.
   rewrite replace_externs_as_inj, replace_externs_vis.
     intros. destruct (me_mapped0 _ _ _ H) as [b [Rb Eb]]; clear H.
     exists b; split; trivial.
@@ -2860,6 +2466,8 @@ Proof. intros. inv ME; econstructor; try eassumption.
   intros. 
     rewrite restrict_sm_all, vis_restrict_sm, restrict_nest; try assumption.
     apply (me_temps0 _ _ H).
+  rewrite restrict_sm_locBlocksSrc; trivial.
+  rewrite restrict_sm_locBlocksTgt; trivial.
   intros.
     rewrite restrict_sm_all, vis_restrict_sm, restrict_nest; try assumption.
     apply (me_mapped0 _ _ _ H).
@@ -3177,7 +2785,7 @@ mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
 nu (NuHyp : nu = replace_locals mu pubSrc' pubTgt')
 nu' ret1 m1' ret2 m2'
 (INC : extern_incr nu nu')
-(SEP : sm_inject_separated nu nu' m1 m2)
+(SEP : globals_separate tge nu nu')
 (WDnu' : SM_wd nu')
 (SMvalNu' : sm_valid nu' m1' m2')
 (MemInjNu' : Mem.inject (as_inj nu') m1' m2')
@@ -3240,42 +2848,12 @@ assert (INCvisNu': inject_incr
       apply restrict_incr. 
 assert (RC': REACH_closed m1' (mapped (as_inj nu'))).
         eapply inject_REACH_closed; eassumption.
-assert (PGnu': meminj_preserves_globals (Genv.globalenv prog) (as_inj nu')).
-    subst. clear - INC SEP PG GF WDmu WDnu'.
-    apply meminj_preserves_genv2blocks in PG.
-    destruct PG as [PGa [PGb PGc]].
-    apply meminj_preserves_genv2blocks.
-    split; intros.
-      specialize (PGa _ H).
-      apply joinI; left. apply INC.
-      rewrite replace_locals_extern.
-      assert (GG: isGlobalBlock ge b = true).
-          unfold isGlobalBlock, ge. apply genv2blocksBool_char1 in H.
-          rewrite H. trivial.
-      destruct (frgnSrc _ WDmu _ (GF _ GG)) as [bb2 [dd [FF FT2]]].
-      rewrite (foreign_in_all _ _ _ _ FF) in PGa. inv PGa.
-      apply foreign_in_extern; eassumption.
-    split; intros. specialize (PGb _ H).
-      apply joinI; left. apply INC.
-      rewrite replace_locals_extern.
-      assert (GG: isGlobalBlock ge b = true).
-          unfold isGlobalBlock, ge. apply genv2blocksBool_char2 in H.
-          rewrite H. intuition.
-      destruct (frgnSrc _ WDmu _ (GF _ GG)) as [bb2 [dd [FF FT2]]].
-      rewrite (foreign_in_all _ _ _ _ FF) in PGb. inv PGb.
-      apply foreign_in_extern; eassumption.
-    eapply (PGc _ _ delta H). specialize (PGb _ H). clear PGa PGc.
-      remember (as_inj mu b1) as d.
-      destruct d; apply eq_sym in Heqd.
-        destruct p. 
-        apply extern_incr_as_inj in INC; trivial.
-        rewrite replace_locals_as_inj in INC.
-        rewrite (INC _ _ _ Heqd) in H0. trivial.
-      destruct SEP as [SEPa _].
-        rewrite replace_locals_as_inj, replace_locals_DomSrc, replace_locals_DomTgt in SEPa. 
-        destruct (SEPa _ _ _ Heqd H0).
-        destruct (as_inj_DomRng _ _ _ _ PGb WDmu).
-        congruence.
+assert (PGnu': meminj_preserves_globals (Genv.globalenv prog) (as_inj nu')). 
+  eapply meminj_preserves_globals_extern_incr_separate. eassumption.
+    rewrite replace_locals_as_inj. assumption.
+    assumption. 
+    specialize (genvs_domain_eq_isGlobal _ _ GDE_lemma). intros GL.
+    red. unfold ge in GL. rewrite GL. apply SEP.
 assert (RR1: REACH_closed m1'
   (fun b : Values.block =>
    locBlocksSrc nu' b
@@ -3401,7 +2979,7 @@ split.
                 intros. apply andb_true_iff in H; destruct H. 
                   rewrite H. split; simpl; trivial. rewrite H in H0. simpl in *. apply negb_true_iff in H0; trivial.
        xomega.
-       xomega.
+       instantiate (1:= m2). xomega.
        eassumption. 
        eassumption.
        eassumption.
@@ -4553,7 +4131,7 @@ assert (GDE: genvs_domain_eq ge tge).
         
 { (*after_external *)
   intros. eapply MATCH_afterExternal. eapply MemInjMu. eassumption. eassumption.
-     eassumption. eassumption. eassumption. eassumption. eassumption. eassumption. 
+     eassumption. eassumption. eassumption. eassumption. eassumption. eassumption.
      eassumption. eassumption. eassumption. eassumption. eassumption. eassumption. 
      eassumption. eassumption. eassumption. eassumption. eassumption. eassumption. 
     }
@@ -4565,7 +4143,7 @@ assert (GDE: genvs_domain_eq ge tge).
     split. eapply MU.
     split. eapply MU.
     split. eapply MU.
-    split. eapply MU. 
+(*    split. eapply MU. *)
     exists U2. split. left; trivial. eapply MU. }
 Qed.
 

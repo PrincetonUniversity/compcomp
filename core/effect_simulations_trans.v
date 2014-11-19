@@ -69,6 +69,7 @@ Definition filter_id (j:meminj): meminj:=
         | None => None
     end.
 
+
 Lemma initial_inject_split: forall j m1 m3 (Inj:Mem.inject j m1 m3),
   exists m2 j1 j2, j = compose_meminj j1 j2 /\
        Mem.inject j1 m1 m2 /\ Mem.inject j2 m2 m3 /\
@@ -101,7 +102,7 @@ Proof.
     destruct (l b) eqn:lmap; trivial.
     rewrite lmap. destruct p; auto. }
   split.
-  (*Mem.inject j m2 m2*) (*Should be a stand alone lemma of filter_id *)
+  (*Mem.inject j m2 m2*) (* this uses the hyp Inj *)
   {constructor.
    + { constructor.
        + subst; intros.
@@ -111,11 +112,19 @@ Proof.
        + subst; intros.
          unfold filter_id in H; destruct (l b1); try solve [inversion H].
          inversion H; subst. unfold Pos.divide; exists 0; omega. 
-       + subst; intros.
-         unfold filter_id in H; destruct (l b1); try solve [inversion H].
-         inversion H; subst. replace (ofs + 0) with ofs by omega.
-         destruct (ZMap.get ofs (Mem.mem_contents m1) !! b2) eqn:IDK; try constructor.
-         admit. }
+       + subst k j; intros.
+         unfold filter_id in H; destruct (l b1) eqn:lmap; try solve [inversion H].
+         inversion H; subst b1 delta. replace (ofs + 0) with ofs by omega.
+         subst m2; destruct (ZMap.get ofs (Mem.mem_contents m1) !! b2) eqn:cont; try constructor.
+         (*TRY*)
+         destruct Inj. destruct mi_inj.
+         destruct p; eapply mi_memval in lmap; eauto.
+         rewrite cont in lmap. inversion lmap.
+         econstructor; unfold filter_id. rewrite H3; reflexivity.
+         rewrite Int.add_unsigned.
+         rewrite Int.unsigned_repr_eq.
+         rewrite Zmod_0_l.  replace (Int.unsigned i + 0) with (Int.unsigned i) by omega.
+         symmetry; apply Int.repr_unsigned. }
    + subst; intros. apply Inj in H. 
      unfold filter_id. rewrite H; auto.
    + subst; intros. destruct Inj.
@@ -171,8 +180,9 @@ Proof.
 intros b; intros. 
   destruct (compose_meminjD_Some _ _ _ _ _ H) as [? [? [? [? [? ?]]]]].
     subst. destruct (flatinj_E _ _ _ _ H0) as [? [? ?]]. subst.
-    exfalso. xomega.
-    (*intros b; intros.
+
+         exfalso. xomega.
+(*intros b; intros.
    unfold Mem.valid_block; simpl; split; intros N; xomega.*)
 split; intros. unfold Mem.valid_block in H0. simpl in H0. exfalso; xomega.
   apply Mem.perm_valid_block in H0. unfold Mem.valid_block in H0. simpl in H0. exfalso; xomega.
@@ -284,6 +294,7 @@ Theorem eff_sim_trans: forall
         (SIM23: @SM_simulation_inject _ _ _ _ _ _ Sem2 Sem3 g2 g3),
         @SM_simulation_inject _ _ _ _ _ _ Sem1 Sem3 g1 g3.
 Proof. (*follows structure of forward_simulations_trans.injinj*)
+
   intros.
   destruct SIM12 
     as [core_data12 match_core12 core_ord12 core_ord_wf12 
@@ -736,7 +747,7 @@ eqn: Xb; auto.
   clear - match_sm_wd12 match_sm_valid12 core_at_external12 
           eff_after_external12  match_visible12 (*match_restrict12*)
           match_sm_wd23 match_sm_valid23 core_at_external23 
-          eff_after_external23.
+          eff_after_external23 genvs_dom_eq23 match_genv12 match_genv23.
   intros. rename st2 into st3. rename m2 into m3. 
           rename vals2 into vals3'. rename m2' into m3'.
           rename UnchLOOR into UnchLOOR13.
@@ -753,6 +764,7 @@ eqn: Xb; auto.
      clear UnchLOOR13 UnchPrivSrc Mu'Hyp mu' frgnTgtHyp frgnTgt'
               frgnSrcHyp frgnSrc' FwdTgt FwdSrc RValInjNu' MemInjNu' 
               SMvalNu' WDnu' (*SEP*) INC m3' ret2 m1' ret1 (*nu'*) NuHyp (*nu*)
+              (* GlobalsSeparate: SMvalNu' WDnu' INC m3' ret2 m1' ret1 NuHyp *)
               pubTgtHyp pubTgt' pubSrcHyp pubSrc' ValInjMu AtExtTgt 
               AtExtSrc eff_after_external23 core_at_external23 
               eff_after_external12 core_at_external12 HasTy1 HasTy2. 
@@ -780,6 +792,7 @@ eqn: Xb; auto.
      clear UnchLOOR13 UnchPrivSrc Mu'Hyp mu' frgnTgtHyp frgnTgt'
               frgnSrcHyp frgnSrc' FwdTgt FwdSrc RValInjNu' MemInjNu' 
               SMvalNu' WDnu' (*SEP*) INC m3' ret2 m1' ret1 (*nu'*) NuHyp (*nu*)
+              (* GlobalsSeparate: SMvalNu' WDnu' INC m3' ret2 m1' ret1 NuHyp*)
               pubTgtHyp pubTgt' pubSrcHyp pubSrc' ValInjMu AtExtTgt 
               AtExtSrc eff_after_external23 core_at_external23 
               eff_after_external12 core_at_external12 HasTy1 HasTy2. 
@@ -874,7 +887,6 @@ eqn: Xb; auto.
         destruct GLUEINV as [GlueA [GlueB [GlueC GlueD]]].
         subst.
         clear UnchLOOR13 UnchPrivSrc (*SEP*) INC MemInjMu ArgsInj12 MInj12.
-              
         (*rewrite restrict_sm_locBlocksTgt.*) (*sm_extern_normalize_exportedTgt; trivial.*)
            rewrite GlueA. intros b Hb. rewrite andb_true_iff in *.
         destruct Hb. split; trivial.
@@ -983,7 +995,7 @@ eqn: Xb; auto.
       INC (*Pure*) nu12_valid nu23_valid)
      as [m2' [nu12' [nu23' [X [Incr12 [Incr23 (*[Pure'*) [MInj12'
         [Fwd2 [MInj23' [nu12'valid
-        [nu23'valid [GLUEINV' [full' [UnchMidA UnchMidB ]]]]]]]]]]]]]]; simpl in *.
+        [nu23'valid [GLUEINV' [full' [UnchMidA [UnchMidB [Pure12 Pure23]]]]]]]]]]]]]]]]; simpl in *.
     (*discharge the unchOn application conditions*)
        subst; apply UnchPrivSrc.
        subst. apply UnchLOOR13. 
@@ -1003,7 +1015,9 @@ eqn: Xb; auto.
         destruct mu12; destruct mu23; simpl.
         exact full.
         }
-      
+       { (*full_ext *)  
+        unfold full_ext, full_comp, replace_locals.
+        destruct nmu12, mu23; simpl. exact full. }    
  
       (*discharge the Norm Hypothesis*)
       (*rewrite Heqnmu12. do 2 rewrite replace_locals_extern.
@@ -1091,7 +1105,8 @@ eqn: Xb; auto.
           assert (Arith : ofs - (d1 + d2) + d1 = ofs - d2) by omega.
           rewrite <- Arith.
           eapply MinjNu12. eapply pub_in_all; try eassumption. apply N.
-        rewrite H in PubTgt2. discriminate.
+          rewrite H in PubTgt2. discriminate.
+    
 
   (*next, prepare for application of eff_after_external12*)
   destruct GLUEINV' as [WDnu12' [WDnu23' [GLUEa' [GLUEb' [GLUEc' GLUEd']]]]].
@@ -1108,7 +1123,7 @@ eqn: Xb; auto.
   subst. 
   assert (HasTy12: Val.has_type ret2 (proj_sig_res (AST.ef_sig e))). 
   { clear - HasTy2 RValInjNu23'. inv RValInjNu23'; auto. constructor. }
-  (*assert (LIES: globals_separate g2
+  (* OLD VERSION: assert (GSep2: globals_separate g2
                            (replace_locals
                               (restrict_sm mu12
                                  (fun b : block =>
@@ -1149,9 +1164,63 @@ eqn: Xb; auto.
                                         || frgnBlocksSrc mu12 b0
                                         || mapped
                                              (as_inj (compose_sm mu12 mu23))
-                                             b0)) vals2) b)) nu12' ) by ad_it.*)
+                                             b0)) vals2) b)) nu12') by ad_it. *)
+  assert (GSep2: globals_separate g2
+    (replace_locals mu12
+       (fun b : block =>
+        locBlocksSrc mu12 b && REACH m1 (exportedSrc mu12 vals1) b)
+       (fun b : block =>
+        locBlocksTgt mu12 b && REACH m2 (exportedTgt mu12 vals2) b)) nu12').
+  { unfold globals_separate in *.
+  intros. 
+  destruct (isGlobalBlock g2 b2) eqn:Globb2; try trivial.
+  rewrite <- Globb2.
+  rewrite (genvs_domain_eq_isGlobal _ _ genvs_dom_eq23).
+  eapply GSep.
+  Lemma compose_sm_None1:
+      forall mu mu' b,
+        as_inj mu b = None ->
+        as_inj (compose_sm mu mu') b = None.
+      intros.
+      unfold compose_sm.
+      unfold as_inj, join in *.
+      destruct (extern_of mu b) eqn: extofb; try solve[ destruct p; simpl H; inversion H]; simpl.
+      unfold compose_meminj.
+      rewrite extofb, H; trivial.
+     Qed.
+  apply (compose_sm_None1 _ _ _ H).
+
+  assert (extern_of nu23' b2 = Some (b2, 0)).
+  {
+  eapply Incr23.
+  rewrite replace_locals_extern.
+  eapply meminj_preserves_globals_isGlobalBlock.
+  apply match_genv23 in MC23.
+  destruct MC23 as [MPG global_frgn].
+  eapply MPG.
+  exact Globb2.
+  }
+  assert (extern_of nu12' b1 = Some (b2, d)).
+  {
+    unfold as_inj, join in H0; simpl in H0.
+    destruct (extern_of nu12' b1) eqn:extofb1.
+    + destruct p.
+      exact H0.
+    + apply WDnu23' in H1.
+      destruct H1 as [extS23' extTgt23'].
+      rewrite <- GLUEb' in extS23'.
+      apply (local_locBlocks _ WDnu12') in H0; destruct H0 as
+      [locS [locT [extS [extT ?]]]].
+      rewrite extT in extS23'.
+      discriminate extS23'.
+  }
+  unfold compose_sm, compose_meminj, as_inj, join; simpl.
+  rewrite H2.
+  rewrite H1.
+  reflexivity. }
+  
   specialize (eff_after_external12 nu12' ret1 
-     m1' ret2 m2' HasTy1 HasTy12 Incr12 (*LIES Sep12*) WDnu12' nu12'valid MInj12' RValInjNu12'
+     m1' ret2 m2' HasTy1 HasTy12 Incr12 GSep2 WDnu12' nu12'valid MInj12' RValInjNu12'
      FwdSrc Fwd2 (*RetType2*)).
 
   destruct (eff_after_external12 _ (eq_refl _) 
@@ -1162,15 +1231,284 @@ eqn: Xb; auto.
       apply UnchMidB.
 
   (*next, apply eff_after_external23*)
-  specialize (eff_after_external23 nu23').
-  (*assert (LIES3: globals_separate g3
-    (replace_locals mu23
-       (fun b : block =>
-        locBlocksSrc mu23 b && REACH m2 (exportedSrc mu23 vals2) b)
-       (fun b : block =>
-        locBlocksTgt mu23 b && REACH m3 (exportedTgt mu23 vals3) b)) nu23') by ad_it.*)
+
+  specialize (eff_after_external23 nu23'). 
+  assert (GSep3: globals_separate g3
+     (replace_locals mu23
+        (fun b : block =>
+         locBlocksSrc mu23 b && REACH m2 (exportedSrc mu23 vals2) b)
+        (fun b : block =>
+         locBlocksTgt mu23 b && REACH m3 (exportedTgt mu23 vals3) b)) nu23').
+  { eapply match_genv12 in MC12'.
+    eapply match_genv12 in NormMC12.
+    move NormMC12 at bottom;
+      move MC12' at bottom.
+    destruct NormMC12 as [MPG isGlob].
+    destruct MC12' as [MPG' isGlob']. 
+    intros b1 b2 d map23 map23'.
+    assert (extern_of nu23' b1 = Some (b2, d)).
+    { unfold as_inj in map23'; apply joinD_Some in map23'.
+      destruct map23' as [ext23' | [ext23' loc23']].
+      + exact ext23'.
+      + destruct Incr23 as [extinc [loceq [rest]]]; clear rest.
+        rewrite <- loceq in loc23'.
+        unfold as_inj, join in map23. 
+        destruct (extern_of
+              (replace_locals mu23
+                 (fun b : block =>
+                  locBlocksSrc mu23 b && REACH m2 (exportedSrc mu23 vals2) b)
+                 (fun b : block =>
+                  locBlocksTgt mu23 b && REACH m3 (exportedTgt mu23 vals3) b))
+              b1); try solve [destruct p; inversion map23].
+        rewrite loc23' in map23; inversion map23. }
+    assert (extmap23':=H).
+    apply Pure23 in H. destruct H as [extmap | [extmap [b1' [d' newmap]]]].
+    + unfold as_inj, join in map23; rewrite extmap in map23. inversion map23.
+    + assert (newmap':=newmap). apply Pure12 in newmap'. 
+      destruct newmap' as [extmap12' | [extmap12' [b3 [d2 mapnu']]]].
+      - assert (extmap12: extern_of mu12 b1' = Some (b1, d')).
+        { unfold replace_locals in extmap12'; destruct mu12; exact extmap12'. }
+        apply full in extmap12; destruct extmap12 as [b3 [d3 extmap23]].
+        unfold as_inj, join in map23. 
+        destruct mu23; simpl in *; rewrite extmap23 in map23. inversion map23.
+      - eapply GSep.
+        * unfold as_inj, join. rewrite compose_sm_extern, compose_sm_local.
+          unfold compose_meminj. instantiate(1:= b1').
+          rewrite extmap12'.
+          rewrite replace_locals_local, replace_locals_local.
+          destruct (local_of mu12 b1') eqn:locmap12; trivial. exfalso.
+          
+          { rewrite replace_locals_extern in extmap12'.
+            destruct Incr12 as [ext_inc [loceq rest]]; clear rest; 
+            rewrite replace_locals_local in loceq;
+            rewrite replace_locals_extern in ext_inc.
+            rewrite loceq in locmap12.
+            destruct p.
+            eapply WDnu12' in locmap12. destruct locmap12 as [locS locT].
+            eapply WDnu12' in newmap. destruct newmap as [extS extT].
+            destruct WDnu12'. destruct (disjoint_extern_local_Src b1') as [locS' | extS'].
+            + rewrite locS' in locS; inversion locS.
+            + rewrite extS' in extS; inversion extS. }
+       * assert (b3 = b2).
+          { rewrite compose_sm_extern in mapnu'. unfold compose_meminj in mapnu'.
+            rewrite newmap, extmap23' in mapnu'. inversion mapnu'.
+            reflexivity. }
+          unfold as_inj, join. rewrite mapnu'. subst; reflexivity. }
+  (*
+    apply exter_incr_globals_separate.
+    rewrite replace_locals_extern.
+    extensionality b.
+    destruct ( extern_of mu23 b) eqn: extof; symmetry; try destruct p.
+    unfold extern_incr in Incr23; destruct Incr23 as [EXT [? ?]].
+    unfold inject_incr in EXT.
+    move EXT at bottom.
+    rewrite replace_locals_extern in EXT.
+    apply EXT in extof.
+    exact extof.
+    
+    
+    (*TRY*)
+    eapply intern_incr_globals_separate; eauto.
+    unfold intern_incr.
+    (*apply match_genv12 in MC12'.
+    apply match_genv12 in NormMC12.*)
+    generalize Incr23; unfold extern_incr.
+    rewrite replace_locals_locBlocksSrc, replace_locals_locBlocksTgt, replace_locals_extBlocksSrc, replace_locals_extBlocksTgt, replace_locals_pubBlocksSrc, replace_locals_pubBlocksTgt, replace_locals_frgnBlocksSrc, replace_locals_frgnBlocksTgt, replace_locals_local, replace_locals_extern.
+    intros extInc;
+    destruct extInc as [? [? [? [? [? [? [? [? [? ?]]]]]]]]].
+    repeat (split; try assumption).
+    rewrite H0. apply inject_incr_refl.
+    ad_it.
+    rewrite H3; intros b HH; apply HH.
+    rewrite H4; intros b HH; apply HH.
+    
+    
+    
+    
+
+    unfold globals_separate in *.
+    rewrite replace_locals_as_inj; intros.
+    destruct (isGlobalBlock g3 b2) eqn:Globb3; [rewrite <- Globb3 |try trivial].
+    eapply GSep.
+    unfold as_inj.
+  repeat rewrite compose_sm_extern.
+  repeat rewrite compose_sm_local.
+  repeat rewrite replace_locals_extern.
+  repeat rewrite replace_locals_local.
+  repeat rewrite <- compose_sm_extern.
+  repeat rewrite <- compose_sm_local.
+  remember (compose_sm
+           (restrict_sm mu12
+              (fun b : block =>
+               locBlocksSrc mu12 b || frgnBlocksSrc mu12 b
+               || mapped
+                    (join (extern_of (compose_sm mu12 mu23))
+                       (local_of (compose_sm mu12 mu23))) b)) mu23) as NU.
+  fold (as_inj NU).
+  rewrite HeqNU; clear HeqNU.
+  
+  erewrite compose_sm_as_inj; eauto; destruct GLUEINV as [GLUEa [GLUEb [GLUEc GLUEd]]].
+  2: rewrite restrict_sm_locBlocksTgt; assumption.
+  2: rewrite restrict_sm_extBlocksTgt; assumption.
+  eapply match_genv12 in NormMC12.
+  destruct NormMC12 as [GSep1 glo_frgn].
+  
+  
+
+  Lemma compose_sm_None2:
+      forall mu mu' b b' delta,
+        SM_wd mu ->
+        as_inj mu b = Some (b', delta) ->
+        as_inj mu' b' = None ->
+        as_inj (compose_sm mu mu') b = None.
+      intros.
+      unfold compose_sm, compose_meminj;
+      unfold as_inj, join in *; simpl.
+      destruct (extern_of mu b) eqn: extofb. 
+      destruct p. inversion H0.
+      destruct ( extern_of mu' b') eqn:extofb'. destruct p; inversion H1.
+      destruct (local_of mu b) eqn:localofb; try reflexivity.
+      destruct p.
+      apply H in localofb; apply H in extofb.
+      destruct localofb; destruct extofb.
+      inversion H.
+      destruct (disjoint_extern_local_Src b).
+      rewrite H2 in H8; discriminate H8.
+      rewrite H6 in H8; discriminate H8.
+      rewrite H0.
+      destruct (extern_of mu' b'); try (destruct p; inv H1).
+      rewrite H1; reflexivity.
+  Qed.
+  assert (H':=H).
+  rewrite replace_locals_as_inj in H'.
+  unfold compose_sm, as_inj; simpl.
+  rewrite replace_locals_extern.
+  rewrite replace_locals_local.
+  rewrite replace_locals_extern.
+  rewrite replace_locals_local.
+  repeat rewrite <- compose_sm_extern.
+  repeat rewrite <- compose_sm_local.
+  instantiate(1:= b2).
+  assert (H'':= H').
+  apply as_injD_None in H''.
+  destruct H'' as [extof localof].
+  Lemma local_None: forall mu b,
+                      local_of mu b = None -> pubBlocksSrc mu b = false.
+  Ad_itted.
+  Lemma extern_None: forall mu b,
+                      extern_of mu b = None -> frgnBlocksSrc mu b = false.
+  Ad_itted.
+  apply local_None in localof.
+  apply extern_None in extof.
+  destruct GLUEINV as [GLUEa [GLUEb [GLUEc GLUEd]]].
+  assert (pubBlocksTgt mu12 b1 = false).
+  destruct (pubBlocksTgt mu12 b1) eqn:pub12; try reflexivity.
+  apply GLUEc in pub12.
+  rewrite pub12 in localof; discriminate localof.
+  assert (frgnBlocksTgt mu12 b1 = false).
+  destruct (frgnBlocksTgt mu12 b1) eqn:frgn12; try reflexivity.
+  apply GLUEd in frgn12.
+  rewrite frgn12 in extof; discriminate extof.
+  
+  apply match_genv12 in NormMC12.
+  destruct NormMC12 as [GSep1 glo_frgn].
+  rewrite <- (genvs_domain_eq_isGlobal _ _ genvs_dom_eq23) in Globb3.
+  rewrite <- (genvs_domain_eq_isGlobal _ _ genvs_dom_eq12) in Globb3.
+  assert (extern_of mu12 b2 = Some (b2, 0)).
+  { rewrite restrict_sm_extern in GSep1.
+  apply (meminj_preserves_globals_isGlobalBlock _ _ GSep1) in Globb3.
+  unfold restrict in Globb3.
+  destruct ( locBlocksSrc mu12 b2 || frgnBlocksSrc mu12 b2
+               || mapped (as_inj (compose_sm mu12 mu23)) b2) eqn:WYMCI; try solve[ inversion Globb3].
+  rewrite Globb3; reflexivity. }
+  destruct (extern_of (restrict_sm mu12
+              (fun b : block =>
+               locBlocksSrc mu12 b || frgnBlocksSrc mu12 b
+               || mapped
+                    (join (extern_of (compose_sm mu12 mu23))
+                       (local_of (compose_sm mu12 mu23))) b)) b2) eqn:SMTH; try destruct p.
+  assert (SMTH':=SMTH).
+  rewrite restrict_sm_extern in SMTH.
+  unfold restrict in SMTH.
+  destruct (locBlocksSrc mu12 b2 || frgnBlocksSrc mu12 b2
+             || mapped
+                  (join (extern_of (compose_sm mu12 mu23))
+                     (local_of (compose_sm mu12 mu23))) b2); try solve [inversion SMTH]. 
+  rewrite H3 in SMTH; inv SMTH.
+  simpl in SMTH'. 
+  simpl; unfold compose_meminj, join; simpl.
+  unfold compose_meminj, join in SMTH'; simpl in SMTH'.
+  rewrite SMTH'.
+  simpl.
+  clear SMTH'. 
+  apply as_injD_None in H'.
+  destruct H' as [extof' localof'].
+  
+
+  rewrite H3.
+  unfold join.
+  
+  
+  
+
+  apply glo_frgn in Globb3. rewrite restrict_sm_frgnBlocksSrc in Globb3.
+
+
+
+  apply local_ofD_None in localof.
+  
+  destruct extof as [frgn21 unk12].
+  destruct localof as [pu21 priv12].
+  
+  assert (extern_of mu23 b1 = None) by ad_it.
+  assert (local_of mu23 b1 = None) by adm_it.
+  assert (extern_of mu12 b1 = None) by ad_it.
+  assert (local_of mu12 b1 = None) by ad_it.
+  unfold compose_meminj, mapped, replace_locals; simpl.
+  repeat (
+      try rewrite H1;
+      try rewrite H2;
+      try rewrite H3;
+      try rewrite H4).
+  destruct (as_inj
+    (replace_locals
+        (restrict_sm mu12
+           (fun b : block =>
+            locBlocksSrc mu12 b || frgnBlocksSrc mu12 b
+            || mapped (as_inj (compose_sm mu12 mu23)) b))
+        (fun b : block =>
+         locBlocksSrc
+           (restrict_sm mu12
+              (fun b0 : block =>
+               locBlocksSrc mu12 b0 || frgnBlocksSrc mu12 b0
+               || mapped (as_inj (compose_sm mu12 mu23)) b0)) b &&
+         REACH m1
+           (exportedSrc
+              (restrict_sm mu12
+                 (fun b0 : block =>
+                  locBlocksSrc mu12 b0 || frgnBlocksSrc mu12 b0
+                  || mapped (as_inj (compose_sm mu12 mu23)) b0)) vals1) b)
+        (fun b : block =>
+         locBlocksTgt
+           (restrict_sm mu12
+              (fun b0 : block =>
+               locBlocksSrc mu12 b0 || frgnBlocksSrc mu12 b0
+               || mapped (as_inj (compose_sm mu12 mu23)) b0)) b &&
+         REACH m2
+           (exportedTgt
+              (restrict_sm mu12
+                 (fun b0 : block =>
+                  locBlocksSrc mu12 b0 || frgnBlocksSrc mu12 b0
+                  || mapped (as_inj (compose_sm mu12 mu23)) b0)) vals2) b)) b1) eqn:WHF.
+destruct p.
+  
+  eapply (compose_sm_None2 _ _ _ ); eauto.
+  2: eapply (compose_sm_None1 _ _ _ ); eauto.
+  
+  
+  } *)
   destruct (eff_after_external23 ret2 m2' 
-       ret3 m3' HasTy12 HasTy2 Incr23 (*LIES3 Sep23*) WDnu23' nu23'valid
+       ret3 m3' HasTy12 HasTy2 Incr23 GSep3 WDnu23' nu23'valid
        MInj23' RValInjNu23' Fwd2 FwdTgt (*RetTypeTgt*)
      _ (eq_refl _) _ (eq_refl _) _ (eq_refl _)) as
      [d23' [c22' [c3' [AftExt22 [AftExt3 MC23']]]]];

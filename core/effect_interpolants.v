@@ -28,6 +28,8 @@ Parameter effect_interp_II: forall m1 m2 nu12
                              (MemInjNu' : Mem.inject (as_inj nu') m1' m3')
                              (ExtIncr: extern_incr (compose_sm nu12 nu23) nu')
                              (*Pure: pure_comp_ext nu12 nu23 m1 m2*)
+                             (*(SMInjSep: sm_inject_separated (compose_sm nu12 nu23) nu' m1 m3)*)
+                             (*GSep: globals_separate *)
                              (SMV12: sm_valid nu12 m1 m2)
                              (SMV23: sm_valid nu23 m2 m3)
                              (UnchPrivSrc: Mem.unchanged_on (fun b ofs => locBlocksSrc (compose_sm nu12 nu23) b = true /\ 
