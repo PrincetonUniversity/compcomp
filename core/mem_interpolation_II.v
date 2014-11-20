@@ -336,7 +336,10 @@ Lemma MKI_Some23:
     (j', k') = mkInjections sizeM2 j k l ->
     forall b2 b3 d,
       k' b2 = Some (b3, d) ->
-      k b2 = Some (b3, d) \/ k b2 = None /\ (l (b2 - sizeM2)%positive = Some (b3, d) /\ (b2 ?= sizeM2)%positive = Gt).
+      k b2 = Some (b3, d) \/ k b2 = None /\ 
+      (l (b2 - sizeM2)%positive = Some (b3, d) /\ 
+       j (b2 - sizeM2)%positive = None /\
+       (b2 ?= sizeM2)%positive = Gt).
   intros. inversion H; clear H. 
   unfold add_inj, shiftT, filter_id, shiftS in *.
   subst.
@@ -383,6 +386,24 @@ Lemma MKI_Some23':
     exists (b2 - sizeM2)%positive; trivial.
     apply pure_filter_Some in H0; destruct H0; auto.
 Qed.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 (* Legacy: The following lemmas mathc some old lemmas. Probably useless now. *)
 Definition removeUndefs (j l j':meminj):meminj := 
@@ -729,6 +750,8 @@ Definition mem_add_acc nu12 nu23 (j12' :meminj) (m1 m1' m2 : mem) :=
                 | None =>  None
               end.
 
+         
+
 
 (* Short section about injecting memvals*)
 
@@ -771,7 +794,10 @@ Proof.
 Qed.
 (* End of inject_memval *)
 
-
+Definition mem_add_nb (m1 m2:mem):=
+  let n1 := Mem.nextblock m1 in
+  let n2 := Mem.nextblock m2 in
+  (n2 + n1)%positive. 
 
 
 (* The first injection maps blocks and pointers, 
@@ -815,10 +841,211 @@ Definition mem_add_cont nu12 nu23 (j12' :meminj) (m1 m1' m2 : mem) :=
         | None =>  Undef
       end.
 
-Definition mem_add_nb (m1 m2:mem):=
-  let n1 := Mem.nextblock m1 in
-  let n2 := Mem.nextblock m2 in
-  (n2 + n1)%positive. 
+Definition mi_mappedblocks f m2 := forall (b b' : block) (delta : Z),
+                               f b = Some (b', delta) -> Mem.valid_block m2 b'.
+
+Definition mi_mappedblocks' f N2 := forall (b b' : block) (delta : Z),
+                               f b = Some (b', delta) -> Plt b' N2.
+
+Lemma finite_acc: forall nu12 nu23 j12' m1 m1' m2
+                    (finite12: mi_mappedblocks (as_inj nu12) m2)
+                    (finite12': mi_mappedblocks' j12' (mem_add_nb m1' m2))
+                  (SMWD12: SM_wd nu12),
+                  forall n : positive,
+                    (n >= mem_add_nb m1' m2)%positive ->
+                    mem_add_acc nu12 nu23 j12' m1 m1' m2 n = (fun _ _ => None).
+  intros.
+  extensionality x; extensionality k; unfold mem_add_acc.
+  assert (sour: source (as_inj nu12) m1 n x = None).
+  { destruct (source (as_inj nu12) m1 n x) eqn:sour; trivial.
+    symmetry in sour; apply source_SomeE in sour.
+    destruct sour as 
+        [b02 [delta' [ofs2 [invert [ineq [jmap [mperm ofseq]]]]]]].
+   apply finite12 in jmap. unfold Mem.valid_block, Plt in jmap. admit. }
+  
+  assert (sour_loc: source (local_of nu12) m1 n x = None). (*Could use result above... *)
+  { destruct (source (local_of nu12) m1 n x) eqn:sour_loc; trivial.
+    symmetry in sour_loc; apply source_SomeE in sour_loc.
+    destruct sour_loc as 
+        [b02 [delta' [ofs2 [invert [ineq [jmap [mperm ofseq]]]]]]].
+   apply local_in_all in jmap; trivial.
+   apply finite12 in jmap. unfold Mem.valid_block, Plt in jmap. admit. }
+
+  assert (sour12': source j12' m1' n x = None).
+  { destruct (source j12' m1' n x) eqn:sour12'; trivial.
+    symmetry in sour12'; apply source_SomeE in sour12'.
+    destruct sour12' as 
+        [b02 [delta' [ofs2 [invert [ineq [jmap [mperm ofseq]]]]]]].
+   apply finite12' in jmap. unfold Mem.valid_block, Plt in jmap. admit. }
+  
+  rewrite sour, sour12', sour_loc.
+  assert (HH: forall k, (Mem.mem_access m2) !! n x k = None).
+  { intros. apply (Mem.nextblock_noaccess m2). admit. }
+  rewrite HH.
+  (*Do the cases*)
+  destruct (valid_dec m2 n); trivial. 
+  destruct (locBlocksSrc nu23 n), (pubBlocksSrc nu23), (as_inj nu23 n); 
+    try destruct p; trivial.
+Qed.
+
+Lemma block_content_superbound: forall m,
+                                  exists lo hi,
+                                    forall b ofs,
+                                      (ofs<lo \/ ofs>hi)->
+                                      ZMap.get ofs ( m.(Mem.mem_contents) !! b) = Undef.
+  Admitted.
+
+Lemma delta_superbound: forall (j:meminj),
+                                  exists lod hid,
+                                    forall b,
+                                      forall b' d, j b = Some (b', d) ->
+                                                   d < hid /\ d > lod.
+  Admitted.
+           
+Lemma finite_cont_perblock: forall nu12 nu23 j12' m1 m1' m2 (SMWD12: SM_wd nu12),
+                          forall b,
+                   exists lo hi,
+                     forall z : Z, z < lo \/ z > hi -> 
+                                   mem_add_cont nu12 nu23 j12' m1 m1' m2 b z = Undef.
+  intros.
+  destruct (block_content_superbound m1') as [lo1 [hi1 bound1]].
+  destruct (delta_superbound j12') as [lod [hid bound3]].
+  destruct (zmap_finite _ (Mem.mem_contents m2) !! b) as [lo2 [hi2 bound2]].
+  exists (Z.min lo2 (lo1 + lod)), (Z.max hi2 (hi1 + hid)).
+  intros. unfold mem_add_cont.
+  assert (HH: ZMap.get z (Mem.mem_contents m2) !! b = Undef).
+  { erewrite bound2.
+    apply m2. destruct H;  xomega. }
+  rewrite HH.
+  (*Now do the cases *)
+  destruct (valid_dec m2 b).
+  + destruct (locBlocksSrc nu23 b). 
+    - destruct (pubBlocksSrc nu23 b); trivial.
+      destruct (source (local_of nu12) m1 b z) eqn:sour12; trivial.
+      destruct p; destruct (pubBlocksSrc nu12 b0); trivial.
+      assert (ZMap.get z0 (Mem.mem_contents m1') !! b0 = Undef).
+      { symmetry in sour12; apply source_SomeE in sour12.
+        destruct sour12 as 
+            [b02 [delta' [ofs2 [invert [ineq [jmap [mperm ofseq]]]]]]].
+        inversion invert.
+        apply local_in_all in jmap; try assumption.
+        assert (jmap': j12' b02 = Some (b, delta')) by admit.
+        apply bound3 in jmap'; destruct jmap'.
+        apply bound1. destruct H; [left | right]; xomega. }
+      rewrite H0; auto.
+    - destruct ( source (as_inj nu12) m1 b z) eqn: sour;
+      try solve [ destruct(as_inj nu23 b); try destruct p; trivial].
+      destruct p.
+      assert (ZMap.get z0 (Mem.mem_contents m1') !! b0 = Undef).
+      { symmetry in sour; apply source_SomeE in sour.
+        destruct sour as 
+            [b02 [delta' [ofs2 [invert [ineq [jmap [mperm ofseq]]]]]]].
+        inversion invert.
+        assert (jmap': j12' b02 = Some (b, delta')) by admit.
+        apply bound3 in jmap'; destruct jmap'.
+        apply bound1. destruct H; [left | right]; xomega. }
+      rewrite H0; auto.
+  + destruct (source j12' m1' b z) eqn:sour; trivial.
+    destruct p.
+    assert (ZMap.get z0 (Mem.mem_contents m1') !! b0 = Undef).
+    {  symmetry in sour; apply source_SomeE in sour.
+        destruct sour as 
+            [b02 [delta' [ofs2 [invert [ineq [jmap' [mperm ofseq]]]]]]].
+        inversion invert.
+        apply bound3 in jmap'; destruct jmap'.
+        apply bound1. destruct H; [left | right]; xomega. }
+    rewrite H0; trivial.
+Qed.
+
+Lemma finite_cont: forall nu12 nu23 j12' m1 m1' m2
+                    (finite12: mi_mappedblocks (as_inj nu12) m2)
+                    (finite12': mi_mappedblocks' j12' (mem_add_nb m1' m2))
+                  (SMWD12: SM_wd nu12),
+                   exists N,
+                  forall n : positive,
+                    (n >= Pmax (mem_add_nb m1' m2) N )%positive ->
+                    mem_add_cont nu12 nu23 j12' m1 m1' m2 n = (fun _ => Undef).
+  intros.
+  destruct (pmap_finite _ (Mem.mem_contents m2)) as [N bound]; exists N.
+  intros.
+  extensionality x; unfold mem_add_cont.
+  assert (sour: source (as_inj nu12) m1 n x = None).
+  { destruct (source (as_inj nu12) m1 n x) eqn:sour; trivial.
+    symmetry in sour; apply source_SomeE in sour.
+    destruct sour as 
+        [b02 [delta' [ofs2 [invert [ineq [jmap [mperm ofseq]]]]]]].
+   apply finite12 in jmap. unfold Mem.valid_block, Plt in jmap. 
+   admit. }
+  
+  assert (sour_loc: source (local_of nu12) m1 n x = None). (*Could use result above... *)
+  { destruct (source (local_of nu12) m1 n x) eqn:sour_loc; trivial.
+    symmetry in sour_loc; apply source_SomeE in sour_loc.
+    destruct sour_loc as 
+        [b02 [delta' [ofs2 [invert [ineq [jmap [mperm ofseq]]]]]]].
+   apply local_in_all in jmap; trivial.
+   apply finite12 in jmap. unfold Mem.valid_block, Plt in jmap. admit. }
+
+  assert (sour12': source j12' m1' n x = None).
+  { destruct (source j12' m1' n x) eqn:sour12'; trivial.
+    symmetry in sour12'; apply source_SomeE in sour12'.
+    destruct sour12' as 
+        [b02 [delta' [ofs2 [invert [ineq [jmap [mperm ofseq]]]]]]].
+   apply finite12' in jmap. unfold Mem.valid_block, Plt in jmap. admit. }
+  
+  rewrite sour, sour12', sour_loc.
+  destruct (valid_dec m2 n); trivial.
+  assert (HH: ZMap.get x (Mem.mem_contents m2) !! n = Undef).
+  { unfold ZMap.get.
+    rewrite bound.
+    assert (HH:= Mem.contents_default m2).
+    unfold ZMap.get; apply HH. apply (Mem.contents_default m2). 
+    
+    (Mem.nextblock_noaccess m2). admit. }
+  rewrite HH.
+  (*Do the cases*)
+  destruct (valid_dec m2 n); trivial. 
+  destruct (locBlocksSrc nu23 n), (pubBlocksSrc nu23), (as_inj nu23 n); 
+    try destruct p; trivial.
+Qed.
+
+
+Lemma mem_interpolation:
+  forall (nu12 nu23:SM_Injection)(j12':meminj) (m1 m1' m2 m3: mem)
+    (finite12: mi_mappedblocks (as_inj nu12) m2)
+      (finite12': mi_mappedblocks' j12' (mem_add_nb m1' m2))
+      (SMWD12: SM_wd nu12),
+    exists m3, (forall b ofs, ZMap.get ofs (Mem.mem_contents m3) !! b = 
+                                   mem_add_cont nu12 nu23 j12' m1 m1' m2 b ofs) /\
+                    (forall b, (Mem.mem_access m3) !! b = 
+                               mem_add_acc nu12 nu23 j12' m1 m1' m2 b) /\  
+                    (Mem.nextblock m3 = mem_add_nb m1' m2).
+Proof.
+  intros.
+
+  (*Access*)
+  assert (finite_acc:=finite_acc nu12 nu23 j12' m1 m1' m2 finite12 finite12' SMWD12).
+  destruct (pmap_construct _ 
+                           (mem_add_acc nu12 nu23 j12' m1 m1' m2) 
+                           (mem_add_nb m1' m2) 
+                           (fun _ _ => None)
+                           finite_acc)  as [mem_acc acc_property].
+
+ 
+  (*Content*)
+  assert (finite_cont:=finite_cont nu12 nu23 j12' m1 m1' m2 SMWD12).
+  destruct (pmap_construct _ 
+                           (mem_add_acc nu12 nu23 j12' m1 m1' m2) 
+                           (mem_add_nb m1' m2) 
+                           (fun _ _ => None)
+                           finite_acc)  as [mem_acc acc_property].
+  
+  
+  
+  admit.
+  
+  
+  econstructor; intuition.
+  
 
 Axiom mem_add_ax: forall (nu12 nu23:SM_Injection)(j12':meminj) (m1 m1' m2 m3: mem), 
                     m3 = mem_add nu12 nu23 j12' m1 m1' m2 ->

@@ -4732,7 +4732,7 @@ apply effect_simulations_lemmas.inj_simulation_star_wf with
 (*MATCH_reachclosed*)
   apply MATCH_RC.
 (*MATCH_restrict*)
-  apply MATCH_restrict.
+  (*apply MATCH_restrict.*)
 (*MATCH_valid*)
   apply MATCH_valid.
 (*MATCH_preserves_globals*)

@@ -63,10 +63,23 @@ Parameter effect_interp_II: forall m1 m2 nu12
                                      exists b3 d2, extern_of nu23' b2 = Some(b3, d2)) /\ 
                               Mem.unchanged_on (fun b ofs => locBlocksSrc nu23 b = true /\ 
                                                              pubBlocksSrc nu23 b = false) m2 m2' /\
-                              Mem.unchanged_on (local_out_of_reach nu12 m1) m2 m2' (* /\
-                              the following fact is not any longer exported, since it can be established 
-                              outside of interpolation, in the transitivioty proof:
-                              Mem.unchanged_on (local_out_of_reach nu23 m2) m3 m3'*).
+                              Mem.unchanged_on (local_out_of_reach nu12 m1) m2 m2' /\
+                              (* The following clauses state that the interpolation *
+                               * doesnt invent any new mappings                     *)
+                              (*(forall b1 b2 d1, as_inj nu12' b1 = Some(b2,d1) -> 
+                                                as_inj nu12 b1 = Some(b2,d1) \/
+                                                exists b3 d, as_inj nu' b1 = Some(b3,d)) /\
+                              (forall b2 b3 d2, as_inj nu23' b2 = Some(b3,d2) -> 
+                                                as_inj nu23 b2 = Some(b3,d2) \/
+                                                exists b1 d, as_inj nu' b1 = Some(b3,d)).*)
+                              (forall b1 b2 d, extern_of nu12' b1 = Some (b2, d) ->
+                                               extern_of nu12 b1 = Some (b2, d) \/
+                                               extern_of nu12 b1 = None /\
+                                               exists b3 d2, extern_of nu' b1 = Some (b3, d2)) /\
+                              (forall b2 b3 d2, extern_of nu23' b2 = Some (b3, d2) ->
+                                               extern_of nu23 b2 = Some (b3, d2) \/
+                                               extern_of nu23 b2 = None /\
+                                               exists b1 d, extern_of nu12' b1 = Some (b2, d)).
 
 (*(*The following lemma from mem_interpolation (pre- structured-injection! is used in the proof of
   Lemma initial_inject_split in effect_simulations_trans. Prior to reintegrating global environments,

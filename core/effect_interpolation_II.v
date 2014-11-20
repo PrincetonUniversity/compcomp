@@ -12,8 +12,8 @@ Require Import effect_simulations.
 Require Import effect_simulations_lemmas.
 Require Import mem_lemmas.
 Require Import mem_interpolation_defs.
-(*Require Import mem_interpolation_II.*)
-Load mem_interpolation_II.
+Require Import mem_interpolation_II.
+(*Load mem_interpolation_II.*)
 Require Import FiniteMaps.
 Require Import StructuredInjections.
 
@@ -269,12 +269,22 @@ Lemma EFF_interp_II_strong:
                                                                          pubBlocksSrc nu23 b = false) m2 m2' /\
                                           Mem.unchanged_on (local_out_of_reach nu12 m1) m2 m2' /\
                                           (*             Mem.unchanged_on (local_out_of_reach nu23 m2) m3 m3' /\*)
-                                          (forall b1 b2 d1, as_inj nu12' b1 = Some(b2,d1) -> 
+                                          (*(forall b1 b2 d1, as_inj nu12' b1 = Some(b2,d1) -> 
                                                             as_inj nu12 b1 = Some(b2,d1) \/
                                                             exists b3 d, as_inj nu' b1 = Some(b3,d)) /\
                                           (forall b2 b3 d2, as_inj nu23' b2 = Some(b3,d2) -> 
                                                             as_inj nu23 b2 = Some(b3,d2) \/
-                                                            exists b1 d, as_inj nu' b1 = Some(b3,d)).
+                                                            exists b1 d, as_inj nu' b1 = Some(b3,d)).*)
+                         
+                                          (forall b1 b2 d, extern_of nu12' b1 = Some (b2, d) ->
+                                                           extern_of nu12 b1 = Some (b2, d) \/
+                                                           extern_of nu12 b1 = None /\
+                                                           exists b3 d2, extern_of nu' b1 = Some (b3, d2)) /\
+                                          (forall b2 b3 d2, extern_of nu23' b2 = Some (b3, d2) ->
+                                                            extern_of nu23 b2 = Some (b3, d2) \/
+                                               extern_of nu23 b2 = None /\
+                                                            exists b1 d, extern_of nu12' b1 = Some (b2, d)).
+
 (*                   (forall b1 b2 ofs2, as_inj nu12' b1 = Some(b2,ofs2) -> 
                      (as_inj nu12 b1 = Some (b2,ofs2)) \/
                      (b1 = Mem.nextblock m1 /\ b2 = Mem.nextblock m2 /\ ofs2 = 0) \/ 
@@ -1163,7 +1173,7 @@ Proof. intros.
              + subst nu23'.
                rewrite ext_change_ext in extmap.
                eapply MKI_Some23 in extmap; eauto. 
-               destruct extmap as [kmap | [kmap [lmap' bGt]]].
+               destruct extmap as [kmap | [kmap [lmap' [jmapN bGt]]]].
                - assert (bavl: Mem.valid_block m2 b1).
                  { apply SMV23; eauto. 
                    unfold DOM; eapply as_inj_DomRng; eauto.
@@ -1347,7 +1357,7 @@ Proof. intros.
            subst nu23'; unfold as_inj, join in H. rewrite ext_change_ext, loc_change_ext in H.
            destruct (k' b1) eqn:kmap'. 
            * destruct p0. destruct (MKI_Some23 _ _ _ _ _ _ Heqoutput _ _ _ kmap') as 
-                          [kmap | [kmap [ lmap bGt]]].
+                          [kmap | [kmap [lmap [jmapN bGt]]]].
            inversion H; subst b z.
            subst k. destruct MInj23. destruct mi_inj.
            eapply (mi_align b1 b2); eauto. 
@@ -1417,7 +1427,7 @@ Proof. intros.
              + subst nu23'.
                rewrite ext_change_ext in extmap.
                eapply MKI_Some23 in extmap; eauto. 
-               destruct extmap as [kmap | [kmap [lmap' bGt]]].
+               destruct extmap as [kmap | [kmap [lmap' [jmapN bGt]]]].
                - assert (bavl: Mem.valid_block m2 b1).
                  { apply SMV23; eauto. 
                    unfold DOM; eapply as_inj_DomRng; eauto.
@@ -2057,7 +2067,7 @@ Proof. intros.
          subst nu23'. apply as_in_SomeE in H; destruct H as [ext1 | loc1];
          [ rewrite ext_change_ext in ext1 | rewrite loc_change_ext in loc1].
          - eapply MKI_Some23 in ext1; eauto. 
-           destruct ext1 as [kmap | [kmap [lmap bt]]].
+           destruct ext1 as [kmap | [kmap [lmap [jmapN bt]]]].
            assert (map23: as_inj nu23 b = Some (b', delta)).
            { apply extern_in_all; subst k; trivial. }
            eapply MInj23; eauto.
@@ -2279,16 +2289,30 @@ Proof. intros.
        { exact UnchLOOR12.
        }
        split.
-       { intros; subst nu12';
-         eapply destruct_sminj12; eauto.
+       { intros; subst nu12'. 
+         rewrite ext_change_ext in H. apply (MKI_Some12 _ _ _ _ _ _ Heqoutput) in H.
+         destruct H.
+         + left; trivial.
+         + destruct H as [jmap [b2' [d' [lmap rest]]]].
+           right; split; trivial; exists b2', d'. trivial.
        }
        { clear SMWD12 SMWD12' SMWD23'.
-         intros; subst nu23' j k l';
-         edestruct destruct_sminj23; eauto.
-         right; destruct H0 as [b1 rest]; exists b1, d2; exact rest.
+         intros; subst nu23' j k l'. 
+         rewrite ext_change_ext in H.
+         eapply (MKI_Some23 _ _ _ _ _ _ Heqoutput) in H.
+         destruct H as [extmap23 | [extmap23 [extmap' [extmap12 rest]]]].
+         + left; trivial.
+         + right; split; trivial.
+           exists (b2 - Mem.nextblock m2)%positive, 0.
+           subst nu12'. rewrite ext_change_ext.
+           inversion Heqoutput.
+           unfold add_inj.
+           rewrite extmap12. (*NEW: this is the key to not using sm_inject_separated*)
+           unfold filter_id, shiftT; rewrite extmap'. 
+           replace (b2 - Mem.nextblock m2 + Mem.nextblock m2)%positive with b2; auto. 
+           symmetry; apply Pos.sub_add. apply Pos.gt_lt_iff. apply rest.
        }
 Qed.
-
 Lemma EFF_interp_II: forall m1 m2 nu12 
                              (MInj12 : Mem.inject (as_inj nu12) m1 m2) m1'
                              (Fwd1: mem_forward m1 m1') nu23 m3
@@ -2332,8 +2356,17 @@ Lemma EFF_interp_II: forall m1 m2 nu12
                                      exists b3 d2, extern_of nu23' b2 = Some(b3, d2)) /\ 
                               Mem.unchanged_on (fun b ofs => locBlocksSrc nu23 b = true /\ 
                                                              pubBlocksSrc nu23 b = false) m2 m2' /\
-                              Mem.unchanged_on (local_out_of_reach nu12 m1) m2 m2' 
-                          (* /\ Mem.unchanged_on (local_out_of_reach nu23 m2) m3 m3'*).
+                              Mem.unchanged_on (local_out_of_reach nu12 m1) m2 m2' /\
+                              (forall b1 b2 d, extern_of nu12' b1 = Some (b2, d) ->
+                                               extern_of nu12 b1 = Some (b2, d) \/
+                                               extern_of nu12 b1 = None /\
+                                               exists b3 d2, extern_of nu' b1 = Some (b3, d2)) /\
+                              (forall b2 b3 d2, extern_of nu23' b2 = Some (b3, d2) ->
+                                               extern_of nu23 b2 = Some (b3, d2) \/
+                                               extern_of nu23 b2 = None /\
+                                               exists b1 d, extern_of nu12' b1 = Some (b2, d)).
+
+                          (* /\ Mem.unchanged_on (local_out_of_reach nu23 m2) m3 m3'.*)
 Proof. intros.
   destruct (EFF_interp_II_strong _ _ _ MInj12 _ Fwd1 _ _ MInj23 _ 
               Fwd3 _ WDnu' SMvalNu' MemInjNu' ExtIncr
@@ -2342,5 +2375,6 @@ Proof. intros.
   exists m2', nu12', nu23'. intuition.
 Qed.
 
+Print Assumptions EFF_interp_II.
 
 
