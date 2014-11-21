@@ -964,7 +964,9 @@ Lemma finite_cont: forall nu12 nu23 j12' m1 m1' m2
                    exists N,
                   forall n : positive,
                     (n >= Pmax (mem_add_nb m1' m2) N )%positive ->
-                    mem_add_cont nu12 nu23 j12' m1 m1' m2 n = (fun _ => Undef).
+                    mem_add_cont nu12 nu23 j12' m1 m1' m2 n = 
+                    (fun z => ZMap.get z (fst (Mem.mem_contents m2))) 
+(*fun _ => Undef*).
   intros.
   destruct (pmap_finite _ (Mem.mem_contents m2)) as [N bound]; exists N.
   intros.
@@ -992,23 +994,16 @@ Lemma finite_cont: forall nu12 nu23 j12' m1 m1' m2
         [b02 [delta' [ofs2 [invert [ineq [jmap [mperm ofseq]]]]]]].
    apply finite12' in jmap. unfold Mem.valid_block, Plt in jmap. admit. }
   
-  rewrite sour, sour12', sour_loc.
-  destruct (valid_dec m2 n); trivial.
-  assert (HH: ZMap.get x (Mem.mem_contents m2) !! n = Undef).
-  { unfold ZMap.get.
-    rewrite bound.
-    assert (HH:= Mem.contents_default m2).
-    unfold ZMap.get; apply HH. apply (Mem.contents_default m2). 
-    
-    (Mem.nextblock_noaccess m2). admit. }
-  rewrite HH.
-  (*Do the cases*)
-  destruct (valid_dec m2 n); trivial. 
-  destruct (locBlocksSrc nu23 n), (pubBlocksSrc nu23), (as_inj nu23 n); 
-    try destruct p; trivial.
+  rewrite sour, sour12', sour_loc, bound.
+  { destruct (valid_dec m2 n).
+    + destruct (locBlocksSrc nu23 n).
+      - destruct (pubBlocksSrc nu23 n); trivial.
+      - destruct (as_inj nu23 n) eqn:map23; trivial.
+       destruct p. admit. (* finite map! Add a hypotesis finite23 *)
+    +  admit. }
+  eapply Pos.max_lub_r. eapply Pos.ge_le_iff; exact H.
 Qed.
-
-
+     
 Lemma mem_interpolation:
   forall (nu12 nu23:SM_Injection)(j12':meminj) (m1 m1' m2 m3: mem)
     (finite12: mi_mappedblocks (as_inj nu12) m2)
