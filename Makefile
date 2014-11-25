@@ -126,7 +126,7 @@ CORE=Extensionality.v base.v eq_dec.v Address.v \
   StructuredInjections.v \
   effect_semantics.v reach.v effect_simulations.v rg_lemmas.v \
   effect_simulations_lemmas.v effect_properties.v effect_corediagram_trans.v \
-  effect_simulations_trans.v \
+  effect_simulations_trans.v full_composition.v pure.v \
   FiniteMaps.v mem_interpolation_defs.v mem_interpolation_II.v \
   effect_interpolation_II.v effect_interpolants.v effect_interpolation_proofs.v \
   arguments.v compcert.v \
@@ -140,9 +140,10 @@ CORE=Extensionality.v base.v eq_dec.v Address.v \
 
 LINKING=cast.v pos.v stack.v seq_lemmas.v pred_lemmas.v core_semantics_tcs.v \
   sepcomp.v gallina_coresem.v inj_lemmas.v join_sm.v reestablish.v wf_lemmas.v\
-  linking_spec.v linking.v compcert_linking.v linking_lemmas.v compcert_linking_lemmas.v \
+  linking_spec.v linking.v compcert_linking.v \
   disjointness.v reach_lemmas.v rc_semantics.v rc_semantics_lemmas.v \
   linking_inv.v ret_lemmas.v call_lemmas.v linking_proof.v context_equiv.v
+  # linking_lemmas.v compcert_linking_lemmas.v \
 
 # Putting everything together (in driver/)
 

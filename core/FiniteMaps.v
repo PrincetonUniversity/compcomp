@@ -20,11 +20,40 @@ Proof.
   zify; omegaContradiction.
 Qed.
 
+Lemma ptree_finite_type:
+  forall (t: PTree.t A), {p:positive & forall n, (p <= n)%positive -> PTree.get n t = None}.
+Proof.
+  cut (forall (l: list (positive*A)), {p:positive & forall a n, (p <= n)%positive -> ~ In (n,a) l}).
+  { intros. 
+    destruct (X (PTree.elements t)) as [N condition].
+    exists N; intros.
+    destruct (t!n) eqn:mapget; trivial. 
+    apply PTree.elements_correct in mapget.
+    contradict mapget; apply condition; trivial. }
+  { induction l.
+    + exists 1%positive; auto.
+    + destruct IHl as [N condition]; destruct a as [a A'].
+      exists (Pos.max N (a + 1)); intros.
+      simpl; intros HH; destruct HH as [HH | HH].
+      - inversion HH; subst.
+        contradict H. xomega.
+      - assert (ineq: (N <= n)%positive) by xomega.
+        eapply (condition _ _ ineq HH). }
+Qed.
+
 Lemma pmap_finite:
   forall (m: PMap.t A), exists p, forall n, (p <= n)%positive -> PMap.get n m = fst m.
 Proof.
   intros. destruct m as [dfl t]; simpl.
   destruct (ptree_finite t) as [p N].
+  exists p; intros. unfold PMap.get. simpl. rewrite N; auto. 
+Qed. 
+
+Lemma pmap_finite_type:
+  forall (m: PMap.t A), { p: positive & forall n, (p <= n)%positive -> PMap.get n m = fst m}.
+Proof.
+  intros. destruct m as [dfl t]; simpl.
+  destruct (ptree_finite_type t) as [p N].
   exists p; intros. unfold PMap.get. simpl. rewrite N; auto. 
 Qed. 
 
@@ -66,6 +95,17 @@ Proof.
   unfold ZIndexed.index. destruct n; zify; omega. 
 Qed.
 
+Lemma zmap_finite_type:
+  forall (m: ZMap.t A), 
+  {lo : Z & { hi: Z & forall n, n < lo \/ n > hi -> ZMapc.get n m = fst m }}.
+Proof.
+  intros.
+  destruct (pmap_finite_type m) as [p D].
+  exists (-2 * Z.pos p); exists (2 * Z.pos p); intros.
+  unfold ZMap.get. apply D. 
+  unfold ZIndexed.index. destruct n; zify; omega. 
+Qed.
+
 Require Import Zwf.
 
 Lemma zmap_construct:
@@ -83,6 +123,31 @@ Proof.
     exists (ZMap.init dfl). intros. rewrite ZMap.gi. symmetry. apply OUTSIDE. omega. 
   - (* Inductive case *)
     destruct (H (x - 1)) as [m P].
+    red. omega. omega. 
+    exists (ZMap.set x (f x) m); intros.
+    rewrite ZMap.gsspec. unfold ZIndexed.eq. destruct (zeq n x). 
+    congruence.
+    apply P. omega. 
+  }
+  destruct (REC hi) as [m P]. omega. 
+  exists m; intros. apply P. omega.
+Qed.
+
+Lemma zmap_construct_type:
+  forall (f: Z -> A) lo hi dfl,
+  (forall n, n < lo \/ n > hi -> f n = dfl) ->
+  sigT (fun (m:ZMap.t A) => forall n, ZMap.get n m = f n).
+Proof.
+  intros until dfl; intros OUTSIDE.
+  assert (REC: forall x, x <= hi ->
+                         sigT (fun m => forall n, n <= x \/ n > hi -> ZMap.get n m = f n)).
+  {
+    intros x0. pattern x0. apply (well_founded_induction_type (Zwf_well_founded lo)); intros.
+    destruct (zlt x lo).
+  - (* Base case *)
+    exists (ZMap.init dfl). intros. rewrite ZMap.gi. symmetry. apply OUTSIDE. omega. 
+  - (* Inductive case *)
+    destruct (X (x - 1)) as [m P].
     red. omega. omega. 
     exists (ZMap.set x (f x) m); intros.
     rewrite ZMap.gsspec. unfold ZIndexed.eq. destruct (zeq n x). 

@@ -2,7 +2,6 @@ Require Import Events.
 Require Import Memory.
 Require Import Coqlib.
 Require Import Values.
-Require Import Maps.
 Require Import Integers.
 Require Import AST.
 Require Import Globalenvs.
