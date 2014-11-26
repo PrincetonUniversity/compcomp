@@ -97,7 +97,7 @@ Qed.
 
 Lemma zmap_finite_type:
   forall (m: ZMap.t A), 
-  {lo : Z & { hi: Z & forall n, n < lo \/ n > hi -> ZMapc.get n m = fst m }}.
+  {lo : Z & { hi: Z & forall n, n < lo \/ n > hi -> ZMap.get n m = fst m }}.
 Proof.
   intros.
   destruct (pmap_finite_type m) as [p D].

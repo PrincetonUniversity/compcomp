@@ -301,7 +301,7 @@ Proof. intros.
        destruct GlueInvNu as [SMWD12 [SMWD23 GlueInv]].
 
        (***************************************
-        * Construct the injections and memory *
+        * Construct the injections            *
         ***************************************)
        remember (extern_of nu12) as j;
          remember (extern_of nu23) as k;
@@ -316,11 +316,9 @@ Proof. intros.
        remember (change_ext nu12 extS12 extT12 j') as nu12';
          remember (change_ext nu23 extS23 extT23 k') as nu23'.
        remember (as_inj nu12') as j12'.
-       remember (mem_add nu12 nu23 j12' m1 m1' m2) as m2';
-       exists m2', nu12', nu23'.
        
        (************************************************
-        * Proving some properties of my construction   *
+        * Proving some properties of my injections     *
         ************************************************)
        
        (* compose_sm *)
@@ -359,15 +357,152 @@ Proof. intros.
          apply bconcat_larger1; auto.
        }
 
+       (* SM_wd 12 *)
+       assert (SMWD12': SM_wd nu12').
+       { subst nu12'. eapply MKI_wd12; eauto.
+         + subst extS12. intros.
+           destruct (locBlocksSrc nu12 b) eqn:locBS12; auto.
+           right. destruct ExtIncr as [? [? [extS [? [locS ?]]]]].
+           simpl in locS; rewrite locS in locBS12.
+           destruct WDnu'. destruct (disjoint_extern_local_Src b) as [locFalse | extFalse].
+           rewrite locBS12 in locFalse; inversion locFalse.
+           exact extFalse.
+         + subst extT12. intros.
+           destruct (locBlocksTgt nu12 b) eqn:locBT12; auto.
+           right. 
+           unfold bconcat, buni, bshift.
+           destruct ExtIncr as [? [? [extS [? [locS [locT ?]]]]]].
+           destruct SMWD12. destruct (disjoint_extern_local_Tgt b) as [locFalse | extFalse].
+           rewrite locBT12 in locFalse; inversion locFalse.
+           rewrite extFalse; simpl.
+           destruct SMV12 as [DOM12 RNG12].
+           subst sizeM2;
+             rewrite RNG12; auto.
+           unfold RNG, DomTgt.
+           rewrite locBT12; auto.
+         + inversion Heqoutput. unfold add_inj, shiftT; intros.
+           destruct (j b1) eqn:jb1. 
+         - rewrite H in jb1. subst j.
+           destruct SMWD12. apply extern_DomRng in jb1. destruct jb1 as [extS12true extT12true].
+           subst extS12 extT12. apply ExtIncr in extS12true.
+           rewrite extS12true; split; trivial.
+           apply bconcat_larger1; auto.
+         - unfold filter_id in H. destruct (l' b1) eqn:lb1; inversion H.
+           subst extS12 extT12. subst l'.
+           destruct WDnu', p;
+             apply extern_DomRng in lb1.
+           destruct lb1 as [extStrue extTtrue].
+           split; auto.
+           subst sizeM2; apply bconcat_larger2; auto.
+           + intros. subst extT12. apply bconcat_larger1; auto.
+             apply SMWD12 in H.
+             exact H.
+       }
+
+       
+       (* SM_wd 23 *)
+       assert (SMWD23': SM_wd nu23').
+       { subst nu23'; eapply MKI_wd23; eauto.
+         + subst extS23; intros.
+           destruct (locBlocksSrc nu23 b) eqn:locBS23; auto.
+           right. 
+           unfold bconcat, buni, bshift.
+             destruct SMWD23; destruct (disjoint_extern_local_Src b) as [locSfalse | extSfalse].
+           rewrite locBS23 in locSfalse; inversion locSfalse.
+           rewrite extSfalse; simpl.
+           destruct ExtIncr as [? [? [extS [extT [locS [locT ?]]]]]].
+           destruct SMV23 as [DOM23 RNG23].
+           subst sizeM2; rewrite DOM23; auto.
+           unfold DOM, DomSrc. rewrite locBS23; auto.
+         + subst extT23. intros.
+           destruct (locBlocksTgt nu23 b) eqn:locBT23; auto.
+           right. destruct ExtIncr as [? [? [extS [? [locS [locT ?]]]]]].
+           simpl in locT; rewrite locT in locBT23.
+           destruct WDnu'. destruct (disjoint_extern_local_Tgt b) as [locFalse | extFalse].
+           rewrite locBT23 in locFalse; inversion locFalse.
+           exact extFalse.
+         + inversion Heqoutput. unfold add_inj, shiftS; intros.
+           destruct (k b1) eqn:kb1. 
+         - rewrite H in kb1. subst k.
+           destruct SMWD23. apply extern_DomRng in kb1. destruct kb1 as [extS23true extT23true].
+           subst extS23 extT23. destruct ExtIncr as [? [? [extS [extT [locS [locT ?]]]]]].
+           simpl in extT; apply extT in extT23true.
+           rewrite extT23true; split; trivial.
+           apply bconcat_larger1; auto.
+         - rename H into lb1. inversion lb1.
+           destruct ((b1 ?= Mem.nextblock m2)%positive) eqn:ineq; try solve [inversion H2].
+           subst extS23 extT23. subst l'.
+           destruct WDnu'.
+           apply pure_filter_Some in lb1; destruct lb1 as [jmap lb1].
+           apply extern_DomRng in lb1.
+           destruct lb1 as [extStrue extTtrue].
+           split; auto.             
+           replace b1 with ((b1 - sizeM2) + sizeM2)%positive; 
+             subst sizeM2. apply bconcat_larger2; auto.
+           apply Pos.sub_add; destruct (Pos.compare_gt_iff b1 (Mem.nextblock m2)). 
+           apply H; auto.
+           + intros. subst extT23. destruct ExtIncr as [? [? [extS [extT [locS [locT ?]]]]]].
+             apply extT; simpl; auto.
+             apply SMWD23 in H; auto.
+       }
+
+        (***************************************
+        * Construct the memory                *
+        ***************************************)
+       assert (finite12: mi_mappedblocks (as_inj nu12) m2).
+       { unfold mi_mappedblocks. intros. apply SMV12. unfold RNG. 
+         destruct (as_inj_DomRng _ _ _ _ H SMWD12); auto. }
+       
+       assert (finite12': mi_mappedblocks' j12' (mem_add_nb m1' m2)).
+       { unfold mi_mappedblocks'. intros. subst j12' nu12'.
+         unfold as_inj, join in H. rewrite ext_change_ext, loc_change_ext in H.
+         inversion Heqoutput; subst j'. 
+         unfold add_inj, filter_id, shiftT in H.
+         destruct (j b) eqn:jmap.
+         + destruct p; inversion H; subst b' delta j.
+           eapply SMWD12 in jmap; destruct jmap.
+           eapply Pos.lt_le_trans. apply SMV12. unfold RNG, DomTgt.
+           rewrite H1; apply orb_true_r. 
+           unfold mem_add_nb; xomega.
+         + destruct (l' b) eqn:lmap'.
+           - inversion H. 
+             assert (Plt b (Mem.nextblock m1')).
+             { destruct p. subst l'; apply WDnu' in lmap'.
+               destruct lmap'. apply SMvalNu'.
+               unfold DOM, DomSrc. rewrite H0; apply orb_true_r. }
+             unfold mem_add_nb; xomega.
+           - unfold mem_add_nb; eapply Pos.lt_le_trans.
+             apply SMV12. unfold RNG, DomTgt.
+             apply SMWD12 in H; destruct H.
+             rewrite H0; auto.
+             xomega. }
+       
+       assert (INCR: inject_incr (as_inj nu12) j12').
+       { subst j12'; apply extern_incr_as_inj; auto. }
+         
+       destruct (mem_interpolation 
+                   nu12 nu23 j12' m1 m1' m2 m3
+                   (finite12: mi_mappedblocks (as_inj nu12) m2)
+                   (finite12': mi_mappedblocks' j12' (mem_add_nb m1' m2))
+                   (SMWD12: SM_wd nu12)
+                   (INCR: inject_incr (as_inj nu12) j12')) 
+                as [m2' [property_cont [property_acc property_nb]]].
+       clear finite12 finite12' INCR.
+       exists m2', nu12', nu23'.
+
+       (************************************************
+        * Proving some properties of my memory m2'     *
+        ************************************************)
+
        (* mem_forward m2 m2' *)
        assert (Fwd2: mem_forward m2 m2').
-       { subst m2'. unfold mem_forward; split.
+       { unfold mem_forward; split.
          + unfold Mem.valid_block in *.
-           rewrite mem_add_nbx.
+           rewrite property_nb.
            unfold mem_add_nb.
            xomega.
          + intros ofs per. 
-           unfold Mem.perm. rewrite (mem_add_accx nu12 nu23 j12' m1 m1' m2); unfold mem_add_acc.
+           unfold Mem.perm. rewrite property_acc; unfold mem_add_acc.
            destruct (valid_dec m2 b); try contradiction.
            destruct (locBlocksSrc nu23 b) eqn: loc23.
            destruct (pubBlocksSrc nu23 b) eqn: pub23; trivial.
@@ -395,14 +530,14 @@ Proof. intros.
        assert (UnchPrivSrc12 : Mem.unchanged_on
                    (fun (b : block) (_ : Z) =>
                       locBlocksSrc nu23 b = true /\ pubBlocksSrc nu23 b = false) m2 m2').
-       { subst m2'. constructor. 
+       { constructor. 
          + intros b ofs k0 p [locS pubS] bval; unfold Mem.perm.
-           rewrite (mem_add_accx nu12 nu23 j12' m1 m1' m2); unfold mem_add_acc.
+           rewrite property_acc; unfold mem_add_acc.
            rewrite locS, pubS.
            destruct (valid_dec m2 b); try solve[contradict bval;trivial].
            split; auto.
          + intros b ofs [locS pubS] mperm.
-           rewrite (mem_add_contx nu12 nu23 j12' m1 m1' m2); unfold mem_add_cont.
+           rewrite property_cont; unfold mem_add_cont.
            rewrite locS, pubS.
            destruct (valid_dec m2 b); try solve[trivial].
            (*Invalid case*) apply Mem.perm_valid_block in mperm; contradiction.
@@ -410,11 +545,10 @@ Proof. intros.
        
        (*Mem.unchanged_on local_out_of_reach 12*)
        assert (UnchLOOR12: Mem.unchanged_on (local_out_of_reach nu12 m1) m2 m2').
-       { subst m2'.
-         unfold local_out_of_reach.
+       { unfold local_out_of_reach.
          constructor. 
          + intros b ofs k0 p [locT mapcondition] bval; unfold Mem.perm.
-           rewrite (mem_add_accx nu12 nu23 j12' m1 m1' m2); 
+           rewrite property_acc; 
                  unfold mem_add_acc.
            destruct (valid_dec m2 b); try solve[contradict bval;trivial].
            assert (locS: locBlocksSrc nu23 b = true ) by
@@ -431,7 +565,7 @@ Proof. intros.
              * contradict mperm1. replace (ofs0 + d0 - d0) with ofs0 by omega; trivial.
              * rewrite pubS1; split; auto.
          + intros b ofs [locT mapcondition] mperm; unfold Mem.perm.
-           rewrite (mem_add_contx nu12 nu23 j12' m1 m1' m2); 
+           rewrite property_cont; 
                  unfold mem_add_cont.
            destruct (valid_dec m2 b).
            - assert (locS: locBlocksSrc nu23 b = true ) by
@@ -584,94 +718,7 @@ Proof. intros.
              symmetry; apply Pos.sub_add. xomega.
        }*)
        
-       (* SM_wd 12 *)
-       assert (SMWD12': SM_wd nu12').
-       { subst nu12'. eapply MKI_wd12; eauto.
-         + subst extS12. intros.
-           destruct (locBlocksSrc nu12 b) eqn:locBS12; auto.
-           right. destruct ExtIncr as [? [? [extS [? [locS ?]]]]].
-           simpl in locS; rewrite locS in locBS12.
-           destruct WDnu'. destruct (disjoint_extern_local_Src b) as [locFalse | extFalse].
-           rewrite locBS12 in locFalse; inversion locFalse.
-           exact extFalse.
-         + subst extT12. intros.
-           destruct (locBlocksTgt nu12 b) eqn:locBT12; auto.
-           right. 
-           unfold bconcat, buni, bshift.
-           destruct ExtIncr as [? [? [extS [? [locS [locT ?]]]]]].
-           destruct SMWD12. destruct (disjoint_extern_local_Tgt b) as [locFalse | extFalse].
-           rewrite locBT12 in locFalse; inversion locFalse.
-           rewrite extFalse; simpl.
-           destruct SMV12 as [DOM12 RNG12].
-           subst sizeM2;
-             rewrite RNG12; auto.
-           unfold RNG, DomTgt.
-           rewrite locBT12; auto.
-         + inversion Heqoutput. unfold add_inj, shiftT; intros.
-           destruct (j b1) eqn:jb1. 
-         - rewrite H in jb1. subst j.
-           destruct SMWD12. apply extern_DomRng in jb1. destruct jb1 as [extS12true extT12true].
-           subst extS12 extT12. apply ExtIncr in extS12true.
-           rewrite extS12true; split; trivial.
-           apply bconcat_larger1; auto.
-         - unfold filter_id in H. destruct (l' b1) eqn:lb1; inversion H.
-           subst extS12 extT12. subst l'.
-           destruct WDnu', p;
-             apply extern_DomRng in lb1.
-           destruct lb1 as [extStrue extTtrue].
-           split; auto.
-           subst sizeM2; apply bconcat_larger2; auto.
-           + intros. subst extT12. apply bconcat_larger1; auto.
-             apply SMWD12 in H.
-             exact H.
-       }
-
        
-       (* SM_wd 23 *)
-       assert (SMWD23': SM_wd nu23').
-       { subst nu23'; eapply MKI_wd23; eauto.
-         + subst extS23; intros.
-           destruct (locBlocksSrc nu23 b) eqn:locBS23; auto.
-           right. 
-           unfold bconcat, buni, bshift.
-             destruct SMWD23; destruct (disjoint_extern_local_Src b) as [locSfalse | extSfalse].
-           rewrite locBS23 in locSfalse; inversion locSfalse.
-           rewrite extSfalse; simpl.
-           destruct ExtIncr as [? [? [extS [extT [locS [locT ?]]]]]].
-           destruct SMV23 as [DOM23 RNG23].
-           subst sizeM2; rewrite DOM23; auto.
-           unfold DOM, DomSrc. rewrite locBS23; auto.
-         + subst extT23. intros.
-           destruct (locBlocksTgt nu23 b) eqn:locBT23; auto.
-           right. destruct ExtIncr as [? [? [extS [? [locS [locT ?]]]]]].
-           simpl in locT; rewrite locT in locBT23.
-           destruct WDnu'. destruct (disjoint_extern_local_Tgt b) as [locFalse | extFalse].
-           rewrite locBT23 in locFalse; inversion locFalse.
-           exact extFalse.
-         + inversion Heqoutput. unfold add_inj, shiftS; intros.
-           destruct (k b1) eqn:kb1. 
-         - rewrite H in kb1. subst k.
-           destruct SMWD23. apply extern_DomRng in kb1. destruct kb1 as [extS23true extT23true].
-           subst extS23 extT23. destruct ExtIncr as [? [? [extS [extT [locS [locT ?]]]]]].
-           simpl in extT; apply extT in extT23true.
-           rewrite extT23true; split; trivial.
-           apply bconcat_larger1; auto.
-         - rename H into lb1. inversion lb1.
-           destruct ((b1 ?= Mem.nextblock m2)%positive) eqn:ineq; try solve [inversion H2].
-           subst extS23 extT23. subst l'.
-           destruct WDnu'.
-           apply pure_filter_Some in lb1; destruct lb1 as [jmap lb1].
-           apply extern_DomRng in lb1.
-           destruct lb1 as [extStrue extTtrue].
-           split; auto.             
-           replace b1 with ((b1 - sizeM2) + sizeM2)%positive; 
-             subst sizeM2. apply bconcat_larger2; auto.
-           apply Pos.sub_add; destruct (Pos.compare_gt_iff b1 (Mem.nextblock m2)). 
-           apply H; auto.
-           + intros. subst extT23. destruct ExtIncr as [? [? [extS [extT [locS [locT ?]]]]]].
-             apply extT; simpl; auto.
-             apply SMWD23 in H; auto.
-       }
 
        (****************************
         * Proving each condition   *
@@ -714,8 +761,8 @@ Proof. intros.
          (* Prove Mem.inject12*)
          constructor.
          + constructor.
-         - { intros b1 b2 delta ofs k0 per H H0. subst m2'.
-             unfold Mem.perm; rewrite (mem_add_accx nu12 nu23 j12' m1 m1' m2); 
+         - { intros b1 b2 delta ofs k0 per H H0.
+             unfold Mem.perm; rewrite property_acc; 
              unfold mem_add_acc.
              (* New trying things*)
              unfold as_inj in H; apply joinD_Some in H; 
@@ -843,8 +890,8 @@ Proof. intros.
            apply SMWD12.
            eauto.
          - (*mi_memval12*) (*HERE*)
-           { intros b1 ofs b2 delta map12' mperm1'. subst m2'.
-             unfold Mem.perm; rewrite (mem_add_contx nu12 nu23 j12' m1 m1' m2); unfold mem_add_cont.
+           { intros b1 ofs b2 delta map12' mperm1'. 
+             unfold Mem.perm; rewrite property_cont; unfold mem_add_cont.
              (* New trying things*)
              unfold as_inj in map12'; apply joinD_Some in map12'; destruct map12' as [extmap | [extNone locmap]].
              + subst nu12'; rewrite ext_change_ext in extmap.
@@ -1090,17 +1137,17 @@ Proof. intros.
          apply mi_freeblocks0 in H; destruct (as_injD_None _ _ H) as [ext' loc'].
          unfold join.
          erewrite MKI_None12; eauto; subst j k l'; eauto.
-       + unfold as_inj; subst nu12' m2'.
+       + unfold as_inj; subst nu12'.
          intros b b' delta map; destruct (as_in_SomeE _ _ _ _ map) as [ext | loc].
          rewrite ext_change_ext in ext. 
          destruct (MKI_Some12 _ _ _ _ _ _ Heqoutput _ _ _ ext).
          destruct MInj12.
-         unfold Mem.valid_block; rewrite mem_add_nbx; unfold mem_add_nb.
+         unfold Mem.valid_block; rewrite property_nb; unfold mem_add_nb.
          eapply Pos.lt_trans; try eapply (Pos.lt_add_diag_r (Mem.nextblock m2)).
          apply (mi_mappedblocks b b' delta).
          unfold as_inj, join; subst j k l'; rewrite H; auto.
          destruct H as [jmap [b2' [d' [lmap' [eq1 eq2]]]]].
-         destruct MemInjNu'. unfold Mem.valid_block; rewrite mem_add_nbx.
+         destruct MemInjNu'. unfold Mem.valid_block; rewrite property_nb.
          unfold mem_add_nb. subst b'.
          destruct WDnu'.
          subst l'.
@@ -1110,7 +1157,7 @@ Proof. intros.
          apply DOMv. unfold DOM, DomSrc. rewrite extS; apply orb_true_r.
          xomega.
 
-         unfold Mem.valid_block; rewrite mem_add_nbx.
+         unfold Mem.valid_block; rewrite property_nb.
          unfold mem_add_nb.
          rewrite loc_change_ext in loc.
          destruct SMWD12.
@@ -1164,10 +1211,10 @@ Proof. intros.
        { exact Fwd2. }
        split.
        (* Mem.inject 23*)
-       { subst m2'; constructor.
+       { constructor.
          + constructor.
          - { intros b1 b2 delta ofs k0 p map23.
-             unfold Mem.perm. rewrite (mem_add_accx nu12 nu23 j12' m1 m1' m2); unfold mem_add_acc.
+             unfold Mem.perm. rewrite property_acc; unfold mem_add_acc.
              unfold as_inj in map23; apply joinD_Some in map23.
              destruct map23 as [extmap | [extmap locmap]].
              + subst nu23'.
@@ -1369,7 +1416,7 @@ Proof. intros.
            eauto.
 
            unfold Mem.range_perm, Mem.perm in H0.
-           rewrite (mem_add_accx nu12 nu23 j12' m1 m1' m2) in H0; unfold mem_add_acc in H0.
+           rewrite property_acc in H0; unfold mem_add_acc in H0.
            destruct (valid_dec m2 b1).
            { contradict v. unfold not, Mem.valid_block. clear - bGt.
              unfold Plt, Pos.lt. intros H; rewrite H in bGt; inversion bGt. }
@@ -1420,8 +1467,8 @@ Proof. intros.
          - { (*mi_memval23*)
              intros b1 ofs b2 delta map23.
              unfold Mem.perm. 
-             rewrite (mem_add_contx nu12 nu23 j12' m1 m1' m2); unfold mem_add_cont.
-              rewrite (mem_add_accx nu12 nu23 j12' m1 m1' m2); unfold mem_add_acc.
+             rewrite property_cont; unfold mem_add_cont.
+              rewrite property_acc; unfold mem_add_acc.
              unfold as_inj in map23; apply joinD_Some in map23.
              destruct map23 as [extmap | [extmap locmap]].
              + subst nu23'.
@@ -1743,7 +1790,7 @@ Proof. intros.
                }
              }
       + intros b H. unfold Mem.valid_block in H.
-        rewrite (mem_add_nbx nu12 nu23 j12' m1 m1' m2) in H.
+        rewrite property_nb in H.
         unfold mem_add_nb in H.
         destruct (as_inj nu23' b) eqn:map; trivial.
         contradict H. unfold as_inj in map; destruct p.
@@ -1831,7 +1878,7 @@ Proof. intros.
                rewrite Heqk in kmap1.
                assert(kmap1':=kmap1).
                unfold Mem.perm in H2, H3.
-               rewrite (mem_add_accx nu12 nu23 j12' m1 m1' m2) in H2, H3; 
+               rewrite property_acc in H2, H3; 
                  unfold mem_add_acc in H2,H3.
                assert (Mem.valid_block m2 b1) by auto_sm.
                destruct (valid_dec m2 b1); 
@@ -1909,7 +1956,7 @@ Proof. intros.
                rewrite Heqk in kmap2.
                assert(kmap2':=kmap2).
                unfold Mem.perm in H2, H3.
-               rewrite (mem_add_accx nu12 nu23 j12' m1 m1' m2) in H2, H3; 
+               rewrite property_acc in H2, H3; 
                  unfold mem_add_acc in H2,H3.
                assert (Mem.valid_block m2 b2) by auto_sm.
                destruct (valid_dec m2 b2) eqn:bval2; 
@@ -1991,7 +2038,7 @@ Proof. intros.
                destruct pfmap1 as [jmpa1 lmap1']; destruct pfmap2 as [jmap2 lmap2'].
                
                unfold Mem.perm in H2, H3.
-               rewrite (mem_add_accx nu12 nu23 j12' m1 m1' m2) in H2, H3; 
+               rewrite property_acc in H2, H3; 
                  unfold mem_add_acc in H2,H3.
                destruct (valid_dec m2 b1).
                {contradict v. unfold Mem.valid_block. xomega. }
@@ -2088,7 +2135,7 @@ Proof. intros.
            eapply MemInjNu'.
            apply extern_in_all; subst l'; eauto.
            unfold Mem.perm in H0.
-           rewrite (mem_add_accx nu12 nu23 j12' m1 m1' m2) in H0; 
+           rewrite property_acc in H0; 
                  unfold mem_add_acc in H0.
            assert (bval: ~Mem.valid_block m2 b). 
              { unfold Mem.valid_block, Plt, Pos.lt; intros HH. 
@@ -2160,8 +2207,8 @@ Proof. intros.
          rewrite H0; apply orb_true_r.
          
          (* Valid block *)
-         { subst nu12' m2'. unfold RNG, DomTgt, change_ext in H. destruct nu12; simpl in H.
-           unfold Mem.valid_block. rewrite mem_add_nbx. unfold mem_add_nb.
+         { subst nu12'. unfold RNG, DomTgt, change_ext in H. destruct nu12; simpl in H.
+           unfold Mem.valid_block. rewrite property_nb. unfold mem_add_nb.
            apply orb_true_iff in H; destruct H.
            + destruct SMV12 as [DOMtrue RNGtrue].
              unfold RNG, DomTgt in RNGtrue; move RNGtrue at bottom; simpl in RNGtrue.
@@ -2204,11 +2251,11 @@ Proof. intros.
        (* sm_valid 23'*)
        { unfold sm_valid.
          split; intros.
-         subst nu23' m2'. unfold DOM, DomSrc, change_ext in H. destruct nu23; simpl in H.
+         subst nu23'. unfold DOM, DomSrc, change_ext in H. destruct nu23; simpl in H.
          subst extS23; simpl in H.
          (* Valid block *)
          { unfold DOM, DomSrc, change_ext in H.
-           unfold Mem.valid_block. rewrite mem_add_nbx. unfold mem_add_nb.
+           unfold Mem.valid_block. rewrite property_nb. unfold mem_add_nb.
            apply orb_true_iff in H; destruct H.
            + destruct SMV23 as [DOMtrue RNGtrue].
              unfold DOM, DomSrc in DOMtrue; move DOMtrue at bottom; simpl in DOMtrue.
@@ -2374,7 +2421,4 @@ Proof. intros.
   as [m2' [nu12' [nu23' [A [B [C [D [E [F [G [H [I [J [K [L [M ]]]]]]]]]]]]]]]].
   exists m2', nu12', nu23'. intuition.
 Qed.
-
-Print Assumptions EFF_interp_II.
-
 

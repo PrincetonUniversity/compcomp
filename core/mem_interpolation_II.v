@@ -684,7 +684,7 @@ Qed.
  *         MEMORY        *
  *************************)
 (*mem_add j k jp m1' m2 *)
-Parameter mem_add: SM_Injection -> SM_Injection -> meminj -> mem -> mem -> mem -> mem.
+(*Parameter mem_add: SM_Injection -> SM_Injection -> meminj -> mem -> mem -> mem -> mem.*)
 
 Definition has_preimage (f:meminj) (m:mem) (b2:block):=
   exists b1 delta, Mem.valid_block m b1 /\ 
@@ -1066,7 +1066,6 @@ Lemma block_content_superbound: forall m,
         rewrite property1. apply m.
         destruct H1; xomega.
       - cut False; try contradiction ; clear - X xb H0. 
-        rewrite Ppred_minus in *. rewrite <- Ppred_minus in xb.
         apply Pos.succ_lt_mono in xb. 
         apply Pos.lt_succ_r in xb.
         rewrite Pos.succ_pred in xb. xomega.
@@ -1099,10 +1098,26 @@ Lemma delta_superbound: forall (j:meminj) N,
     rewrite <- Ppred_minus; apply Ppred_Plt; trivial.
     destruct (j (x-1)%positive) eqn:jmap; try destruct p as [b' d].
     - exists (Z.min lo (d - 1)), (Z.max hi (d + 1)); intros.
-      destruct (peq b (x - 1)).
-      * subst b. rewrite jmap in H1; inversion H1.
-        xomega. 
-  Admitted.
+      destruct (b ?= (x - 1))%positive eqn:bx.
+      * apply Pos.compare_eq_iff in bx; subst b. 
+        rewrite jmap in H1; inversion H1. xomega.
+      * apply (property _ _ _ bx) in H1. xomega.
+      * rewrite <- Ppred_minus in bx. apply Pos.gt_lt_iff in bx.
+        apply Pos.succ_lt_mono in bx. 
+        apply Pos.lt_succ_r in bx.
+        rewrite Pos.succ_pred in bx. xomega.
+        xomega.
+    - exists lo, hi; intros.
+      eapply property; eauto.
+      destruct (b ?= (x - 1))%positive eqn:bx.
+      * apply Pos.compare_eq_iff in bx; subst b. congruence.
+      * trivial.
+      * rewrite <- Ppred_minus in bx. apply Pos.gt_lt_iff in bx.
+        apply Pos.succ_lt_mono in bx. 
+        apply Pos.lt_succ_r in bx.
+        rewrite Pos.succ_pred in bx. xomega.
+        xomega.
+ Qed.
            
 Lemma finite_cont_perblock: forall nu12 nu23 j12' m1 m1' m2 
                                    (SMWD12: SM_wd nu12)
@@ -1114,7 +1129,8 @@ Lemma finite_cont_perblock: forall nu12 nu23 j12' m1 m1' m2
                                    mem_add_cont nu12 nu23 j12' m1 m1' m2 b z = Undef)).
   intros.
   destruct (block_content_superbound m1') as [lo1 [hi1 bound1]].
-  destruct (delta_superbound  j12' (Mem.nextblock m1)) as [lod [hid boundd]].
+  destruct (delta_superbound  j12' (Pos.max (Mem.nextblock m1) (Mem.nextblock m1'))) 
+    as [lod [hid boundd]].
   destruct (zmap_finite_type _ (Mem.mem_contents m2) !! b) as [lo2 [hi2 bound2]].
   destruct (zmap_finite_type _ (fst (Mem.mem_contents m2))) as [lo3 [hi3 bound3]].
   (*exists (Z.min (lo1 + lod) (Z.min lo2 lo3 )), (Z.max (hi1 + hid) (Z.max hi2 hi3)).*)
@@ -1138,8 +1154,9 @@ Lemma finite_cont_perblock: forall nu12 nu23 j12' m1 m1' m2
         apply local_in_all in jmap; try assumption.
         
         assert (jmap': j12' b02 = Some (b, delta')) by (apply INCR; trivial).
-        apply boundd in jmap'; auto; destruct jmap'.
-        apply bound1. destruct H; [left | right]; xomega. }
+        apply boundd in jmap'; destruct jmap'.
+        apply bound1. destruct H; [left | right]; xomega. 
+        apply Pos.max_lt_iff; auto. }
       rewrite H0; auto.
     - destruct ( source (as_inj nu12) m1 b z) eqn: sour;
       try solve [ destruct(as_inj nu23 b); try destruct p; trivial].
@@ -1150,8 +1167,9 @@ Lemma finite_cont_perblock: forall nu12 nu23 j12' m1 m1' m2
             [b02 [delta' [ofs2 [invert [ineq [jmap [mperm ofseq]]]]]]].
         inversion invert.
         assert (jmap': j12' b02 = Some (b, delta')) by (apply INCR; trivial).
-        apply boundd in jmap'; destruct jmap'.
-        apply bound1. destruct H; [left | right]; xomega. }
+        apply boundd in jmap'; auto; destruct jmap'.
+        apply bound1. destruct H; [left | right]; xomega.
+        apply Pos.max_lt_iff; auto. }
       rewrite H0; auto.
   + destruct (source j12' m1' b z) eqn:sour; trivial.
     - destruct p.
@@ -1160,8 +1178,9 @@ Lemma finite_cont_perblock: forall nu12 nu23 j12' m1 m1' m2
          destruct sour as 
              [b02 [delta' [ofs2 [invert [ineq [jmap' [mperm ofseq]]]]]]].
          inversion invert.
-         apply boundd in jmap'; destruct jmap'.
-         apply bound1. destruct H; [left | right]; xomega. }
+         apply boundd in jmap'; auto; destruct jmap'.
+         apply bound1. destruct H; [left | right]; xomega.
+         apply Pos.max_lt_iff; auto. }
       rewrite H0; trivial.
     - destruct (pmap_finite _ (Mem.mem_contents m2)) as [N bound].
       rewrite bound3. 
@@ -1171,13 +1190,13 @@ Lemma finite_cont_perblock: forall nu12 nu23 j12' m1 m1' m2
 Qed.
 
 Lemma cont_construct_perblock: 
-  forall nu12 nu23 j12' m1 m1' m2 (SMWD12: SM_wd nu12),
+  forall nu12 nu23 j12' m1 m1' m2 (SMWD12: SM_wd nu12) (INCR: inject_incr (as_inj nu12) j12'),
   forall b,
   sigT (fun mem_contents_block: ZMap.t memval =>
     (forall ofs, ZMap.get ofs mem_contents_block = mem_add_cont nu12 nu23 j12' m1 m1' m2 b ofs) /\
     (fst mem_contents_block = Undef)) .
   intros.
-  destruct (finite_cont_perblock _ nu23 j12' m1 m1' m2 SMWD12 b) as [lo [hi finite_proof]].
+  destruct (finite_cont_perblock _ nu23 j12' m1 m1' m2 SMWD12 INCR b) as [lo [hi finite_proof]].
   destruct (zmap_construct_type 
                            _                                         (*A*)
                            (mem_add_cont nu12 nu23 j12' m1 m1' m2 b) (*f*)
@@ -1269,7 +1288,8 @@ Lemma cont_construct_step1:
   forall nu12 nu23 j12' m1 m1' m2 
          (finite12: mi_mappedblocks (as_inj nu12) m2)
          (finite12': mi_mappedblocks' j12' (mem_add_nb m1' m2))
-         (SMWD12: SM_wd nu12),
+         (SMWD12: SM_wd nu12)
+         (INCR: inject_incr (as_inj nu12) j12'),
   exists mem_contents: block -> (ZMap.t memval),
   (forall b ofs,
     (ZMap.get ofs (mem_contents b) = 
@@ -1283,8 +1303,8 @@ Lemma cont_construct_step1:
   cut (exists f, forall b, (P b (f b))).
   { subst P; intros. destruct H. exists x. exact H. }
   { apply try. intros. 
-  destruct (finite_cont_perblock _ nu23 j12' m1 m1' m2 SMWD12 b) as [hi [lo finite_block']].
-  destruct (cont_construct_perblock nu12 nu23 j12' m1 m1' m2 SMWD12 b) as 
+  destruct (finite_cont_perblock _ nu23 j12' m1 m1' m2 SMWD12 INCR b) as [hi [lo finite_block']].
+  destruct (cont_construct_perblock nu12 nu23 j12' m1 m1' m2 SMWD12 INCR b) as 
       [block_content [cont_property dfl_property]].
   exists block_content.
   subst P. intros; split.
@@ -1296,12 +1316,14 @@ Lemma cont_construct:
   forall nu12 nu23 j12' m1 m1' m2 
          (finite12: mi_mappedblocks (as_inj nu12) m2)
          (finite12': mi_mappedblocks' j12' (mem_add_nb m1' m2))
-         (SMWD12: SM_wd nu12),
+         (SMWD12: SM_wd nu12)
+         (INCR: inject_incr (as_inj nu12) j12'),
+    
   exists mem_contents: PMap.t (ZMap.t memval),
     (forall b ofs, ZMap.get ofs (mem_contents !! b) = 
                  mem_add_cont nu12 nu23 j12' m1 m1' m2 b ofs) /\
     (forall b, fst (mem_contents !! b) = Undef).
-  intros. destruct (cont_construct_step1 _ nu23 _ m1 _ _ finite12 finite12' SMWD12) 
+  intros. destruct (cont_construct_step1 _ nu23 _ m1 _ _ finite12 finite12' SMWD12 INCR) 
           as [mem_contents_f' prop].
   remember ( fst (Mem.mem_contents m2)) as dfl.
   destruct (finite_cont _ nu23 _ m1 _ _ finite12 finite12' SMWD12) as [N finite_proof].
@@ -1339,7 +1361,8 @@ Lemma mem_interpolation:
   forall (nu12 nu23:SM_Injection)(j12':meminj) (m1 m1' m2 m3: mem)
     (finite12: mi_mappedblocks (as_inj nu12) m2)
       (finite12': mi_mappedblocks' j12' (mem_add_nb m1' m2))
-      (SMWD12: SM_wd nu12),
+      (SMWD12: SM_wd nu12)
+      (INCR: inject_incr (as_inj nu12) j12'),
     exists m3, (forall b ofs, ZMap.get ofs (Mem.mem_contents m3) !! b = 
                                    mem_add_cont nu12 nu23 j12' m1 m1' m2 b ofs) /\
                     (forall b, (Mem.mem_access m3) !! b = 
@@ -1353,7 +1376,7 @@ Proof.
       [mem_access [property_acc [access_max nextblock_noaccess]]].
    
   (*Content*)
-  destruct (cont_construct nu12 nu23 j12' m1 m1' m2 finite12 finite12' SMWD12) as
+  destruct (cont_construct nu12 nu23 j12' m1 m1' m2 finite12 finite12' SMWD12 INCR) as
       [mem_contents [property_cont contents_default]].
 
   exists (Mem.mkmem mem_contents 
@@ -1372,7 +1395,7 @@ Qed.
                     (forall b, (Mem.mem_access m3) !! b = 
                                mem_add_acc nu12 nu23 j12' m1 m1' m2 b) /\  
                     (Mem.nextblock m3 = mem_add_nb m1' m2).*)
-
+(*
 Lemma mem_add_contx:
   forall nu12 nu23 j12' m1 m1' m2, 
     (forall b ofs, 
@@ -1392,7 +1415,7 @@ Lemma mem_add_nbx:
   forall nu12 nu23 j12' m1 m1' m2,
                     (Mem.nextblock (mem_add nu12 nu23 j12' m1 m1' m2)) = mem_add_nb m1' m2.
   intros; remember (mem_add nu12 nu23 j12' m1 m1' m2) as m3; destruct (mem_add_ax nu12 nu23 j12' m1 m1' m2 m3) as [A [B C]]; auto.
-Qed.
+Qed.*)
 
 (*************************
  *    MEMORY PROPRTIES   *
