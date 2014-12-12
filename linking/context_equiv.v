@@ -86,6 +86,39 @@ Definition Equiv_ctx (ge : ge_ty) (N : pos) plt (p1 p2 : Prog.t N) :=
       (terminates (link_ctx C p1 plt) ge c1 m1 
    <-> terminates (link_ctx C p2 plt) ge c2 m2).
 
+(** A weaker notion of contextual equivalence, in which the initial memory [m]
+ is equal in source and target (this is possible, e.g., if [m] contains just
+ globals). [m] must self-inject. 
+
+ The advantage of the weaker notion is that it is easily shown to be a preorder
+ (reflexive and transitive). *)
+
+Definition Equiv_ctx_weak (ge : ge_ty) (N : pos) plt (p1 p2 : Prog.t N) :=
+  forall C : Ctx.t ge,
+  forall (main : val) (args : list val) m,
+  cc_init_inv (Mem.flat_inj (Mem.nextblock m)) ge args m ge args m -> 
+  forall c1, initial_core (link_ctx C p1 plt) ge main args = Some c1 -> 
+  (forall n, safeN (link_ctx C p1 plt) ge n c1 m) -> 
+  exists c2, 
+  [/\ initial_core (link_ctx C p2 plt) ge main args = Some c2 
+    , (forall n, safeN (link_ctx C p2 plt) ge n c2 m) 
+    & (terminates (link_ctx C p1 plt) ge c1 m 
+   <-> terminates (link_ctx C p2 plt) ge c2 m)].
+
+Lemma Equiv_ctx_weak_refl ge N plt (p : Prog.t N) : Equiv_ctx_weak ge plt p p.
+Proof. by move=> C main args m Inv c1 -> Hsafe; exists c1; split. Qed.
+
+Lemma Equiv_ctx_weak_trans ge N plt (p1 p2 p3 : Prog.t N) : 
+  Equiv_ctx_weak ge plt p1 p2 -> 
+  Equiv_ctx_weak ge plt p2 p3 -> 
+  Equiv_ctx_weak ge plt p1 p3.
+Proof. 
+move=> H1 H2 C main args m Inv c1 Init1 Hsafe.
+case (H1 C main args m Inv c1 Init1 Hsafe)=> c2 []Init2 Hsafe2 Hterm12.
+case: (H2 C main args m Inv c2 Init2 Hsafe2)=> c3 []Init3 Hsafe3 Hterm23.
+by exists c3; split=> //; rewrite Hterm12 Hterm23.
+Qed.
+
 (** Prove that Simulation implies Equiv_ctx *)
 
 Module ContextEquiv (LS : LINKING_SIMULATION). 
