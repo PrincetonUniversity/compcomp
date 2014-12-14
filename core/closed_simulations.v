@@ -34,21 +34,21 @@ relate semantics that may not use CompCert memories). *)
 
 Module Wholeprog_sim. Section Wholeprog_sim.
 
-Context {G1 C1 M1 G2 C2 M2 : Type}
+Context {G1 C1 M1 G2 C2 M2 V T : Type}
 
-(Sem1 : @CoreSemantics G1 C1 M1)
-(Sem2 : @CoreSemantics G2 C2 M2)
+(Sem1 : @CoreSemantics G1 C1 M1 V T)
+(Sem2 : @CoreSemantics G2 C2 M2 V T)
 
 (ge1 : G1)
 (ge2 : G2)
 
-(main : val).
+(main : V).
 
 Variable ge_inv : G1 -> G2 -> Prop.
 
-Variable init_inv : meminj -> G1 -> list val -> M1 -> G2 -> list val -> M2 -> Prop.
+Variable init_inv : meminj -> G1 -> list V -> M1 -> G2 -> list V -> M2 -> Prop.
 
-Variable halt_inv : SM_Injection -> G1 -> val -> M1 -> G2 -> val -> M2 -> Prop.
+Variable halt_inv : SM_Injection -> G1 -> V -> M1 -> G2 -> V -> M2 -> Prop.
 
 Record Wholeprog_sim := 
 { core_data : Type
@@ -108,7 +108,7 @@ Definition cc_halt_inv j (ge1 : Genv.t F1 V1) v1 m1 (ge2 : Genv.t F2 V2) v2 m2 :
   /\ Mem.inject (as_inj j) m1 m2.
 
 Definition CompCert_wholeprog_sim :=
-  @Wholeprog_sim.Wholeprog_sim _ _ _ _ _ _ 
+  @Wholeprog_sim.Wholeprog_sim _ _ _ _ _ _ _ _
     Sem1 Sem2
     ge1 ge2
     main

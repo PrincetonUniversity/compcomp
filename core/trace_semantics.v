@@ -76,8 +76,8 @@ Definition initial_core (ge : G) (v : val) (vs : list val)
 
 Definition halted (c : Z*list Event.t*C) := halted sem (snd c).
 
-Program Definition coresem : CoreSemantics G (Z*list Event.t*C) mem :=
-  @Build_CoreSemantics G (Z*list Event.t*C) mem 
+Program Definition coresem : CoreSemantics G (Z*list Event.t*C) mem val :=
+  @Build_CoreSemantics G (Z*list Event.t*C) mem val
   initial_core
   (fun _ => None)
   (fun _ _ => None)
@@ -228,7 +228,7 @@ Proof.
 unfold yielded.
 case_eq (at_external sem c); auto.
 intros [[ef sig] args] AT.
-generalize (@at_external_halted_excl _ _ _ sem c).
+generalize (@at_external_halted_excl _ _ _ _ sem c).
 rewrite AT. intros [|W]; try congruence; auto. 
 intros CONTRA; elimtype False; apply CONTRA.
 left; exists ef, sig, args; auto.
@@ -239,7 +239,7 @@ Proof.
 unfold yielded.
 case_eq (at_external sem c).
 intros [[ef sig] args] AT.
-generalize (@at_external_halted_excl _ _ _ sem c).
+generalize (@at_external_halted_excl _ _ _ _ sem c).
 rewrite AT. intros [|W]; try congruence; auto. intros AT.
 case_eq (semantics.halted sem c); auto.
 intros v HALT.

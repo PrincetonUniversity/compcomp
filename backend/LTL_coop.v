@@ -283,9 +283,9 @@ Inductive initial_state (p: program): state -> Prop :=
       initial_state p (Callstate nil f (Locmap.init Vundef) m0).
 *)
 
-Definition LTL_core_sem : CoreSemantics genv LTL_core mem.
+Definition LTL_core_sem : CoreSemantics genv LTL_core mem _ _.
 Proof.
-  eapply (@Build_CoreSemantics _ _ _ 
+  eapply (@Build_CoreSemantics _ _ _ _ _
        LTL_initial_core
        LTL_at_external
        LTL_after_external

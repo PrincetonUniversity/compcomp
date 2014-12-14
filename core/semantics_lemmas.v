@@ -12,7 +12,7 @@ Require Import Axioms.
 Require Import mem_lemmas.
 Require Import semantics.
 
-Definition corestep_fun {G C M : Type} (sem : CoreSemantics G C M) :=
+Definition corestep_fun {G C M V T : Type} (sem : CoreSemantics G C M V T) :=
   forall (m m' m'' : M) ge c c' c'',
   corestep sem ge c m c' m' -> 
   corestep sem ge c m c'' m'' -> 
@@ -21,7 +21,7 @@ Definition corestep_fun {G C M : Type} (sem : CoreSemantics G C M) :=
 (**  Multistepping *)
 
 Section corestepN.
-  Context {G C M E:Type} (Sem:CoreSemantics G C M) (ge:G).
+  Context {G C M V T E:Type} (Sem:CoreSemantics G C M V T) (ge:G).
 
   Fixpoint corestepN (n:nat) : C -> M -> C -> M -> Prop :=
     match n with

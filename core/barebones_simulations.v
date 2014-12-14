@@ -9,12 +9,12 @@ Require Import mem_lemmas.
 Module Barebones_simulation. Section Barebones_simulation.
 
 Context 
-  {F1 V1 C1 F2 V2 C2 : Type}
-  (Sem1 : CoreSemantics (Genv.t F1 V1) C1 mem)
-  (Sem2 : CoreSemantics (Genv.t F2 V2) C2 mem)
+  {F1 V1 C1 F2 V2 C2 V T : Type}
+  (Sem1 : CoreSemantics (Genv.t F1 V1) C1 mem V T)
+  (Sem2 : CoreSemantics (Genv.t F2 V2) C2 mem V T)
   (ge1 : Genv.t F1 V1)
   (ge2 : Genv.t F2 V2)
-  (main : val).
+  (main : V).
 
 Record Barebones_simulation := 
 { match_state : C1 -> C2 -> Prop

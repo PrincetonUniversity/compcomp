@@ -411,9 +411,9 @@ Lemma Mach_corestep_not_halted ge m q m' q':
       mach_step ge q m q' m' -> Mach_halted q = None.
 Proof. intros. inv H; auto. Qed.
 
-Definition Mach_core_sem : CoreSemantics genv Mach_core mem.
+Definition Mach_core_sem : CoreSemantics genv Mach_core mem val.
 Proof.
-  eapply (@Build_CoreSemantics _ _ _ 
+  eapply (@Build_CoreSemantics _ _ _ _
             Mach_initial_core
             Mach_at_external
             Mach_after_external

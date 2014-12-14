@@ -160,7 +160,8 @@ CORE=Extensionality.v \
   nucular_semantics.v \
   closed_simulations.v closed_simulations_lemmas.v \
   barebones_simulations.v \
-  val_casted.v
+  val_casted.v \
+  gen_genv.v
 
 # Linking files
 
@@ -201,6 +202,8 @@ ifeq ($(CCHECKLINK),true)
 endif
 
 proof: $(FILES:.v=.vo)
+
+linking: linking/linking_proof.vo
 
 extraction: extraction/STAMP
 

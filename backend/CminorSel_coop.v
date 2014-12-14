@@ -300,9 +300,9 @@ Definition CMinSel_initial_core (ge:genv) (v: val) (args:list val): option CMinS
      | _ => None
     end.
 
-Definition CMinSel_core_sem : CoreSemantics genv CMinSel_core mem.
+Definition CMinSel_core_sem : CoreSemantics genv CMinSel_core mem _ _.
 Proof.
-  eapply (@Build_CoreSemantics _ _ _ 
+  eapply (@Build_CoreSemantics _ _ _ _ _
     CMinSel_initial_core
     CMinSel_at_external
     CMinSel_after_external

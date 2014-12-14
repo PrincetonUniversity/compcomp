@@ -195,8 +195,8 @@ Record SM_simulation_inject := {
       nu (NuHyp: nu = replace_locals mu pubSrc' pubTgt'),
 
       forall nu' ret1 m1' ret2 m2'
-        (HasTy1: Val.has_type ret1 (proj_sig_res (AST.ef_sig e)))
-        (HasTy2: Val.has_type ret2 (proj_sig_res (AST.ef_sig e')))
+        (HasTy1: Val.has_type ret1 (proj_sig_res (AST.ef_sig (gen_genv.gef_to_ef e))))
+        (HasTy2: Val.has_type ret2 (proj_sig_res (AST.ef_sig (gen_genv.gef_to_ef e'))))
         (INC: extern_incr nu nu')  
         (SEP: sm_inject_separated nu nu' m1 m2)
 

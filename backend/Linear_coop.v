@@ -331,9 +331,9 @@ Lemma Linear_after_at_external_excl retv q q':
          destruct retv; inv H0; simpl; trivial.
   Qed.
 
-Definition Linear_core_sem : CoreSemantics genv Linear_core mem.
+Definition Linear_core_sem : CoreSemantics genv Linear_core mem val.
 Proof.
-  eapply (@Build_CoreSemantics _ _ _ 
+  eapply (@Build_CoreSemantics _ _ _ _
            Linear_initial_core
            Linear_at_external
            Linear_after_external

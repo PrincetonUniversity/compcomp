@@ -29,8 +29,8 @@ Arguments core_diagram : default implicits.
 
 Section closed_simulations_lemmas.
 Context  {G TG C D M TM Z data : Type}
-         {source : @CoreSemantics G C M}
-         {target : @CoreSemantics TG D TM}
+         {source : @CoreSemantics G C M val}
+         {target : @CoreSemantics TG D TM val}
          {geS : G}
          {geT : TG}
          {ge_inv : G -> TG -> Prop}
@@ -199,7 +199,7 @@ Qed.
 End closed_simulations_lemmas.
 
 Lemma corestepN_splits_lt 
-       {G C M} (csem : CoreSemantics G C M) (ge : G)
+       {G C M V} (csem : CoreSemantics G C M V) (ge : G)
        c m c' m' c'' m'' n1 n2 :
   corestep_fun csem -> 
   corestepN csem ge (S n1) c m c' m' -> 
@@ -249,15 +249,15 @@ Qed.
 
 (** ** Closed Simulation Implies Equitermination *)
 
-Definition terminates {G C M} (csem : CoreSemantics G C M) 
+Definition terminates {G C M V} (csem : CoreSemantics G C M V) 
     (ge : G) (c : C) (m : M) :=
   exists c' m', corestep_star csem ge c m c' m' 
   /\ exists v, halted csem c' = Some v.
 
 Section termination_preservation.
 Context  {G TG C D M TM Z data : Type}
-         {source : @CoreSemantics G C M}
-         {target : @CoreSemantics TG D TM}
+         {source : @CoreSemantics G C M val}
+         {target : @CoreSemantics TG D TM val}
          {geS : G}
          {geT : TG}
          {ge_inv : G -> TG -> Prop}
@@ -315,8 +315,8 @@ End termination_preservation.
 
 Section equitermination.
 Context  {G TG C D M TM Z data : Type}
-         {source : @CoreSemantics G C M}
-         {target : @CoreSemantics TG D TM}
+         {source : @CoreSemantics G C M val}
+         {target : @CoreSemantics TG D TM val}
          {geS : G}
          {geT : TG}
          {ge_inv : G -> TG -> Prop}

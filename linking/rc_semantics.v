@@ -157,8 +157,8 @@ Qed.
 
 (** ** Reach-Closed Interaction Semantics *)
   
-Program Definition coresem : CoreSemantics (Genv.t F V) state mem :=
-  Build_CoreSemantics _ _ _
+Program Definition coresem : CoreSemantics (Genv.t F V) state mem _ _ :=
+  Build_CoreSemantics _ _ _ _ _
     initial_core
     at_external
     after_external

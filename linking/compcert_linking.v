@@ -274,7 +274,7 @@ Import Modsem.
 
 Definition initCore (sg: signature) (ix: 'I_N) (v: val) (args: list val) 
   : option (Core.t my_cores):=
-  if @initial_core _ _ _ 
+  if @initial_core _ _ _ _
        (my_cores ix).(sem)
        (my_cores ix).(Modsem.ge) 
        v args 
@@ -419,7 +419,7 @@ Definition at_external0 (l: linker N my_cores) :=
   let: sem := (my_cores ix).(Modsem.sem) in                        
   let: F   := (my_cores ix).(Modsem.F) in                              
   let: V   := (my_cores ix).(Modsem.V) in                              
-    @at_external (Genv.t F V) _ _ sem (Core.c c).
+    @at_external (Genv.t F V) _ _ _ sem (Core.c c).
 
 Arguments at_external0 !l.
 
@@ -432,7 +432,7 @@ Definition halted0 (l: linker N my_cores) :=
   let: sem := (my_cores ix).(Modsem.sem) in
   let: F   := (my_cores ix).(Modsem.F) in
   let: V   := (my_cores ix).(Modsem.V) in
-  if @halted (Genv.t F V) _ _ sem (Core.c c) is Some v then
+  if @halted (Genv.t F V) _ _ _ sem (Core.c c) is Some v then
     if val_casted.val_has_type_func v (proj_sig_res sg) then Some v
     else None 
   else None.
@@ -452,7 +452,7 @@ Definition corestep0
   let: V   := (my_cores ix).(Modsem.V) in
   let: ge  := (my_cores ix).(Modsem.ge) in
     exists c', 
-      @corestep (Genv.t F V) _ _ sem ge (Core.c c) m c' m'
+      @corestep (Genv.t F V) _ _ _ sem ge (Core.c c) m c' m'
    /\ l' = updCore l (Core.upd c c').
 
 Arguments corestep0 !l m l' m'.
@@ -482,7 +482,7 @@ Definition after_external (mv: option val) (l: linker N my_cores) :=
   let: F   := (my_cores ix).(Modsem.F) in
   let: V   := (my_cores ix).(Modsem.V) in
   let: ge  := (my_cores ix).(Modsem.ge) in
-    if @after_external (Genv.t F V) _ _ sem mv (Core.c c) 
+    if @after_external (Genv.t F V) _ _ _ sem mv (Core.c c) 
       is Some c' then Some (updCore l (Core.upd c c'))
     else None.
 
@@ -753,8 +753,8 @@ Qed.
 
 (** Construct the interaction semantics of linking. *)
 
-Definition coresem : CoreSemantics ge_ty (linker N my_cores) Mem.mem :=
-  Build_CoreSemantics ge_ty (linker N my_cores) Mem.mem 
+Definition coresem : CoreSemantics ge_ty (linker N my_cores) Mem.mem _ :=
+  Build_CoreSemantics ge_ty (linker N my_cores) Mem.mem _
     initial_core
     at_external
     after_external
@@ -860,8 +860,8 @@ Section csem.
 Notation mycsem := (LinkerSem.coresem N my_cores my_fun_tbl).
 
 Program Definition csem 
-  : CoreSemantics ge_ty (linker N my_cores) Mem.mem := 
-  Build_CoreSemantics _ _ _
+  : CoreSemantics ge_ty (linker N my_cores) Mem.mem _ := 
+  Build_CoreSemantics _ _ _ _
     (initial_core mycsem)
     (at_external mycsem)
     (after_external mycsem)

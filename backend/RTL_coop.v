@@ -229,9 +229,9 @@ Proof.
   intros. destruct q; destruct q'; try destruct f; destruct retv; simpl in *; try discriminate; try reflexivity.
 Qed.
 
-Definition RTL_core_sem : CoreSemantics genv RTL_core mem.
+Definition RTL_core_sem : CoreSemantics genv RTL_core mem _ _.
 Proof.
-  eapply (@Build_CoreSemantics _ _ _ 
+  eapply (@Build_CoreSemantics _ _ _ _ _
             RTL_initial_core
             RTL_at_external
             RTL_after_external

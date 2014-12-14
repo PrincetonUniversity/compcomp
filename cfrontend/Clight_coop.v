@@ -269,9 +269,9 @@ Definition CL_initial_core (v: val) (args:list val): option CL_core :=
 End SEMANTICS.
 
 Definition CL_core_sem (FE:function -> list val -> mem -> env -> temp_env -> mem -> Prop)
-         : CoreSemantics genv CL_core mem.
+         : CoreSemantics genv CL_core mem _ _.
 Proof.
-  eapply (@Build_CoreSemantics _ _ _ 
+  eapply (@Build_CoreSemantics _ _ _ _ _
       CL_initial_core CL_at_external CL_after_external 
        CL_halted (clight_corestep FE)). 
     apply CL_corestep_not_at_external.

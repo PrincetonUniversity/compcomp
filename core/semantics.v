@@ -10,6 +10,7 @@ Require Import Globalenvs.
 Require Import Axioms.
 
 Require Import mem_lemmas.
+Require Import gen_genv.
 
 (** * Interaction Semantics *)
 
@@ -43,11 +44,12 @@ Require Import mem_lemmas.
 (** -2 a state cannot both step and be halted, and *)
 (** -3 a state cannot both be halted and blocked on an external call. *)
 
-Record CoreSemantics {G C M : Type} : Type :=
-  { initial_core : G -> val -> list val -> option C
-  ; at_external : C -> option (external_function * signature * list val)
-  ; after_external : option val -> C -> option C
-  ; halted : C -> option val
+(* V is the type of values transmitted between cores and the memory. *)
+Record CoreSemantics {G C M V T : Type} : Type :=
+  { initial_core : G -> V -> list V -> option C
+  ; at_external : C -> option (g_external_function T * g_signature T * list V)
+  ; after_external : option V -> C -> option C
+  ; halted : C -> option V
   ; corestep : G -> C -> M -> C -> M -> Prop
 
   ; corestep_not_at_external: 
@@ -67,7 +69,7 @@ Implicit Arguments CoreSemantics [].
    [core/mem_lemmas.v] for the defn. of [mem_forward]. *)
 
 Record CoopCoreSem {G C} :=
-  { coopsem :> CoreSemantics G C mem
+  { coopsem :> CoreSemantics G C mem val typ
   ; corestep_fwd : 
       forall g c m c' m' (CS: corestep coopsem g c m c' m'), 
       mem_forward m m' }.

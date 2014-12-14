@@ -9,9 +9,9 @@ Unset Printing Implicit Defensive.
 
 Section closed_safety.
 
-Variable (G C D Z M : Type).
+Variable (G C D Z M V : Type).
 
-Variable sem : CoreSemantics G C M.
+Variable sem : CoreSemantics G C M V.
 
 Variable ge : G.
 

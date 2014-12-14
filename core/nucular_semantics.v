@@ -108,7 +108,7 @@ Module Nuke_sem. Section nucular_semantics.
 
 Variable F V C : Type.
 
-Variable csem : CoreSemantics (Genv.t F V) C mem.
+Variable csem : CoreSemantics (Genv.t F V) C mem val typ.
 
 (* A "nucular" semantics is a core semantics that preserves the "WMD"
    property as an execution invariant. "WMD m" (formally, [mem_wd m],

@@ -13,28 +13,24 @@ Require Import semantics.
 Require Import semantics_lemmas.
 Require Import structured_injections.
 
-(** * Effect Semantics *)
+(** * Generalized Effect Semantics *)
 
-(** Effect semantics augment interaction semantics with effects, in the form 
-    of a set of locations [block -> Z -> bool] associated with each internal 
-    step of the semantics. *)
-
-(** Unlike general interaction semantics, which are parametric in the type of
-    memory, effect semantics are specialized to CompCert memories. *)
+(** Generalized effect semantics augment interaction semantics with effects,
+    but are not specific to CompCert memories or values. *)
  
-Record EffectSem {G C} :=
-  { (** [sem] is a cooperating interaction semantics. *)
-    sem :> CoopCoreSem G C
+Record GenEffectSem {G C M V E} :=
+  { (** [sem] is an interaction semantics. *)
+    sem :> CoreSemantics G C M V
 
     (** The step relation of the new semantics. *)
-  ; effstep: G -> (block -> Z -> bool) -> C -> mem -> C -> mem -> Prop
+  ; effstep: G -> E -> C -> M -> C -> M -> Prop
 
     (** The next three fields axiomatize [effstep] and its relation to the
         underlying step relation of [sem]. *)
   ; effax1: forall M g c m c' m',
        effstep g M c m c' m' ->
             corestep sem g c m c' m'  
-         /\ Mem.unchanged_on (fun b ofs => M b ofs = false) m m'
+         /\ Mem.unchanged_on (fun b ofs => M b ofs = false) m m' (* !! *)
   ; effax2: forall g c m c' m',
        corestep sem g c m c' m' ->
        exists M, effstep g M c m c' m'
@@ -46,7 +42,7 @@ Record EffectSem {G C} :=
 (** * Lemmas and auxiliary definitions *)
 
 Section effsemlemmas.
-  Context {G C:Type} (Sem: @EffectSem G C) (g:G).
+  Context {G C M V:Type} (Sem: @GenEffectSem G C M V) (g:G).
 
   Lemma effstep_corestep: forall M g c m c' m',
       effstep Sem g M c m c' m' -> corestep Sem g c m c' m'. 

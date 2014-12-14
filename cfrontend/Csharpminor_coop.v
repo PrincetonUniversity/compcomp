@@ -237,9 +237,9 @@ Definition CSharpMin_initial_core (ge:genv) (v: val) (args:list val): option CSh
      | _ => None
     end.
 
-Definition CSharpMin_core_sem : CoreSemantics genv CSharpMin_core mem.
+Definition CSharpMin_core_sem : CoreSemantics genv CSharpMin_core mem _ _.
 Proof.
-  eapply (@Build_CoreSemantics _ _ _ 
+  eapply (@Build_CoreSemantics _ _ _ _ _
     CSharpMin_initial_core
     CSharpMin_at_external
     CSharpMin_after_external

@@ -246,9 +246,9 @@ Lemma Asm_corestep_not_halted : forall ge m q m' q',
     auto.
   Qed.
  
-Definition Asm_core_sem : CoreSemantics genv state mem.
+Definition Asm_core_sem : CoreSemantics genv state mem _ _.
 Proof.
-  eapply (@Build_CoreSemantics _ _ _ 
+  eapply (@Build_CoreSemantics _ _ _ _ _
             Asm_initial_core
             Asm_at_external
             Asm_after_external

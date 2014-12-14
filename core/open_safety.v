@@ -5,10 +5,12 @@ Require Import extspec.
 Require Import semantics.
 Require Import semantics_lemmas.
 
+Require Import gen_genv.
+
 Section safety.
-  Context {G C M D Z:Type}.
-  Context (Hcore:CoreSemantics G C M).
-  Variable (Hspec:external_specification M external_function Z).
+  Context {G C M V T D Z:Type}.
+  Context (Hcore:CoreSemantics G C M V T).
+  Variable (Hspec:external_specification M V T (g_external_function T) Z).
 
   Variable ge : G.
 
@@ -23,9 +25,9 @@ Section safety.
              safeN n' z c' m'
        | Some (e,sig,args), None =>
            exists x:ext_spec_type Hspec e,
-             ext_spec_pre Hspec e x (sig_args sig) args z m /\
+             ext_spec_pre Hspec e x (g_sig_args sig) args z m /\
              (forall ret m' z',
-               ext_spec_post Hspec e x (sig_res sig) ret z' m' ->
+               ext_spec_post Hspec e x (Some (g_sig_res sig)) ret z' m' ->
                exists c',
                  after_external Hcore ret c = Some c' /\
                  safeN n' z' c' m')

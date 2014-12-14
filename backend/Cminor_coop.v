@@ -275,9 +275,9 @@ Lemma CMin_after_at_external_excl : forall retv q q',
        destruct retv; inv H1; simpl; trivial.*)
 Qed.
 
-Definition CMin_core_sem : CoreSemantics genv CMin_core mem.
+Definition CMin_core_sem : CoreSemantics genv CMin_core mem val typ.
 Proof.
-  eapply (@Build_CoreSemantics _ _ _ 
+  eapply (@Build_CoreSemantics _ _ _ _ _
     CMin_initial_core
     CMin_at_external
     CMin_after_external
