@@ -27,6 +27,33 @@ Fixpoint safeN (n : nat) (c : C) (m : M) : Prop :=
       end
   end.
 
+Fixpoint safeN_det (n : nat) (c : C) (m : M) : Prop :=
+  match n with
+    | O => True
+    | S n' => 
+      match halted sem c with
+        | None => exists c', exists m', 
+                    corestep sem ge c m c' m' /\ safeN_det n' c' m'
+        | Some i => True
+      end
+  end.
+
+Lemma det_safeN_det n c m : 
+  corestep_fun sem -> 
+  safeN_det n c m -> 
+  safeN n c m.
+Proof.
+intros Hfun; revert c m; induction n; simpl; auto.
+intros c m.
+destruct (halted sem c); auto.
+intros [c' [m' [Hstep Hsafe]]].
+split.
+exists c', m'; auto.
+intros c'' m'' Hstep'.
+destruct (Hfun _ _ _ _ _ _ _ Hstep Hstep').
+subst c' m'; apply IHn; auto.
+Qed.
+
 Lemma safe_downward1 n c m : safeN (S n) c m -> safeN n c m.
 Proof.
 revert c m; induction n; simpl; intros; auto.
