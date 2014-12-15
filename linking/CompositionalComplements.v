@@ -93,4 +93,39 @@ by eapply asm_step_det; eauto.
 move=> ix; move: (transf ix)=> H.
 by eapply transf_clight_program_correct in H; eauto.
 Qed.
-  
+
+Module CE2 := ContextEquiv2 LinkingSimulation.
+
+Lemma compcert_equiv2  
+  (N : pos)
+  (source_modules : 'I_N -> Clight_module)
+  (target_modules : 'I_N -> Asm_module)
+  (plt : ident -> option 'I_N) :
+  let sems_S (ix : 'I_N) := mk_src_sem (source_modules ix) in
+  let sems_T (ix : 'I_N) := mk_tgt_sem (target_modules ix) in
+  let prog_S := Prog.mk sems_S in
+  let prog_T := Prog.mk sems_T in
+  forall ge_top : ge_ty,
+  forall domeq_S : (forall ix : 'I_N, genvs_domain_eq ge_top (sems_S ix).(Modsem.ge)),
+  forall domeq_T : (forall ix : 'I_N, genvs_domain_eq ge_top (sems_T ix).(Modsem.ge)), 
+  forall lnr : (forall ix : 'I_N, list_norepet (map fst (prog_defs (source_modules ix)))),
+  forall transf : 
+    (forall ix : 'I_N, transf_clight_program (source_modules ix) 
+                     = Errors.OK (target_modules ix)),
+  Equiv_ctx2 ge_top plt prog_S prog_T.
+Proof.
+move=> sems_S sems_T prog_S prog_T ge_top deqS deqT lnr transf.
+have find_syms :
+  forall (i : 'I_N) (id : ident) (bf : block),
+  Genv.find_symbol (Modsem.ge (sems_S i)) id = Some bf ->
+  Genv.find_symbol (Modsem.ge (sems_T i)) id = Some bf.
+{ move=> idx id bf; rewrite /sems_S /sems_T /=; move: (transf idx)=> H.
+  by apply transf_clight_program_preserves_syms with (s := id) in H; rewrite H. }
+apply: CE2.equiv=> //.
+by move=> ix; apply: Clight_RC.
+by move=> ix; apply: Asm_is_nuc.
+move=> ix; rewrite /Prog.sems/= => m m' m'' ge c c' c'' /= H H2. 
+by eapply asm_step_det; eauto.
+move=> ix; move: (transf ix)=> H.
+by eapply transf_clight_program_correct in H; eauto.
+Qed.  
