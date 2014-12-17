@@ -510,3 +510,64 @@ inversion 1; subst; auto.
 Qed.
 
 End safety_preservation.
+
+Definition safe {G C M} (csem : CoreSemantics G C M) ge c m :=
+  forall n, safeN csem ge n c m.
+
+Inductive behavior : Type := Termination | Divergence | Going_wrong.
+
+Inductive has_behavior {G C M} (csem : CoreSemantics G C M) ge c m : behavior -> Prop :=
+  | Terminates : 
+      terminates csem ge c m -> has_behavior csem ge c m Termination
+  | Diverges : 
+      safe csem ge c m -> ~terminates csem ge c m -> 
+      has_behavior csem ge c m Divergence
+  | Goes_wrong :
+      ~safe csem ge c m -> has_behavior csem ge c m Going_wrong.
+
+Inductive behavior_refines : behavior -> behavior -> Prop :=
+  | Equitermination : behavior_refines Termination Termination 
+  | Equidivergence : behavior_refines Divergence Divergence
+  | Any_going_wrong : forall any, behavior_refines any Going_wrong.
+
+Section behavior_refinement.
+Context  {F V TF TV C D Z data : Type}.
+Let G := Genv.t F V.
+Let TG := Genv.t TF TV.
+Context  {source : @CoreSemantics G C mem}
+         {target : @CoreSemantics TG D mem}
+         {geS : G}
+         {geT : TG}
+         {ge_inv : G -> TG -> Prop}
+         {init_inv : meminj -> G -> list val -> mem -> TG -> list val -> mem -> Prop}
+         {halt_inv : structured_injections.SM_Injection ->
+                     G -> val -> mem -> TG -> val -> mem -> Prop}
+         (main : val)
+
+  (sim : Wholeprog_sim source target geS geT main ge_inv init_inv halt_inv)
+  (TGT_DET : corestep_fun target).
+
+Lemma behavior_refinment:
+  forall em : ClassicalFacts.excluded_middle, (* proof can probably be done without EM *)
+  forall c d m tm tbeh (MATCH : exists cd j, match_state sim cd j c m d tm),
+  has_behavior target geT d tm tbeh -> 
+  exists beh, has_behavior source geS c m beh /\ behavior_refines tbeh beh.
+Proof.
+intros until tbeh; intros [cd [j MATCH]].
+cut (safe source geS c m \/ ~safe source geS c m).
+{ intros [Safe|Nsafe].
+  { (*safe*) inversion 1; subst.
+    exists Termination; split; try constructor.
+    solve[erewrite equitermination; eauto].
+    assert (~terminates source geS c m). 
+    { intros nterm. erewrite equitermination in nterm; eauto. }
+    solve[exists Divergence; split; try constructor; auto].
+    elimtype False; apply H0.
+    solve[intros n; eapply safety_preservation in Safe; eauto]. }
+  { (*not safe*) intros. exists Going_wrong. split; try constructor; auto. }}
+{ apply em. }
+Qed.    
+
+End behavior_refinement.
+
+
