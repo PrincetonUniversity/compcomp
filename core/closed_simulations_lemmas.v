@@ -568,6 +568,30 @@ cut (safe source geS c m \/ ~safe source geS c m).
 { apply em. }
 Qed.    
 
+Lemma behavior_refinment':
+  forall em : ClassicalFacts.excluded_middle, (* proof can probably be done without EM *)
+  forall c d m tm tbeh (MATCH : exists cd j, match_state sim cd j c m d tm),
+  safe source geS c m -> 
+  (has_behavior target geT d tm tbeh <-> 
+   has_behavior source geS c m tbeh).
+Proof.
+intros; split; intros. 
+{ 
+eapply behavior_refinment in H0; eauto.
+destruct H0 as [beh [Hhas Href]]; inv Href; eauto.
+inv Hhas; contradiction.
+}
+{
+destruct MATCH as [cd [j Hmatch]].
+inv H0; constructor. 
+erewrite <-equitermination; eauto.
+intros n. specialize (H n). eapply safety_preservation; eauto.
+intros Hterm; apply H2.
+erewrite equitermination; eauto.
+contradiction.
+}
+Qed.    
+
 End behavior_refinement.
 
 
