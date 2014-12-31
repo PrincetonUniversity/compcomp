@@ -34,7 +34,10 @@ Proof. omega. Qed.
 Definition pos_incr (p : pos) := mkPos (pos_incr' p).                  
 
 Module Prog.
-Record t (N : pos) : Type := mk {sems :> 'I_N -> Modsem.t}.
+Record t (N : pos) : Type := 
+  mk { sems :> 'I_N -> Modsem.t;
+       main : val
+     }.
 End Prog.
 
 Section ExtendSems.
@@ -60,7 +63,7 @@ End ExtendSems.
 
 Definition apply_ctx (ge : ge_ty) (C : Ctx.t ge) 
                      (N : pos) (p : Prog.t N) : Prog.t (pos_incr N) :=
-  Prog.mk (extend_sems C p.(Prog.sems)).
+  Prog.mk (extend_sems C p.(Prog.sems)) (Prog.main p).
 
 Lemma leq_N_Nincr (N : pos) : ssrnat.leq N (pos_incr N).
 Proof. by rewrite /= plus_comm. Qed.
@@ -76,17 +79,77 @@ Definition link_ctx (ge : ge_ty) (C : Ctx.t ge) (N : pos) (p : Prog.t N) plt : E
     end
   in effsem (pos_incr N) (Prog.sems (apply_ctx C p)) extended_plt.
 
-Definition Equiv_ctx (ge : ge_ty) (N : pos) plt (p1 p2 : Prog.t N) :=
-  forall C : Ctx.t ge,
-  forall (main : val) (args1 args2 : list val) m1 m2,
-  forall j, cc_init_inv j ge args1 m1 ge args2 m2 -> 
-  forall c1, initial_core (link_ctx C p1 plt) ge main args1 = Some c1 -> 
-  forall c2, initial_core (link_ctx C p2 plt) ge main args2 = Some c2 -> 
-  (forall n, safeN (link_ctx C p1 plt) ge n c1 m1) -> 
-      (terminates (link_ctx C p1 plt) ge c1 m1 
-   <-> terminates (link_ctx C p2 plt) ge c2 m2).
+Section program_behaviors.
+Variables (ge : ge_ty) (N : pos).
 
-(** An alternate of contextual equivalence, in which the initial memory [m]
+Definition initializable plt (C : Ctx.t ge) (p : Prog.t N) args :=
+  exists c, initial_core (link_ctx C p plt) ge (Prog.main p) args = Some c.
+
+Definition prog_has_behavior plt (C : Ctx.t ge) (p : Prog.t N) args m beh :=
+  [\/ exists c, 
+      [/\ initial_core (link_ctx C p plt) ge (Prog.main p) args = Some c
+        & has_behavior (link_ctx C p plt) ge c m beh]
+    | [/\ ~initializable plt C p args & beh = Going_wrong]].
+
+Definition prog_terminates plt (C : Ctx.t ge) (p : Prog.t N) args m :=
+  prog_has_behavior plt C p args m Termination.
+
+Lemma prog_terminates_initializable plt C p args m :
+  prog_terminates plt C p args m ->
+  initializable plt C p args.
+Proof.
+case; first by case=> c []Hinit ?; exists c=> //.
+by case=> ?; discriminate.
+Qed.
+
+Definition prog_refines plt (C : Ctx.t ge) (p tp : Prog.t N) args targs m tm :=
+  forall tbeh, prog_has_behavior plt C tp targs tm tbeh ->
+  exists beh, [/\ prog_has_behavior plt C p args m beh & behavior_refines tbeh beh].
+
+Definition prog_equiv plt (C : Ctx.t ge) (p tp : Prog.t N) args targs m tm :=
+  [/\ prog_refines plt C p tp args targs m tm
+    & prog_refines plt C tp p targs args tm m].
+
+Definition safe plt (C : Ctx.t ge) (p : Prog.t N) args m :=
+  exists c, 
+  [/\ initial_core (link_ctx C p plt) ge (Prog.main p) args = Some c
+    & forall n, safeN (link_ctx C p plt) ge n c m].
+
+Lemma behavior_exists (EM : ClassicalFacts.excluded_middle)
+          plt C p args m :
+  exists beh, prog_has_behavior plt C p args m beh.
+Proof.
+case Init: (initial_core (link_ctx C p plt) ge (Prog.main p) args)=> [c|].
+case: (EM (prog_terminates plt C p args m)).
+{ move=> Hterm; exists Termination; left; exists c; split=> //.
+  by case: Hterm; case=> c' //; rewrite Init; case; case=> <-. }
+{ move=> Hnterm; case: (EM (safe plt C p args m)).
+  { move=> Hsafe; exists Divergence; left; exists c; split=> //.
+    case: Hsafe=> c'; rewrite Init; case; case=> <- Hsafe.
+    constructor=> // Hnterm'; apply: Hnterm.
+    by left; exists c; split=> //; constructor. }
+  { move=> Hnsafe; exists Going_wrong; left; exists c; split=> //.
+    by constructor=> // Hnsafe'; apply: Hnsafe; exists c; split. }
+}
+exists Going_wrong; right; split=> //.
+by rewrite /initializable Init; case.
+Qed.
+    
+End program_behaviors.
+
+Definition ok_init j (ge : ge_ty) args1 args2 m1 m2 :=
+  cc_init_inv j ge args1 m1 ge args2 m2.
+
+Definition Equiv_ctx (ge : ge_ty) (N : pos) plt (p1 p2 : Prog.t N) :=
+  forall (C : Ctx.t ge) args1 args2 m1 m2 j, 
+  ok_init j ge args1 args2 m1 m2 -> safe plt C p1 args1 m1 -> 
+  (prog_terminates plt C p1 args1 m1 <-> prog_terminates plt C p2 args2 m2).
+
+Definition Prog_refines (ge : ge_ty) (N : pos) plt (p1 p2 : Prog.t N) :=
+  forall (C : Ctx.t ge) args1 args2 m1 m2 j, ok_init j ge args1 args2 m1 m2 ->     
+  prog_refines plt C p1 p2 args1 args2 m1 m2.
+
+(** An alternate contextual equivalence, in which the initial memory [m]
  is equal in source and target (this is possible, e.g., if [m] contains just
  globals). [m] must self-inject. 
 
@@ -119,7 +182,7 @@ case: (H2 C main args m Inv c2 Init2 Hsafe2)=> c3 []Init3 Hsafe3 Hterm23.
 by exists c3; split=> //; rewrite Hterm12 Hterm23.
 Qed.
 
-Definition Prog_refines (ge : ge_ty) (N : pos) plt (p1 p2 : Prog.t N) :=
+Definition Prog_refines2 (ge : ge_ty) (N : pos) plt (p1 p2 : Prog.t N) :=
   forall C : Ctx.t ge,
   forall (main : val) (args : list val) m,
   cc_init_inv (Mem.flat_inj (Mem.nextblock m)) ge args m ge args m -> 
@@ -143,16 +206,16 @@ inversion 1; subst; auto.
 inversion 1; subst; auto.
 Qed.
 
-Lemma Prog_refines_refl ge N plt (p : Prog.t N) : Prog_refines ge plt p p.
+Lemma Prog_refines2_refl ge N plt (p : Prog.t N) : Prog_refines2 ge plt p p.
 Proof.
 move=> C main args m Inv c1 Init1; exists c1; split=> //.
 move=> tbeh Has1; exists tbeh; split=> //; last by apply: behavior_refines_refl.
 Qed.
 
-Lemma Prog_refines_trans ge N plt (p1 p2 p3 : Prog.t N) : 
-  Prog_refines ge plt p1 p2 -> 
-  Prog_refines ge plt p2 p3 -> 
-  Prog_refines ge plt p1 p3.
+Lemma Prog_refines2_trans ge N plt (p1 p2 p3 : Prog.t N) : 
+  Prog_refines2 ge plt p1 p2 -> 
+  Prog_refines2 ge plt p2 p3 -> 
+  Prog_refines2 ge plt p1 p3.
 Proof.
 move=> H1 H2 C main args m Inv c1 Init1.
 case: (H1 C main args m Inv c1 Init1)=> c2 []Init2 X2.
@@ -164,7 +227,7 @@ exists beh1; split=> //.
 by apply: (behavior_refines_trans R2 R1).
 Qed.
 
-(** Prove that Simulation implies Equiv_ctx *)
+(** Simulation implies Equiv_ctx *)
 
 Module ContextEquiv (LS : LINKING_SIMULATION). 
                                                                        
@@ -191,10 +254,11 @@ Variable find_symbol_ST :
   Genv.find_symbol (ge (Prog.sems pS ix)) id = Some bf -> 
   Genv.find_symbol (ge (Prog.sems pT ix)) id = Some bf.
 
-Lemma equiv : Equiv_ctx ge_top plt pS pT.
+Lemma equiv (Hmain : Prog.main pS = Prog.main pT) : Equiv_ctx ge_top plt pS pT.
 Proof.
-rewrite /Equiv_ctx=> C main args1 args2 m1 m2 j Inv c1 Init1 c2 Init2 Hsafe.
-have sim: CompCert_wholeprog_sim (link_ctx C pS plt) (link_ctx C pT plt) ge_top ge_top main.
+rewrite /Equiv_ctx=> C args1 args2 m1 m2 j Inv Hsafe. 
+have sim: CompCert_wholeprog_sim 
+          (link_ctx C pS plt) (link_ctx C pT plt) ge_top ge_top (Prog.main pS).
 { apply: link=> ix; rewrite /Prog.sems/apply_ctx/extend_sems. 
   by move=> ??; case e: (lt_dec ix N)=> [pf|pf] //; apply find_symbol_ST.
   by case e: (lt_dec ix N)=> [pf|pf] //; apply: (Ctx.rclosed_C C).
@@ -205,14 +269,19 @@ have sim: CompCert_wholeprog_sim (link_ctx C pS plt) (link_ctx C pT plt) ge_top 
 have target_det: corestep_fun (link_ctx C pT plt). 
 { apply: linking_det=> ix; rewrite /Prog.sems/apply_ctx/extend_sems.
   by case e: (lt_dec ix N)=> [pf|pf] //; apply Ctx.det_C. }
+case: Hsafe=> c1 []Init1 Hsafe; move: (Init1)=> Init1'.
 eapply @core_initial 
   with (Sem1 := link_ctx C pS plt) (Sem2 := link_ctx C pT plt) 
        (ge1 := ge_top) (ge2 := ge_top) (halt_inv := cc_halt_inv)
-       (j := j) (main := main) (m1 := m1) (m2 := m2) (w := sim)
+       (j := j) (main := Prog.main pS) (m1 := m1) (m2 := m2) (w := sim)
   in Init1; eauto.
-case: Init1=> mu []cd []x []_ []Init2' Hmatch.
-rewrite Init2 in Init2'; case: Init2'=> ->.
-by apply equitermination in Hmatch.
+case: Init1=> mu []cd []c2 []_ []Init2 Hmatch.
+apply equitermination in Hmatch=> //; split=> H1.
+left; exists c2; split=> //; first by rewrite Hmain in Init2.
+constructor; rewrite -Hmatch. 
+by case: H1=> [][]c1' //; rewrite Init1'; case; case=> <-; inversion 1.
+left; exists c1; split=> //; constructor; rewrite Hmatch.
+by case: H1=> [][]c2' //; rewrite -Hmain Init2; case; case=> <-; inversion 1.
 Qed.
 
 End ContextEquiv.
@@ -301,10 +370,12 @@ Variable find_symbol_ST :
   Genv.find_symbol (ge (Prog.sems pS ix)) id = Some bf -> 
   Genv.find_symbol (ge (Prog.sems pT ix)) id = Some bf.
 
-Lemma refines (EM : ClassicalFacts.excluded_middle) : Prog_refines ge_top plt pS pT.
+Lemma refines (Hmain : Prog.main pS = Prog.main pT) 
+      (EM : ClassicalFacts.excluded_middle) : Prog_refines ge_top plt pS pT.
 Proof.
-rewrite /Equiv_ctx=> C main args m Init c1 Init1.
-have sim: CompCert_wholeprog_sim (link_ctx C pS plt) (link_ctx C pT plt) ge_top ge_top main.
+rewrite /Equiv_ctx=> C args1 args2 m1 m2 j Inv tbeh Hhas2.
+have sim: CompCert_wholeprog_sim 
+          (link_ctx C pS plt) (link_ctx C pT plt) ge_top ge_top (Prog.main pS).
 { apply: link=> ix; rewrite /Prog.sems/apply_ctx/extend_sems. 
   by move=> ??; case e: (lt_dec ix N)=> [pf|pf] //; apply find_symbol_ST.
   by case e: (lt_dec ix N)=> [pf|pf] //; apply: (Ctx.rclosed_C C).
@@ -315,13 +386,30 @@ have sim: CompCert_wholeprog_sim (link_ctx C pS plt) (link_ctx C pT plt) ge_top 
 have target_det: corestep_fun (link_ctx C pT plt). 
 { apply: linking_det=> ix; rewrite /Prog.sems/apply_ctx/extend_sems.
   by case e: (lt_dec ix N)=> [pf|pf] //; apply Ctx.det_C. }
+
+have [beh Hhas1]: (exists beh, prog_has_behavior plt C pS args1 m1 beh).
+{ by apply: behavior_exists. }
+
+case: Hhas1.
+{ 
+case=> c1 []Init1 Hhas1; move: (Init1)=> Init1'.
 eapply @core_initial 
   with (Sem1 := link_ctx C pS plt) (Sem2 := link_ctx C pT plt) 
        (ge1 := ge_top) (ge2 := ge_top) (halt_inv := cc_halt_inv)
-       (j := Mem.flat_inj (Mem.nextblock m)) (main := main) (m1 := m) (m2 := m) (w := sim)
+       (j := j) (main := Prog.main pS) (m1 := m1) (m2 := m2) (w := sim)
   in Init1; eauto.
-case: Init1=> mu []cd []c2 []_ []Init2' Hmatch.
-by exists c2; split=> //; first by move=> tbeh; eapply behavior_refinment; eauto.
+case: Init1=> mu []cd []c2 []_ []Init2 Hmatch.
+case: (behavior_refinment (Prog.main pS) sim target_det EM c1 c2 m1 m2 tbeh).
+by exists cd, mu.
+case: Hhas2; case=> c2' //; first by rewrite -Hmain Init2; case; case=> <-.
+by elimtype False; apply: c2'; exists c2; rewrite -Hmain Init2.
+move=> beh' []Hhas1' Href; exists beh'; split=> //.
+by left; exists c1; split.
+}
+{
+case=> Init1 Hwrong; exists Going_wrong; split; last by constructor.
+by right; split.
+}
 Qed.
 
 End ProgRefines.

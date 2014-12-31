@@ -1,3 +1,10 @@
+(* ssreflect *)
+
+Require Import ssreflect ssrbool ssrfun seq eqtype fintype.
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
+
 Require Import pos.
 Require Import compcert_linking.
 Require Import linking_proof.
@@ -12,13 +19,6 @@ Require Import Asm_nucular.
 Require Import CompositionalCompiler.
 
 (** * Contextual Equivalence for CompCert Clight->x86 Asm *)
-
-(* ssreflect *)
-
-Require Import ssreflect ssrbool ssrfun seq eqtype fintype.
-Set Implicit Arguments.
-Unset Strict Implicit.
-Unset Printing Implicit Defensive.
 
 (** Notations and convenient definitions: *)
 
@@ -49,13 +49,16 @@ Lemma compcert_equiv
 
 (** The function [plt] maps a subset of the possible function names to the
   modules in which they are defined. *)
-  (plt : ident -> option 'I_N) :
+  (plt : ident -> option 'I_N) 
+
+(** The entry point *)
+  (main : val) :
 
 (** Wrap the source and target modules as 'Modsem's (as in Section 3). *)
   let sems_S (ix : 'I_N) := mk_src_sem (source_modules ix) in
   let sems_T (ix : 'I_N) := mk_tgt_sem (target_modules ix) in
-  let prog_S := Prog.mk sems_S in
-  let prog_T := Prog.mk sems_T in
+  let prog_S := Prog.mk sems_S main in
+  let prog_T := Prog.mk sems_T main in
 
 (** [ge_top] and the two [domeq_*] hypotheses below constrain the source--target
   global envs. of the modules in [sems_S] and [sems_T] to have equal domain, as
@@ -100,11 +103,12 @@ Lemma compcert_equiv2
   (N : pos)
   (source_modules : 'I_N -> Clight_module)
   (target_modules : 'I_N -> Asm_module)
-  (plt : ident -> option 'I_N) :
+  (plt : ident -> option 'I_N) 
+  (main : val) :
   let sems_S (ix : 'I_N) := mk_src_sem (source_modules ix) in
   let sems_T (ix : 'I_N) := mk_tgt_sem (target_modules ix) in
-  let prog_S := Prog.mk sems_S in
-  let prog_T := Prog.mk sems_T in
+  let prog_S := Prog.mk sems_S main in
+  let prog_T := Prog.mk sems_T main in
   forall ge_top : ge_ty,
   forall domeq_S : (forall ix : 'I_N, genvs_domain_eq ge_top (sems_S ix).(Modsem.ge)),
   forall domeq_T : (forall ix : 'I_N, genvs_domain_eq ge_top (sems_T ix).(Modsem.ge)), 
@@ -136,11 +140,12 @@ Lemma compcert_refines
   (N : pos)
   (source_modules : 'I_N -> Clight_module)
   (target_modules : 'I_N -> Asm_module)
-  (plt : ident -> option 'I_N) :
+  (plt : ident -> option 'I_N) 
+  (main : val) :
   let sems_S (ix : 'I_N) := mk_src_sem (source_modules ix) in
   let sems_T (ix : 'I_N) := mk_tgt_sem (target_modules ix) in
-  let prog_S := Prog.mk sems_S in
-  let prog_T := Prog.mk sems_T in
+  let prog_S := Prog.mk sems_S main in
+  let prog_T := Prog.mk sems_T main in
   forall ge_top : ge_ty,
   forall domeq_S : (forall ix : 'I_N, genvs_domain_eq ge_top (sems_S ix).(Modsem.ge)),
   forall domeq_T : (forall ix : 'I_N, genvs_domain_eq ge_top (sems_T ix).(Modsem.ge)), 
