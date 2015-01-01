@@ -156,3 +156,51 @@ eapply IHn; eauto.
 Qed.
 
 End closed_safety.
+
+(** Behaviors-related stuff; should probably go in a new file. *)
+
+Definition terminates {G C M} (csem : CoreSemantics G C M) 
+    (ge : G) (c : C) (m : M) :=
+  exists c' m', corestep_star csem ge c m c' m' 
+  /\ exists v, halted csem c' = Some v.
+
+Definition safe {G C M} (csem : CoreSemantics G C M) ge c m :=
+  forall n, safeN csem ge n c m.
+
+Definition forever_steps_or_halted {G C M} (csem : CoreSemantics G C M) ge c m :=
+  forall n, safeN_det csem ge n c m.
+
+Lemma safeN_safeN_det G C M (csem : CoreSemantics G C M) ge c m n :
+  safeN csem ge n c m -> 
+  safeN_det csem ge n c m.
+Proof.
+revert c m; induction n; auto.
+intros c m; simpl.
+destruct (halted csem c); auto.
+intros [[c' [m' Hhlt]] H].
+exists c', m'; split; auto.
+Qed.
+
+Lemma safe_forever_steps_or_halted G C M (csem : CoreSemantics G C M) ge c m :
+  safe csem ge c m -> 
+  forever_steps_or_halted csem ge c m.
+Proof.
+intros H n; specialize (H n); apply safeN_safeN_det; auto.
+Qed.
+
+Inductive behavior : Type := Termination | Divergence | Going_wrong.
+
+Inductive has_behavior {G C M} (csem : CoreSemantics G C M) ge c m : behavior -> Prop :=
+  | Terminates : 
+      terminates csem ge c m -> has_behavior csem ge c m Termination
+  | Diverges : 
+      forever_steps_or_halted csem ge c m -> ~terminates csem ge c m -> 
+      has_behavior csem ge c m Divergence
+  | Goes_wrong :
+      ~safe csem ge c m -> has_behavior csem ge c m Going_wrong.
+
+Inductive behavior_refines : behavior -> behavior -> Prop :=
+  | Equitermination : behavior_refines Termination Termination 
+  | Equidivergence : behavior_refines Divergence Divergence
+  | Any_going_wrong : forall any, behavior_refines any Going_wrong.
+

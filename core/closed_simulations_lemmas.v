@@ -249,11 +249,6 @@ Qed.
 
 (** ** Closed Simulation Implies Equitermination *)
 
-Definition terminates {G C M} (csem : CoreSemantics G C M) 
-    (ge : G) (c : C) (m : M) :=
-  exists c' m', corestep_star csem ge c m c' m' 
-  /\ exists v, halted csem c' = Some v.
-
 Section termination_preservation.
 Context  {G TG C D M TM Z data : Type}
          {source : @CoreSemantics G C M}
@@ -511,25 +506,6 @@ Qed.
 
 End safety_preservation.
 
-Definition safe {G C M} (csem : CoreSemantics G C M) ge c m :=
-  forall n, safeN csem ge n c m.
-
-Inductive behavior : Type := Termination | Divergence | Going_wrong.
-
-Inductive has_behavior {G C M} (csem : CoreSemantics G C M) ge c m : behavior -> Prop :=
-  | Terminates : 
-      terminates csem ge c m -> has_behavior csem ge c m Termination
-  | Diverges : 
-      safe csem ge c m -> ~terminates csem ge c m -> 
-      has_behavior csem ge c m Divergence
-  | Goes_wrong :
-      ~safe csem ge c m -> has_behavior csem ge c m Going_wrong.
-
-Inductive behavior_refines : behavior -> behavior -> Prop :=
-  | Equitermination : behavior_refines Termination Termination 
-  | Equidivergence : behavior_refines Divergence Divergence
-  | Any_going_wrong : forall any, behavior_refines any Going_wrong.
-
 Section behavior_refinement.
 Context  {F V TF TV C D Z data : Type}.
 Let G := Genv.t F V.
@@ -547,7 +523,7 @@ Context  {source : @CoreSemantics G C mem}
   (sim : Wholeprog_sim source target geS geT main ge_inv init_inv halt_inv)
   (TGT_DET : corestep_fun target).
 
-Lemma behavior_refinment:
+Lemma behavior_refinement:
   forall em : ClassicalFacts.excluded_middle, (* proof can probably be done without EM *)
   forall c d m tm tbeh (MATCH : exists cd j, match_state sim cd j c m d tm),
   has_behavior target geT d tm tbeh -> 
@@ -561,14 +537,15 @@ cut (safe source geS c m \/ ~safe source geS c m).
     solve[erewrite equitermination; eauto].
     assert (~terminates source geS c m). 
     { intros nterm. erewrite equitermination in nterm; eauto. }
-    solve[exists Divergence; split; try constructor; auto].
+    exists Divergence; split; try constructor; auto.
+    solve[apply safe_forever_steps_or_halted; auto].
     elimtype False; apply H0.
     solve[intros n; eapply safety_preservation in Safe; eauto]. }
   { (*not safe*) intros. exists Going_wrong. split; try constructor; auto. }}
 { apply em. }
 Qed.    
 
-Lemma behavior_refinment':
+Lemma behavior_equiv:
   forall em : ClassicalFacts.excluded_middle, (* proof can probably be done without EM *)
   forall c d m tm tbeh (MATCH : exists cd j, match_state sim cd j c m d tm),
   safe source geS c m -> 
@@ -577,7 +554,7 @@ Lemma behavior_refinment':
 Proof.
 intros; split; intros. 
 { 
-eapply behavior_refinment in H0; eauto.
+eapply behavior_refinement in H0; eauto.
 destruct H0 as [beh [Hhas Href]]; inv Href; eauto.
 inv Hhas; contradiction.
 }
@@ -585,7 +562,9 @@ inv Hhas; contradiction.
 destruct MATCH as [cd [j Hmatch]].
 inv H0; constructor. 
 erewrite <-equitermination; eauto.
-intros n. specialize (H n). eapply safety_preservation; eauto.
+intros n. 
+eapply safety_preservation with (d0:=d)(tm0:=tm)(n0:=n) in H; eauto.
+solve[apply safeN_safeN_det; auto].
 intros Hterm; apply H2.
 erewrite equitermination; eauto.
 contradiction.

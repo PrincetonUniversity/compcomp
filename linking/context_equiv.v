@@ -126,8 +126,8 @@ case: (EM (prog_terminates plt C p args m)).
 { move=> Hnterm; case: (EM (safe plt C p args m)).
   { move=> Hsafe; exists Divergence; left; exists c; split=> //.
     case: Hsafe=> c'; rewrite Init; case; case=> <- Hsafe.
-    constructor=> // Hnterm'; apply: Hnterm.
-    by left; exists c; split=> //; constructor. }
+    constructor=> // Hnterm'; first by apply safeN_safeN_det.
+    by apply: Hnterm; left; exists c; split=> //; constructor. }
   { move=> Hnsafe; exists Going_wrong; left; exists c; split=> //.
     by constructor=> // Hnsafe'; apply: Hnsafe; exists c; split. }
 }
@@ -316,7 +316,7 @@ eapply @core_initial
        (j := j) (main := Prog.main pS) (m1 := m1) (m2 := m2) (w := sim)
   in Init1; eauto.
 case: Init1=> mu []cd []c2 []_ []Init2 Hmatch.
-case: (behavior_refinment (Prog.main pS) sim target_det EM c1 c2 m1 m2 tbeh).
+case: (behavior_refinement (Prog.main pS) sim target_det EM c1 c2 m1 m2 tbeh).
 by exists cd, mu.
 case: Hhas2; case=> c2' //; first by rewrite -Hmain Init2; case; case=> <-.
 by elimtype False; apply: c2'; exists c2; rewrite -Hmain Init2.
