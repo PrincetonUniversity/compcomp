@@ -4072,8 +4072,8 @@ assert (GDE: genvs_domain_eq ge tge).
   apply MATCH_wd. 
 (*MATCH_reachclosed*)
   apply MATCH_RC.
-(*MATCH_restrict*)
-  apply MATCH_restrict.
+(*MATCH_restrict
+  apply MATCH_restrict.*)
 (*MATCH_valid*)
   apply MATCH_valid.
 (*MATCH_dival

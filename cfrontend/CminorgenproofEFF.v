@@ -3270,8 +3270,8 @@ assert (GDE:= GDE_lemma).
   apply MATCH_sm_wd.
 (*match_visible*)
   apply MATCH_visible.
-(*match_restrict*)
-  apply MATCH_restrict.
+(*match_restrict
+  apply MATCH_restrict.*)
 (*match_valid*)
   apply MATCH_validblocks.
 (*match_genv*)
