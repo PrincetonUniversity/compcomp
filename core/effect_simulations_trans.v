@@ -299,7 +299,7 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
   destruct SIM12 
     as [core_data12 match_core12 core_ord12 core_ord_wf12 
       match_sm_wd12 genvs_dom_eq12 match_genv12
-      match_visible12 (*match_junk_inv12 match_restrict12 *)
+      match_visible12 (*match_junk_inv12 match_restrict12*)
       match_sm_valid12 core_initial12 effcore_diagram12
       core_halted12 core_at_external12 eff_after_external12].  
   destruct SIM23 
@@ -353,108 +353,32 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
     destruct d as [[d12 cc2] d23].
     destruct H as [c2 [m2 [mu12 [mu23 [X [J [INV [MC12 [MC23 IFDL]]]]]]]]]; subst.
     simpl. rewrite vis_compose_sm. eapply match_visible12. eassumption. }
-(*
-{ (*match_restrict'*)
-  clear - match_restrict12 match_restrict23 match_visible12 match_visible23.
+(*{ (*match_restrict'*)
+  clear - match_sm_wd12 match_restrict12 match_restrict23 match_visible12 match_visible23.
     intros. rename c2 into c3. rename m2 into m3.
     destruct d as [[d12 cc2] d23].
     destruct H as [c2 [m2 [mu12 [mu23 [XX [J [INV [MC12 [MC23 pure]]]]]]]]];
       subst; simpl.
-    (* destruct (ex_clean_mem (restrict_sm mu12 X) m1 m2) as [m2' [JINV NJNK]].
-    remember (clean (restrict_sm mu12 X) m1' m2) as m2'.*)
-    remember (fun b => image mu12 X b || vis mu23 b) as X'.
-    exists c2, m2, (restrict_sm mu12 X), (restrict_sm mu23 X').
-    intuition. 
+    exists c2, m2, (restrict_sm mu12 X), mu23. (* (restrict_sm mu23 X').*)
+    intuition;
+    try (solve [unfold restrict_sm; destruct mu12, mu23; simpl; auto]).
     unfold compose_sm; f_equal; 
     try (solve [unfold restrict_sm; destruct mu12, mu23; simpl; auto]).
     { rewrite restrict_compose, restrict_sm_local.
       extensionality b.
       unfold compose_meminj, restrict.
-      destruct (X b) 
-eqn: Xb; auto.
-      destruct (local_of mu12 b) eqn:imgloc12; try destruct p; auto.
-      cut (local_of mu23 b0 = local_of (restrict_sm mu23 X') b0).
-      + intros HH; rewrite HH; auto.
-      + assert (SMWD:SM_wd mu23) by ad_it .
-        destruct mu23; unfold  restrict_sm, restrict; simpl.
-        destruct (X' b0) eqn:X'b0; auto. 
-        destruct (local_of b0) eqn:locb0; auto.
-        subst X'; simpl in X'b0.  
-        destruct p.
-        apply SMWD in locb0; destruct locb0 as [HH HHH]; simpl in *.
-        unfold vis in X'b0; simpl in X'b0.
-        rewrite HH in X'b0; rewrite orb_true_r in X'b0; inversion X'b0. }
-        { rewrite restrict_compose, restrict_sm_extern.
-          extensionality b.
-          unfold compose_meminj, restrict.
-          destruct (X b) eqn: Xb; auto.
-          destruct (extern_of mu12 b) eqn:imgloc12; try destruct p; auto.
-          cut (extern_of mu23 b0 = extern_of (restrict_sm mu23 X') b0).
-      + intros HH; rewrite HH; auto.
-      + eapply (image_forward
- mu12 X) in Xb.
-        subst X'.
-        destruct mu23; unfold  restrict_sm, restrict; simpl.
-        rewrite Xb; simpl; auto.
-        instantiate (1:=z).
-        rewrite <- imgloc12.
-        ad_it.
-        }
-    solve [unfold restrict_sm; destruct mu12, mu23; simpl; auto].
-    solve [unfold restrict_sm; destruct mu12, mu23; simpl; auto].
-    solve [unfold restrict_sm; destruct mu12, mu23; simpl; auto].
-    solve [unfold restrict_sm; destruct mu12, mu23; simpl; auto].
-    eapply match_restrict23; eauto.
-    rewrite vis_compose_sm in H0.
-    { intros. subst X'. destruct (vis mu23 b) eqn: visb.
-      + rewrite orb_true_r; auto.
-      + unfold vis in H4. inversion H4. }
-    subst X'. apply REACH_closed_union.
-    ad_it. (* REACH_closed m2 (image mu12 X) *)
-    eapply (match_visible23 _ _ _ _ _ _ MC23).
-    ad_it. }
-{ (*match_restrict*)
-  clear - match_restrict12 match_restrict23 match_junk_inv12 match_junk_inv23.
-    intros. rename c2 into c3. rename m2 into m3.
-    destruct d as [[d12 cc2] d23].
-    destruct H as [c2 [m2 [mu12 [mu23 [XX [J [INV [MC12 [MC23 IFDL]]]]]]]]]; 
-      subst; simpl in *.
-    destruct (ex_clean_mem (restrict_sm mu12 X) m1 m2) as [m2' [JINV NJNK]].
-    exists c2, m2', (restrict_sm mu12 X), (restrict_sm mu12 X).
-    assert (vis' : forall b : block, vis mu23 b = true -> X b = true).
-    generalize H0; clear.
-    unfold compose_sm; unfold vis; simpl; intros.
-    apply H0.
-    specialize (match_restrict12 _ _ _ _ _ _ X MC12 H0 H1).
-    specialize (match_restrict23 _ _ _ _ _ _ X MC23 H0 H1).
-    intuition.
-    (*apply restrict_sm_WD; eauto.*)
-    unfold compose_sm; simpl.
-    f_equal; try (destruct mu12, mu23; reflexivity).
-      destruct mu12, mu23; simpl in *.
-        unfold compose_meminj, restrict. extensionality b.
-        remember (X b) as d.
-        destruct d; trivial.
-      destruct mu12; simpl in *.
-        unfold compose_meminj, restrict. extensionality b.
-        remember (X b) as d.
-        destruct d; trivial.
-      destruct mu12; simpl in *. assumption.
-      destruct mu12; simpl in *. assumption.
-      destruct mu12; simpl in *. apply (H2 _ H4).
-      destruct mu12; simpl in *. apply (H5 _ H4).
+      destruct (X b) eqn: Xb; auto.  }
+    { rewrite restrict_compose, restrict_sm_extern.
+      extensionality b.
+      unfold compose_meminj, restrict.
+      destruct (X b) eqn: Xb; auto. }
 
-      apply (match_junk_inv12 _ _ _ _ _ m2); eauto.
-      
-      ad_it.
-
-      move IFDL at bottom.
-      unfold I_fiddle in *. intros b2 ofs perm ext.
-      specialize (IFDL b2 delta23 b3 extern_maps ofs allocated); 
-        destruct IFDL as [b1 [delta12 has_source]].
-      unfold source, sourceN.
-      exists b1, delta12.
-} *) 
+    (*full_ext*)
+    (*Destructing mu12. THIS SHOULD BE A LEMMA*)
+    generalize pure; clear pure.
+    unfold restrict_sm, restrict, full_ext, full_comp.
+    destruct mu12; simpl; intros.
+    destruct (X b0) eqn:Xb0; eauto; inversion H4. (*Solves two goals*) }*)
 { (*sm_valid*)
     clear - match_sm_valid12 match_sm_valid23.
     intros. rename c2 into c3.  rename m2 into m3.

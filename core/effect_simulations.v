@@ -134,23 +134,7 @@ Record SM_simulation_inject :=
       match_state d mu c1 m1 c2 m2 ->
       forall X, (forall b, vis mu b = true -> X b = true) ->
                 REACH_closed m1 X ->
-      (*forall m2', junk_inv_r (restrict_sm mu X) m1' m2 m2' ->
-                  junk_inv_l (restrict_sm mu X) m1 m1' ->*)
       match_state d (restrict_sm mu X) c1 m1 c2 m2*)
-
-(*match_junk_inv: 
-    forall d mu c1 m1 c2 m2,
-    match_state d mu c1 m1 c2 m2 -> 
-    forall m2', junk_inv_r mu m1 m2 m2' ->
-    (*forall m1', junk_inv_l mu m1 m1' ->*)
-    match_state d mu c1 m1 c2 m2'
-
-; match_restrict : 
-    forall d mu c1 m1 c2 m2 X, 
-    match_state d mu c1 m1 c2 m2 -> 
-    (forall b, vis mu b = true -> X b = true) ->
-    REACH_closed m1 X ->
-    match_state d (restrict_sm mu X) c1 m1 c2 m2*)
 
 ; match_validblocks : 
     forall d mu c1 m1 c2 m2, 

@@ -193,7 +193,7 @@ clear - match_sm_wd. intros. destruct H; subst. eauto.
 assumption.
 clear - match_genv. intros. destruct MC; subst. eauto.
 clear - match_visible. intros. destruct H; subst. eauto.
-(* clear - match_restrict. intros. destruct H; subst. eauto. *)
+(* RESTRIC : clear - match_restrict. intros. destruct H; subst. eauto.*)
 clear - match_validblocks. intros.
     destruct H; subst. eauto.
 clear - inj_initial_cores. intros.
@@ -323,7 +323,7 @@ clear - match_sm_wd. intros. destruct H; subst. eauto.
 assumption.
 clear - match_genv. intros. destruct MC; subst. eauto.
 clear - match_visible. intros. destruct H; subst. eauto.
-(*clear - match_restrict. intros. destruct H; subst. eauto.*)
+(* RESTRICT: clear - match_restrict. intros. destruct H; subst. eauto.*)
 clear - match_validblocks. intros.
     destruct H; subst. eauto.
 clear - inj_initial_cores. intros.
