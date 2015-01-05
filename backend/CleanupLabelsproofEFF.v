@@ -1942,9 +1942,9 @@ apply GDE_lemma.
   intros. destruct MC; subst. eapply MATCH_PG; eassumption.
 (*match_reach_closed*)
 intros. apply H.
-(*genvs_restrict*)
+(*genvs_restrict
   intros. destruct H; subst. 
-  split; trivial. eapply MATCH_restrict; eassumption.
+  split; trivial. eapply MATCH_restrict; eassumption.*)
 (*match_valid*)
   intros. apply H.
 (*initial_core*)

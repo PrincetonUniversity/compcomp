@@ -6535,8 +6535,8 @@ assert (GDE:= GDE_lemma).
   apply MATCH_wd. 
 (*MATCH_reachclosed*)
   apply MATCH_RC.
-(*MATCH_restrict*)
-  apply MATCH_restrict.
+(*MATCH_restrict
+  apply MATCH_restrict.*)
 (*MATCH_valid*)
   apply MATCH_valid.
 (*MATCH_preserves_globals*)

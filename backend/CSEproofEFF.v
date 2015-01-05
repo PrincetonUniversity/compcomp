@@ -2403,8 +2403,8 @@ assert (GDE:= GDE_lemma).
   intros; apply H.
 (*match_visible*)
   intros. apply H.
-(*match_restrict*)
-  intros x. apply MATCH_restrict.
+(*match_restrict
+  intros x. apply MATCH_restrict.*)
 (*match_valid*)
   intros. apply H.
 (*match_genv*)

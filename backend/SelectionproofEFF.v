@@ -3370,8 +3370,8 @@ eapply effect_simulations_lemmas.inj_simulation_star with
   intros; apply H.
 (*match_visible*)
   intros. apply H.
-(*match_restrict*)
-  apply Match_restrict.
+(*match_restrict
+  apply Match_restrict.*)
 (*match_valid*)
   intros. apply H.
 (*match_genv*)

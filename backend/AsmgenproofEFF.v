@@ -1107,6 +1107,7 @@ assert (PGnu': meminj_preserves_globals (Genv.globalenv prog) (as_inj nu')).
     assumption. 
     specialize (genvs_domain_eq_isGlobal _ _ GDE_lemma). intros GL.
     red. unfold ge in GL. rewrite GL. apply SEP.
+    clear SEP.
 assert (RR1: REACH_closed m1'
   (fun b : Values.block =>
    locBlocksSrc nu' b
@@ -1173,7 +1174,7 @@ assert (RR1: REACH_closed m1'
   { destruct IHL. congruence.
     apply andb_true_iff in H. simpl in H. 
     destruct H as [DomNu' Rb']. 
-    clear INC SEP INCvisNu' UnchLOOR UnchPrivSrc.
+    clear INC INCvisNu' UnchLOOR UnchPrivSrc.
     remember (locBlocksSrc nu' b) as d.
     destruct d; simpl; trivial. apply eq_sym in Heqd.
     apply andb_true_iff.
@@ -3049,8 +3050,8 @@ assert (GDE:= GDE_lemma).
   apply MATCH_wd. 
 (*MATCH_reachclosed*)
   apply MATCH_RC.
-(*MATCH_restrict*)
-  apply MATCH_restrict.
+(*MATCH_restrict
+  apply MATCH_restrict.*)
 (*MATCH_valid*)
   apply MATCH_valid.
 (*MATCH_preserves_globals*)

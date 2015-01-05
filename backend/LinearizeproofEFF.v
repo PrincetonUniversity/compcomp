@@ -1218,7 +1218,6 @@ Lemma MATCH_afterExternal: forall
        nu' ret1 m1' ret2 m2' 
        (INC: extern_incr nu nu')
        (SEP : globals_separate tge nu nu')
-       (*SEP: sm_inject_separated nu nu' m1 m2*)
        (WDnu': SM_wd nu')
        (SMvalNu': sm_valid nu' m1' m2')
        (MemInjNu': Mem.inject (as_inj nu') m1' m2')
@@ -2333,8 +2332,8 @@ assert (GDE:= GDE_lemma).
   intros; apply H.
 (*match_visible*)
   intros. apply H.
-(*match_restrict*)
-  intros x. apply MATCH_restrict.
+(*match_restrict:
+  intros x. apply MATCH_restrict.*)
 (*match_valid*)
   intros. apply H.
 (*match_genv*)

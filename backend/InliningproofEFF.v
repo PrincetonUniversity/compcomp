@@ -2231,7 +2231,7 @@ Proof. intros.
                                                              DomTgt nu' b &&
                                                                     (negb (locBlocksTgt nu' b) &&
                                                                           REACH m2' (exportedTgt nu' (ret2 :: nil)) b))))) (as_inj nu')).
-       unfold vis. rewrite replace_externs_frgnBlocksSrc, replace_externs_locBlocksSrc.
+       (*unfold vis. rewrite replace_externs_frgnBlocksSrc, replace_externs_locBlocksSrc.*)
        apply restrict_incr. 
        assert (RC': REACH_closed m1' (mapped (as_inj nu'))).
        eapply inject_REACH_closed; eassumption.
@@ -2239,9 +2239,13 @@ Proof. intros.
        eapply meminj_preserves_globals_extern_incr_separate. eassumption.
        rewrite replace_locals_as_inj. assumption.
        assumption. 
+
+       { (*Here is the only place SEP is used*)
        specialize (genvs_domain_eq_isGlobal _ _ GDE_lemma). intros GL.
        red. unfold ge in GL. rewrite GL. apply SEP.
-
+       } 
+       clear SEP.
+       
        assert (RR1: REACH_closed m1'
                                  (fun b : Values.block =>
                                     locBlocksSrc nu' b
@@ -2304,7 +2308,7 @@ Proof. intros.
        destruct IHL. inv H.
        apply andb_true_iff in H. simpl in H. 
        destruct H as[DomNu' Rb']. 
-       clear INC SEP INCvisNu' UnchLOOR UnchPrivSrc.
+       clear INC INCvisNu' UnchLOOR UnchPrivSrc.
        remember (locBlocksSrc nu' b) as d.
        destruct d; simpl; trivial. apply eq_sym in Heqd.
        apply andb_true_iff.
@@ -2446,8 +2450,9 @@ Proof. intros.
          apply REACH_nil. apply orb_true_iff. right. 
          apply frgnSrc_shared; trivial. 
          trivial.
-         clear - PGnu' SEP. red. red in SEP.
-         rewrite replace_locals_as_inj, replace_externs_as_inj in *; assumption.
+         clear - PGnu'. red.
+
+         rewrite replace_externs_as_inj in *; assumption.
          
          rewrite replace_externs_local. 
          red in INC. rewrite replace_locals_local in INC.
