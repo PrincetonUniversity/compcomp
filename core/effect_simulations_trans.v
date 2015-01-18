@@ -1192,15 +1192,35 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
       destruct newmap' as [extmap12' | [extmap12' [b3 [d2 mapnu']]]].
       - assert (extmap12: extern_of mu12 b1' = Some (b1, d')).
         { unfold replace_locals in extmap12'; destruct mu12; exact extmap12'. }
-        apply full in extmap12; destruct extmap12 as [b3 [d3 extmap23]].
-        unfold as_inj, join in map23. 
-        destruct mu23; simpl in *; rewrite extmap23 in map23. inversion map23.
+        eapply GSep.
+        * unfold as_inj, join. rewrite compose_sm_extern, compose_sm_local.
+          unfold compose_meminj. instantiate(1:= b1').
+          rewrite extmap12'. rewrite extmap.
+          rewrite replace_locals_local, replace_locals_local.
+
+          destruct (local_of mu12 b1') eqn:locmap12;
+          trivial. exfalso.          
+          { rewrite replace_locals_extern in extmap12'.
+            destruct Incr12 as [ext_inc [loceq rest]]; clear rest; 
+            rewrite replace_locals_local in loceq;
+            rewrite replace_locals_extern in ext_inc.
+            rewrite loceq in locmap12.
+            destruct p.
+            eapply WDnu12' in locmap12. destruct locmap12 as [locS locT].
+            eapply WDnu12' in newmap. destruct newmap as [extS extT].
+            destruct WDnu12'. destruct (disjoint_extern_local_Src b1') as [locS' | extS'].
+            + rewrite locS' in locS; inversion locS.
+            + rewrite extS' in extS; inversion extS. }
+       *  unfold as_inj, join. 
+          unfold compose_sm; simpl. unfold compose_meminj.
+          rewrite newmap. rewrite extmap23'. reflexivity.
       - eapply GSep.
         * unfold as_inj, join. rewrite compose_sm_extern, compose_sm_local.
           unfold compose_meminj. instantiate(1:= b1').
           rewrite extmap12'.
           rewrite replace_locals_local, replace_locals_local.
-          destruct (local_of mu12 b1') eqn:locmap12; trivial. exfalso.
+          destruct (local_of mu12 b1') eqn:locmap12;
+          trivial. exfalso.
           
           { rewrite replace_locals_extern in extmap12'.
             destruct Incr12 as [ext_inc [loceq rest]]; clear rest; 
