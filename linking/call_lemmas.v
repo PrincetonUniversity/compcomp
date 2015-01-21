@@ -48,6 +48,10 @@ Import Wholeprog_sim.
 Import SM_simulation.
 Import Linker. 
 Import Modsem.
+Import CallStack.
+
+Require Import compcert_imports. Import CompcertLibraries.
+Require Import mem_welldefined.
 
 Section call_lems.
 
@@ -74,11 +78,8 @@ Variable my_ge : ge_ty.
 Variable my_ge_S : forall (i : 'I_N), genvs_domain_eq my_ge (cores_S i).(ge).
 Variable my_ge_T : forall (i : 'I_N), genvs_domain_eq my_ge (cores_T i).(ge).
 
-Notation cast'  pf x := (cast (C \o cores_T) pf x).
-Notation cast'' pf x := (cast (C \o cores_T) (sym_eq pf) x).
-Notation rc_cast'  pf x := (cast (RC.state \o C \o cores_T) pf x).
-Notation rc_cast'' pf x := (cast (RC.state \o C \o cores_T) (sym_eq pf) x).
-
+Notation my_cast  pf x := (cast (C \o cores_T) pf x).
+Notation my_cast_sym pf x := (cast (C \o cores_T) (sym_eq pf) x).
 Notation R := (@R N cores_S cores_T rclosed_S nucular_T sims my_ge). 
 
 Context
@@ -111,10 +112,10 @@ set P := fun ix (x : T ix) =>
             at_external (sem (cores_T ix)) x
             = Some (ef, sig, args2).
 change (P (Core.i (peekCore st2)) (Core.c (peekCore st2))).
-have X: (P (Core.i (c inv)) (cast'' pf (Core.c (d inv)))).
+have X: (P (Core.i (c inv)) (my_cast_sym pf (Core.c (d inv)))).
 { move: atext2=> /=; rewrite /RC.at_external /P /=.
   have eq': at_external (sem (cores_T (Core.i (c inv))))
-            (cast'' pf (Core.c (d inv))) =
+            (my_cast_sym pf (Core.c (d inv))) =
            at_external (sem (cores_T (Core.i (d inv))))
             (Core.c (d inv)). 
   { set T' := C \o cores_T.
@@ -140,11 +141,6 @@ move=> f1 Hfind1; case: (H2 _ _ Hfind1); split=> //.
 by rewrite -(genvs_domain_eq_isGlobal _ _ Hgenv).
 Qed.
 
-Import CallStack.
-
-Require Import compcert_imports. Import CompcertLibraries.
-Require Import mem_welldefined.
-
 Lemma hdl2 args2 : 
   LinkerSem.at_external0 st2 = Some (ef,sig,args2) -> 
   exists cd' st2' mu',
@@ -162,7 +158,7 @@ have atext1':
 
 have atext2': 
   at_external (sem (cores_T (Core.i (c inv)))) 
-              (cast'' pf (Core.c (d inv)))
+              (my_cast_sym pf (Core.c (d inv)))
   = Some (ef,sig,args2).
  { set T := C \o cores_T.
    set P := fun ix (x : T ix) => 
@@ -174,7 +170,7 @@ have atext2':
 
 have atext2'': 
   at_external (sem (cores_T (Core.i (c inv))))
-              (cast'' pf (Core.c (d inv)))
+              (my_cast_sym pf (Core.c (d inv)))
   = Some (ef,sig,args2).
  { set T := C \o cores_T.
    set P := fun ix (x : T ix) => 
@@ -239,20 +235,19 @@ have frgnT_sub_domT: {subset frgnT <= domT}.
   move: (head_globs my_ge_S hdinv); move/(_ b0 H3')=> H4.
   have J: extern_of mu_top b0 = Some (b0,0).
   { move: (head_match hdinv)=> mtch; apply match_genv in mtch.
-    case: mtch=> pres _.
-    move: (meminj_preserves_globals_isGlobalBlock _ _ pres b0)=> H5. 
-    by move: H3'; rewrite isGlob_iffS; eauto. }
+    case: mtch=> pres _; move: (meminj_preserves_globals_isGlobalBlock _ _ pres b0)=> H5. 
+    apply: H5; set (b' := isGlobalBlock _ _); suff: (is_true b')=> //.
+    by rewrite -(isGlob_iffS (my_ge:=my_ge)). }
   case: (Inj_wd mu_top)=> _ _ _ _ _; case/(_ b0 H4)=> x []y []H5 H6 _ _.
-  apply/orP; right; apply: frgntgt_sub_exttgt.
-  by move: H6; rewrite H5 in J; case: J=> ->.
+  by apply/orP; right; apply: frgntgt_sub_exttgt; move: H6; 
+     rewrite H5 in J; case: J=> ->.
   have [b1 [ofs [getbs1 asinj1]]]: 
     exists b1 ofs, 
     [/\ getBlocks args1 b1
       & as_inj mu_top b1 = Some (b0,ofs)]. 
   { move: (forall_inject_val_list_inject _ _ _ vinj)=> vinj'.
     case: (vals_def_getBlocksTS vinj' defs1 H3)=> x' []y' []? res.
-    exists x',y'; split=> //.
-    by case: (restrictD_Some _ _ _ _ _ res). }
+    by exists x',y'; split=> //; case: (restrictD_Some _ _ _ _ _ res). }
   by case: (as_inj_DomRng _ _ _ _ asinj1 (Inj_wd _))=> _ ->. }
 
 have st1_eq: callStack (stack st1) = [:: c inv & STACK.pop st1].
@@ -263,9 +258,8 @@ have st2_eq: callStack (stack st2) = [:: d inv & STACK.pop st2].
 
 have all_at2: all (atExternal cores_T) (CallStack.callStack st2).
 { move: (callStack_wf st2); move/andP=> []atext_tail _; rewrite st2_eq.
-  move=> /=; apply/andP; split=> //.
-  move: A; rewrite /LinkerSem.at_external0 /atExternal.
-  rewrite /d /s2 /pf2 /peekCore.
+  move=> /=; apply/andP; split=> //; move: A. 
+  rewrite /LinkerSem.at_external0 /atExternal /d /s2 /pf2 /peekCore.
   by case: (STACK.head _ _)=> ? ? /= d atext2_; rewrite /RC.at_external atext2_. }
 
 have globs_frgnS:
@@ -331,7 +325,7 @@ have [cd_new [c2 [pf_new [init2 mtch12]]]]:
     [/\ initCore cores_T (ef_sig ef) ix (Vptr bf Integers.Int.zero) args2 = Some c2
       & match_state (sims (Core.i c1)) cd_new
         (initial_SM domS domT frgnS frgnT j) 
-        (Core.c c1) m1 (cast'' pf (Core.c c2)) m2].
+        (Core.c c1) m1 (my_cast_sym pf (Core.c c2)) m2].
 { move: init1; rewrite /initCore.
   case init1: (semantics.initial_core _ _ _ _)=> //[c1']; case=> X.
   generalize dependent c1; case=> c1_i c1; intros.
