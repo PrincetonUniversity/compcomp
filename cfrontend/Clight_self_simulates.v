@@ -1094,26 +1094,18 @@ Fixpoint bind_parameters_effect e mu (params :list (ident * type)) (vals: list v
   | _,_ => fun b z => false
  end.
 
-Lemma function_entry1_inject mu f vargs m e le m' tvargs tm te :
-  Mem.inject (as_inj mu) m tm -> 
-  val_list_inject (restrict (as_inj mu) (vis mu)) vargs tvargs -> 
-  function_entry1 f vargs m e le m' ->
-  exists tm', function_entry1 f tvargs tm te (create_undef_temps (fn_temps f)) tm'.
-Admitted.
-
 Theorem store_params_correct_eff:
-  forall mu le lo hi te tlo thi e m params args m',
+  forall le mu lo hi te tlo thi e m params args m',
   bind_parameters e m params args m' ->
-  forall tm tle1 tle2 targs,
+  forall tm tle targs,
   list_norepet (var_names params) ->
   list_forall2 val_casted args (map snd params) ->
   val_list_inject (restrict (as_inj mu) (vis mu)) args targs ->
-  match_envs mu e le m lo hi te tle1 tlo thi ->
+  match_envs mu e le m lo hi te tle tlo thi ->
   Mem.inject (as_inj mu) m tm ->
-  (forall id, ~In id (var_names params) -> tle2!id = tle1!id) ->
   (forall id, In id (var_names params) -> le!id = None) ->
   forall (WD: SM_wd mu) (SMV: sm_valid mu m tm) (RC:REACH_closed m (vis mu)),
-  exists tle, exists tm',
+  exists tm',
      bind_parameters te tm params targs tm'
   /\ Mem.inject (as_inj mu) m' tm'
   /\ match_envs mu e le m' lo hi te tle tlo thi
@@ -1123,11 +1115,12 @@ Theorem store_params_correct_eff:
   /\ (forall bb z, bind_parameters_effect e mu params targs bb z = true
                    -> exists b d, local_of mu b = Some(bb,d)).
 Proof.
-  induction 1; simpl; intros until targs; intros NOREPET CASTED VINJ MENV MINJ TLE LE WD SMV RC.
+  induction 1; simpl; intros until targs; 
+    intros NOREPET CASTED VINJ MENV MINJ (*TLE*) LE WD SMV RC.
   (* base case *)
-  inv VINJ. exists tle2; exists tm; eexists. constructor.
+  inv VINJ. (*exists tle1;*) exists tm; eexists. constructor.
   split. auto. 
-  split. apply match_envs_temps_exten with tle1; auto. intuition.
+  split. apply match_envs_temps_exten with tle; auto. intuition.
   (* inductive case *)
   inv NOREPET. inv CASTED. inv VINJ.
   exploit me_vars; eauto. instantiate (1 := id); intros MV.
@@ -1145,17 +1138,10 @@ Proof.
          apply assign_loc_forward in H0. apply H0. apply SMV. trivial.
          apply assign_loc_forward in A. apply A. apply SMV. trivial.     
   exploit IHbind_parameters. eauto. eauto. eauto.
-  instantiate (1 := PTree.set id v' tle1).
-  apply match_envs_change_temp.  
+  instantiate (1 := (*PTree.set id v'*) tle).
+  (*apply match_envs_change_temp.*)
   eapply match_envs_intern_invariant; eauto. apply intern_incr_refl.
-  apply LE; auto. auto.
-  eauto.
-  instantiate (1 := PTree.set id v' tle2). 
-  intros. repeat rewrite PTree.gsspec. destruct (peq id0 id). auto.
-  apply TLE. intuition.
-  intros. apply LE. auto.
-  trivial.
-  trivial.
+  eapply B. auto. auto. auto.
   (*REACH_closed m1 (vis mu)*)
       assert (MinjR:  Mem.inject (restrict (as_inj mu) (vis mu)) m tm).
            eapply inject_restrict; try eassumption.
@@ -1182,8 +1168,8 @@ Proof.
                induction MapBytes; inv Hbb.
                inv H. apply (restrictD_Some _ _ _ _ _ H4).
                apply (IHMapBytes H0).
-  intros [tle [tm' [EFF1 [U [V [X [Y [Z SMV2]]]]]]]].
-  exists tle; exists tm'; eexists. econstructor; eauto.
+  intros [tm' [EFF1 [U [V [X [Y [Z SMV2]]]]]]].
+  (*exists tle;*) exists tm'; eexists. econstructor; eauto.
   rewrite ENV; simpl.
   specialize (local_in_all _ WD _ _ _ MAPPED); intros AI.
   rewrite AI.
@@ -1192,9 +1178,18 @@ Proof.
         exists b d, local_of mu b = Some (bb, d)).
   { intros. apply orb_true_iff in H; destruct H.
     specialize (SMV2 _ _ H). auto.
+    unfold assign_loc_Effect in H.
     destruct (eq_block bb b'); subst; simpl in *.
     solve[exists b, 0; trivial].
-    admit. }
+    inv A; rewrite H2 in H. 
+    assert (bb = b'). 
+    { rewrite !andb_true_iff in H. destruct H as [[? ?] ?]. 
+      unfold eq_block in H. destruct (peq b' bb). subst; auto. simpl in H; congruence. }
+    subst. elimtype False; auto.
+    assert (bb = b'). 
+    { rewrite !andb_true_iff in H. destruct H as [[? ?] ?]. 
+      unfold eq_block in H. destruct (peq bb b'). subst; auto. simpl in H; congruence. }
+    subst. elimtype False; auto. }
   intuition.   
   rewrite (assign_loc_nextblock _ _ _ _ _ _ A) in X. auto.
 Qed.
@@ -2634,7 +2629,7 @@ Proof. intros.
                end) Int.max_unsigned).
   rewrite H2. intros. simpl. rewrite <-val_casted_list_funcP in H. 
     assert (type_of_params (fn_params f) = targs) as ->.
-    { admit. } 
+    { inv tyof; auto. }
     rewrite H, TNV; auto.
   intros CONTRA. solve[elimtype False; auto].
   intros CONTRA. solve[elimtype False; auto].
@@ -2747,9 +2742,12 @@ Qed.
 
 Lemma MATCH_effcore_diagram: forall st1 m1 st1' m1' 
          (U1 : block -> Z -> bool)
-         (CS: effstep (CL_eff_sem1 hf) ge U1 st1 m1 st1' m1')
-         st2 mu m2
-         (MTCH: MATCH st1 mu st1 m1 st2 m2),
+         (CS: effstep (CL_eff_sem1 hf) ge U1 st1 m1 st1' m1') st2 mu m2
+         (MTCH: MATCH st1 mu st1 m1 st2 m2)
+         (*Something like the following must be assumed (currently, asserted 
+           by SimplLocals.
+           (DISJ: forall id f, In (id,Gfun (Internal f)) (prog_defs prog) ->
+                  list_disjoint (var_names (fn_params f)) (var_names (fn_temps f)))*),
    exists st2' m2' U2, effstep_plus (CL_eff_sem1 hf) tge U2 st2 m2 st2' m2'
 /\ exists mu', MATCH st1' mu' st1' m1' st2' m2' /\
     intern_incr mu mu' /\
@@ -3443,25 +3441,35 @@ destruct CS; intros;
                                 (restrict (as_inj mu') (vis mu'))); try eassumption.
       eapply intern_incr_restrict; eassumption. 
     eexact B. eexact C.
-    intros. instantiate (1 := (fn_temps f)). 
-    instantiate (1 := (create_undef_temps (fn_temps f))). auto.
-    intros. admit.
-  auto. auto. auto.
-  intros [tel [tm1 [P [Q [R [S [SMV'' [RC'' HH]]]]]]]].
-  eexists; eexists; eexists; split.  
-    eapply effstep_plus_one. econstructor. 
-    econstructor; eauto.
+    intros. instantiate (1 := fn_temps f). auto.
+  destruct (create_undef_temps (fn_temps f))!id as [v|] eqn:?; auto.
+  exploit create_undef_temps_inv; eauto. intros [P Q]. 
+    assert (l : list_disjoint (var_names (fn_params f)) (var_names (fn_temps f))).
+    { admit. (*established by compiler*) }
+    elim (l id id). auto.
+  auto. auto. auto. auto. auto.
+  intros [tm1 [P [Q [R [S [SMV'' [RC'' HH]]]]]]].
+  generalize (vars_and_temps_properties (cenv_for f) (fn_params f) (fn_vars f) (fn_temps f)).
+  intros [X [Y Z]]. auto. auto. 
+  admit. (*established by compiler*)
+  exists (CL_State f (fn_body f) tk te (create_undef_temps (fn_temps f))).
+  eexists; eexists; split.
+    eapply effstep_plus_one. econstructor. econstructor; eauto.
   eexists mu'; split.  
-    split. admit.
-    split; auto.
-    split; auto.
+    split. econstructor; eauto.
+      eapply match_cont_intern_invariant; eauto. 
+      intros. transitivity (Mem.load chunk m1 b 0). 
+      eapply bind_parameters_load; eauto. intros. 
+      exploit alloc_variables_range. eexact H1. eauto. 
+      unfold empty_env. rewrite PTree.gempty. intros [?|?]. congruence. 
+      red; intros; subst b'. xomega. 
+      eapply alloc_variables_load; eauto.
+      rewrite (bind_parameters_nextblock _ _ _ _ _ H2). xomega.
+      rewrite S; xomega.
     exploit @intern_incr_meminj_preserves_globals_as_inj; try eapply D.
-      eassumption. split; eassumption. eassumption.
-      intros [PG' GLOB'].           
-      intuition.
-    split; trivial.
-    admit.
-    split; auto.
+      eassumption. split; eassumption. eassumption. 
+    intros [PG' GLOB'].           
+    intuition.
     split; auto.
     split. (*sm_inject_separated goal*)
     { clear - LocAlloc E F SMV. 
@@ -3479,13 +3487,7 @@ destruct CS; intros;
       rewrite (nextblock_eq_freshloc _ _ _ S).
       rewrite (nextblock_eq_freshloc _ _ _ H2).
       apply LocAlloc. }
-    intros. 
-      clear P. 
-      destruct H3. intuition.
-      admit.
-      exists b, 0; split; auto.
-      admit.
-      admit. }
+    intros. intuition. }
 
 { (* return *)
   inv MCONT. 
