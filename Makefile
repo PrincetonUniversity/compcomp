@@ -131,7 +131,7 @@ BACKEND=\
 CFRONTEND=Ctypes.v Cop.v Csyntax.v Csem.v Cstrategy.v Cexec.v \
   Initializers.v Initializersproof.v \
   SimplExpr.v SimplExprspec.v SimplExprproof.v \
-  Clight.v Clight_coop.v Clight_eff.v ClightBigstep.v \
+  Clight.v Clight_coop.v Clight_eff.v Clight_self_simulates.v ClightBigstep.v \
   SimplLocals.v SimplLocalsproof.v SimplLocalsproof_comp.v \
   Cshmgen.v Cshmgenproof.v Cshmgenproof_comp.v \
   Csharpminor.v Csharpminor_coop.v Csharpminor_eff.v \
