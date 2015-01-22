@@ -1517,7 +1517,8 @@ Inductive match_cont mu : cont -> cont -> mem -> block -> block -> Prop :=
   | match_Kswitch: forall k tk m bound tbound,
       match_cont mu k tk m bound tbound ->
       match_cont mu (Kswitch k) (Kswitch tk) m bound tbound
-  | match_Kcall: forall optid fn e le k tfn te tle tk m hi thi lo tlo bound tbound,
+  | match_Kcall: forall optid fn e le k tfn te tle tk m hi thi lo tlo bound tbound
+      (DISJ: list_disjoint (var_names (fn_params fn)) (var_names (fn_temps fn))),
       fn = tfn ->
       match_envs mu e le m lo hi te tle tlo thi ->
       match_cont mu k tk m lo tlo ->
@@ -1884,7 +1885,8 @@ Inductive match_states mu: CL_core -> mem -> CL_core -> mem -> Prop :=
         (MCONT: match_cont mu k tk m lo tlo)
         (MINJ: Mem.inject (as_inj mu) m tm)
         (BOUND: Ple hi (Mem.nextblock m))
-        (TBOUND: Ple thi (Mem.nextblock tm)),
+        (TBOUND: Ple thi (Mem.nextblock tm))
+        (DISJ: list_disjoint (var_names (fn_params f)) (var_names (fn_temps f))),
       match_states mu (CL_State f s k e le) m
                       (CL_State tf ts tk te tle) tm
   | match_call_state:
@@ -1894,7 +1896,9 @@ Inductive match_states mu: CL_core -> mem -> CL_core -> mem -> Prop :=
         (MINJ: Mem.inject (as_inj mu) m tm)
         (AINJ: val_list_inject (restrict (as_inj mu) (vis mu)) vargs tvargs)
         (FUNTY: type_of_fundef fd = Tfunction targs tres)
-        (ANORM: val_casted_list vargs targs),
+        (ANORM: val_casted_list vargs targs)
+        (DISJ: forall f, fd = Internal f -> 
+               list_disjoint (var_names (fn_params f)) (var_names (fn_temps f))),
       match_states mu (CL_Callstate fd vargs k) m
                       (CL_Callstate tfd tvargs tk) tm
   | match_return_state:
@@ -1925,7 +1929,8 @@ Lemma match_var_restrict mu e m te tle id: forall
       (HX : forall b : block, vis mu b = true -> X b = true)
       (WD: SM_wd mu),
       match_var (restrict_sm mu X) e m te tle id.
-Proof. intros. inv MV.
+Proof. 
+  intros. inv MV.
   eapply match_var_not_lifted; try eassumption.
     rewrite restrict_sm_local'; eassumption.
   eapply match_var_not_local; try eassumption. 
@@ -1936,7 +1941,8 @@ Lemma match_envs_restrict mu e le m lo hi te tle tlo thi: forall
         (HX : forall b : block, vis mu b = true -> X b = true)
         (WD : SM_wd mu),
       match_envs (restrict_sm mu X) e le m lo hi te tle tlo thi.
-Proof. intros. inv ME; econstructor; try eassumption.
+Proof. 
+  intros. inv ME; econstructor; try eassumption.
   intros. eapply match_var_restrict; eauto.
   intros. 
     rewrite restrict_sm_all, vis_restrict_sm, restrict_nest; try assumption.
@@ -2178,7 +2184,7 @@ destruct MTCH as [MC [RC [PG [Glob [SMV WD]]]]].
 Qed.
 
 Lemma MATCH_afterExternal: forall
-mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig' 
+  mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig' 
 (MemInjMu : Mem.inject (as_inj mu) m1 m2)
 (MatchMu : MATCH st1 mu st1 m1 st2 m2)
 (AtExtSrc : at_external (CL_eff_sem1 hf) st1 = Some (e, ef_sig, vals1))
@@ -2360,9 +2366,6 @@ assert (RR1: REACH_closed m1'
         split. unfold DomSrc. rewrite (frgnBlocksSrc_extBlocksSrc _ WDnu' _ RC). intuition.
         apply REACH_nil. unfold exportedSrc.
           rewrite (frgnSrc_shared _ WDnu' _ RC). intuition.
-  (*case DomSrc nu' b' &&
-    (negb (locBlocksSrc nu' b') &&
-     REACH m1' (exportedSrc nu' (ret1 :: nil)) b') = true*)
     destruct IHL. inv H.
     apply andb_true_iff in H. simpl in H. 
     destruct H as[DomNu' Rb']. 
@@ -2458,8 +2461,7 @@ intuition.
 Qed.
 
 Lemma match_globalenvs_init':
-  forall (R: list_norepet (map fst (prog_defs prog)))
-  m j,
+  forall (R: list_norepet (map fst (prog_defs prog))) m j,
   Genv.init_mem prog = Some m ->
   meminj_preserves_globals ge j ->
   match_globalenvs j (Mem.nextblock m).
@@ -2549,9 +2551,6 @@ Proof.
   intros. eapply Genv.genv_vars_range; eauto.
 Qed.
 
-(*Lemma function_entry1_inject f vargs m e le m' tvargs tm te tle :
-  exists tm', function_entry1 f tvargs tm te tle tm'*)
-
 Lemma MATCH_init_core: forall v
   (vals1 : list val) c1 (m1 : mem) (j : meminj)
   (vals2 : list val) (m2 : mem) (DomS DomT : Values.block -> bool)
@@ -2567,7 +2566,9 @@ Lemma MATCH_init_core: forall v
         (fun b' : Values.block => isGlobalBlock tge b' || getBlocks vals2 b') b =
          true -> DomT b = true)
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
-  (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
+  (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b)
+  (Disj: forall b f, Genv.find_funct_ptr (Genv.globalenv prog) b = Some (Internal f) ->
+                     list_disjoint (var_names (fn_params f)) (var_names (fn_temps f))),
 exists c2,
   initial_core (CL_eff_sem2 hf) tge v vals2 = Some c2 /\
   MATCH c1
@@ -2688,10 +2689,12 @@ Proof. intros.
   eapply restrict_forall_vals_inject; try eassumption.
   intros. apply REACH_nil. rewrite H; intuition.
   apply val_casted_list_funcP; auto.
+  { intros. inv H. clear - Disj Heqzz. apply (Disj _ _ Heqzz). }
   destruct (core_initial_wd ge tge _ _ _ _ _ _ _ Inj
               VInj J RCH PG GDE_lemma HDomS HDomT _ (eq_refl _))
     as [AA [BB [CC [DD [EE [FF GG]]]]]].
-  intuition. rewrite initial_SM_as_inj. assumption.
+  intuition. 
+  rewrite initial_SM_as_inj. assumption.
 Qed.
 
 Lemma FreelistEffect_PropagateLeft mu e le m lo hi te tle tlo thi: forall
@@ -2729,7 +2732,8 @@ Proof. intros.
                 apply foreign_in_all in H; eassumption.
                 intros [? _].
                 destruct (ident_eq x i); subst. trivial.
-                exploit me_inj. eassumption. apply EE. apply H0. assumption. trivial. intros; contradiction.               
+                exploit me_inj. eassumption. apply EE. apply H0. assumption. 
+                  trivial. intros; contradiction.               
              rewrite Zminus_0_r.
              split. eapply FreelistEffect_I; try eassumption.
                      apply foreign_in_all in H; trivial.
@@ -2744,10 +2748,8 @@ Lemma MATCH_effcore_diagram: forall st1 m1 st1' m1'
          (U1 : block -> Z -> bool)
          (CS: effstep (CL_eff_sem1 hf) ge U1 st1 m1 st1' m1') st2 mu m2
          (MTCH: MATCH st1 mu st1 m1 st2 m2)
-         (*Something like the following must be assumed (currently, asserted 
-           by SimplLocals.
-           (DISJ: forall id f, In (id,Gfun (Internal f)) (prog_defs prog) ->
-                  list_disjoint (var_names (fn_params f)) (var_names (fn_temps f)))*),
+         (DISJ: forall vf f, Genv.find_funct ge vf = Some (Internal f) -> 
+                list_disjoint (var_names (fn_params f)) (var_names (fn_temps f))),
    exists st2' m2' U2, effstep_plus (CL_eff_sem1 hf) tge U2 st2 m2 st2' m2'
 /\ exists mu', MATCH st1' mu' st1' m1' st2' m2' /\
     intern_incr mu mu' /\
@@ -2965,10 +2967,13 @@ destruct CS; intros;
     apply effstep_plus_one. eapply clight_effstep_call with (fd := tfd).
     eauto. eauto. eauto. eauto. subst; auto.
   rewrite restrict_sm_all in D.
+  subst.
   exists mu; split.
     split. 
       econstructor; eauto. 
       intros. econstructor; eauto.
+      intros; subst; auto.
+      specialize (DISJ _ _ H2); auto.
     intuition.
   split. apply intern_incr_refl. 
   split. apply sm_inject_separated_same_sminj.
@@ -3169,7 +3174,8 @@ destruct CS; intros;
   intuition. }
 
 { (* break loop1 *)
-  inv MCONT. eexists; eexists; eexists; split. apply effstep_plus_one. eapply clight_effstep_break_loop1.
+  inv MCONT. eexists; eexists; eexists; split. apply effstep_plus_one. 
+    eapply clight_effstep_break_loop1.
   exists mu; split.
     split. econstructor; eauto.
            intuition.
@@ -3445,13 +3451,12 @@ destruct CS; intros;
   destruct (create_undef_temps (fn_temps f))!id as [v|] eqn:?; auto.
   exploit create_undef_temps_inv; eauto. intros [P Q]. 
     assert (l : list_disjoint (var_names (fn_params f)) (var_names (fn_temps f))).
-    { admit. (*established by compiler*) }
+    { apply DISJ0; auto. }
     elim (l id id). auto.
   auto. auto. auto. auto. auto.
   intros [tm1 [P [Q [R [S [SMV'' [RC'' HH]]]]]]].
   generalize (vars_and_temps_properties (cenv_for f) (fn_params f) (fn_vars f) (fn_temps f)).
   intros [X [Y Z]]. auto. auto. 
-  admit. (*established by compiler*)
   exists (CL_State f (fn_body f) tk te (create_undef_temps (fn_temps f))).
   eexists; eexists; split.
     eapply effstep_plus_one. econstructor. econstructor; eauto.
@@ -3510,7 +3515,9 @@ Qed.
 
 (** The simulation proof *)
 Theorem transl_program_correct:
-  forall (R: list_norepet (map fst (prog_defs prog))),
+  forall (R: list_norepet (map fst (prog_defs prog)))
+         (DISJ: forall vf f, Genv.find_funct ge vf = Some (Internal f) -> 
+                list_disjoint (var_names (fn_params f)) (var_names (fn_temps f))),
   SM_simulation.SM_simulation_inject (CL_eff_sem1 hf) (CL_eff_sem1 hf) ge tge.
 Proof.
 intros.
@@ -3533,7 +3540,11 @@ assert (GDE: genvs_domain_eq ge tge).
 (*MATCH_preserves_globals*)
   apply MATCH_PG.
 (* init*) { 
-  intros. eapply MATCH_init_core; try eassumption. }
+  intros. eapply MATCH_init_core; try eassumption. 
+  intros b f Hfind. 
+  specialize (DISJ (Vptr b Int.zero) f). simpl in DISJ.
+  destruct (Int.eq_dec Int.zero Int.zero); auto.
+  elimtype False; apply n; auto. }
 { (* halted *)
     intros. destruct H as [MC [RC [PG [Glob [VAL WD]]]]].
     inv MC; simpl in H0. inv H0. inv H0.
