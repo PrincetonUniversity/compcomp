@@ -15,12 +15,12 @@ Require Import Cop.
 Require Import Clight. 
 Require Import mem_lemmas. (*for mem_forward*)
 Require Import semantics.
-Require Import mem_lemmas.
 Require Import BuiltinEffects.
 
 Require Import val_casted.
 
 Section CLIGHT_COOP.
+
 Variable hf : I64Helpers.helper_functions.
 
 Inductive CL_core: Type :=
@@ -65,37 +65,7 @@ Definition CL_after_external (rv: option val) (c: CL_core) : option CL_core :=
         end
    | _ => None
   end.
-(*Previously we had this: but afterEtxernal clause in ChmgenproofEFF (MATCH)
-  requires to have Returnstates
-Definition CL_after_external (rv: option val) (c: CL_core) : option CL_core :=
-  match c with
-     CL_Callstate fd vargs (Clight.Kcall optid f e lenv k) =>
-        match fd with
-          Internal _ => None
-        | External ef tps tp =>
-            match rv, optid with
-              Some v, _ => Some(CL_State f Sskip k e (set_opttemp optid v lenv))
-            |   None, None    => Some(CL_State f Sskip k e lenv)
-            | _ , _ => None
-            end
-        end
-   | _ => None
-  end.
-*)
-(*
-Definition CL_after_external (vret: option val) (c: CL_core) : option CL_core :=
-  match c with 
-    CL_Callstate fd args k => 
-         match fd with
-            Internal f => None
-          | External ef targs tres => match vret with
-                             None => Some (CL_Returnstate Vundef k)
-                           | Some v => Some (CL_Returnstate v k)
-                           end
-         end
-  | _ => None
-  end.
-*)       
+
 Definition CL_halted (q : CL_core): option val :=
     match q with 
        CL_Returnstate v Kstop => 
@@ -105,10 +75,13 @@ Definition CL_halted (q : CL_core): option val :=
     end.
    
 (** Transition relation *)
+
 Section SEMANTICS.
+
 Variable function_entry: function -> list val -> mem -> env -> temp_env -> mem -> Prop.
 
 Variable ge: genv.
+
 Inductive clight_corestep: CL_core -> mem-> CL_core -> mem -> Prop :=
 
   | clight_corestep_assign:   forall f a1 a2 k e le m loc ofs v2 v m',
@@ -217,13 +190,6 @@ Inductive clight_corestep: CL_core -> mem-> CL_core -> mem -> Prop :=
       function_entry f vargs m e le m' ->
       clight_corestep (CL_Callstate (Internal f) vargs k) m
         (CL_State f f.(fn_body) k e le) m'
-
-(*All external calls in this language at handled by atExternal
-  | step_external_function: forall ef targs tres vargs k m vres t m',
-      external_call ef ge vargs m t vres m' ->
-      clight_corestep (CL_Callstate (External ef targs tres) vargs k) m
-         (CL_Returnstate vres k) m'
-*)
 
   | clight_corestep_returnstate: forall v optid f e le k m,
       clight_corestep (CL_Returnstate v (Kcall optid f e le k)) m
