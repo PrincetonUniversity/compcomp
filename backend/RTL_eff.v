@@ -122,7 +122,7 @@ Inductive RTL_effstep (ge:genv):  (block -> Z -> bool) ->
         (RTL_Returnstate (Stackframe res f sp pc rs :: s) vres) m
         (RTL_State s f sp pc (rs#res <- vres)) m.
 
-Lemma rtl_eff_exec_Iload':
+Lemma rtl_effstep_exec_Iload':
   forall ge s f sp pc rs m chunk addr args dst pc' rs' a v,
   (fn_code f)!pc = Some(Iload chunk addr args dst pc') ->
   Op.eval_addressing ge sp addr rs##args = Some a ->
@@ -135,7 +135,7 @@ Proof.
   intros. subst rs'. eapply rtl_effstep_exec_Iload; eauto.
 Qed.
 
-Lemma rtl_eff_exec_Iop':
+Lemma rtl_effstep_exec_Iop':
   forall g s f sp pc rs m op args res pc' rs' v,
   (fn_code f)!pc = Some(Iop op args res pc') ->
   Op.eval_operation g sp op rs##args m = Some v ->

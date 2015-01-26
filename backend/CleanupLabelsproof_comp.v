@@ -854,7 +854,8 @@ Lemma MATCH_afterExternal: forall
        nu (NuHyp: nu = replace_locals mu pubSrc' pubTgt')
        nu' ret1 m1' ret2 m2' 
        (INC: extern_incr nu nu')
-       (SEP: sm_inject_separated nu nu' m1 m2)
+       (SEP : globals_separate tge nu nu')
+       (*SEP: sm_inject_separated nu nu' m1 m2*)
        (WDnu': SM_wd nu')
        (SMvalNu': sm_valid nu' m1' m2')
        (MemInjNu': Mem.inject (as_inj nu') m1' m2')
@@ -904,42 +905,13 @@ simpl.
       apply restrict_incr. 
 assert (RC': REACH_closed m1' (mapped (as_inj nu'))).
         eapply inject_REACH_closed; eassumption.
-assert (PHnu': meminj_preserves_globals (Genv.globalenv prog) (as_inj nu')).
-    subst. clear - INC SEP PG Glob WDmu WDnu'.
-    apply meminj_preserves_genv2blocks in PG.
-    destruct PG as [PGa [PGb PGc]].
-    apply meminj_preserves_genv2blocks.
-    split; intros.
-      specialize (PGa _ H).
-      apply joinI; left. apply INC.
-      rewrite replace_locals_extern.
-      assert (GG: isGlobalBlock ge b = true).
-          unfold isGlobalBlock, ge. apply genv2blocksBool_char1 in H.
-          rewrite H. trivial.
-      destruct (frgnSrc _ WDmu _ (Glob _ GG)) as [bb2 [dd [FF FT2]]].
-      rewrite (foreign_in_all _ _ _ _ FF) in PGa. inv PGa.
-      apply foreign_in_extern; eassumption.
-    split; intros. specialize (PGb _ H).
-      apply joinI; left. apply INC.
-      rewrite replace_locals_extern.
-      assert (GG: isGlobalBlock ge b = true).
-          unfold isGlobalBlock, ge. apply genv2blocksBool_char2 in H.
-          rewrite H. intuition.
-      destruct (frgnSrc _ WDmu _ (Glob _ GG)) as [bb2 [dd [FF FT2]]].
-      rewrite (foreign_in_all _ _ _ _ FF) in PGb. inv PGb.
-      apply foreign_in_extern; eassumption.
-    eapply (PGc _ _ delta H). specialize (PGb _ H). clear PGa PGc.
-      remember (as_inj mu b1) as d.
-      destruct d; apply eq_sym in Heqd.
-        destruct p. 
-        apply extern_incr_as_inj in INC; trivial.
-        rewrite replace_locals_as_inj in INC.
-        rewrite (INC _ _ _ Heqd) in H0. trivial.
-      destruct SEP as [SEPa _].
-        rewrite replace_locals_as_inj, replace_locals_DomSrc, replace_locals_DomTgt in SEPa. 
-        destruct (SEPa _ _ _ Heqd H0).
-        destruct (as_inj_DomRng _ _ _ _ PGb WDmu).
-        congruence.
+assert (PGnu': meminj_preserves_globals (Genv.globalenv prog) (as_inj nu')).
+ eapply meminj_preserves_globals_extern_incr_separate. eassumption.
+ rewrite replace_locals_as_inj. assumption.
+ assumption. 
+ specialize (genvs_domain_eq_isGlobal _ _ GDE_lemma). intros GL.
+ red. unfold ge in GL. rewrite GL. apply SEP.
+
 assert (RR1: REACH_closed m1'
   (fun b : Values.block =>
    locBlocksSrc nu' b
@@ -1369,7 +1341,6 @@ exists st2' m2' U2,
    effstep_star (Linear_eff_sem hf) tge U2 st2 m2 st2' m2')
 /\ exists mu',
   intern_incr mu mu' /\
-  sm_inject_separated mu mu' m1 m2 /\
   sm_locally_allocated mu mu' m1 m2 m1' m2' /\
   MATCH mu' st1' m1' st2' m2' /\
   (forall (U1Vis: forall b ofs, U1 b ofs = true -> vis mu b = true)
@@ -1390,8 +1361,7 @@ Proof. intros.
     left; eapply effstep_plus_one.
           econstructor; eauto.
   exists mu.
-    split. apply intern_incr_refl. 
-    split. apply sm_inject_separated_same_sminj. 
+    split. apply intern_incr_refl.  
     split. rewrite sm_locally_allocatedChar.
         repeat split; extensionality bb; 
           try rewrite freshloc_irrefl; intuition.
@@ -1407,8 +1377,7 @@ Proof. intros.
     left; eapply effstep_plus_one.
           econstructor; eauto.
   exists mu.
-    split. apply intern_incr_refl. 
-    split. apply sm_inject_separated_same_sminj. 
+    split. apply intern_incr_refl.  
     split. rewrite sm_locally_allocatedChar.
         repeat split; extensionality bb; 
           try rewrite freshloc_irrefl; intuition.
@@ -1433,8 +1402,7 @@ Proof. intros.
       econstructor; eauto. instantiate (1 := v2). rewrite <- EVALOP'.
        apply eval_operation_preserved. exact symbols_preserved.
   exists mu.
-    split. apply intern_incr_refl. 
-    split. apply sm_inject_separated_same_sminj. 
+    split. apply intern_incr_refl.  
     split. rewrite sm_locally_allocatedChar.
         repeat split; extensionality bb; 
           try rewrite freshloc_irrefl; intuition.
@@ -1472,8 +1440,7 @@ Proof. intros.
           econstructor; eauto. rewrite <- EA'.
             apply eval_addressing_preserved. exact symbols_preserved. 
   exists mu.
-    split. apply intern_incr_refl. 
-    split. apply sm_inject_separated_same_sminj. 
+    split. apply intern_incr_refl.  
     split. rewrite sm_locally_allocatedChar.
         repeat split; extensionality bb; 
           try rewrite freshloc_irrefl; intuition.
@@ -1511,8 +1478,7 @@ Proof. intros.
          rewrite <- EA'; apply eval_addressing_preserved. 
            exact symbols_preserved.
   exists mu.
-  split. apply intern_incr_refl. 
-  split. apply sm_inject_separated_same_sminj. 
+  split. apply intern_incr_refl.  
   split. rewrite sm_locally_allocatedChar.
       repeat split; apply extensionality; intros bb; 
       try rewrite (storev_freshloc _ _ _ _ _ H0); 
@@ -1556,8 +1522,7 @@ Proof. intros.
        econstructor. eassumption.
         symmetry; apply sig_function_translated.
   exists mu.
-    split. apply intern_incr_refl. 
-    split. apply sm_inject_separated_same_sminj. 
+    split. apply intern_incr_refl.  
     split. rewrite sm_locally_allocatedChar.
         repeat split; extensionality bb; 
           try rewrite freshloc_irrefl; intuition.
@@ -1602,7 +1567,6 @@ Proof. intros.
       eapply SMV; assumption.
   exists mu.
   split. apply intern_incr_refl. 
-  split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       repeat split; apply extensionality; intros bb; 
           try rewrite (freshloc_free _ _ _ _ _ H2);
@@ -1637,7 +1601,6 @@ Proof. intros.
             econstructor. eassumption. reflexivity.
   exists mu'.
   split; trivial. 
-  split; trivial.
   split; trivial.
   split. split. econstructor; eauto.
       eapply list_match_stackframes_intern_incr; try eassumption.
@@ -1679,8 +1642,7 @@ Proof. intros.
   eexists; eexists; eexists; split. 
     left; eapply effstep_plus_one. constructor.
   exists mu.
-    split. apply intern_incr_refl. 
-    split. apply sm_inject_separated_same_sminj. 
+    split. apply intern_incr_refl.  
     split. rewrite sm_locally_allocatedChar.
         repeat split; extensionality bb; 
           try rewrite freshloc_irrefl; intuition.
@@ -1691,8 +1653,7 @@ Proof. intros.
   eexists; eexists; eexists; split. 
     right. split. simpl. omega. eapply effstep_star_zero.
   exists mu. 
-    split. apply intern_incr_refl. 
-    split. apply sm_inject_separated_same_sminj. 
+    split. apply intern_incr_refl.  
     split. rewrite sm_locally_allocatedChar.
         repeat split; extensionality bb; 
           try rewrite freshloc_irrefl; intuition.
@@ -1705,8 +1666,7 @@ Proof. intros.
     left; eapply effstep_plus_one.
        econstructor. eapply find_label_translated; eauto. red; auto. 
   exists mu.
-    split. apply intern_incr_refl. 
-    split. apply sm_inject_separated_same_sminj. 
+    split. apply intern_incr_refl.  
     split. rewrite sm_locally_allocatedChar.
         repeat split; extensionality bb; 
           try rewrite freshloc_irrefl; intuition.
@@ -1724,8 +1684,7 @@ Proof. intros.
     left; eapply effstep_plus_one.
           econstructor. auto. eauto. eapply find_label_translated; eauto. red; auto. 
   exists mu.
-    split. apply intern_incr_refl. 
-    split. apply sm_inject_separated_same_sminj. 
+    split. apply intern_incr_refl.  
     split. rewrite sm_locally_allocatedChar.
         repeat split; extensionality bb; 
           try rewrite freshloc_irrefl; intuition.
@@ -1744,8 +1703,7 @@ Proof. intros.
     left; eapply effstep_plus_one.
           eapply lin_effexec_Lcond_false; eauto.
   exists mu.
-    split. apply intern_incr_refl. 
-    split. apply sm_inject_separated_same_sminj. 
+    split. apply intern_incr_refl.  
     split. rewrite sm_locally_allocatedChar.
         repeat split; extensionality bb; 
           try rewrite freshloc_irrefl; intuition.
@@ -1764,8 +1722,7 @@ Proof. intros.
          econstructor. eauto. eauto. eapply find_label_translated; eauto. 
          red. eapply list_nth_z_in; eauto. eauto.
   exists mu.
-    split. apply intern_incr_refl. 
-    split. apply sm_inject_separated_same_sminj. 
+    split. apply intern_incr_refl.  
     split. rewrite sm_locally_allocatedChar.
         repeat split; extensionality bb; 
           try rewrite freshloc_irrefl; intuition.
@@ -1800,8 +1757,7 @@ Proof. intros.
       eapply SMV; assumption.
       eapply SMV; assumption.
   exists mu.
-    split. apply intern_incr_refl. 
-    split. apply sm_inject_separated_same_sminj. 
+    split. apply intern_incr_refl.  
     split. rewrite sm_locally_allocatedChar.
       repeat split; apply extensionality; intros bb; 
           try rewrite (freshloc_free _ _ _ _ _ H0);
@@ -1822,9 +1778,8 @@ Proof. intros.
 { (* initial function *)
   eexists; eexists; eexists.
   split. left. eapply effstep_plus_one. econstructor.
-  eexists. split. apply intern_incr_refl. 
-  split. apply sm_inject_separated_same_sminj. split. 
-  rewrite sm_locally_allocatedChar.
+  eexists. split. apply intern_incr_refl.  
+  split. rewrite sm_locally_allocatedChar.
   split. extensionality b. rewrite freshloc_irrefl, orb_comm; auto.
   split. extensionality b. rewrite freshloc_irrefl, orb_comm; auto.
   split. extensionality b. rewrite freshloc_irrefl, orb_comm; auto.
@@ -1847,7 +1802,6 @@ Proof. intros.
     left; eapply effstep_plus_one.
        econstructor; simpl; eauto.
   exists mu'. 
-  split. assumption.
   split. assumption.
   split. assumption.
   split. split. econstructor; eauto with coqlib.       
@@ -1913,7 +1867,6 @@ Proof. intros.
   exists mu'.
   split; trivial. 
   split; trivial.
-  split; trivial.
   split.
     split. econstructor; eauto.
       rewrite restrict_sm_all, vis_restrict_sm, restrict_nest; trivial. 
@@ -1951,8 +1904,7 @@ Proof. intros.
   eexists; eexists; eexists; split. 
     left; eapply effstep_plus_one. econstructor; eauto. 
   exists mu.
-    split. apply intern_incr_refl. 
-    split. apply sm_inject_separated_same_sminj. 
+    split. apply intern_incr_refl.  
     split. rewrite sm_locally_allocatedChar.
         repeat split; extensionality bb; 
           try rewrite freshloc_irrefl; intuition.
@@ -1977,9 +1929,9 @@ apply GDE_lemma.
   intros. destruct MC; subst. eapply MATCH_PG; eassumption.
 (*match_reach_closed*)
 intros. apply H.
-(*genvs_restrict*)
+(*genvs_restrict
   intros. destruct H; subst. 
-  split; trivial. eapply MATCH_restrict; eassumption.
+  split; trivial. eapply MATCH_restrict; eassumption.*)
 (*match_valid*)
   intros. apply H.
 (*initial_core*)
@@ -1992,7 +1944,6 @@ intros. apply H.
     exploit MATCH_effcore_diagram; eauto.
     intros [st2' [m2' [U2 [CS' [mu' MU']]]]].
     exists st2', m2', st1', mu'.
-    split; try eapply MU'.
     split; try eapply MU'.
     split; try eapply MU'.
     split. split; trivial. apply MU'.

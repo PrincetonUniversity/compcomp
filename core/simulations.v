@@ -15,6 +15,9 @@ Require Import semantics.
 Require Import effect_semantics.
 Require Import structured_injections.
 Require Import reach.
+Require Export globalSep.
+
+
 
 (** * Structured Simulations *)
 
@@ -65,13 +68,14 @@ Record SM_simulation_inject := {
     REACH_closed m1 (vis mu)
 
   (** [match_state] is closed under restriction to reach-closed supersets of 
-      the visible blocks. *)
-; match_restrict : 
-    forall d mu c1 m1 c2 m2 X, 
-    match_state d mu c1 m1 c2 m2 -> 
-    (forall b, vis mu b = true -> X b = true) ->
-    REACH_closed m1 X ->
-    match_state d (restrict_sm mu X) c1 m1 c2 m2
+      the visible blocks. REMOVED in jan. 2015*)
+(*; match_restrict:
+    forall d mu c1 m1 c2 m2,
+      match_state d mu c1 m1 c2 m2 ->
+      forall X, (forall b, vis mu b = true -> X b = true) ->
+                REACH_closed m1 X ->
+      match_state d (restrict_sm mu X) c1 m1 c2 m2*)
+
 
   (** The blocks in the domain/range of [mu] are valid in [m1]/[m2]. *)
 ; match_validblocks : 
@@ -114,8 +118,7 @@ Record SM_simulation_inject := {
     forall cd st2 mu m2,
     match_state cd mu st1 m1 st2 m2 ->
     exists st2', exists m2', exists cd', exists mu',
-      intern_incr mu mu' 
-      /\ sm_inject_separated mu mu' m1 m2 
+      intern_incr mu mu'
       /\ sm_locally_allocated mu mu' m1 m2 m1' m2' 
       /\ match_state cd' mu' st1' m1' st2' m2'
       /\ exists U2,              
@@ -197,8 +200,8 @@ Record SM_simulation_inject := {
       forall nu' ret1 m1' ret2 m2'
         (HasTy1: Val.has_type ret1 (proj_sig_res (AST.ef_sig e)))
         (HasTy2: Val.has_type ret2 (proj_sig_res (AST.ef_sig e')))
-        (INC: extern_incr nu nu')  
-        (SEP: sm_inject_separated nu nu' m1 m2)
+        (INC: extern_incr nu nu') 
+        (GSep: globals_separate ge2 nu nu')
 
         (WDnu': SM_wd nu') (SMvalNu': sm_valid nu' m1' m2')
 
@@ -247,7 +250,6 @@ Lemma core_diagram (SMI: SM_simulation_inject):
         match_state SMI cd mu st1 m1 st2 m2 ->
         exists st2', exists m2', exists cd', exists mu',
           intern_incr mu mu' /\
-          sm_inject_separated mu mu' m1 m2 /\
           sm_locally_allocated mu mu' m1 m2 m1' m2' /\ 
           match_state SMI cd' mu' st1' m1' st2' m2' /\
           ((corestep_plus Sem2 ge2 st2 m2 st2' m2') \/
@@ -256,10 +258,9 @@ Lemma core_diagram (SMI: SM_simulation_inject):
 Proof. intros. 
 apply effax2 in H. destruct H as [U1 H]. 
 exploit (effcore_diagram SMI); eauto.
-intros [st2' [m2' [cd' [mu' [INC [SEP [LOCALLOC 
-  [MST [U2 [STEP _]]]]]]]]]].
+intros [st2' [m2' [cd' [mu' [INC [LOCALLOC 
+  [MST [U2 [STEP _]]]]]]]]].
 exists st2', m2', cd', mu'.
-split; try assumption.
 split; try assumption.
 split; try assumption.
 split; try assumption.
@@ -272,3 +273,4 @@ Qed.
 End SharedMemory_simulation_inject. 
 
 End SM_simulation.
+

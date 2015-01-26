@@ -860,7 +860,8 @@ Lemma MATCH_afterExternal: forall
        nu (NuHyp: nu = replace_locals mu pubSrc' pubTgt')
        nu' ret1 m1' ret2 m2' 
        (INC: extern_incr nu nu')
-       (SEP: sm_inject_separated nu nu' m1 m2)
+       (SEP : globals_separate tge nu nu')
+       (*SEP: sm_inject_separated nu nu' m1 m2*)
        (WDnu': SM_wd nu')
        (SMvalNu': sm_valid nu' m1' m2')
        (MemInjNu': Mem.inject (as_inj nu') m1' m2')
@@ -910,42 +911,13 @@ simpl.
       apply restrict_incr. 
 assert (RC': REACH_closed m1' (mapped (as_inj nu'))).
         eapply inject_REACH_closed; eassumption.
-assert (PHnu': meminj_preserves_globals (Genv.globalenv prog) (as_inj nu')).
-    subst. clear - INC SEP PG Glob WDmu WDnu'.
-    apply meminj_preserves_genv2blocks in PG.
-    destruct PG as [PGa [PGb PGc]].
-    apply meminj_preserves_genv2blocks.
-    split; intros.
-      specialize (PGa _ H).
-      apply joinI; left. apply INC.
-      rewrite replace_locals_extern.
-      assert (GG: isGlobalBlock ge b = true).
-          unfold isGlobalBlock, ge. apply genv2blocksBool_char1 in H.
-          rewrite H. trivial.
-      destruct (frgnSrc _ WDmu _ (Glob _ GG)) as [bb2 [dd [FF FT2]]].
-      rewrite (foreign_in_all _ _ _ _ FF) in PGa. inv PGa.
-      apply foreign_in_extern; eassumption.
-    split; intros. specialize (PGb _ H).
-      apply joinI; left. apply INC.
-      rewrite replace_locals_extern.
-      assert (GG: isGlobalBlock ge b = true).
-          unfold isGlobalBlock, ge. apply genv2blocksBool_char2 in H.
-          rewrite H. intuition.
-      destruct (frgnSrc _ WDmu _ (Glob _ GG)) as [bb2 [dd [FF FT2]]].
-      rewrite (foreign_in_all _ _ _ _ FF) in PGb. inv PGb.
-      apply foreign_in_extern; eassumption.
-    eapply (PGc _ _ delta H). specialize (PGb _ H). clear PGa PGc.
-      remember (as_inj mu b1) as d.
-      destruct d; apply eq_sym in Heqd.
-        destruct p. 
-        apply extern_incr_as_inj in INC; trivial.
-        rewrite replace_locals_as_inj in INC.
-        rewrite (INC _ _ _ Heqd) in H0. trivial.
-      destruct SEP as [SEPa _].
-        rewrite replace_locals_as_inj, replace_locals_DomSrc, replace_locals_DomTgt in SEPa. 
-        destruct (SEPa _ _ _ Heqd H0).
-        destruct (as_inj_DomRng _ _ _ _ PGb WDmu).
-        congruence.
+assert (PGnu': meminj_preserves_globals (Genv.globalenv prog) (as_inj nu')).
+         eapply meminj_preserves_globals_extern_incr_separate. eassumption.
+         rewrite replace_locals_as_inj. assumption.
+         assumption. 
+         specialize (genvs_domain_eq_isGlobal _ _ GDE_lemma). intros GL.
+         red. unfold ge in GL. rewrite GL. apply SEP.
+
 assert (RR1: REACH_closed m1'
   (fun b : Values.block =>
    locBlocksSrc nu' b
@@ -1858,9 +1830,9 @@ apply GDE_lemma.
   intros. destruct MC; subst. eapply MATCH_PG; eassumption.
 (*match_reach_closed*)
 intros. apply H.
-(*genvs_restrict*)
+(*genvs_restrict
   intros. destruct H; subst. 
-  split; trivial. eapply MATCH_restrict; eassumption.
+  split; trivial. eapply MATCH_restrict; eassumption.*)
 (*match_valid*)
   intros. apply H.
 (*initial_core*)
@@ -1876,7 +1848,8 @@ intros. apply H.
     split; try eapply MU'.
     split; try eapply MU'.
     split; try eapply MU'.
-    split. split; trivial. apply MU'.
+    split; try eapply MU'.
+    reflexivity.
     exists U2.
     split. destruct CS'. 
         left; trivial.

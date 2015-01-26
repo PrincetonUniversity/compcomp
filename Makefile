@@ -112,7 +112,7 @@ BACKEND=\
   RTLtyping.v \
   Kildall.v Liveness.v \
   ConstpropOp.v Constprop.v ConstpropOpproof.v Constpropproof.v \
-  CombineOp.v CSE.v CombineOpproof.v CSEproof.v \
+  CombineOp.v CSE.v CombineOpproof.v CSEproof.v CSEproofEFF.v\
   Machregs.v Locations.v Conventions1.v Conventions.v \
   LTL.v LTL_coop.v LTL_eff.v \
   Allocation.v Allocproof.v Allocproof_comp.v \
@@ -148,11 +148,11 @@ CORE=Extensionality.v \
   extspec.v open_safety.v \
   structured_injections.v \
   effect_semantics.v \
-  reach.v \
+  reach.v globalSep.v \
   simulations.v \
   relyguarantee_lemmas.v \
   simulations_lemmas.v effect_properties.v internal_diagram_trans.v \
-  simulations_trans.v \
+  simulations_trans.v full_composition.v\
   FiniteMaps.v mem_interpolation_defs.v mem_interpolation_II.v \
   interpolation_II.v interpolants.v interpolation_proofs.v \
   arguments.v compcert_imports.v \
@@ -171,6 +171,7 @@ LINKING=cast.v pos.v stack.v seq_lemmas.v pred_lemmas.v \
   linking_inv.v ret_lemmas.v call_lemmas.v linking_proof.v \
   context.v context_equiv.v \
   jstep.v safe_clight_rc.v CompositionalComplements.v 
+
 
 # Putting everything together (in driver/)
 
