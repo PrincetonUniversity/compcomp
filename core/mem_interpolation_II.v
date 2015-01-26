@@ -9,7 +9,7 @@ Require Import Axioms.
 
 Require Import mem_lemmas.
 Require Import mem_interpolation_defs.
-Require Import StructuredInjections.
+Require Import structured_injections.
 
 (*Require Import pure.*)
 Require Import full_composition.

@@ -2011,7 +2011,7 @@ assert (PGnu': meminj_preserves_globals (Genv.globalenv prog) (as_inj nu')).
   rewrite replace_locals_as_inj. assumption.
   assumption. 
   specialize (genvs_domain_eq_isGlobal _ _ GDE_lemma). intros GL.
-  red. unfold ge in GL. rewrite GL. apply SEP.}
+  red. unfold ge in GL. rewrite GL. apply SEP. }
 
 assert (RR1: REACH_closed m1'
   (fun b : Values.block =>

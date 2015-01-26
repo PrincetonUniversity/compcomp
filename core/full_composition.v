@@ -9,7 +9,7 @@ Require Import Axioms.
 
 Require Import mem_lemmas. (*needed for definition of mem_forward etc*)
 
-Require Import StructuredInjections.
+Require Import structured_injections.
 Require Import reach.
 Require Import Wellfounded.
 

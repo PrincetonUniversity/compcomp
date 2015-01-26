@@ -14,7 +14,6 @@ Require Import reach.
 Require Import simulations.
 Require Import simulations_lemmas.
 
-Require Import pure.
 Require Import full_composition.
 Module Type EffectInterpolationAxioms.
 
