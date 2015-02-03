@@ -280,27 +280,36 @@ Ltac fun_tac :=
        apply (eventval_list_match_fun H) in H'; inv H'
  end. 
 
+Section clight_corestep_fun.
+Variable is_i64_helper_empty_trace : (* The following should be provable but isn't, 
+                                        due to a misspecification of i64_helpers 
+                                        (they should all have empty trace)! *)
+  forall F V hf ef (ge : Genv.t F V) name sg vargs m t vres m',
+  I64Helpers.is_I64_helper hf name sg ->
+  external_call ef ge vargs m t vres m' -> 
+  t = E0.
+
 Lemma not_observed_empty_trace F V hf (ge : Genv.t F V) ef vargs m t vres m' :
   ~observableEF hf ef -> 
   external_call ef ge vargs m t vres m' -> 
-  t = E0.
+  t = E0. 
 Proof.
-destruct ef; simpl; try solve[intros C; elimtype False; auto].
+destruct ef; try solve[simpl; intros C; elimtype False; auto].
 destruct (I64Helpers.is_I64_helper_dec hf name sg); 
   [|intros; elimtype False; apply H; auto].
-intros _ H; inv H. admit. (*this is a misspecification; i64 helpers should not be observable (cf. Selectionproof.v)*)
+intros; eapply is_i64_helper_empty_trace in H0; eauto.
 destruct (I64Helpers.is_I64_helper_dec hf name sg); 
   [|intros; elimtype False; apply H; auto].
-intros _ H; inv H. admit. (*this is a misspecification; i64 helpers should not be observable (cf. Selectionproof.v)*)
+intros; eapply is_i64_helper_empty_trace in H0; eauto.
 intros _ H; inv H; auto.
 intros _ H; inv H; auto.
 intros _ H; inv H; auto.
 Qed.
 
 Lemma clight_corestep_fun hf ge: forall m q m1 q1 m2 q2, 
-    clight_corestep hf function_entry1 ge q m q1 m1 -> 
-    clight_corestep hf function_entry1 ge q m q2 m2 -> 
-    (q1,m1)=(q2,m2).
+  clight_corestep hf function_entry1 ge q m q1 m1 -> 
+  clight_corestep hf function_entry1 ge q m q2 m2 -> 
+  (q1,m1)=(q2,m2).
 Proof.
 intros.
 rename H0 into STEP; 
@@ -324,3 +333,5 @@ rename H0 into STEP;
   eapply alloc_variables_fun in H1; eauto. inv H1.
   eapply bind_parameters_fun in H2; eauto. inv H2. auto. }
 Qed.
+
+End clight_corestep_fun.
