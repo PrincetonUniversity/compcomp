@@ -58,6 +58,15 @@ Notation Clight_prog := (AST.program fundef Ctypes.type).
 Definition mk_Clight_Modsem hf (p : Clight_prog) :=
   @Modsem.mk fundef Ctypes.type (Genv.globalenv p) CL_core (CL_eff_sem1 hf).
 
+Section Clight_Ctx.
+Variable is_i64_helper_empty_trace : (* The following should be provable but isn't, 
+                                        due to a misspecification of i64_helpers 
+                                        (they should all have empty trace)! *)
+  forall F V hf ef (ge : Genv.t F V) name sg vargs m t vres m',
+  I64Helpers.is_I64_helper hf name sg ->
+  external_call ef ge vargs m t vres m' -> 
+  t = E0.
+
 Program Definition mk_Clight_Ctx hf (p : Clight_prog)
            (R: list_norepet (map fst (prog_defs p)))
            (DISJ: forall vf f, Genv.find_funct (Genv.globalenv p) vf = Some (Internal f) -> 
@@ -77,3 +86,5 @@ Next Obligation.
 intros m *; simpl; intros H H2.
 eapply clight_corestep_fun in H; eauto; inv H; auto.
 Qed.
+
+End Clight_Ctx.
