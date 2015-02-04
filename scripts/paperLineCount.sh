@@ -160,7 +160,7 @@ count-nocompcert "Gallina Sems. (Chapter~\ref{ch:coresem})" "$GALLINASEM_SPEC_FI
 
 LINKING_SPEC_FILES="../linking/linking_spec.v ../linking/linking.v ../linking/compcert_linking.v ../linking/rc_semantics.v ../linking/context.v ../linking/context_equiv.v ../linking/pos.v"
 LINKING_PROOF_FILES="../linking/compcert_linking_lemmas.v ../linking/cast.v ../linking/compcert_linking_lemmas.v ../linking/disjointness.v ../linking/inj_lemmas.v ../linking/join_sm.v ../linking/linking_inv.v ../linking/linking_proof.v ../linking/pred_lemmas.v ../linking/rc_semantics_lemmas.v ../linking/reach_lemmas.v ../linking/reestablish.v ../linking/ret_lemmas.v ../linking/seq_lemmas.v ../linking/stacking.v ../linking/stack.v ../linking/wf_lemmas.v"
-count-nocompcert "Linking (Chapter~\ref{ch:linking})" "$LINKING_SPEC_FILES" "$LINKING_PROOF_FILES" ""
+count-nocompcert "Linking (Chapters~\ref{ch:linking} and~\ref{ch:sepcomp})" "$LINKING_SPEC_FILES" "$LINKING_PROOF_FILES" ""
 
 CLOSEDSIM_SPEC_FILES="../core/closed_simulations.v"
 CLOSEDSIM_PROOF_FILES="../core/closed_simulations_lemmas.v"
