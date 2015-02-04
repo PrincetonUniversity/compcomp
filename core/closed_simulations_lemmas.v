@@ -206,8 +206,8 @@ Lemma corestepN_splits_lt
   corestepN csem ge n2 c m c'' m'' -> 
   (S n1 <= n2)%nat -> 
   exists a b,
-    (a > O)%nat
-    /\ (b=0 -> S n1=n2)%nat
+    a = S n1
+    /\ (b=0 -> a=n2)%nat
     /\ n2 = plus a b 
     /\ corestepN csem ge a c m c' m'
     /\ corestepN csem ge b c' m' c'' m''.
@@ -245,6 +245,26 @@ split; auto. omega.
 split; auto.
 exists c2,m2'.
 split; auto.
+Qed.
+
+Lemma corestepN_splits_lt' 
+       {G C M} (csem : CoreSemantics G C M) (ge : G)
+       c m c' m' c'' m'' n1 n2 :
+  corestep_fun csem -> 
+  corestepN csem ge n1 c m c' m' -> 
+  corestepN csem ge n2 c m c'' m'' -> 
+  (n1 <= n2)%nat -> 
+  exists q,
+       n2 = plus n1 q 
+    /\ corestepN csem ge n1 c m c' m'
+    /\ corestepN csem ge q c' m' c'' m''.
+Proof.
+intros.
+destruct n1.
+simpl. exists n2. split; auto. simpl in H0. split; auto. inv H0; auto.
+destruct (corestepN_splits_lt csem ge c m c' m' c'' m'' n1 n2 H H0 H1 H2) 
+ as (a&b&H3&H4&H5&H6&H7).
+exists b; split; auto. omega.
 Qed.
 
 (** ** Closed Simulation Implies Equitermination *)
@@ -376,7 +396,7 @@ destruct (lt_dec n2 n) as [pf|pf].
   destruct (corestepN_splits_lt target geT d tm d' tm' d2 tm2 n (S n2) TGT_DET
               TSTEPN TSTEPN2)
       as [a [b [alt [neq [X [Y W]]]]]]. omega.
-  destruct b. rewrite neq in lt; auto. omega. 
+  destruct b. subst. rewrite neq in lt; auto. omega. 
   simpl in W. destruct W as [? [? [W _]]].
   apply corestep_not_halted in W; rewrite W in HLT2; congruence. }
 Qed.
@@ -572,5 +592,3 @@ contradiction.
 Qed.    
 
 End behavior_refinement.
-
-
