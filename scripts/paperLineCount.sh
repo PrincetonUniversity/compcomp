@@ -10,6 +10,16 @@ function count_files {
   fi
 }
 
+#count_lemmas
+# - count the number of lines starting with the 'Lemma' keyword.
+# - this may slightly undercount total number of distinct lemmas proved.
+# $1: file names 
+function count_lemmas {
+  if [ ! -f `echo $1 | awk '{print $1;}'` ]; then echo $1
+  else grep -e "Lemma\|Theorem" $1 | wc -l | awk '{printf "%d ", $1;}'
+  fi
+}
+
 #count
 # $1: phase name
 # $2: spec files
@@ -22,7 +32,9 @@ function count {
   count_files "$3" 0; echo -n "& "
   count_files "$2" $6; echo -n "& "
   count_files "$5" 0; echo -n "& "
-  count_files "$4" 0
+  count_files "$4" 0; echo -n "& "
+  count_lemmas "$5"; echo -n "& "
+  count_lemmas "$4"
   echo "\\\\"
 }
 
@@ -33,13 +45,14 @@ function count {
 function count-nocompcert {
   echo -n "$1 && "
   count_files "$2" 0; echo -n "&& "
-  count_files "$3" 0
+  count_files "$3" 0; echo -n "&& "
+  count_lemmas "$3"
   echo "\\\\"
 }
 
-echo "\begin{tabular}{|l|r r |r r|}"
-echo "\hline            & \multicolumn{2}{c|}{Specs.}        & \multicolumn{2}{c|}{Proofs} \\\\ \hline"
-echo "\emph{Compiler Phases:} & old & new & old & new \\\\"
+echo "\begin{tabular}{|l|r r |r r|r r|}"
+echo "\hline            & \multicolumn{2}{c|}{Specs.}        & \multicolumn{2}{c|}{Proofs}  & \multicolumn{2}{c|}{Lemmas} \\\\ \hline"
+echo "\emph{Compiler Phases:} & old & new & old & new & old & new \\\\"
 
 SIMPLLOCALS_SPEC_FILES="../cfrontend/Clight.v ../cfrontend/Clight_coop.v ../cfrontend/Clight_eff.v"
 SIMPLLOCALS_SPEC_FILES_COMPCERT="../cfrontend/Clight.v"
@@ -133,7 +146,7 @@ ASMGEN_UNUSED_SPECS=`./countCompCertOpsem.sh ../backend/Mach.v ../ia32/Asm.v` #C
 count "Asmgen" "$ASMGEN_SPEC_FILES" "$ASMGEN_SPEC_FILES_COMPCERT" "$ASMGEN_PROOF_FILES" "$ASMGEN_PROOF_FILES_COMPCERT" "$ASMGEN_UNUSED_SPECS"
 
 echo "\hline"
-echo "\emph{Theories:} & & & & \\\\"
+echo "\emph{Theories:} & & & & & & \\\\"
 
 INTERACTIONSEM_SPEC_FILES="../core/semantics.v"
 INTERACTIONSEM_PROOF_FILES="../core/semantics_lemmas.v"
@@ -175,9 +188,6 @@ count-nocompcert "Well-Defined Contexts (Chapter~\ref{ch:sepcomp})" "$CONTEXTS_S
 
 C_CONTEXTS_PROOF_FILES="../linking/clight_nucular.v ../cfrontend/Clight_self_simulates.v ../cfrontend/Clight_lemmas.v ../linking/safe_clight_rc.v"
 count-nocompcert "Clight Well-Defined (Chapter~\ref{ch:sepcomp})" "-" "$C_CONTEXTS_PROOF_FILES"
-
-echo "\hline"
-echo "\emph{Chapter~\ref{ch:modver}:} & & & & \\\\"
 
 echo "\hline"
 echo "\end{tabular}"
