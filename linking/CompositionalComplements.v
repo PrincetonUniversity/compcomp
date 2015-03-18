@@ -65,7 +65,6 @@ Lemma compcert_equiv
   explained in Section 3. *)
   forall ge_top : ge_ty,
   forall domeq_S : (forall ix : 'I_N, genvs_domain_eq ge_top (sems_S ix).(Modsem.ge)),
-  forall domeq_T : (forall ix : 'I_N, genvs_domain_eq ge_top (sems_T ix).(Modsem.ge)), 
 
 (** No module defines the same module twice. *)
   forall lnr : (forall ix : 'I_N, list_norepet (map fst (prog_defs (source_modules ix)))),
@@ -81,7 +80,7 @@ Lemma compcert_equiv
   Equiv_ctx ge_top plt prog_S prog_T.
 
 Proof.
-move=> sems_S sems_T prog_S prog_T ge_top deqS deqT lnr transf.
+move=> sems_S sems_T prog_S prog_T ge_top deqS lnr transf.
 have find_syms :
   forall (i : 'I_N) (id : ident) (bf : block),
   Genv.find_symbol (Modsem.ge (sems_S i)) id = Some bf ->
@@ -111,7 +110,6 @@ Lemma compcert_refines
   let prog_T := Prog.mk sems_T main in
   forall ge_top : ge_ty,
   forall domeq_S : (forall ix : 'I_N, genvs_domain_eq ge_top (sems_S ix).(Modsem.ge)),
-  forall domeq_T : (forall ix : 'I_N, genvs_domain_eq ge_top (sems_T ix).(Modsem.ge)), 
   forall lnr : (forall ix : 'I_N, list_norepet (map fst (prog_defs (source_modules ix)))),
   forall transf : 
     (forall ix : 'I_N, transf_clight_program (source_modules ix) 
@@ -119,7 +117,7 @@ Lemma compcert_refines
   forall EM : ClassicalFacts.excluded_middle,
   Prog_refines ge_top plt prog_S prog_T.
 Proof.
-move=> sems_S sems_T prog_S prog_T ge_top deqS deqT lnr transf EM.
+move=> sems_S sems_T prog_S prog_T ge_top deqS lnr transf EM.
 have find_syms :
   forall (i : 'I_N) (id : ident) (bf : block),
   Genv.find_symbol (Modsem.ge (sems_S i)) id = Some bf ->
