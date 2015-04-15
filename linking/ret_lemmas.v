@@ -268,7 +268,8 @@ have restrict_mu_top_nu:
 { rewrite /restrict /as_inj /join; extensionality b.
   move: (head_rel hdinv); rewrite mus_eq /= => [][]. 
   case=> /= incr_mu0_top sep_mu0_top disj_mu0_top _ _.
-  case e: (DomSrc nu b)=> //.
+  case e: (DomSrc nu b)=> //. 
+  { 
   case eOf_nu: (extern_of nu b)=> [[x' y']|].  
   rewrite /nu replace_locals_extern in eOf_nu.
   case eOf_top: (extern_of mu_top b)=> [[x'' y'']|].
@@ -284,24 +285,29 @@ have restrict_mu_top_nu:
   move: (inj_incr b x'' y''); rewrite /as_inj /join.
   rewrite /nu replace_locals_local in lOf_nu.
   by rewrite eOf_nu eOf_top lOf_nu; apply.
-  case: sep_mu0_top; move/(_ b x' y').
-  rewrite /nu replace_locals_local in lOf_nu.
-  rewrite /as_inj /join eOf_nu lOf_nu eOf_top; case=> //.
-  by rewrite e.
-  case: incr_mu0_top=> inj_incr []H1 H2.
-  case lOf_nu: (local_of nu b)=> [[x' y']|].
-  rewrite /nu replace_locals_local in lOf_nu.
-  case lOf_top: (local_of mu_top b)=> [[x'' y'']|].
-  move: (inj_incr b x' y'); rewrite /as_inj /join.
-  by rewrite lOf_nu lOf_top eOf_nu eOf_top; apply.
-  move: (inj_incr b x' y'); rewrite /as_inj /join.
-  by rewrite lOf_nu lOf_top eOf_nu eOf_top; move/(_ erefl).
-  rewrite /nu replace_locals_local in lOf_nu.
-  case lOf_top: (local_of mu_top b)=> //[[x' y']].
-  case: (local_locBlocks _ (Inj_wd _) _ _ _ lOf_top).
-  case: sep_mu0_top; move/(_ b x' y').
-  rewrite /as_inj /join eOf_nu lOf_nu eOf_top lOf_top; case=> //.
-  by rewrite e. 
+  have Contra: False.
+  { case: sep_mu0_top; move/(_ b x' y').
+    rewrite /nu replace_locals_local in lOf_nu.
+    rewrite /as_inj /join eOf_nu lOf_nu eOf_top; case=> //.
+    by rewrite e.
+  } by elimtype False; apply: Contra.
+  have local_of_mu_top_nu: local_of mu_top b = local_of nu b.
+  { case: incr_mu0_top=> inj_incr []H1 H2.
+    case lOf_nu: (local_of nu b)=> [[x' y']|].
+    rewrite /nu replace_locals_local in lOf_nu.
+    case lOf_top: (local_of mu_top b)=> [[x'' y'']|].
+    move: (inj_incr b x' y'); rewrite /as_inj /join.
+    by rewrite lOf_nu lOf_top eOf_nu eOf_top; apply.
+    move: (inj_incr b x' y'); rewrite /as_inj /join.
+    by rewrite lOf_nu lOf_top eOf_nu eOf_top; move/(_ erefl).
+    rewrite /nu replace_locals_local in lOf_nu.
+    case lOf_top: (local_of mu_top b)=> //[[x' y']].
+    case: (local_locBlocks _ (Inj_wd _) _ _ _ lOf_top).
+    case: sep_mu0_top; move/(_ b x' y').
+    rewrite /as_inj /join eOf_nu lOf_nu eOf_top lOf_top; case=> //.
+    by rewrite e. 
+  } by apply: local_of_mu_top_nu.
+  }
   case eOf_nu: (extern_of nu b)=> [[x' y']|].
   rewrite /nu replace_locals_extern in eOf_nu.
   case: (extern_DomRng' _ (Inj_wd _) _ _ _ eOf_nu).
@@ -310,7 +316,8 @@ have restrict_mu_top_nu:
   case lOf_nu: (local_of nu b)=> //[[x' y']].
   rewrite /nu replace_locals_local in lOf_nu.
   case: (local_DomRng _ (Inj_wd _) _ _ _ lOf_nu)=> H1 _.  
-  by rewrite /DomSrc /nu replace_locals_locBlocksSrc H1 /= in e. }
+  by rewrite /DomSrc /nu replace_locals_locBlocksSrc H1 /= in e. 
+}
 
 have asInj_nu'_mu_top: as_inj nu' = as_inj mu_top.
 { by apply: reestablish_as_inj. }
