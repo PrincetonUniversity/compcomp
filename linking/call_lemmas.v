@@ -411,9 +411,9 @@ have pkg_hdinv:
     mu_top mus m1 m2 hdinv _ _ args1 args2 inj vinj erefl erefl mtch_pkg).
   rewrite /pkg /= /mu_pkg.
   have ->: lo_wd _ _ _ _ _ = mu_pkg_wd by move=> *; apply: proof_irr.
-  by apply. }
+    by apply. }
 
-have mu_new_rel_inv_pkg: rel_inv_pred m1 mu_new pkg.
+have mu_new_rel_inv_pkg: rel_inv_pred my_ge m1 mu_new pkg.
 { by apply init_rel_inv_mu
     with (c := c inv) (d := d inv) (pf := pf) 
          (cd := (cast (fun ix : 'I_N => 
@@ -423,7 +423,7 @@ have mu_new_rel_inv_pkg: rel_inv_pred m1 mu_new pkg.
          (eq1 := erefl) (eq2 := erefl). }
 
 have mu_new_rel_inv_all: 
-  All (rel_inv_pred m1 (initial_SM domS domT frgnS frgnT j)) mus.
+  All (rel_inv_pred my_ge m1 (initial_SM domS domT frgnS frgnT j)) mus.
 { apply init_rel_inv_rest 
     with (c := c inv) (d := d inv) (pf := pf) 
          (cd := (cast (fun ix : 'I_N => 

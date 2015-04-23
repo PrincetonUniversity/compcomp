@@ -172,6 +172,20 @@ Definition join_sm mu1 mu2 : SM_Injection :=
     [predI (frgnBlocksTgt mu1) & frgnBlocksTgt mu2]
     (join2 (extern_of mu1) (extern_of mu2)).
 
+Lemma consistent_incr: forall mu0 mu mu',
+                         inject_incr (as_inj mu0) (as_inj mu) ->
+                         inject_incr (as_inj mu) (as_inj mu') ->
+                         Consistent mu0 mu'.
+Proof.
+  clear.
+  move => mu0 mu mu'.
+  rewrite /Consistent /consistent => //=.
+  move => incr incr' b1 b2 b2' d2 d2'.                                     
+  move/incr /incr' => map1.
+  rewrite map1.
+  case => //=.
+Qed.
+
 Lemma join_sm_wd (mu1 : Inj.t) (mu2 : Inj.t) :
   DisjointLS mu1 mu2 -> 
   DisjointLT mu1 mu2 -> 

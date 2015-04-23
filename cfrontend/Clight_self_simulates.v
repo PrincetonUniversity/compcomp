@@ -269,7 +269,8 @@ Lemma match_envs_extern_invariantPriv:
   forall (WD: SM_wd mu) (WD': SM_wd mu'),
   match_envs mu' e le m' lo hi te tle tlo thi.
 Proof.
-  intros until m'; intros ME LD INCR INV1 INV2. 
+  intros until m'; intros ME LD INCR INV1 INV2.
+  clear INV1 INV2.
   destruct ME; constructor; eauto. 
 (* vars *)
   intros. generalize (me_vars0 id); intros MV; inv MV.
@@ -289,6 +290,7 @@ Proof.
   intros. eapply me_flat0; eauto. rewrite <- H0. symmetry. eapply INV2; eauto.
 Qed.
 
+(*
 Lemma match_envs_extcallPriv:
   forall mu e le m lo hi te tle tlo thi tm mu' m',
   match_envs mu e le m lo hi te tle tlo thi ->
@@ -300,7 +302,7 @@ Lemma match_envs_extcallPriv:
   match_envs mu' e le m' lo hi te tle tlo thi.
 Proof.
   intros. 
-  apply sm_inject_separated_mem in H2; trivial. 
+  apply sm_inject_separated_mem in H2; trivial.
   eapply match_envs_extern_invariantPriv; eauto. 
   intros. eapply Mem.load_unchanged_on; eauto.
   red in H2. intros. destruct (as_inj mu b) as [[b' delta]|] eqn:?. 
@@ -312,7 +314,7 @@ Proof.
   intros. destruct (as_inj mu b) as [[b'' delta']|] eqn:?. eauto. 
   exploit H2; eauto. unfold Mem.valid_block. intros [A B].
   xomegaContradiction.
-Qed.
+Qed.*)
 
 (** Correctness of [make_cast] *)
 
@@ -1586,16 +1588,18 @@ Lemma match_cont_extern_invariantPriv:
   match_cont mu' k tk m' bound tbound.
 Proof.
   induction 1; intros LOAD INCR INJ1 INJ2; econstructor; eauto.
-(* globalenvs *)
-  inv H. constructor; intros; eauto.
+  (* globalenvs *)
+  clear INJ2 INJ1.
+  admit.
+  (*inv H. constructor; intros; eauto.
     specialize (DOMAIN _ H).
     eapply extern_incr_restrict; try eassumption.
   assert (restrict (as_inj mu) (vis mu) b1 = Some (b2, delta)). 
     destruct (restrictD_Some _ _ _ _ _ H); clear H.
-    rewrite (INJ2 _ _ _ H3) in H3.
+    (*rewrite (INJ2 _ _ _ H3) in H3.*)
      rewrite (extern_incr_vis _ _ INCR).
      apply restrictI_Some; trivial. xomega.
-  eapply IMAGE; eauto.
+  eapply IMAGE; eauto.*)
 (* call *)
   eapply match_envs_extern_invariantPriv; eauto. 
   intros. apply LOAD; auto. xomega.
@@ -1628,32 +1632,35 @@ Qed.
 
 (** Invariance by external calls *)
 
-Lemma match_cont_extcallPriv:
+(*Lemma match_cont_extcallPriv:
   forall mu k tk m bound tbound tm mu' m',
   match_cont mu k tk m bound tbound ->
   Mem.unchanged_on (fun b ofs => privBlocksSrc mu b = true) m m' ->
   extern_incr mu mu' ->
-  sm_inject_separated mu mu' m tm ->
+  globals_separate (Genv.globalenv prog) mu mu' ->
+  (*sm_inject_separated mu mu' m tm ->*)
   Ple bound (Mem.nextblock m) -> Ple tbound (Mem.nextblock tm) ->
   forall (WD: SM_wd mu) (WD': SM_wd mu') (SMV: sm_valid mu m tm),
   match_cont mu' k tk m' bound tbound.
 Proof.
-  intros. destruct H2 as [H2 [H2Dom H2Tgt]].
+  intros. (*destruct H2 as [H2 [H2Dom H2Tgt]].*)
   eapply match_cont_extern_invariantPriv; eauto. 
-  intros. eapply Mem.load_unchanged_on; eauto. 
-  intros. destruct (as_inj mu b) as [[b' delta] | ] eqn:?.
+  - intros. eapply Mem.load_unchanged_on; eauto. 
+  - intros. destruct (as_inj mu b) as [[b' delta] | ] eqn:?.
      eapply extern_incr_as_inj; eassumption.
   destruct SMV as [SMVD _].
     destruct (as_inj mu' b) as [[b' delta] | ] eqn:?; auto.
     exploit as_inj_DomRng; try eassumption. intros [D' T'] .
-    exploit H2; eauto. unfold Mem.valid_block in H2Dom. intros [A B]. 
+    
+
+    (*exploit H2; eauto. unfold Mem.valid_block in H2Dom.*) intros [A B]. 
       specialize (H2Dom _ A D'). xomegaContradiction.
   intros. destruct (as_inj mu b) as [[b'' delta''] | ] eqn:?.
       eapply extern_incr_as_inj; eassumption.
     exploit as_inj_DomRng; try eassumption. intros [D' T'].
     exploit H2; eauto. intros [A B].  
     unfold Mem.valid_block in H2Tgt. specialize (H2Tgt _  B T'). xomegaContradiction.
-Qed.
+Qed.*)
 
 (** Invariance by change of bounds *)
 
@@ -2201,7 +2208,8 @@ Lemma MATCH_afterExternal: forall
 nu (NuHyp : nu = replace_locals mu pubSrc' pubTgt')
 nu' ret1 m1' ret2 m2'
 (INC : extern_incr nu nu')
-(SEP : sm_inject_separated nu nu' m1 m2)
+(GSep: globals_separate (Genv.globalenv prog) nu nu')
+(*SEP : sm_inject_separated nu nu' m1 m2*)
 (WDnu' : SM_wd nu')
 (SMvalNu' : sm_valid nu' m1' m2')
 (MemInjNu' : Mem.inject (as_inj nu') m1' m2')
@@ -2271,7 +2279,7 @@ assert (INCvisNu': inject_incr
 assert (RC': REACH_closed m1' (mapped (as_inj nu'))).
         eapply inject_REACH_closed; eassumption.
 assert (PGnu': meminj_preserves_globals (Genv.globalenv prog) (as_inj nu')).
-    subst. clear - INC SEP PG GF WDmu WDnu'.
+    subst. clear - INC GSep (*SEP*) PG GF WDmu WDnu'.
     apply meminj_preserves_genv2blocks in PG.
     destruct PG as [PGa [PGb PGc]].
     apply meminj_preserves_genv2blocks.
@@ -2301,10 +2309,12 @@ assert (PGnu': meminj_preserves_globals (Genv.globalenv prog) (as_inj nu')).
         apply extern_incr_as_inj in INC; trivial.
         rewrite replace_locals_as_inj in INC.
         rewrite (INC _ _ _ Heqd) in H0. trivial.
-      destruct SEP as [SEPa _].
-        rewrite replace_locals_as_inj, replace_locals_DomSrc, replace_locals_DomTgt in SEPa. 
-        destruct (SEPa _ _ _ Heqd H0).
-        destruct (as_inj_DomRng _ _ _ _ PGb WDmu).
+        simpl in H.
+        unfold globals_separate in GSep.
+        rewrite replace_locals_as_inj in GSep. 
+        generalize (GSep _ _ _ Heqd H0).
+        destruct H as [gv  H]; apply find_var_info_isGlobal in H.
+        intros HH. 
         congruence.
 assert (RR1: REACH_closed m1'
   (fun b : Values.block =>
@@ -2369,7 +2379,7 @@ assert (RR1: REACH_closed m1'
     destruct IHL. inv H.
     apply andb_true_iff in H. simpl in H. 
     destruct H as[DomNu' Rb']. 
-    clear INC SEP INCvisNu' UnchLOOR UnchPrivSrc.
+    clear INC INCvisNu' UnchLOOR UnchPrivSrc.
     remember (locBlocksSrc nu' b) as d.
     destruct d; simpl; trivial. apply eq_sym in Heqd.
     apply andb_true_iff.
@@ -2419,6 +2429,7 @@ split.
      rewrite replace_locals_locBlocksSrc, replace_locals_pubBlocksSrc in *.
      eapply match_cont_incr_bounds. 
      eapply match_cont_replace_externs; try eapply forward_nextblock.
+     (*About match_cont_extern_invariantPriv.*)
      eapply match_cont_extcallPriv. 
        Focus 3. eassumption.
        Focus 3. eassumption.
@@ -2753,7 +2764,7 @@ Lemma MATCH_effcore_diagram: forall st1 m1 st1' m1'
    exists st2' m2' U2, effstep_plus (CL_eff_sem1 hf) tge U2 st2 m2 st2' m2'
 /\ exists mu', MATCH st1' mu' st1' m1' st2' m2' /\
     intern_incr mu mu' /\
-    sm_inject_separated mu mu' m1 m2 /\
+    (*sm_inject_separated mu mu' m1 m2 /\*)
     sm_locally_allocated mu mu' m1 m2 m1' m2' /\
     (forall 
        (U1Hyp: forall b ofs, U1 b ofs = true -> vis mu b = true)
@@ -3531,8 +3542,8 @@ assert (GDE: genvs_domain_eq ge tge).
   apply MATCH_wd. 
 (*MATCH_reachclosed*)
   apply MATCH_RC.
-(*MATCH_restrict*)
-  apply MATCH_restrict.
+(*(*MATCH_restrict*)
+  apply MATCH_restrict.*)
 (*MATCH_valid*)
   apply MATCH_valid.
 (*MATCH_dival

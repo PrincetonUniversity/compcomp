@@ -84,6 +84,7 @@ apply: disjinv_call_aux; first by apply: pubBlocksLocReachSrc.
 by apply: pubBlocksLocReachTgt.
 Qed.
 
+(* obsolete: look bellow for DisjointLS_intern_step'*)
 Lemma DisjointLS_intern_step mu0 (mu mu' : Inj.t) m1 m2 :
   DisjointLS mu0 mu -> 
   intern_incr mu mu' -> 
@@ -105,6 +106,7 @@ have D: Disjoint (locBlocksSrc mu0)
 by apply: (Disjoint_incr disj D).
 Qed.
 
+(* obsolete: look bellow for DisjointLT_intern_step'*)
 Lemma DisjointLT_intern_step mu0 (mu mu' : Inj.t) m1 m2 :
   DisjointLT mu0 mu -> 
   intern_incr mu mu' -> 
@@ -124,6 +126,48 @@ have D: Disjoint (locBlocksTgt mu0)
                  [predD (locBlocksTgt mu') & locBlocksTgt mu].
   by apply: (Disjoint_sub1 B C).
 by apply: (Disjoint_incr disj D).
+Qed.
+
+Lemma DisjointLS_intern_step' mu0 (mu mu' : Inj.t) m1 m2 m1' m2' :
+  DisjointLS mu0 mu -> 
+  intern_incr mu mu' -> 
+  sm_locally_allocated mu mu' m1 m2 m1' m2'  -> 
+  sm_valid mu0 m1 m2 -> 
+  (*sm_valid mu m1 m2 -> *)
+  DisjointLS mu0 mu'.
+Proof.
+  move=> disj incr loca val1 (*val2*).
+  have B: Disjoint (locBlocksSrc mu0) [pred b | ~~ validblock m1 b].
+  apply: smvalid_locsrc_disjoint=> //. 
+    by apply: (sm_valid_smvalid_src _ _ _ val1).
+  have C: {subset [predD (locBlocksSrc mu') & locBlocksSrc mu]
+           <= [pred b | ~~ validblock m1 b]}.
+  by apply: (sminj_alloc_locsrc incr loca).
+  have D: Disjoint (locBlocksSrc mu0) 
+                     [predD (locBlocksSrc mu') & locBlocksSrc mu].
+   by apply: (Disjoint_sub1 B C).
+by apply: (Disjoint_incr disj D).
+Qed.
+
+Lemma DisjointLT_intern_step' mu0 (mu mu' : Inj.t) m1 m2 m1' m2' :
+  DisjointLT mu0 mu -> 
+  intern_incr mu mu' -> 
+  sm_locally_allocated mu mu' m1 m2 m1' m2'  -> 
+  sm_valid mu0 m1 m2 -> 
+  (*sm_valid mu m1 m2 -> *)
+  DisjointLT mu0 mu'.
+Proof.
+  move=> disj incr loca val1 (*val2*).
+  have B: Disjoint (locBlocksTgt mu0) [pred b | ~~ validblock m2 b].
+  apply: smvalid_loctgt_disjoint=> //. 
+    by apply: (sm_valid_smvalid_tgt _ _ _ val1).
+  have C: {subset [predD (locBlocksTgt mu') & locBlocksTgt mu]
+           <= [pred b | ~~ validblock m2 b]}.
+  by apply: (sminj_alloc_loctgt incr loca).
+  have D: Disjoint (locBlocksTgt mu0) 
+                     [predD (locBlocksTgt mu') & locBlocksTgt mu].
+    by apply: (Disjoint_sub1 B C).
+      by apply: (Disjoint_incr disj D).
 Qed.
 
 Lemma loc_of_as_inj (mu : Inj.t) b1 b2 d2 : 
@@ -150,6 +194,7 @@ Proof.
 by move=> L E; rewrite /as_inj /join L E.
 Qed.
 
+(* obsolete: see bellow for disjinv_localloc_step*)
 Lemma disjinv_intern_step (mu0 mu mu' : Inj.t) m10 m20 m1 m2 :
   disjinv mu0 mu -> 
   intern_incr mu mu' -> 
@@ -216,6 +261,39 @@ apply: Build_disjinv.
   case: VAL2=> H1 H2; apply: H1; rewrite /DOM /DomSrc.
   case: (local_DomRng _ _ _ _ _ L); first by apply Inj_wd.  
   by move=> -> _; apply/orP; left.
+Qed.
+
+Lemma disjinv_localloc_step (mu0 mu mu' : Inj.t) m10 m20 m1 m2 m1' m2':
+    disjinv mu0 mu ->
+    inject_incr (as_inj mu0) (as_inj mu) ->
+      intern_incr mu mu' ->
+      mem_forward m10 m1 ->
+      mem_forward m20 m2 ->
+      sm_locally_allocated mu mu' m1 m2 m1' m2' ->
+      sm_valid mu0 m10 m20 ->
+      sm_valid mu m1 m2 ->
+      disjinv mu0 mu'.
+Proof.
+move=> inv incr' incr mf1 mf2 loca VAL VAL'.
+have VAL2: sm_valid mu0 m1 m2 by apply: (sm_valid_fwd VAL mf1 mf2).
+apply: Build_disjinv.  
++ have A: Disjoint (locBlocksSrc mu0) (locBlocksSrc mu) by case: inv.
+   by apply: (DisjointLS_intern_step' A incr loca VAL2).
++ have A: Disjoint (locBlocksTgt mu0) (locBlocksTgt mu) by case: inv.
+  by apply: (DisjointLT_intern_step' A incr loca VAL2).
++ have A: [predI (frgnBlocksSrc mu') & locBlocksSrc mu0]
+          = [predI (frgnBlocksSrc mu) & locBlocksSrc mu0].
+    by rewrite (intern_incr_frgnsrc incr).  
+  by rewrite A; case: inv.
++ case: inv; rewrite/foreign_of. 
+  generalize dependent mu; generalize dependent mu'.
+  case; case=> /= ? ? ? ? ? ? ? ? ? ? ?. 
+  case; case=> /= ? ? ? ? ? ? ? ? ? ? ? ? incr.
+  move: (intern_incr_frgnsrc incr) (intern_incr_frgntgt incr)=> /= -> ->.
+  by move: (intern_incr_extern incr)=> /= ->.
++ have wd: SM_wd mu' by destruct mu' => //.
+  eapply intern_incr_as_inj in incr => //.                                 
+  by apply (consistent_incr incr' incr).
 Qed.
 
 Lemma disjinv_unchanged_on_src 

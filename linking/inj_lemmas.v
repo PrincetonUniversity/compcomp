@@ -531,6 +531,7 @@ Lemma intern_incr_extern mu mu' :
   intern_incr mu mu' -> extern_of mu=extern_of mu'.
 Proof. by case=> _ []->. Qed.
 
+(*Obsolete: see bellow sminj_alloc_locsrc*)
 Lemma sminjsep_locsrc mu (mu' : Inj.t) m1 m2 :
   intern_incr mu mu' -> 
   sm_valid mu m1 m2 -> 
@@ -546,6 +547,7 @@ move: H; case: INCR=> []_ []_ []_ []_ []_ []_ []_ []_ []-> _ G.
 by case: (Inj_wd mu'); move/(_ b); rewrite D G; case.
 Qed.
 
+(*Obsolete: see bellow sminj_alloc_loctgt*)
 Lemma sminjsep_loctgt mu (mu' : Inj.t) m1 m2 :
   intern_incr mu mu' -> 
   sm_valid mu m1 m2 -> 
@@ -560,6 +562,72 @@ rewrite /DomTgt D E; apply=> //=; case H: (extBlocksTgt mu b)=> //.
 move: H; case: INCR=> []_ []_ []_ []_ []_ []_ []_ []_ []_ -> G.
 by case: (Inj_wd mu')=> _; move/(_ b); rewrite D G; case.
 Qed.
+
+Lemma localloc_locS:
+  forall mu mu' m10 m20 m1 m2,
+    sm_locally_allocated mu mu' m10 m20 m1 m2 ->
+    {subset [predD locBlocksSrc mu' & locBlocksSrc mu] <= [pred b | freshloc m10 m1 b]}.
+  rewrite /sm_locally_allocated.
+  case => locS locT ? ? ? ? ? ? ? ?;
+  case => locS' locT' ? ? ? ? ? ? ? ? /=.
+  move => m10 m20 m1 m2.                    
+  case => locSH [locTH ext]. 
+  rewrite locSH /sub_mem /predD /in_mem /mem /in_mem /=.
+  rewrite /in_mem => x /=.
+  case (locS x) => //=.
+Qed.
+
+Lemma localloc_locT:
+  forall mu mu' m10 m20 m1 m2,
+    sm_locally_allocated mu mu' m10 m20 m1 m2 ->
+    {subset [predD locBlocksTgt mu' & locBlocksTgt mu] <= [pred b | freshloc m20 m2 b]}.
+  rewrite /sm_locally_allocated.
+  case => locS locT ? ? ? ? ? ? ? ?;
+  case => locS' locT' ? ? ? ? ? ? ? ? /=.
+  move => m10 m20 m1 m2.                    
+  case => locSH [locTH ext]. 
+  rewrite locTH /sub_mem /predD /in_mem /mem /in_mem /=.
+  rewrite /in_mem => x /=.
+  case (locT x) => //=.
+Qed. 
+
+Lemma sminj_alloc_locsrc:
+  forall (mu : SM_Injection) (mu' : Inj.t) (m10 m20 m1 m2 : Memory.mem),
+    intern_incr mu mu' ->
+    (*sm_valid mu m10 m20 ->*)
+    sm_locally_allocated mu mu' m10 m20 m1 m2 ->
+       {subset [predD locBlocksSrc mu' & locBlocksSrc mu]
+            <= [pred b | ~~ validblock m10 b]}.
+  intros ? ? ? ? ? ? incr (*VAL*) loca.
+  eapply (subset_trans' (localloc_locS loca)).
+  unfold freshloc.
+  move=> b.
+  case/andP=> //= =>H.
+  case (valid_block_dec m10 b)=>//=.
+  rewrite /in_mem => /=.
+  rewrite /validblock /Mem.valid_block /Plt;
+    move=> HH ?.
+    by apply/negP/Pos.ltb_lt=>//.
+Qed.  
+
+Lemma sminj_alloc_loctgt:
+  forall (mu : SM_Injection) (mu' : Inj.t) (m10 m20 m1 m2 : Memory.mem),
+    intern_incr mu mu' ->
+    (*sm_valid mu m10 m20 ->*)
+    sm_locally_allocated mu mu' m10 m20 m1 m2 ->
+       {subset [predD locBlocksTgt mu' & locBlocksTgt mu]
+            <= [pred b | ~~ validblock m20 b]}.
+  intros ? ? ? ? ? ? incr (*VAL*) loca. 
+  eapply (subset_trans' (localloc_locT loca)).
+  unfold freshloc.
+  move=> b.
+  case/andP=> //= =>H.
+  case (valid_block_dec m20 b)=>//=.
+  rewrite /in_mem => /=.
+  rewrite /validblock /Mem.valid_block /Plt;
+    move=> HH ?.
+    by apply/negP/Pos.ltb_lt=>//.
+Qed.  
 
 Lemma sm_inject_separated_refl mu m m' : sm_inject_separated mu mu m m'.
 Proof.

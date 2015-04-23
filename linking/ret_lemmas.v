@@ -261,11 +261,32 @@ have [nu_wd [nu_valid0 [nu_inj0 nu_vinj]]]:
 
 (* nu' = reestablish nu w/r/t mu_top *)
 
-set nu' := reestablish nu mu_top.
+set nu' := reestablish nu mu_top.  
 
 have restrict_mu_top_nu:
   restrict (as_inj mu_top) (DomSrc nu) = as_inj nu.
-{ rewrite /restrict /as_inj /join; extensionality b.
+{ (*edit: Santiago*)
+  rewrite /nu lo_DomSrc replace_locals_as_inj; extensionality b.
+  move: (head_rel hdinv). rewrite mus_eq /= =>[] []. 
+  case=> /= incr_mu0_top sep_mu0_top gsep_mu0_top disj_mu0_top _ _.
+  case incr_mu0_top => incr [incrS incrT].
+  destruct (as_inj mu0 b) eqn:map1.
+  - move: p map1. case => b0 d map1.
+    have DS: DomSrc mu0 b = true.
+    { move: map1; move /(as_inj_DomRng). move => HH. move/HH: mu0_wd => [] //. }
+    rewrite /restrict DS.
+    by apply: incr =>  //=.
+  - rewrite /restrict. destruct (DomSrc mu0 b) eqn:DS=> //=.
+    (*have DS': DomSrc mu_top b = true by apply: incrS.*)
+    case map: (as_inj mu_top b) => [p|] .
+    + exfalso; move: map; case p => b2 d.
+      case (sep_mu0_top) => sep0 []sep1 sep2 map2.
+      case (sep0 b b2 d map1 map2).
+      by rewrite DS; discriminate.
+    + reflexivity. }
+
+  (*Old proof 
+  rewrite /restrict /as_inj /join; extensionality b.
   move: (head_rel hdinv); rewrite mus_eq /= => [][]. 
   case=> /= incr_mu0_top sep_mu0_top disj_mu0_top _ _.
   case e: (DomSrc nu b)=> //.
@@ -310,17 +331,30 @@ have restrict_mu_top_nu:
   case lOf_nu: (local_of nu b)=> //[[x' y']].
   rewrite /nu replace_locals_local in lOf_nu.
   case: (local_DomRng _ (Inj_wd _) _ _ _ lOf_nu)=> H1 _.  
-  by rewrite /DomSrc /nu replace_locals_locBlocksSrc H1 /= in e. }
+  by rewrite /DomSrc /nu replace_locals_locBlocksSrc H1 /= in e. }*)
 
 have asInj_nu'_mu_top: as_inj nu' = as_inj mu_top.
 { by apply: reestablish_as_inj. }
+
+(* Old proof
+  rewrite /nu' /as_inj reestablish_local_of reestablish_extern_of /nu
+          replace_locals_locBlocksSrc replace_locals_local.
+   move: (head_rel hdinv). rewrite mus_eq /= =>[] []. 
+  case=> /= incr_mu0_top locinv sep_mu0_top disj_mu0_top _ _.    
+  rewrite locinv /as_inj /join /restrict.
+  extensionality b.
+  destruct (locBlocksSrc mu0 b) eqn:locS0.
+  - reflexivity. 
+  - destruct (extern_of mu_top b) eqn:extmap.
+    + destruct p; reflexivity.
+    + destruct (local_of mu_top b); try destruct p; reflexivity. }*)
 
 have nu'_vinj: val_inject (as_inj nu') rv1 rv2.
 { rewrite asInj_nu'_mu_top.
   by apply: (val_inject_restrictD _ _ _ _ vinj). }
 
 move: (head_rel hdinv); rewrite mus_eq /= => [][].  
-case=> /= incr0_top sep0_top disj0_top _ _.
+case=> /= incr0_top sep0_top gsep0_top disj0_top _ _.
 
 have extsrc_nu_top b: extBlocksSrc nu b -> DomSrc mu_top b.
 { rewrite /nu replace_locals_extBlocksSrc=> H1.
@@ -333,7 +367,7 @@ have exttgt_nu_top b: extBlocksTgt nu b -> DomTgt mu_top b.
   by apply; apply/orP; right. }
 
 have nu_nu'_eincr: extern_incr nu nu'.
-{ apply: reestablish_extern_incr=> //; first by apply: Inj_wd. }
+{ apply: reestablish_extern_incr=> //; by apply: Inj_wd. }
 
 have locsrc_nu_top b: locBlocksSrc nu b -> DomSrc mu_top b.
 { rewrite /nu replace_locals_locBlocksSrc=> H1.
@@ -344,9 +378,74 @@ have loctgt_nu_top b: locBlocksTgt nu b -> DomTgt mu_top b.
 { rewrite /nu replace_locals_locBlocksTgt=> H1.
   by case: incr0_top=> _ [] _; move/(_ b); rewrite /DomTgt H1; apply. }
 
-have nu_nu'_sep: sm_inject_separated nu nu' m10 m20.
+(*Obsolete *)
+(*have nu_nu'_sep: sm_inject_separated nu nu' m10 m20.
 { apply: reestablish_sm_injsep=> //; first by apply: Inj_wd.
-  by apply: sm_inject_separated_replace_locals. }
+  by apply: sm_inject_separated_replace_locals. }*)
+
+(* This version is just FALSE in general:
+have nu_nu'_sep: sm_inject_separated' nu nu' m10 m20.
+{ admit. } *)
+
+(*New *)
+Lemma gsep_change_env {V V'} {F F'} (ge: Genv.t V F) (ge': Genv.t V' F') mu1 mu2:
+  genvs_domain_eq ge ge' ->
+  globals_separate ge mu1 mu2 ->
+  globals_separate ge' mu1 mu2.
+  case => A []B C.
+  rewrite /globals_separate /isGlobalBlock /genv2blocksBool /=.
+  move => H1 b1 b2 d H2 H3. move: (H1 _ _ _ H2 H3).
+  move: A B; rewrite /genv2blocks /=; move => A B.
+  
+  case one':(Genv.invert_symbol ge b2) =>  //.
+  have one:(Genv.invert_symbol ge' b2 = None).
+  { case one:(Genv.invert_symbol ge' b2)=>  [ a|]; last by reflexivity.
+    apply Genv.invert_find_symbol in one.
+    have ONE:(exists a, Genv.find_symbol ge' a = Some b2) by exists a; auto.
+    apply A in ONE; case ONE => a' ONE'.   
+    apply Genv.find_invert_symbol in ONE'.
+    rewrite one' in ONE'; discriminate. }
+  
+  case two':(Genv.find_var_info ge b2) =>  //.
+  have two:(Genv.find_var_info ge' b2 = None).
+  { case two:(Genv.find_var_info ge' b2)=>  [ a|]; last by reflexivity.
+    have TWO:(exists a, Genv.find_var_info ge' b2 = Some a) by exists a; auto.
+    apply B in TWO; case TWO => a' TWO'.  
+    rewrite two' in TWO'; discriminate. }
+    by rewrite one two.
+Qed.
+                                              
+have nu_nu'_gsep: globals_separate (ge (cores_T (Core.i hd1))) nu nu'.
+{ apply (@gsep_change_env _ _ _ _ _ _ _ _ (my_ge_T (Core.i hd1))).
+  have : (SM_wd nu) by auto.
+  rewrite /globals_separate /nu' /nu. move => _ b1 b2 d.
+  rewrite replace_locals_as_inj reestablish_as_inj //.
+  rewrite /globals_separate in gsep0_top.
+  intros.
+  by eapply (gsep0_top b1 b2 d); auto.
+}
+  
+(*  May want to make it into a lemma. This one is wrong:
+  Lemma reestablish_globals_separate:
+    forall F V ge (mu0 mu : SM_Injection),
+       SM_wd mu0 ->
+       SM_wd mu ->
+       restrict (as_inj mu) (DomSrc mu0) = as_inj mu0 ->
+       (forall b : block, locBlocksSrc mu0 b = true -> DomSrc mu b = true) ->
+       (forall b : block, locBlocksTgt mu0 b = true -> DomTgt mu b = true) ->
+       forall m1 m2 : Memory.mem,
+       globals_separate(F:=F)(V:=V) ge mu0 mu ->
+       globals_separate ge mu0 (reestablish mu0 mu).
+    clear.
+    move => ? ? ge mu mu' wd wd' rest HHS HHT m1 m2.
+    rewrite /globals_separate.
+    intros. eapply H; eauto.
+    move: H1. rewrite reestablish_as_inj; eauto. 
+  Qed.
+  eapply reestablish_globals_separate; eauto.
+  case mu_top; auto.
+}*)
+
 
 have nu'_wd: SM_wd nu'.
 { apply: reestablish_wd=> //; first by apply: Inj_wd.
@@ -417,7 +516,11 @@ have [hd2' [pf_eq22' [pf_sig22' [pf_eq12' [pf_sig12' [cd' [aft2' mtch12']]]]]]]:
 { case: (popCoreE _ pop2)=> wf_pf []inCtx2 st2''_eq'.
   rewrite st2''_eq' in st2''_eq.
   rewrite /updStack in st2''_eq; case: st2''_eq=> fntbl_eq pop2_eq'.
-  move: (@eff_after_external 
+  (*assert (nu_nu'_gsep: globals_separate (ge (cores_T (Core.i hd1))) nu nu').
+  { move: nu_nu'_sep; unfold globals_separate; unfold sm_inject_separated.
+    intros. destruct (nu_nu'_sep) as [a  [b c]]. 
+    destruct (a _ _ _ H H0) as [DSfalse DTfalse]. }*)
+  move: (@eff_after_external
   _ _ _ _ _ _ _ _ 
   _ _  
   (sims (Core.i hd1))
@@ -428,7 +531,7 @@ have [hd2' [pf_eq22' [pf_sig22' [pf_eq12' [pf_sig12' [cd' [aft2' mtch12']]]]]]]:
 
   nu' rv1 m1 rv2 m2
 
-  hasty_rv1 hasty_rv2 nu_nu'_eincr nu_nu'_sep
+  hasty_rv1 hasty_rv2 nu_nu'_eincr nu_nu'_gsep
   nu'_wd nu'_valid nu'_inj nu'_vinj
   fwd1 fwd2
 
@@ -529,7 +632,7 @@ have mu0_mu'_incr : incr mu0 mu'.
   { by move: (extBlocksSrc_locBlocksSrc _ (Inj_wd _) _ E). }
   rewrite lN; apply/orP; right.
   move: (head_rel hdinv); rewrite mus_eq /=; case; case=> /=; case.
-  move=> _; case; move/(_ b0)=> H _ _ _ _ _; apply: H.
+  move=> _; case; move/(_ b0)=> H _ _ _ _ _ _; apply: H.
   by rewrite /DomSrc E; apply/orP; right.
 
   rewrite /DomTgt; case/orP; rewrite /mu' replace_externs_locBlocksTgt /nu'.
@@ -540,13 +643,19 @@ have mu0_mu'_incr : incr mu0 mu'.
   { by move: (extBlocksTgt_locBlocksTgt _ (Inj_wd _) _ E). }
   rewrite lN; apply/orP; right.
   move: (head_rel hdinv); rewrite mus_eq /=; case; case=> /=; case.
-  move=> _; case=> _; move/(_ b0)=> H _ _ _ _; apply: H.
+  move=> _; case=> _; move/(_ b0)=> H _ _ _ _ _; apply: H.
   by rewrite /DomTgt E; apply/orP; right. }
 
 have as_inj_mu'_mu_top : as_inj mu' = as_inj mu_top.
 { by rewrite replace_externs_as_inj asInj_nu'_mu_top. }
 
-have DomSrc_mu'_mu_top : DomSrc mu' = DomSrc mu_top.
+have locS_mu'_mu_top : locBlocksSrc mu' = locBlocksSrc nu.
+{ by rewrite /mu' /nu' replace_externs_locBlocksSrc reestablish_locBlocksSrc. }
+
+have locT_mu'_mu_top : locBlocksTgt mu' = locBlocksTgt nu.
+{ by rewrite /mu' /nu' replace_externs_locBlocksTgt reestablish_locBlocksTgt. }
+
+have DomSrc_mu'_mu_top : DomSrc mu' = DomSrc mu_top .
 { by rewrite /mu' replace_externs_DomSrc reestablish_DomSrc. }
 
 have DomTgt_mu'_mu_top : DomTgt mu' = DomTgt mu_top.
@@ -652,9 +761,14 @@ have shrdT_mu0_mu': {subset sharedTgt mu0 <= sharedTgt mu'}.
   apply: REACH_nil; apply/orP; right; rewrite /sharedTgt.
   by apply/orP; right. }
 
+(*Obsolete:
 have mu0_mu'_sep : sm_inject_separated mu0 mu' m10 m20.
 { by apply: (eff_after_check5 mu0 pubSrc' pubTgt' nu erefl nu'
-            mu' frgnSrc' frgnTgt' erefl m10 m20 nu_nu'_sep). }
+            mu' frgnSrc' frgnTgt' erefl m10 m20 nu_nu'_sep). } *)
+
+(* Again, this has no reason to hold within a core.
+have mu0_mu'_sep : sm_inject_separated' mu0 mu' m10 m20.
+{ admit. }*)
 
 exists (Inj.mk mu'_wd),(tl mus).
 
@@ -667,7 +781,7 @@ set mu0_pkg := {| frame_mu0 := mu0; frame_m10 := m10; frame_m20 := m20;
 exists erefl.
 
 move: (head_rel hdinv); rewrite mus_eq /= => rel.
-case: rel; case=> /= incr1 sep1 disj1 rc rel. 
+case: rel; case=> /= incr1 sep1 gsep1 disj1 rc rel. 
 
 have vinj'': 
  Forall2 (val_inject (restrict (as_inj mu_top) (vis mu_top))) 
@@ -688,7 +802,7 @@ apply: Build_head_inv=> //.
   move {mus_eq allinv frametail rc}.
   elim: mus' all0 rel=> // a mus' IH.
   move=> /= []H1 H2 []H3 H4; split; last by apply: IH.
-  case: H3=> incr3 sep3 disj3 rel3.
+  case: H3=> incr3 sep3 gsep3 disj3 rel3.
 
   have frgnSrc'_loc_pub: 
     {subset [predI frgnSrc' & locBlocksSrc a] <= pubBlocksSrc a}.
@@ -723,16 +837,28 @@ apply: Build_head_inv=> //.
     by apply: V; apply/andP; split. }
 
   apply: Build_rel_inv=> //; first by apply: (incr_trans incr3).
-  { case: mu_top_mu'_incr=> AA []BB CC; case: sep3=> XX []YY ZZ; split.
-  move=> b1 b2 d1 asInj asInj'.  
-  case e: (as_inj mu_top b1)=> [[x y]|].
-  move: (AA _ _ _ e); rewrite asInj'; case=> -> _.
-  by apply: (XX _ _ _ asInj e).
-  by rewrite as_inj_mu'_mu_top in asInj'; rewrite asInj' in e.
-  by rewrite DomSrc_mu'_mu_top DomTgt_mu'_mu_top; split. }
+  { case: mu_top_mu'_incr=> AA []BB CC.
+    (*HERE*)
+    case: H1 => _ []sep00 sep01 __ _.
+    case: sep3 => sep30 []sep31 sep32.
+    split.
+    - by rewrite as_inj_mu'_mu_top.
+    - by rewrite /mu' replace_externs_locBlocksSrc replace_externs_locBlocksTgt
+       /nu' reestablish_locBlocksSrc reestablish_locBlocksTgt
+       /nu  replace_locals_locBlocksSrc replace_locals_locBlocksTgt.
+  }
 
+  {(*globals_separate my_ge a mu'*)
+    case: mu_top_mu'_incr=> AA []BB CC.
+    move=> b1 b2 d1 asInj asInj'.  
+    case e: (as_inj mu_top b1)=> [[x y]|].
+    move: (AA _ _ _ e); rewrite asInj'; case=> -> _.
+      by apply: (gsep3 _ _ _ asInj e).
+        by rewrite as_inj_mu'_mu_top in asInj'; rewrite asInj' in e.
+ }
+   
   {(*disjinv a mu'*) 
-  case: H1=> _ _ disj4 rc4.
+  case: H1=> _ _ _ disj4 rc4.
   case: disj4=> X Y Z W U; apply: Build_disjinv.
   by rewrite locBlocksSrc_mu'_eq.
   by rewrite locBlocksTgt_mu'_eq.
@@ -778,8 +904,9 @@ apply: Build_head_inv=> //.
     have aOf0: as_inj a b1 = Some (b2,d1).
     { case e: (as_inj a b1)=> [[x y]|].
       by case: incr3; move/(_ _ _ _ e); rewrite aOf; case=> <- <-.
-      case: sep3; case/(_ b1 b2 d1 e aOf)=> _ D _.
-      move: D; rewrite /DomTgt L; discriminate. }
+      case sep3 => sep30 []sep31 sep32.
+      move: sep30. case/(_ b1 b2 d1 e aOf).
+      rewrite /DomTgt L; discriminate. }
     by rewrite /= /in_mem /= (@as_inj_locBlocks a _ _ _ (Inj_wd _) aOf0). }
 
   move=> b1 b2 b2' d1 d1' AA BB.
@@ -789,7 +916,7 @@ apply: Build_head_inv=> //.
 
   {(*sub REACH ...*)
     move=> b; case/andP=> /= A B.
-    case: H1=> incr0 sep0 disj0 sub0.
+    case: H1=> incr0 sep0 gsep0 disj0 sub0.
     have C: b \in vis mu' by apply match_visible in mtch12'; apply: mtch12'.
     case: (orP C)=> D.
     case: disj0; move/DisjointP; move/(_ b)=> E _ _ _.
@@ -974,4 +1101,3 @@ by apply: (R_ge inv).
 Qed.
 
 End return_lems.
-

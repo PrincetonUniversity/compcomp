@@ -22,7 +22,7 @@ Require Import inj_lemmas.
 Require Import join_sm.
 Require Import reach_lemmas.
 Require Import compcert_linking.
-Require Import compcert_linking_lemmas.
+Require Import compcert_linking_lemmas.s  z
 Require Import disjointness.
 Require Import rc_semantics.
 Require Import rc_semantics_lemmas.
@@ -392,7 +392,7 @@ have U1_DEF': forall b ofs, U1 b ofs -> vis mupkg b.
 
 move/(_ _ _ _ _ MATCH).
 move=> []c2' []m2' []cd' []mu_top0.
-move=> []INCR []SEP []LOCALLOC []MATCH' []U2 []STEP' PERM.
+move=> []INCR (*[]SEP*) []LOCALLOC []MATCH' []U2 []STEP' PERM.
 
 have fwd2: mem_forward m2 m2'.
 { case: STEP'=> step; first by apply effstep_plus_fwd in step.
@@ -443,8 +443,11 @@ split.
    exists erefl=> /=.
    have rcvis: REACH_closed m1' (vis mu').
    { by apply match_visible in MATCH'; apply: MATCH'. }
+   have GSEP: (globals_separate my_ge mupkg mu_top').
+   { 
+   }
    apply (@head_inv_step _ _ _ _ _ sims my_ge my_ge_S 
-     mupkg m1 m2 mu_top' m1' m2' fwd2 (head_valid hdinv) INCR SEP LOCALLOC rcvis
+     mupkg m1 m2 mu_top' m1' m2' fwd2 (head_valid hdinv) INCR LOCALLOC rcvis
      (c INV) (d INV) pf c1' c2'' _ _ mus
      (STACK.pop (CallStack.callStack (s1 INV))) 
      (STACK.pop (CallStack.callStack (s2 INV))) U1 n U2 hdinv frameall)=> //=.
