@@ -29,7 +29,6 @@ Definition entrypoints_compose
   forall v1 v3 sig, In (v1,v3,sig) ep13 =
     exists v2, In (v1,v2,sig) ep12 /\ In (v2,v3,sig) ep23.
 
-
 Section CoreDiagrams_trans.
 Context {F1 V1 C1 F2 V2 C2 F3 V3 C3:Type}
         (Sem1 : @EffectSem (Genv.t F1 V1) C1)
@@ -66,6 +65,7 @@ Lemma effcore_diagram_trans: forall
                    (st2' : C2) (m2' : mem) (cd' : core_data12) (mu' : SM_Injection),
                    intern_incr mu mu' /\
                    (*sm_inject_separated mu mu' m1 m2 /\*)
+                   globals_separate g2 mu mu' /\
                    sm_locally_allocated mu mu' m1 m2 m1' m2' /\
                    match_core12 cd' mu' st1' m1' st2' m2' /\
                    (exists U2 : block -> Z -> bool,
@@ -83,6 +83,7 @@ Lemma effcore_diagram_trans: forall
 (core_data23 : Type)
 (match_core23 : core_data23 -> SM_Injection -> C2 -> mem -> C3 -> mem -> Prop)
 (core_ord23 : core_data23 -> core_data23 -> Prop)
+(genvs_dom_eq23 : genvs_domain_eq g2 g3)
 (eff_diagram23 : forall (st1 : C2) (m1 : mem) (st1' : C2) (m1' : mem)
                    (U1 : block -> Z -> bool),
                  effstep Sem2 g2 U1 st1 m1 st1' m1' ->
@@ -93,6 +94,7 @@ Lemma effcore_diagram_trans: forall
                    (st2' : C3) (m2' : mem) (cd' : core_data23) (mu' : SM_Injection),
                    intern_incr mu mu' /\
                    (*sm_inject_separated mu mu' m1 m2 /\ *)
+                   globals_separate g3 mu mu' /\
                    sm_locally_allocated mu mu' m1 m2 m1' m2' /\
                    match_core23 cd' mu' st1' m1' st2' m2' /\ 
                    (exists U2 : block -> Z -> bool,
@@ -146,6 +148,7 @@ Lemma effcore_diagram_trans: forall
 exists
   (st2' : C3) (m2' : mem) (cd' : core_data12 * option C2 * core_data23) (mu' : SM_Injection),
   intern_incr (compose_sm mu12 mu23) mu' /\
+  globals_separate g3 (compose_sm mu12 mu23) mu' /\
   (*sm_inject_separated (compose_sm mu12 mu23) mu' m1 m3 /\ *)
   sm_locally_allocated (compose_sm mu12 mu23) mu' m1 m3 m1' m2' /\
   (let (y, d2) := cd' in
@@ -183,8 +186,8 @@ exists
 Proof.
   intros.
   destruct (eff_diagram12 _ _ _ _ _ CS1 _ _ _ _ MC12)
-    as [st2' [m2' [d12' [mu12' [InjIncr12 [LocAlloc12
-       [MC12' [U2 [Y MOD21]]]]]]]]]; clear eff_diagram12.
+    as [st2' [m2' [d12' [mu12' [InjIncr12 [Gsep [LocAlloc12
+       [MC12' [U2 [Y MOD21]]]]]]]]]]; clear eff_diagram12.
   assert (ZZ: effstep_plus Sem2 g2 U2 st2 m2 st2' m2' \/
     (st2,m2) = (st2',m2') /\ core_ord12 d12' d12).
   destruct Y. auto.
@@ -202,7 +205,8 @@ Proof.
         extBlocksTgt mu12' = extBlocksSrc mu23' /\
       (forall b, pubBlocksTgt mu12' b = true -> pubBlocksSrc mu23' b = true) /\
       (forall b, frgnBlocksTgt mu12' b = true -> frgnBlocksSrc mu23' b = true)) /\ 
-    intern_incr mu23 mu23' /\ 
+      intern_incr mu23 mu23' /\
+      globals_separate g3 mu23 mu23' /\
     (*sm_inject_separated mu23 mu23' m2 m3 /\ *)
     sm_locally_allocated mu23 mu23' m2 m3 m2' m3' /\
     match_core23 d23' mu23' st2' m2' st3' m3' /\
@@ -221,17 +225,31 @@ Proof.
                U2 b2 (ofs-delta2) = true /\
                Mem.perm m2 b2 (ofs-delta2) Max Nonempty)))).
   intros XX; destruct XX as [st3' [m3' [d23' [mu23' [INV' [InjIncr23 
-          (*[PUB13*) [LocAlloc23 [MC23' [U3 [ZZ MOD32]]]]]]]]]].
+          [GSEP [LocAlloc23 [MC23' [U3 [ZZ MOD32]]]]]]]]]]].
   exists st3'. exists m3'. 
   exists (d12', Some st2', d23').
   exists (compose_sm mu12' mu23').
   split. solve [eapply compose_sm_intern_incr; eauto].
   destruct INV as [INVa [INVb [INVc INVd]]]; subst. 
   (* split. solve [eapply compose_sm_intern_separated; eauto]. *)
-  split. unfold compose_sm; simpl.
+  split.
+  (*Lemma gsep_compose:
+    forall {F V} (ge:  Genv.t F V) mu12 mu23 mu12' mu23',
+      globals_separate ge mu12 mu12' ->
+      globals_separate ge mu23 mu23' ->
+      globals_separate ge (compose_sm mu12 mu23) (compose_sm mu12' mu23').
+    ad_it.
+    Qed. *)
+  
+  apply gsep_compose.  
+  solve [eapply gsep_domain_eq; eauto].
+  solve [auto].
+   
+split. unfold compose_sm; simpl.
          destruct mu12. destruct mu12'. destruct mu23. destruct mu23'.
          destruct INV' as [INVa' [INVb' [INVc' INVd']]].
          subst. simpl in *.
+         
          split; simpl. eapply LocAlloc12.
          split; simpl in *. eapply LocAlloc23.
          split; simpl. eapply LocAlloc12. eapply LocAlloc23.
@@ -257,7 +275,7 @@ Proof.
        rewrite <- exteq23, <- exteq12.
        destruct pure.
        split.
-       + admit.
+       + ad_it.
        + apply H0.
      }*)
      (* Full HERE *)
@@ -321,7 +339,7 @@ Proof.
   clear st1 m1 st1' m1' (*UHyp*) MOD21.
   rewrite pubAlloc12' in *; clear pubAlloc12'.
   rewrite frgnAlloc12' in *; clear frgnAlloc12'.
-  clear lBlocks2 eBlocks2 mu12.
+  clear lBlocks2 eBlocks2 mu12 Gsep.
   remember (pubBlocksTgt mu12') as pubTgt12'.
   remember (frgnBlocksTgt mu12') as frgnTgt12'.
   clear HeqpubTgt12' HeqfrgnTgt12'. 
@@ -336,7 +354,7 @@ Proof.
     destruct H0. inv H0; simpl in *. 
     destruct (eff_diagram23 _ _ _ _ _ H _ _ _ _ (*UHYP2*) MC23) 
       as [st3' [m3' [d23' [mu23' [InjInc23 
-          [LocAlloc23 [? [U5 [? MOD32]]]]]]]]]; clear eff_diagram23.
+          [GSEP [LocAlloc23 [? [U5 [? MOD32]]]]]]]]]]; clear eff_diagram23.
     exists st3'. exists m3'. exists d23'. exists mu23'. 
     split. 
       assert (pubBlock23: pubBlocksSrc mu23 = pubBlocksSrc mu23') by apply InjInc23.
@@ -347,6 +365,7 @@ Proof.
       split; trivial.
       split; trivial.
       split; assumption.
+    split; trivial.
     split; trivial.
     split; trivial.
     split; trivial.
@@ -367,7 +386,7 @@ Proof.
     destruct H as [st2' [m2' [U4 [U3 [Step2 [StepN2 HU]]]]]]. subst x'.
     destruct (eff_diagram23 _ _ _ _ _ Step2 _ _ _ _ MC23) 
       as [c3' [m3' [d23' [mu23' [InjInc23  
-             [LocAlloc23 [MC23' [U5 [Steps3 MOD32]]]]]]]]]; clear eff_diagram23.
+             [GSEP [LocAlloc23 [MC23' [U5 [Steps3 MOD32]]]]]]]]]]; clear eff_diagram23.
     assert (pubSrc23: pubBlocksSrc mu23 = pubBlocksSrc mu23') by eapply InjInc23.
     assert (frgnSrc23: frgnBlocksSrc mu23 = frgnBlocksSrc mu23') by eapply InjInc23.
     assert (XX1: forall b : block, pubTgt12' b = true -> pubBlocksSrc mu23' b = true).
@@ -383,7 +402,7 @@ Proof.
              eapply effstepN_fwd; eassumption.
     destruct (IHx _ mu23' d23' _ _ c3' m3' StepN2 MC23' XX1 XX2)
         as [c3'' [m3'' [d23'' [mu23'' [ZZ [InjIncr' 
-             [LocAlloc23' [MC23'' [U3' [StepN3 MOD32']]]]]]]]]]; clear IHx.
+             [GSEP' [LocAlloc23' [MC23'' [U3' [StepN3 MOD32']]]]]]]]]]]; clear IHx.
     assert (FWD3': mem_forward m3' m3'').
         destruct StepN3 as [[n K] | [[n K] _]];
              eapply effstepN_fwd; eassumption.
@@ -405,6 +424,17 @@ Proof.
     split. solve [eapply intern_incr_trans; eassumption].
     (*split. eapply intern_separated_incr_fwd2; try eassumption.
            eauto.  *)
+    split.
+      (*Lemma gsep_trans:
+    forall {F V} (ge:  Genv.t F V) mu12 mu12' mu12'',
+      globals_separate ge mu12 mu12' ->
+      globals_separate ge mu12' mu12'' ->
+      globals_separate ge mu12 mu12''.
+    ad_it.
+      Qed.*)
+    assert (INCR: inject_incr (as_inj mu23') (as_inj mu23'')).
+    { apply intern_incr_as_inj; auto. eapply match_sm_wd23; eauto. }
+    eapply (gsep_trans _ mu23 mu23' mu23''); eauto.
     split. eapply sm_locally_allocated_trans; eassumption.
     split. apply MC23''.
     exists (fun b z => U5 b z || (U3' b z && valid_block_dec m3 b)). 
@@ -495,8 +525,12 @@ Proof.
    (*split. eapply compose_sm_intern_separated; eauto. 
             apply intern_incr_refl.
             apply sm_inject_separated_same_sminj.     *)       
+           split.
+           { eapply gsep_compose.
+           + eapply gsep_domain_eq; eauto.
+           + eapply gsep_refl. }
    split.
-     clear eff_diagram23.
+   clear eff_diagram23.
      apply sm_locally_allocatedChar; simpl.
      split. apply LocAlloc12.
      split. extensionality b. rewrite freshloc_irrefl.
@@ -529,7 +563,7 @@ Proof.
        destruct pure.
        split.
        + intros.
-         admit.
+         ad_it.
        + apply H0.
      }*)
     (* Full HERE *)

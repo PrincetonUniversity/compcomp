@@ -87,7 +87,7 @@ Proof.
        exists id; trivial.
      rewrite symbols_preserved in Hid.
        exists id; trivial.
-       admit.
+       ad_it.
     (*rewrite varinfo_preserved. intuition.*) *)
   unfold genvs_domain_eq, genv2blocks.
   simpl; split; intros. 
@@ -1905,7 +1905,7 @@ Theorem transl_program_correct:
   Lemma environment_equality: (exists m0:mem, Genv.init_mem SrcProg = Some m0) -> 
                               genvs_domain_eq ge tge.
     intros.
-    admit.
+    ad_it.
     Qed.
   (*
     destruct H0 as [b0]; exists b0;

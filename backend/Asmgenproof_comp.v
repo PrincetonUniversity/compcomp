@@ -1354,7 +1354,8 @@ exists st2' m2' (U2 : block -> Z -> bool),
       (measure st1' < measure st1)%nat /\
       effstep_star (Asm_eff_sem hf)tge U2 st2 m2 st2' m2')
  /\ exists mu',
-    intern_incr mu mu' /\
+      intern_incr mu mu' /\
+      globals_separate ge mu mu' /\
     sm_inject_separated mu mu' m1 m2 /\
     sm_locally_allocated mu mu' m1 m2 m1' m2' /\
     MATCH st1' mu' st1' m1' st2' m2' /\
@@ -1380,7 +1381,8 @@ destruct CS; intros; destruct MTCH as [MS PRE]; try inv MS.
   eexists; exists m2. 
   eexists; split. left; eassumption. 
   exists mu. 
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition. 
@@ -1428,7 +1430,8 @@ destruct CS; intros; destruct MTCH as [MS PRE]; try inv MS.
   exists st', m2. 
   eexists; split. left; eassumption. 
   exists mu. 
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition. 
@@ -1480,7 +1483,8 @@ Local Transparent destroyed_by_setstack.
   exists st', m2'.
   eexists; split. left; eassumption.
   exists mu. 
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition. 
@@ -1579,7 +1583,8 @@ Opaque loadind.
   exists st', m2.
   eexists; split. left; eassumption.
   exists mu. 
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition. 
@@ -1625,7 +1630,8 @@ Opaque loadind.
   exists st', m2.
   eexists; split. left; eassumption.
   exists mu. 
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition. 
@@ -1665,7 +1671,8 @@ Opaque loadind.
   exists st', m2. 
   eexists; split. left; eassumption.
   exists mu. 
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition. 
@@ -1707,7 +1714,8 @@ Opaque loadind.
   exists st', m2'.
   eexists; split. left; eassumption.
   exists mu. 
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition.
@@ -1796,8 +1804,9 @@ Opaque loadind.
     solve[destruct (eq_block_refl stk) as [? ->]; auto]. }
   exists mu'.
   intuition.
+  solve[eapply intern_incr_globals_separate; eauto]. 
   eapply store_args_rec_only_stores in H1. 
-  eapply store_args_rec_only_stores in STORE. 
+  eapply store_args_rec_only_stores in STORE.
   eapply sm_locally_allocated_only_stores; eauto.
   solve[apply alloc_forward in H0; auto].
   solve[apply alloc_forward in ALLOC'; auto].
@@ -1879,7 +1888,8 @@ Opaque loadind.
          simpl. eauto.
   destruct (GFP _ _ FIND) as [fb_mapped fb_globalblock].
   exists mu. 
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition.
@@ -1921,7 +1931,8 @@ Opaque loadind.
       simpl. unfold symbol_offset. rewrite symbols_preserved. rewrite H. eauto.
   destruct (GFP _ _ FIND) as [fb_mapped fb_globalblock].
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition.
@@ -2003,7 +2014,8 @@ Opaque loadind.
            rewrite <- H7, <- H0. eassumption.
   destruct (GFP _ _ FIND) as [fb_mapped fb_globalblock].
   exists mu. 
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition.
@@ -2062,7 +2074,8 @@ Opaque loadind.
         eassumption.
   destruct (GFP _ _ FIND) as [fb_mapped fb_globalblock].
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition.
@@ -2158,7 +2171,8 @@ Opaque loadind.
          eapply functions_transl; eauto. eapply find_instr_tail; eauto. 
         simpl. eauto.
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition.
@@ -2207,7 +2221,8 @@ Opaque loadind.
       simpl. eauto.
     reflexivity.
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition.
@@ -2336,7 +2351,8 @@ Opaque loadind.
          eassumption.
          eassumption.
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition.
@@ -2400,7 +2416,8 @@ Opaque loadind.
       eassumption.
     reflexivity.
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition.
@@ -2445,7 +2462,7 @@ Opaque loadind.
     rewrite <- restrict_sm_all. eapply decode_longs_inject.
     eapply preg_vals; eauto.
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
-           [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
+           [INCR [SEPARATED [GSEP [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]]].
   eexists; eexists; eexists. 
   split. left. eapply effstep_plus_one.
            eapply asm_effexec_step_builtin. eauto. eauto.
@@ -2453,9 +2470,10 @@ Opaque loadind.
            econstructor. eassumption.
             reflexivity. auto. eauto.
   exists mu'.
-  split; trivial. 
-  split; trivial. 
-  split; trivial. 
+  split. trivial. 
+  split. trivial. 
+  split. trivial. 
+  split. trivial. 
   split.
     split. econstructor; eauto.
       eapply match_stack_intern_incr; try eassumption.
@@ -2512,7 +2530,8 @@ Opaque loadind.
     eapply find_instr_tail; eauto.
     simpl; eauto.
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition. 
@@ -2577,7 +2596,8 @@ Opaque loadind.
   exists st', m2. 
   eexists; split. left; eassumption.
   exists mu. 
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition. 
@@ -2635,7 +2655,8 @@ Opaque loadind.
   exists st', m2.
   eexists; split. left; eassumption.
   exists mu. 
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition. 
@@ -2659,7 +2680,8 @@ Opaque loadind.
     eapply find_instr_tail; eauto. 
     simpl. rewrite <- H9. unfold Mach.label in H0; unfold label; rewrite H0. eauto.
   exists mu. 
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition. 
@@ -2724,7 +2746,8 @@ Transparent destroyed_by_jumptable.
       eapply functions_transl; eauto. eapply find_instr_tail; eauto. 
       simpl. eauto. 
   exists mu. 
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition. 
@@ -2801,6 +2824,7 @@ Transparent destroyed_by_jumptable.
       eauto.
   exists mu'.
   split; trivial.
+  split. solve[eapply intern_incr_globals_separate; eauto].
   split; trivial.
   split. rewrite sm_locally_allocatedChar.
     rewrite sm_locally_allocatedChar in LOCALLOC.
@@ -2941,7 +2965,7 @@ Transparent destroyed_at_function_entry.
     apply (EFhelpers _ _ OBS).
     apply decode_longs_inject. rewrite restrict_sm_all in ArgsInj. eapply ArgsInj.
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
-         [A [B [C [D [E F]]]]]]]]]]]]].
+         [A [B [C' [C [D [E F]]]]]]]]]]]]]].
   eexists; eexists; eexists.
   split.
   left.
@@ -2997,7 +3021,8 @@ Transparent destroyed_at_function_entry.
   eexists; eexists; eexists; split.
     right. split. omega. eapply effstep_star_zero.
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition. 
@@ -3070,6 +3095,7 @@ assert (GDE:= GDE_lemma).
    exploit MATCH_effcore_diagram; try eassumption.
     intros [st2' [m2' [U2 [CSTgt [mu' MU]]]]].
     exists st2', m2', mu'.
+    split. eapply MU.
     split. eapply MU.
     split. eapply MU.
     split. eapply MU.

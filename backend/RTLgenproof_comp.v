@@ -663,6 +663,7 @@ Definition transl_expr_prop
   exists rs', exists tm', exists mu',
   (intern_incr mu mu'
   /\ sm_inject_separated mu mu' m tm
+  /\ globals_separate ge mu mu'             
   /\ sm_locally_allocated mu mu' m tm m tm'
   /\ SM_wd mu'
   /\ sm_valid mu' m tm'
@@ -691,7 +692,8 @@ Definition transl_exprlist_prop
     (EXT: Mem.inject (as_inj mu) m tm),
   exists rs', exists tm', exists mu',
   (intern_incr mu mu'
-  /\ sm_inject_separated mu mu' m tm
+   /\ sm_inject_separated mu mu' m tm
+  /\ globals_separate ge mu mu'
   /\ sm_locally_allocated mu mu' m tm m tm'
   /\ SM_wd mu'
   /\ sm_valid mu' m tm'
@@ -720,7 +722,8 @@ Definition transl_condexpr_prop
     (EXT: Mem.inject (as_inj mu) m tm),
   exists rs', exists tm', exists mu',
    (intern_incr mu mu'
-  /\ sm_inject_separated mu mu' m tm
+   /\ sm_inject_separated mu mu' m tm
+  /\ globals_separate ge mu mu'
   /\ sm_locally_allocated mu mu' m tm m tm'
   /\ SM_wd mu'
   /\ sm_valid mu' m tm'
@@ -751,6 +754,7 @@ Proof.
     split. simpl. trivial.
     split. apply intern_incr_refl.
     split. apply sm_inject_separated_same_sminj.
+    split. apply gsep_refl. 
     split. apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
           try rewrite (freshloc_irrefl); intuition.
@@ -923,9 +927,10 @@ Proof.
   exists rs2; exists tm2, mu''.
   split. 
     intuition.
-    eapply intern_incr_trans; eassumption. 
+    eapply intern_incr_trans; eassumption.
     eapply inject_separated_intern_incr_fwd; try eassumption. 
            eapply corestep_plus_fwd. eassumption.
+    eapply gsep_trans'; eassumption.
     eapply sm_locally_allocated_trans; try eassumption. 
              apply mem_forward_refl. 
              apply mem_forward_refl.
@@ -975,11 +980,13 @@ Proof.
      eapply match_env_bind_letvar; eauto.
   intros [rs2 [tm2 [mu'' [MU'' [EX2 [ME3 [RES2 [OTHER2 EXT2]]]]]]]].
   exists rs2; exists tm2, mu''.
-  split. intuition.
-    eapply intern_incr_trans; eassumption. 
-    eapply inject_separated_intern_incr_fwd; try eassumption. 
-           eapply corestep_star_fwd. eassumption.
-    eapply sm_locally_allocated_trans; try eassumption. 
+  split. 
+  intuition.
+  eapply intern_incr_trans; eassumption. 
+  eapply inject_separated_intern_incr_fwd; try eassumption.
+         eapply corestep_star_fwd. eassumption.
+  eapply gsep_trans'; eassumption.
+  eapply sm_locally_allocated_trans; try eassumption. 
              apply mem_forward_refl. 
              apply mem_forward_refl.
              eapply corestep_star_fwd. eassumption.
@@ -1007,6 +1014,7 @@ Proof.
   split. clear H2. intuition. 
       apply intern_incr_refl.
       apply sm_inject_separated_same_sminj.
+      apply gsep_refl.
 
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -1055,7 +1063,7 @@ Proof.
   intros [rs1 [tm1 [mu' [MU' [EX1 [ME1 [RR1 [RO1 EXT1]]]]]]]].
   (*WAS: exploit external_call_mem_extends; eauto. 
         intros [v' [tm2 [A [B [C [D E]]]]]].*)
-  destruct MU' as [INC [SEP [LOCALLOC' [WD' [SMV' RC']]]]].
+  destruct MU' as [INC [SEP [GSEP [LOCALLOC' [WD' [SMV' RC']]]]]].
   exploit (inlineable_extern_inject _ _ GDE_lemma);
        try eapply RR1; try eapply H1; try eassumption.
      apply symbols_preserved.
@@ -1066,13 +1074,14 @@ Proof.
      assumption. assumption. 
  (* exploit external_call_mem_inject; eauto. 
         intros [j' [v' [tm2 [A [B [C [D [E [F G]]]]]]]]].*)
-   intros [mu'' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
+     intros [mu'' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
            [INCR [SEPARATED [LOCALLOC [WD'' [SMV'' RC'']]]]]]]]]]]]].
   exists (rs1#rd <- vres'); exists tm', mu''.
   split. intuition.
-    eapply intern_incr_trans. eassumption. eassumption. 
+    eapply intern_incr_trans. eassumption. eassumption.
     eapply inject_separated_intern_incr_fwd; try eassumption. 
            eapply corestep_star_fwd. eassumption.
+  eapply gsep_trans'; eassumption.
     eapply sm_locally_allocated_trans; try eassumption. 
              apply mem_forward_refl. 
              apply mem_forward_refl.
@@ -1083,7 +1092,8 @@ Proof.
          apply corestep_star_one. eapply rtl_corestep_exec_Ibuiltin; try eassumption. 
 (*  eapply external_call_symbols_preserved; eauto. exact symbols_preserved. exact varinfo_preserved.*)
 (* Match-env *)
-  split. eapply match_env_update_dest; try eassumption.
+         split. eapply match_env_update_dest; try eassumption.
+         
      eapply match_env_inject_incr; try eassumption.
      apply intern_incr_restrict; eassumption. 
 (* Result reg *)
@@ -1138,7 +1148,7 @@ Proof.
        eapply intern_incr_meminj_preserves_globals_as_inj.
          eassumption. split; assumption. 
       apply MU'. apply MU'.
-  destruct MU' as [INC [SEP [LOCALLOC' [WD' [SMV' RC']]]]].
+  destruct MU' as [INC [SEP [GSEP [LOCALLOC' [WD' [SMV' RC']]]]]].
   exploit (inlineable_extern_inject _ _ GDE_lemma);
        try eapply RR1; try eapply H1; try eassumption.
      apply symbols_preserved.
@@ -1149,8 +1159,9 @@ Proof.
   eexists; exists tm', mu''. 
   split. intuition.
      eapply intern_incr_trans; eassumption.
-     eapply inject_separated_intern_incr_fwd; try eassumption. 
+    eapply inject_separated_intern_incr_fwd; try eassumption. 
            eapply corestep_star_fwd. eassumption.
+  eapply gsep_trans'; eassumption.
      eapply sm_locally_allocated_trans; try eassumption. 
              apply mem_forward_refl. 
              apply mem_forward_refl.
@@ -1189,6 +1200,7 @@ Proof.
   split. intuition. 
       apply intern_incr_refl.
       apply sm_inject_separated_same_sminj.
+      apply gsep_refl.
 
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -1233,6 +1245,7 @@ Proof.
     eapply intern_incr_trans; eassumption. 
     eapply inject_separated_intern_incr_fwd; try eassumption. 
            eapply corestep_star_fwd. eassumption.
+  eapply gsep_trans'; eassumption.
     eapply sm_locally_allocated_trans; try eassumption. 
              apply mem_forward_refl. 
              apply mem_forward_refl.
@@ -1319,6 +1332,7 @@ Proof.
     eapply intern_incr_trans; eassumption. 
     eapply inject_separated_intern_incr_fwd; try eassumption. 
            eapply corestep_plus_fwd. eassumption.
+  eapply gsep_trans'; eassumption.
     eapply sm_locally_allocated_trans; try eassumption. 
              apply mem_forward_refl. 
              apply mem_forward_refl.
@@ -1369,6 +1383,7 @@ Proof.
     eapply intern_incr_trans; eassumption. 
     eapply inject_separated_intern_incr_fwd; try eassumption. 
            eapply corestep_star_fwd. eassumption.
+  eapply gsep_trans'; eassumption.
     eapply sm_locally_allocated_trans; try eassumption. 
              apply mem_forward_refl. 
              apply mem_forward_refl.
@@ -1572,6 +1587,7 @@ Definition Efftransl_expr_prop
   exists rs', exists tm', exists mu',
   (intern_incr mu mu'
   /\ sm_inject_separated mu mu' m tm
+  /\ globals_separate ge mu mu'
   /\ sm_locally_allocated mu mu' m tm m tm'
   /\ SM_wd mu'
   /\ sm_valid mu' m tm'
@@ -1600,7 +1616,8 @@ Definition Efftransl_exprlist_prop
     (EXT: Mem.inject (as_inj mu) m tm),
   exists rs', exists tm', exists mu',
   (intern_incr mu mu'
-  /\ sm_inject_separated mu mu' m tm
+   /\ sm_inject_separated mu mu' m tm
+  /\ globals_separate ge mu mu'
   /\ sm_locally_allocated mu mu' m tm m tm'
   /\ SM_wd mu'
   /\ sm_valid mu' m tm'
@@ -1630,6 +1647,7 @@ Definition Efftransl_condexpr_prop
   exists rs', exists tm', exists mu',
    (intern_incr mu mu'
   /\ sm_inject_separated mu mu' m tm
+  /\ globals_separate ge mu mu'
   /\ sm_locally_allocated mu mu' m tm m tm'
   /\ SM_wd mu'
   /\ sm_valid mu' m tm'
@@ -1660,6 +1678,7 @@ Proof.
     split. simpl. trivial.
     split. apply intern_incr_refl.
     split. apply sm_inject_separated_same_sminj.
+    split. apply gsep_refl.
     split. apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
           try rewrite (freshloc_irrefl); intuition.
@@ -1828,9 +1847,10 @@ Proof.
   exists rs2; exists tm2, mu''.
   split. 
     intuition.
-    eapply intern_incr_trans; eassumption. 
+    eapply intern_incr_trans; eassumption.
     eapply inject_separated_intern_incr_fwd; try eassumption. 
            eapply effstep_plus_fwd. eassumption.
+  eapply gsep_trans'; eassumption.
     eapply sm_locally_allocated_trans; try eassumption. 
              apply mem_forward_refl. 
              apply mem_forward_refl.
@@ -1882,9 +1902,10 @@ Proof.
   intros [rs2 [tm2 [mu'' [MU'' [EX2 [ME3 [RES2 [OTHER2 EXT2]]]]]]]].
   exists rs2; exists tm2, mu''.
   split. intuition.
-    eapply intern_incr_trans; eassumption. 
+    eapply intern_incr_trans; eassumption.
     eapply inject_separated_intern_incr_fwd; try eassumption. 
            eapply effstep_star_fwd. eassumption.
+  eapply gsep_trans'; eassumption.
     eapply sm_locally_allocated_trans; try eassumption. 
              apply mem_forward_refl. 
              apply mem_forward_refl.
@@ -1913,6 +1934,7 @@ Proof.
   split. clear H2. intuition. 
       apply intern_incr_refl.
       apply sm_inject_separated_same_sminj.
+      apply gsep_refl.
 
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -1960,7 +1982,7 @@ Proof.
   intros [rs1 [tm1 [mu' [MU' [EX1 [ME1 [RR1 [RO1 EXT1]]]]]]]].
   (*WAS: exploit external_call_mem_extends; eauto. 
         intros [v' [tm2 [A [B [C [D E]]]]]].*)
-  destruct MU' as [INC [SEP [LOCALLOC' [WD' [SMV' RC']]]]].
+  destruct MU' as [INC [SEP [GSEP [LOCALLOC' [WD' [SMV' RC']]]]]].
   exploit (inlineable_extern_inject _ _ GDE_lemma);
        try eapply RR1; try eapply H1; try eassumption.
      apply symbols_preserved.
@@ -1975,9 +1997,10 @@ Proof.
            [INCR [SEPARATED [LOCALLOC [WD'' [SMV'' RC'']]]]]]]]]]]]].
   exists (rs1#rd <- vres'); exists tm', mu''.
   split. intuition.
-    eapply intern_incr_trans. eassumption. eassumption. 
+    eapply intern_incr_trans. eassumption. eassumption.
     eapply inject_separated_intern_incr_fwd; try eassumption. 
            eapply effstep_star_fwd. eassumption.
+  eapply gsep_trans'; eassumption.
     eapply sm_locally_allocated_trans; try eassumption. 
              apply mem_forward_refl. 
              apply mem_forward_refl.
@@ -2021,19 +2044,20 @@ Proof.
        eapply intern_incr_meminj_preserves_globals_as_inj.
          eassumption. split; assumption. 
       apply MU'. apply MU'. 
-  destruct MU' as [INC [SEP [LOCALLOC' [WD' [SMV' RC']]]]].
+  destruct MU' as [INC [SEP [GSEP [LOCALLOC' [WD' [SMV' RC']]]]]].
   exploit (inlineable_extern_inject _ _ GDE_lemma);
        try eapply RR1; try eapply H1; try eassumption.
      apply symbols_preserved.
      assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC. 
         rewrite <- FF; apply Glob.
   intros [mu'' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
-           [INCR [SEPARATED [LOCALLOC [WD'' [SMV'' RC'']]]]]]]]]]]]].
+           [INCR [SEPARATED [GSEP' [LOCALLOC [WD'' [SMV'' RC'']]]]]]]]]]]]]].
   eexists; exists tm', mu''. 
   split. intuition.
      eapply intern_incr_trans; eassumption.
-     eapply inject_separated_intern_incr_fwd; try eassumption. 
+    eapply inject_separated_intern_incr_fwd; try eassumption. 
            eapply effstep_star_fwd. eassumption.
+  eapply gsep_trans'; eassumption.
      eapply sm_locally_allocated_trans; try eassumption. 
              apply mem_forward_refl. 
              apply mem_forward_refl.
@@ -2072,8 +2096,9 @@ Proof.
   intros; red; intros; inv TE.
   exists rs; exists tm, mu.
   split. intuition. 
-      apply intern_incr_refl.
-      apply sm_inject_separated_same_sminj.
+  apply intern_incr_refl.
+  apply sm_inject_separated_same_sminj.
+  apply gsep_refl. 
 
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2119,6 +2144,7 @@ Proof.
     eapply intern_incr_trans; eassumption. 
     eapply inject_separated_intern_incr_fwd; try eassumption. 
            eapply effstep_star_fwd. eassumption.
+  eapply gsep_trans'; eassumption.
     eapply sm_locally_allocated_trans; try eassumption. 
              apply mem_forward_refl. 
              apply mem_forward_refl.
@@ -2207,6 +2233,7 @@ Proof.
     eapply intern_incr_trans; eassumption. 
     eapply inject_separated_intern_incr_fwd; try eassumption. 
            eapply effstep_plus_fwd. eassumption.
+  eapply gsep_trans'; eassumption.
     eapply sm_locally_allocated_trans; try eassumption. 
              apply mem_forward_refl. 
              apply mem_forward_refl.
@@ -2257,6 +2284,7 @@ Proof.
     eapply intern_incr_trans; eassumption. 
     eapply inject_separated_intern_incr_fwd; try eassumption. 
            eapply effstep_star_fwd. eassumption.
+  eapply gsep_trans'; eassumption.
     eapply sm_locally_allocated_trans; try eassumption. 
              apply mem_forward_refl. 
              apply mem_forward_refl.
@@ -3297,8 +3325,9 @@ Lemma MATCH_effcore_diagram: forall
          (MTCH: MATCH st1 mu st1 m1 st2 m2),
 exists st2' m2' mu', exists U2 : block -> Z -> bool,
   (effstep_plus (rtl_eff_sem hf) tge U2 st2 m2 st2' m2' \/
-      effstep_star (rtl_eff_sem hf) tge U2 st2 m2 st2' m2' /\ lt_state st1' st1)
- /\ intern_incr mu mu' /\
+      effstep_star (rtl_eff_sem hf) tge U2 st2 m2 st2' m2' /\ lt_state st1' st1) /\
+  intern_incr mu mu' /\ 
+  globals_separate ge mu mu' /\
   sm_locally_allocated mu mu' m1 m2 m1' m2' /\
   MATCH st1' mu' st1' m1' st2' m2' /\
      (forall 
@@ -3318,7 +3347,8 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   eexists; exists m2, mu; eexists; split.
      right; split. apply effstep_star_zero. Lt_state.
   intuition. 
-      apply intern_incr_refl. 
+  apply intern_incr_refl.
+  apply gsep_refl.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
           try rewrite (freshloc_irrefl); intuition.
@@ -3331,6 +3361,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
     right; split. apply effstep_star_zero. Lt_state.
   intuition. 
       apply intern_incr_refl. 
+      apply gsep_refl.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
           try rewrite (freshloc_irrefl); intuition.
@@ -3363,6 +3394,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
       eapply SMV; assumption.
   intuition. 
       apply intern_incr_refl. 
+      apply gsep_refl.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
           try rewrite (freshloc_free _ _ _ _ _ H4);
@@ -3386,16 +3418,17 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   rewrite restrict_sm_all, restrict_sm_local' in *; trivial.
   exploit Efftransl_expr_correct; eauto. 
   intros [rs' [tm' [mu' [MU' [A [B [C [D E]]]]]]]]; subst.
-  destruct MU' as [INC' [SEP' [LOCALLOC' [WD' [SMV' RC']]]]].
+  destruct MU' as [INC' [SEP' [GSEP' [LOCALLOC' [WD' [SMV' RC']]]]]].
   assert (PG':  meminj_preserves_globals ge (as_inj mu')).
-   eapply meminj_preserves_incr_sep_vb 
+  eapply meminj_preserves_globals_intern_incr_separate; eassumption.
+   (*eapply meminj_preserves_incr_sep_vb 
         with (j:=as_inj mu)(m0:=m)(tm:=m2); try eassumption. 
       intros ? ? ? AI. apply as_inj_DomRng in AI.
               split; eapply SMV; eapply AI.
       assumption.
       apply intern_incr_as_inj; eassumption.
       apply sm_inject_separated_mem. assumption.
-      assumption.
+      assumption.*)
   clear PG.
   eexists; eexists; exists mu', EmptyEffect; split.
     right; split. eauto. Lt_state.
@@ -3424,16 +3457,17 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   rewrite restrict_sm_all, restrict_sm_local' in *; trivial.
   exploit Efftransl_exprlist_correct; eauto.
   intros [rs' [tm' [mu' [MU' [A [B [C [D E]]]]]]]]; subst.
-  destruct MU' as [INC' [SEP' [LOCALLOC' [WD' [SMV' RC']]]]].
+  destruct MU' as [INC' [SEP' [GSEP' [LOCALLOC' [WD' [SMV' RC']]]]]].
   assert (PG':  meminj_preserves_globals ge (as_inj mu')).
-   eapply meminj_preserves_incr_sep_vb 
+  eapply meminj_preserves_globals_intern_incr_separate; eassumption.
+   (*eapply meminj_preserves_incr_sep_vb 
         with (j:=as_inj mu)(m0:=m)(tm:=m2); try eassumption. 
       intros ? ? ? AI. apply as_inj_DomRng in AI.
               split; eapply SMV; eapply AI.
       assumption.
       apply intern_incr_as_inj; eassumption.
       apply sm_inject_separated_mem. assumption.
-      assumption.
+      assumption.*)
   assert (PGR' : meminj_preserves_globals ge
                 (restrict (as_inj mu') (vis mu'))).
      rewrite <- restrict_sm_all. 
@@ -3447,7 +3481,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
     assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC'.
     rewrite <- FF; intuition.
   intros [rs'' [tm'' [mu'' [MU'' [F [G [J [K L]]]]]]]]; subst.
-  destruct MU'' as [INC'' [SEP'' [LOCALLOC'' [WD'' [SMV'' RC'']]]]].
+  destruct MU'' as [INC'' [SEP'' [GSEP'' [LOCALLOC'' [WD'' [SMV'' RC'']]]]]].
   assert (val_list_inject (restrict (as_inj mu') (vis mu')) vl rs''##rl).
     replace (rs'' ## rl) with (rs' ## rl). auto.
     apply list_map_exten. intros. apply K. auto.
@@ -3469,7 +3503,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
       eapply storev_valid_block_1; try eassumption.
         eapply SMV''; assumption.
   assert (ADDRINJ: val_inject (restrict (as_inj mu) (vis mu)) vaddr vaddr').
-           clear - INC' SEP' WD WD' H5 H2. inv H5; inv H2.
+           clear - INC' SEP' WD WD' H5 H2 Glob. inv H5; inv H2.
            destruct (restrictD_Some _ _ _ _ _ H) as [AI' VS']. 
            destruct SEP' as [SEPa [SEPb SEPc]].
            econstructor; try reflexivity.
@@ -3480,7 +3514,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
              inv AI'.
              apply restrictI_Some; try eassumption. 
              eapply intern_incr_vis_inv with (nu:=mu'); eassumption. 
-           destruct (SEPa _ _ _ Heqd AI') as [DS _]. 
+             destruct (SEPa _ _ _ Heqd AI') as [DS _]. 
              destruct (as_inj_DomRng _ _ _ _ AI' WD') as [DS' _]. 
              elim (SEPb _ DS DS'). 
              exploit Mem.store_valid_access_3. eapply H1. intros. 
@@ -3509,7 +3543,8 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   split. 
     eapply intern_incr_trans; eassumption. 
   split. 
-    eapply sm_locally_allocated_trans. eapply LOCALLOC'. 
+  eapply gsep_trans'; eassumption.
+  split. eapply sm_locally_allocated_trans. eapply LOCALLOC'. 
       apply sm_locally_allocatedChar.
       apply sm_locally_allocatedChar in LOCALLOC''.
       destruct LOCALLOC'' as [DS [DT [LBS [LBT [EBS EBT]]]]].
@@ -3558,14 +3593,15 @@ Proof. intros st1 m1 st1' m1' U1 CS.
           intros b' Hb'. rewrite getBlocks_char in Hb'. destruct Hb' as [off Hoff].
              destruct Hoff; try contradiction. subst.   
              inv J. destruct (restrictD_Some _ _ _ _ _ H11); trivial.
-      eapply meminj_preserves_incr_sep_vb
-        with (j:=as_inj mu')(m0:=m)(tm:=tm'); try eassumption. 
-        intros ? ? ? AI. apply as_inj_DomRng in AI.
-              split; eapply SMV'; eapply AI.
-        assumption.
-        apply intern_incr_as_inj; eassumption.
-        apply sm_inject_separated_mem. assumption.
-        assumption.
+      eapply meminj_preserves_globals_intern_incr_separate; eassumption.
+   (*eapply meminj_preserves_incr_sep_vb 
+        with (j:=as_inj mu)(m0:=m)(tm:=m2); try eassumption. 
+      intros ? ? ? AI. apply as_inj_DomRng in AI.
+              split; eapply SMV; eapply AI.
+      assumption.
+      apply intern_incr_as_inj; eassumption.
+      apply sm_inject_separated_mem. assumption.
+      assumption.*)
 
       red; intros ? ? Hb. destruct (GFP _ _ Hb). split; trivial.
          eapply intern_incr_as_inj; try eapply H8. 
@@ -3616,7 +3652,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   rewrite restrict_sm_local' in SP; trivial.
   exploit Efftransl_expr_correct; eauto.
   intros [rs' [tm' [mu' [MU' [A [B [C [D E]]]]]]]]. 
-  destruct MU' as [INC' [SEP' [LOCALLOC' [WD' [SMV' RC']]]]].
+  destruct MU' as [INC' [SEP' [GSEP' [LOCALLOC' [WD' [SMV' RC']]]]]].
   assert (PG':  meminj_preserves_globals ge (as_inj mu')).
    eapply meminj_preserves_incr_sep_vb 
         with (j:=as_inj mu)(m0:=m)(tm:=m2); try eassumption. 
@@ -3639,7 +3675,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
     assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC'.
     rewrite <- FF; intuition.
   intros [rs'' [tm'' [mu'' [MU'' [F [G [J [K L]]]]]]]]. 
-  destruct MU'' as [INC'' [SEP'' [LOCALLOC'' [WD'' [SMV'' RC'']]]]].
+  destruct MU'' as [INC'' [SEP'' [GSEP'' [LOCALLOC'' [WD'' [SMV'' RC'']]]]]].
   exploit functions_translated; eauto. intros [tf' [P Q]].
   destruct (Genv.find_funct_inv _ _ H1) as [bb XX]; subst vf.
   rewrite Genv.find_funct_find_funct_ptr in H1.
@@ -3658,7 +3694,8 @@ Proof. intros st1 m1 st1' m1' U1 CS.
                apply sig_transl_function; auto.
           reflexivity.
   intuition.
-      eapply intern_incr_trans; eassumption. 
+  eapply intern_incr_trans; eassumption.
+  eapply gsep_trans'; eassumption.
       eapply sm_locally_allocated_trans; try eassumption.      
          apply mem_forward_refl.   
          apply mem_forward_refl.
@@ -3704,7 +3741,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   rewrite restrict_sm_local' in SP; trivial.
   exploit Efftransl_exprlist_correct; eauto.
   intros [rs' [tm' [mu' [MU' [A [B [C [D E]]]]]]]]. 
-  destruct MU' as [INC' [SEP' [LOCALLOC' [WD' [SMV' RC']]]]].
+  destruct MU' as [INC' [SEP' [GSEP' [LOCALLOC' [WD' [SMV' RC']]]]]].
   assert (PG':  meminj_preserves_globals ge (as_inj mu')).
    eapply meminj_preserves_incr_sep_vb 
         with (j:=as_inj mu)(m0:=m)(tm:=m2); try eassumption. 
@@ -3765,7 +3802,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   rewrite restrict_sm_local' in SP; trivial.
   exploit Efftransl_expr_correct; eauto.
   intros [rs' [tm' [mu' [MU' [A [B [C [D E]]]]]]]]. 
-  destruct MU' as [INC' [SEP' [LOCALLOC' [WD' [SMV' RC']]]]].
+  destruct MU' as [INC' [SEP'[GSEP'  [LOCALLOC' [WD' [SMV' RC']]]]]].
   assert (PG':  meminj_preserves_globals ge (as_inj mu')).
    eapply meminj_preserves_incr_sep_vb 
         with (j:=as_inj mu)(m0:=m)(tm:=m2); try eassumption. 
@@ -3786,7 +3823,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
      eassumption.  eassumption.  eassumption.
      eassumption.  eassumption. 
   intros [rs'' [tm'' [mu'' [MU'' [EX [F [G [J K]]]]]]]].
-  destruct MU'' as [INC'' [SEP'' [LOCALLOC'' [WD'' [SMV'' RC'']]]]].
+  destruct MU'' as [INC'' [SEP''[GSEP''  [LOCALLOC'' [WD'' [SMV'' RC'']]]]]].
   exploit functions_translated; eauto. intros [tf' [P Q]].
   exploit match_stacks_call_cont; eauto. intros [U V].
   assert (FSS: fn_stacksize tf = fn_stackspace f). inv TF; auto.
@@ -3839,7 +3876,8 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   specialize (restrict_sm_intern_incr _ _ WD' INC'); intros INCR'.
   specialize (restrict_sm_intern_incr _ _ WD'' INC''); intros INCR''.
   intuition.
-    eapply intern_incr_trans; eassumption.
+  eapply intern_incr_trans; eassumption.
+  eapply gsep_trans'; eassumption.
     eapply sm_locally_allocated_trans. eapply LOCALLOC'. 
       apply sm_locally_allocatedChar.
       apply sm_locally_allocatedChar in LOCALLOC''.
@@ -3911,7 +3949,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   rewrite restrict_sm_local' in SP; trivial.
   exploit Efftransl_exprlist_correct; eauto.
   intros [rs' [tm' [mu' [MU' [A [B [C [D E]]]]]]]]. 
-  destruct MU' as [INC' [SEP' [LOCALLOC' [WD' [SMV' RC']]]]].
+  destruct MU' as [INC' [SEP' [GSEP'  [LOCALLOC' [WD' [SMV' RC']]]]]].
   assert (PG':  meminj_preserves_globals ge (as_inj mu')).
    eapply meminj_preserves_incr_sep_vb 
         with (j:=as_inj mu)(m0:=m)(tm:=m2); try eassumption. 
@@ -3964,6 +4002,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   specialize (restrict_sm_intern_incr _ _ WD' INC'); intros INCR'.
   split. trivial.
   split. trivial.
+  split.
     eapply sm_locally_allocated_trans. eapply LOCALLOC'. 
       apply sm_locally_allocatedChar.
       repeat split; extensionality bbb;
@@ -4011,7 +4050,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   rewrite restrict_sm_local' in SP; trivial.
   exploit Efftransl_exprlist_correct; try eapply MINJ; try eassumption.
   intros [rs' [tm' [mu' [MU' [A [B [C [D E]]]]]]]]. 
-  destruct MU' as [INC' [SEP' [LOCALLOC' [WD' [SMV' RC']]]]].
+  destruct MU' as [INC' [SEP' [GSEP'  [LOCALLOC' [WD' [SMV' RC']]]]]].
   assert (PG':  meminj_preserves_globals ge (as_inj mu')).
    eapply meminj_preserves_incr_sep_vb 
         with (j:=as_inj mu)(m0:=m)(tm:=m2); try eassumption. 
@@ -4029,7 +4068,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
      assert (FF: frgnBlocksSrc mu = frgnBlocksSrc mu') by eapply INC'. 
        rewrite <- FF; eapply Glob; eassumption. 
   intros [mu'' [vres' [tm'' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
-           [INC'' [SEP'' [LOCALLOC'' [WD'' [SMV'' RC'']]]]]]]]]]]]].
+           [INC'' [SEP'' [GSEP'' [LOCALLOC'' [WD'' [SMV'' RC'']]]]]]]]]]]]]].
   eexists; eexists; eexists mu''. eexists.
   split. left.
     eapply effstep_star_plus_trans'. eapply A.
@@ -4046,8 +4085,9 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   specialize (restrict_sm_intern_incr _ _ WD'' INC''); intros INCR''.
   split.
     eapply intern_incr_trans; eassumption.
-  split.
-    eapply sm_locally_allocated_trans; try eassumption. 
+  split. 
+  eapply gsep_trans'; eassumption.
+  split.    eapply sm_locally_allocated_trans; try eassumption. 
       apply mem_forward_refl.
       eapply external_call_mem_forward; eassumption.
       eapply effstep_star_fwd; eassumption.
@@ -4108,7 +4148,8 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   eexists; exists m2, mu, EmptyEffect; split.
     right; split. apply effstep_star_zero. Lt_state.
   intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+  apply gsep_refl.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
           try rewrite (freshloc_irrefl); intuition.
@@ -4122,7 +4163,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   rewrite restrict_sm_local' in SP; trivial.
   exploit Efftransl_condexpr_correct; try eassumption.
   intros [rs' [tm' [mu' [MU' [A [B [C D]]]]]]]. 
-  destruct MU' as [INC' [SEP' [LOCALLOC' [WD' [SMV' RC']]]]].
+  destruct MU' as [INC' [SEP'[GSEP'  [LOCALLOC' [WD' [SMV' RC']]]]]].
   assert (PG':  meminj_preserves_globals ge (as_inj mu')).
    eapply meminj_preserves_incr_sep_vb 
         with (j:=as_inj mu)(m0:=m)(tm:=m2); try eassumption. 
@@ -4162,7 +4203,8 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   eexists; exists m2, mu, EmptyEffect; split.
     left. apply effstep_plus_one. eapply rtl_effstep_exec_Inop; eauto. 
   intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+  apply gsep_refl. 
       apply sm_locally_allocatedChar.
       repeat split; extensionality bb; 
           try rewrite (freshloc_irrefl); intuition.
@@ -4177,7 +4219,8 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   eexists; exists m2, mu, EmptyEffect; split.
     right; split. apply effstep_star_zero. Lt_state.
   intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+  apply gsep_refl. 
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
           try rewrite (freshloc_irrefl); intuition.
@@ -4191,6 +4234,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
     right; split. apply effstep_star_zero. Lt_state. 
   intuition. 
       apply intern_incr_refl. 
+  apply gsep_refl.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
           try rewrite (freshloc_irrefl); intuition.
@@ -4204,6 +4248,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
     right; split. apply effstep_star_zero. Lt_state. 
   intuition. 
       apply intern_incr_refl. 
+  apply gsep_refl.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
           try rewrite (freshloc_irrefl); intuition.
@@ -4217,6 +4262,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
     right; split. apply effstep_star_zero. Lt_state. 
   intuition. 
       apply intern_incr_refl. 
+  apply gsep_refl.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
           try rewrite (freshloc_irrefl); intuition.
@@ -4232,7 +4278,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   exploit validate_switch_correct; eauto. intro CTM.
   exploit Efftransl_expr_correct; eauto. 
   intros [rs' [tm' [mu' [MU' [A [B [C [D E]]]]]]]]. 
-  destruct MU' as [INC' [SEP' [LOCALLOC' [WD' [SMV' RC']]]]].
+  destruct MU' as [INC' [SEP' [GSEP'  [LOCALLOC' [WD' [SMV' RC']]]]]].
   assert (PG':  meminj_preserves_globals ge (as_inj mu')).
    eapply meminj_preserves_incr_sep_vb 
         with (j:=as_inj mu)(m0:=m)(tm:=m2); try eassumption. 
@@ -4289,6 +4335,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
       eapply SMV; assumption.
   intuition. 
       apply intern_incr_refl. 
+  apply gsep_refl.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b'; 
           try rewrite (freshloc_free _ _ _ _ _ H0);
@@ -4311,7 +4358,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
   rewrite restrict_sm_local' in SP; trivial.
   exploit Efftransl_expr_correct; eauto.
   intros [rs' [tm' [mu' [MU' [A [B [C [D E]]]]]]]]. 
-  destruct MU' as [INC' [SEP' [LOCALLOC' [WD' [SMV' RC']]]]].
+  destruct MU' as [INC' [SEP'[GSEP'  [LOCALLOC' [WD' [SMV' RC']]]]]].
   assert (PG':  meminj_preserves_globals ge (as_inj mu')).
    eapply meminj_preserves_incr_sep_vb 
         with (j:=as_inj mu)(m0:=m)(tm:=m2); try eassumption. 
@@ -4405,6 +4452,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
     right; split. apply effstep_star_zero. Lt_state.
   intuition. 
       apply intern_incr_refl. 
+  apply gsep_refl.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
           try rewrite (freshloc_irrefl); intuition.
@@ -4419,6 +4467,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
     left; apply effstep_plus_one. eapply rtl_effstep_exec_Inop; eauto.
   intuition. 
       apply intern_incr_refl. 
+  apply gsep_refl.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
           try rewrite (freshloc_irrefl); intuition.
@@ -4438,11 +4487,12 @@ Proof. intros st1 m1 st1' m1' U1 CS.
     unfold rs, e. eapply match_init_env_init_reg; eauto.
   assert (MWF: map_wf map2).
     assert (map_valid init_mapping s0) by apply init_mapping_valid.
-    exploit (add_vars_valid (CminorSel.fn_params f)); eauto. 
+    exploit (add_vars_valid (CminorSel.fn_params f)); eauto.
     intros [A B].
     eapply add_vars_wf; eauto. eapply add_vars_wf; eauto. 
       apply init_mapping_wf.
-  edestruct alloc_parallel_intern as [mu' [tm' [b' [Alloc' [MInj' [INC' [mu'SP mu'MuR]]]]]]]; eauto; try apply Zle_refl.
+      edestruct alloc_parallel_intern as [mu' [tm' [b' [Alloc' [MInj' [INC' [mu'SP mu'MuR]]]]]]]; eauto; try apply Zle_refl.
+      
   destruct mu'MuR as [A [B [C [WD' [E F]]]]].
   eexists. exists tm', mu', EmptyEffect; split.
     left; apply effstep_plus_one.
@@ -4462,6 +4512,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
            eapply intern_incr_as_inj; try eassumption.
          eapply intern_incr_vis; eassumption.
   intuition.
+          eapply intern_incr_globals_separate; eassumption.
   split. econstructor; try rewrite restrict_sm_all, restrict_sm_nest,
                  vis_restrict_sm; try eassumption.
            econstructor; eauto.
@@ -4516,6 +4567,7 @@ Proof. intros st1 m1 st1' m1' U1 CS.
     left; apply effstep_plus_one; constructor. 
   intuition. 
       apply intern_incr_refl. 
+  apply gsep_refl.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
           try rewrite (freshloc_irrefl); intuition.
@@ -4750,7 +4802,7 @@ apply simulations_lemmas.inj_simulation_star_wf with
     intros. eapply H. }
 (*effcore_diagram*)
  { intros. exploit MATCH_effcore_diagram; try eassumption.
-    intros [st2' [m2' [mu' [U2 [CS2 [? [? [? ?]]]]]]]].
+    intros [st2' [m2' [mu' [U2 [CS2 [? [? [? [? ?]]]]]]]]].
     exists st2', m2', mu'.
     repeat (split; trivial).
     exists U2. split; assumption. }

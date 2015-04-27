@@ -15,6 +15,7 @@ Require Import mem_lemmas.
 Require Import structured_injections.
 Require Import reach.
 Require Import Axioms.
+Require Import globalSep.
 
   (** * Axiomatization of the helper functions *)
 
@@ -176,6 +177,7 @@ Lemma helpers_inject: forall {F V TF TV: Type}
        tm1 /\
      intern_incr mu mu' /\
      sm_inject_separated mu mu' m tm /\
+     globals_separate ge mu mu' /\
      sm_locally_allocated mu mu' m tm m1 tm1 /\
      SM_wd mu' /\
      sm_valid mu' m1 tm1 /\
@@ -198,6 +200,7 @@ inv OBS.
       inv H0; econstructor.
     apply intern_incr_refl.
     apply sm_inject_separated_same_sminj.
+    apply gsep_refl.
     apply sm_locally_allocatedChar.
     repeat split; extensionality b;
       try rewrite freshloc_irrefl; intuition. }
@@ -217,6 +220,7 @@ inv OBS.
       inv H0; econstructor.
     apply intern_incr_refl.
     apply sm_inject_separated_same_sminj.
+    apply gsep_refl.
     apply sm_locally_allocatedChar.
     repeat split; extensionality b;
       try rewrite freshloc_irrefl; intuition. }
@@ -235,6 +239,7 @@ inv OBS.
       inv H0; econstructor.
     apply intern_incr_refl.
     apply sm_inject_separated_same_sminj.
+    apply gsep_refl.
     apply sm_locally_allocatedChar.
     repeat split; extensionality b;
       try rewrite freshloc_irrefl; intuition. }
@@ -253,6 +258,7 @@ inv OBS.
       inv H0; econstructor.
     apply intern_incr_refl.
     apply sm_inject_separated_same_sminj.
+    apply gsep_refl.
     apply sm_locally_allocatedChar.
     repeat split; extensionality b;
       try rewrite freshloc_irrefl; intuition. }
@@ -271,6 +277,7 @@ inv OBS.
       inv H0; econstructor.
     apply intern_incr_refl.
     apply sm_inject_separated_same_sminj.
+    apply gsep_refl.
     apply sm_locally_allocatedChar.
     repeat split; extensionality b;
       try rewrite freshloc_irrefl; intuition. }
@@ -289,6 +296,7 @@ inv OBS.
       inv H0; econstructor.
     apply intern_incr_refl.
     apply sm_inject_separated_same_sminj.
+    apply gsep_refl.
     apply sm_locally_allocatedChar.
     repeat split; extensionality b;
       try rewrite freshloc_irrefl; intuition. }
@@ -307,6 +315,7 @@ inv OBS.
       inv H0; econstructor.
     apply intern_incr_refl.
     apply sm_inject_separated_same_sminj.
+    apply gsep_refl.
     apply sm_locally_allocatedChar.
     repeat split; extensionality b;
       try rewrite freshloc_irrefl; intuition. }
@@ -325,6 +334,7 @@ inv OBS.
       inv H0; econstructor.
     apply intern_incr_refl.
     apply sm_inject_separated_same_sminj.
+    apply gsep_refl.
     apply sm_locally_allocatedChar.
     repeat split; extensionality b;
       try rewrite freshloc_irrefl; intuition. }
@@ -343,6 +353,7 @@ inv OBS.
       inv H0; econstructor.
     apply intern_incr_refl.
     apply sm_inject_separated_same_sminj.
+    apply gsep_refl.
     apply sm_locally_allocatedChar.
     repeat split; extensionality b;
       try rewrite freshloc_irrefl; intuition. }
@@ -361,6 +372,7 @@ inv OBS.
       inv H0; econstructor.
     apply intern_incr_refl.
     apply sm_inject_separated_same_sminj.
+    apply gsep_refl.
     apply sm_locally_allocatedChar.
     repeat split; extensionality b;
       try rewrite freshloc_irrefl; intuition. }
@@ -379,6 +391,7 @@ inv OBS.
       inv H0; econstructor.
     apply intern_incr_refl.
     apply sm_inject_separated_same_sminj.
+    apply gsep_refl.
     apply sm_locally_allocatedChar.
     repeat split; extensionality b;
       try rewrite freshloc_irrefl; intuition. }
@@ -397,6 +410,7 @@ inv OBS.
       inv H0; econstructor.
     apply intern_incr_refl.
     apply sm_inject_separated_same_sminj.
+    apply gsep_refl.
     apply sm_locally_allocatedChar.
     repeat split; extensionality b;
       try rewrite freshloc_irrefl; intuition. }
@@ -415,6 +429,7 @@ inv OBS.
       inv H0; econstructor.
     apply intern_incr_refl.
     apply sm_inject_separated_same_sminj.
+    apply gsep_refl.
     apply sm_locally_allocatedChar.
     repeat split; extensionality b;
       try rewrite freshloc_irrefl; intuition. }
@@ -433,6 +448,7 @@ inv OBS.
       inv H0; econstructor.
     apply intern_incr_refl.
     apply sm_inject_separated_same_sminj.
+    apply gsep_refl.
     apply sm_locally_allocatedChar.
     repeat split; extensionality b;
       try rewrite freshloc_irrefl; intuition. }
@@ -451,6 +467,7 @@ inv OBS.
       inv H0; econstructor.
     apply intern_incr_refl.
     apply sm_inject_separated_same_sminj.
+    apply gsep_refl.
     apply sm_locally_allocatedChar.
     repeat split; extensionality b;
       try rewrite freshloc_irrefl; intuition. }
@@ -469,6 +486,7 @@ inv OBS.
       inv H0; econstructor.
     apply intern_incr_refl.
     apply sm_inject_separated_same_sminj.
+    apply gsep_refl.
     apply sm_locally_allocatedChar.
     repeat split; extensionality b;
       try rewrite freshloc_irrefl; intuition. }
@@ -487,6 +505,7 @@ inv OBS.
       inv H0; econstructor.
     apply intern_incr_refl.
     apply sm_inject_separated_same_sminj.
+    apply gsep_refl.
     apply sm_locally_allocatedChar.
     repeat split; extensionality b;
       try rewrite freshloc_irrefl; intuition. }

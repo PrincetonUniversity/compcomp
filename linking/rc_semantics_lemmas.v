@@ -63,10 +63,11 @@ case/(_ st2 mu m2 mtch12)=> st2' []m2' []cd' []mu'.
 case=> incr (*[]sep*) []localloc []mtch12' []U2 []estep' trackback.
 exists st2',m2',cd',mu'=> /=.
 split=> //.
-(*split=> //.*)
 split=> //.
 split=> //.
-by exists U2. }
+split=> //.
+by exists estep'.                    
+(*by exists U2.*) }
 { move=> cd0 mu c1 m1 c2 m2 v1 M; rewrite /= /RC.halted.
   case hlt1: (halted _ _)=> //.
   case def1: (vals_def _)=> //; case=> <-.

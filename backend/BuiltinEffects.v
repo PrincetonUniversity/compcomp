@@ -330,12 +330,13 @@ Lemma inlineable_extern_inject: forall {F V TF TV:Type}
          Mem.unchanged_on (loc_out_of_reach (restrict (as_inj mu) (vis mu)) m) tm tm1 /\
          intern_incr mu mu' /\
          sm_inject_separated mu mu' m tm /\
+         globals_separate ge mu mu' /\
          sm_locally_allocated mu mu' m tm m1 tm1 /\
          SM_wd mu' /\ sm_valid mu' m1 tm1 /\
          REACH_closed m1 (vis mu').
 Proof. intros.
 destruct ef; simpl in H0. 
-    (*EFexternal*)
+(*EFexternal*)
       eapply helpers_inject; try eassumption.
       apply EFhelpersE; eassumption. 
     (*EF_builtin*)
@@ -347,7 +348,7 @@ destruct ef; simpl in H0.
     simpl in OBS; intuition. 
     (*case EF_malloc*)
     inv H0. inv H2. inv H8. inv H6. clear OBS.
-    exploit alloc_parallel_intern; eauto. apply Zle_refl. apply Zle_refl. 
+    exploit alloc_parallel_intern; eauto. apply Zle_refl. apply Zle_refl.
     intros [mu' [tm' [tb [TALLOC [INJ' [INC [AI1 [AI2 [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]].
     exploit Mem.store_mapped_inject. eexact INJ'. eauto. eauto. 
     instantiate (1 := Vint n). auto.   
@@ -385,7 +386,8 @@ destruct ef; simpl in H0.
         rewrite PMap.gso. 
           rewrite (AllocContentsOther1 _ _ _ _ _ TALLOC). trivial. 
           intros N; subst; eapply (Mem.fresh_block_alloc _ _ _ _ _ TALLOC H5).
-        intros N; subst; eapply (Mem.fresh_block_alloc _ _ _ _ _ TALLOC H5).
+          intros N; subst; eapply (Mem.fresh_block_alloc _ _ _ _ _ TALLOC H5).
+          eapply intern_incr_globals_separate; eauto.
     rewrite sm_locally_allocatedChar.
       rewrite sm_locally_allocatedChar in LOCALLOC.
       destruct LOCALLOC as [LAC1 [LAC2 [LAC3 [LAC4 [LAC5 LOC6]]]]].
@@ -469,8 +471,9 @@ destruct ef; simpl in H0.
        apply Mem.perm_cur_max. apply Mem.perm_implies with Freeable; auto with mem.
        apply H0. omega.
 
-     apply intern_incr_refl.
-     apply sm_inject_separated_same_sminj.
+       apply intern_incr_refl.
+       apply sm_inject_separated_same_sminj.
+       apply gsep_refl.
      apply sm_locally_allocatedChar.
        repeat split; try extensionality bb; simpl.
        rewrite (freshloc_free _ _ _ _ _ H5). clear. intuition.
@@ -521,6 +524,7 @@ destruct ef; simpl in H0.
              omega.
   split. apply intern_incr_refl.
   split. apply sm_inject_separated_same_sminj.
+  split. apply gsep_refl.
   split. apply sm_locally_allocatedChar.
        repeat split; try extensionality bb; simpl.
        rewrite (storebytes_freshloc _ _ _ _ _ H10). clear. intuition.

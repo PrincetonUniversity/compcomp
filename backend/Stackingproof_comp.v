@@ -5424,7 +5424,8 @@ Lemma MATCH_effcore_diagram
         st2 mu m2 (MTCH: MATCH st1 mu st1 m1 st2 m2),
      exists st2' m2' U2,
       effstep_plus (Mach_eff_sem hf return_address_offset) tge U2 st2 m2 st2' m2' /\
-     exists mu', intern_incr mu mu' /\
+      exists mu', intern_incr mu mu' /\
+                  globals_separate ge mu mu' /\
           sm_locally_allocated mu mu' m1 m2 m1' m2' /\
           MATCH st1' mu' st1' m1' st2' m2' /\
      (forall
@@ -5460,7 +5461,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     apply effstep_plus_one. apply Mach_effexec_Mgetstack. 
     solve[eapply index_contains_load_stack; eauto].
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_locally_allocatedChar.
       intuition. 
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -5494,7 +5496,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     eapply index_contains_load_stack with (idx := FI_link). eapply TRANSL. 
       solve[eapply agree_link; eauto].
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_locally_allocatedChar.
       clear AGINITF. intuition. 
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -5532,7 +5535,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     eapply index_contains_load_stack with (idx := FI_arg ofs ty). eauto. eauto.
     exploit agree_incoming; eauto. intros EQ; simpl in EQ.
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_locally_allocatedChar.
       intuition. 
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -5556,7 +5560,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     apply effstep_plus_one. apply Mach_effexec_Mgetstack. 
     eapply index_contains_load_stack; eauto.
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_locally_allocatedChar.
       intuition. 
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -5599,7 +5604,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     discriminate.
     econstructor. eapply store_stack_succeeds with (idx := idx); eauto. auto. 
   eexists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_locally_allocatedChar.
       intuition. 
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -5683,7 +5689,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     instantiate (1 := v'). rewrite <- A. apply eval_operation_preserved. 
     exact symbols_preserved. eauto.
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_locally_allocatedChar.
       intuition. 
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -5720,7 +5727,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       exact symbols_preserved.
     eexact C. eauto.
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_locally_allocatedChar.
       intuition. 
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -5774,7 +5782,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   exists mu.
   destruct a; inv H0. rename H2 into STORE.
   destruct a'; inv C. rename H1 into STORE'.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_locally_allocatedChar.
       intuition.
       apply extensionality; intros; rewrite (store_freshloc _ _ _ _ _ _ STORE). intuition.
@@ -5848,7 +5857,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     apply effstep_plus_one. 
      eapply Mach_effexec_Mcall_internal; eauto.
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_locally_allocatedChar.
       intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -5876,7 +5886,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
      eapply effstep_plus_one.
        eapply Mach_effexec_Mcall_external; eauto.
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_locally_allocatedChar.
       intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -5932,7 +5943,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
        solve[eapply Mach_effexec_Mtailcall_internal; eauto].
       reflexivity.
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_locally_allocatedChar.
       intuition.
       apply extensionality; intros; rewrite (freshloc_free _ _ _ _ _ H2). intuition.
@@ -5982,7 +5994,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       eapply Mach_effexec_Mtailcall_external; eassumption. 
      reflexivity.
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_locally_allocatedChar.
       intuition.
       apply extensionality; intros; rewrite (freshloc_free _ _ _ _ _ H2). intuition.
@@ -6022,12 +6035,13 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   exploit (inlineable_extern_inject _ _ GDE_lemma); try eassumption.
      eapply decode_longs_inject. eapply agree_reglist; eassumption.
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
-           [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
+           [INCR [SEPARATED [GSEP [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]]].
   eexists; eexists; eexists. 
   split. eapply effstep_plus_one.
            econstructor. econstructor. eassumption.
             reflexivity. eassumption. reflexivity.
   exists mu'.
+  split. assumption.
   split. assumption.
   split. assumption.
   split. 
@@ -6098,7 +6112,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   eexists; eexists; eexists; split.
     apply effstep_plus_one; apply Mach_effexec_Mlabel.
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_locally_allocatedChar.
       intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -6115,7 +6130,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     apply effstep_plus_one; eapply Mach_effexec_Mgoto; eauto.
     apply transl_find_label; eauto.
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_locally_allocatedChar.
       intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -6137,7 +6153,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
       eapply agree_reglist; eauto.
       eapply transl_find_label; eauto.
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_locally_allocatedChar.
       intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -6160,7 +6177,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     eapply eval_condition_inject with (f:=(restrict (as_inj mu) (vis mu))); eauto.
     eapply agree_reglist; eauto.
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_locally_allocatedChar.
       intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -6181,7 +6199,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     apply effstep_plus_one; eapply Mach_effexec_Mjumptable; eauto. 
     apply transl_find_label; eauto.
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_locally_allocatedChar.
       intuition.
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -6206,7 +6225,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     eapply effstep_plus_one. econstructor; eauto.
     reflexivity.
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_locally_allocatedChar.
       intuition.
       apply extensionality; intros; rewrite (freshloc_free _ _ _ _ _ H). intuition.
@@ -6277,6 +6297,10 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   eapply Mem.fresh_block_alloc; eauto.
   solve[destruct (peq b2 sp0); try simpl in Y; congruence].*)
   (*TODO: sm_locally_allocated_alloc_right_sm*)
+  { 
+    unfold globals_separate; rewrite alloc_right_sm_as_inj.
+    fold (globals_separate ge mu mu); apply gsep_refl.
+    }
   { rewrite sm_locally_allocatedChar.
   assert (locBlocksSrc (alloc_right_sm mu sp0) = locBlocksSrc mu) as -> by auto.
   assert (locBlocksTgt (alloc_right_sm mu sp0) 
@@ -6448,6 +6472,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   generalize (Mem.alloc_result _ _ _ _ _ A). intro SP'_EQ.
   exists mu'.
   split. assumption.
+    split. solve[eapply intern_incr_globals_separate; eauto]. 
   split. assumption.
   split. 
   { (*MATCH*)
@@ -6523,7 +6548,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
      assumption. eassumption. assumption. assumption.
      eapply EFhelpers; eassumption. assumption. assumption. 
   intros [mu' [vres' [tm' [EC [RINJ' [MINJ' [UNMAPPED [OUTOFREACH 
-           [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
+           [INCR [SEPARATED [GSEP [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]]].
   eexists; exists tm'; eexists.
   split. simpl.
            apply effstep_plus_one. 
@@ -6566,6 +6591,7 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
     apply agree_callee_save_set_result. assumption. 
   split; trivial.
   split; trivial.
+  split; trivial.
   split. clear AGREGS.
     split.
       econstructor; eauto.
@@ -6599,7 +6625,8 @@ destruct CS; intros; destruct MTCH as [MS [INJ PRE]];
   eexists; eexists; eexists; split.
     apply effstep_plus_one. apply Mach_effexec_return. 
   exists mu.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl]. 
   split. apply sm_locally_allocatedChar.
       intuition.
       apply extensionality; intros; rewrite freshloc_irrefl. intuition.

@@ -1208,7 +1208,8 @@ Proof. intros.
   intuition.
 Qed.
 
-Lemma MATCH_effcore_diagram: forall st1 m1 st1' m1' U1
+      Lemma MATCH_effcore_diagram: forall st1 m1 st1' m1' U1
+          (genvs_dom_eq : genvs_domain_eq ge tge)
          (CS:effstep (LTL_eff_sem hf) ge U1 st1 m1 st1' m1')
          st2 mu m2 
          (MTCH:MATCH mu st1 m1 st2 m2),
@@ -1218,6 +1219,7 @@ exists st2' m2' U2,
    effstep_star (LTL_eff_sem hf) tge U2 st2 m2 st2' m2')
 /\ exists mu',
   intern_incr mu mu' /\
+  globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m1 m2 /\
   sm_locally_allocated mu mu' m1 m2 m1' m2' /\
   MATCH mu' st1' m1' st2' m2' /\
@@ -1248,6 +1250,7 @@ Proof. intros.
      m2') /\
   (exists mu' : SM_Injection,
      intern_incr mu mu' /\
+     globals_separate ge mu mu' /\
      sm_inject_separated mu mu' m m2 /\
      sm_locally_allocated mu mu' m m2 m m2' /\
      MATCH mu' (LTL_Block s f sp bb rs retty) m st2' m2' /\
@@ -1266,6 +1269,7 @@ Proof. intros.
           econstructor. simpl. rewrite PTree.gmap1. rewrite H. simpl. eauto.
     exists mu.
     split. apply intern_incr_refl. 
+    split. solve[apply gsep_refl].
     split. apply sm_inject_separated_same_sminj. 
     split. rewrite sm_locally_allocatedChar.
         repeat split; extensionality b; 
@@ -1282,6 +1286,7 @@ Proof. intros.
     apply effstep_star_zero.
   exists mu. 
     split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
     split. apply sm_inject_separated_same_sminj. 
     split. rewrite sm_locally_allocatedChar.
         repeat split; extensionality b; 
@@ -1307,6 +1312,7 @@ Proof. intros.
            rewrite <- EVALOP'. eapply eval_operation_preserved. exact symbols_preserved.
   exists mu.
     split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
     split. apply sm_inject_separated_same_sminj. 
     split. rewrite sm_locally_allocatedChar.
         repeat split; extensionality b; 
@@ -1347,6 +1353,7 @@ Proof. intros.
          eauto. eauto.
   exists mu.
     split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
     split. apply sm_inject_separated_same_sminj. 
     split. rewrite sm_locally_allocatedChar.
         repeat split; extensionality b; 
@@ -1366,6 +1373,7 @@ Proof. intros.
          econstructor. reflexivity.
   exists mu.
     split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
     split. apply sm_inject_separated_same_sminj. 
     split. rewrite sm_locally_allocatedChar.
         repeat split; extensionality b; 
@@ -1385,6 +1393,7 @@ Proof. intros.
     left. apply effstep_plus_one. econstructor; eauto.
   exists mu.
     split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
     split. apply sm_inject_separated_same_sminj. 
     split. rewrite sm_locally_allocatedChar.
         repeat split; extensionality b; 
@@ -1423,6 +1432,7 @@ Proof. intros.
      exact symbols_preserved. eauto. eauto.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj. 
   split. rewrite sm_locally_allocatedChar.
       intuition. 
@@ -1471,6 +1481,7 @@ Proof. intros.
         apply sig_preserved.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition;
@@ -1513,6 +1524,7 @@ Proof. intros.
       eapply SMV; assumption.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -1549,9 +1561,10 @@ Proof. intros.
           eapply ltl_effstep_Lbuiltin; eauto.
            econstructor. eassumption. reflexivity.
   exists mu'.
-  split; trivial. 
-  split; trivial.
-  split; trivial.
+  split. trivial. 
+  split. trivial.
+  split. trivial.
+  split. trivial.
   split. 
     split. econstructor; eauto.
       eapply agree_regs_set_regs; try eassumption. 
@@ -1586,6 +1599,7 @@ Proof. intros.
           eapply ltl_effstep_Lbranch; eauto.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition;
@@ -1599,6 +1613,7 @@ Proof. intros.
     right; split. simpl. omega. apply effstep_star_zero.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition;
@@ -1618,6 +1633,7 @@ Proof. intros.
           eapply ltl_effstep_Lcond; eauto.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition;
@@ -1638,6 +1654,7 @@ Proof. intros.
           eauto. rewrite list_nth_z_map. change U.elt with node. rewrite H0. reflexivity. eauto.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. rewrite sm_locally_allocatedChar.
       intuition;
@@ -1672,6 +1689,7 @@ Proof. intros.
       eapply SMV; assumption.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj. 
   split. rewrite sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -1701,6 +1719,7 @@ Proof. intros.
           eapply ltl_effstep_function_internal; eauto.
   exists mu'. 
   split. assumption.
+    split. solve[eapply intern_incr_globals_separate; eauto].  
   split. assumption.
   split. assumption.
   split. 
@@ -1758,7 +1777,7 @@ Proof. intros.
   specialize (EFhelpers _ _ OBS); intros.
   exploit (inlineable_extern_inject _ _ GDE_lemma); try eapply H;
       try eapply ArgsInj; try eassumption. 
-  intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]]. 
+  intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [GSEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]]]. 
  
   eexists; eexists; eexists; split.
     left. eapply effstep_plus_one.
@@ -1766,6 +1785,7 @@ Proof. intros.
            econstructor. eassumption. reflexivity.
   exists mu'.
   split; trivial. 
+  split; trivial.
   split; trivial.
   split; trivial.
   split.
@@ -1805,6 +1825,7 @@ Proof. intros.
   exists mu.
   intuition. 
       apply intern_incr_refl. 
+      solve[apply gsep_refl].
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -1842,12 +1863,19 @@ intros. apply H.
     exists c1, c2; split; auto. }
 (*effcorediagram*)
   { intros. destruct H0 as [MTCH CS]; subst. 
-    exploit MATCH_effcore_diagram; eauto.
+    exploit MATCH_effcore_diagram; eauto; try (apply GDE_lemma).
+    
     intros [st2' [m2' [U2 [CS' [mu' MU']]]]].
     exists st2', m2', st1', mu'.
     split; try eapply MU'.
-    split; try eapply MU'.
-    split; try eapply MU'.
+    split.
+    { eapply gsep_domain_eq; eauto.
+      eapply MU'.
+      apply GDE_lemma.
+      }
+      split; try eapply MU'.
+      split; try eapply MU'.
+    
     split; try eapply MU'.
     reflexivity.
     exists U2.

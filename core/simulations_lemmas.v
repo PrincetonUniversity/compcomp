@@ -169,6 +169,7 @@ Hypothesis order_wf: well_founded order.
         match_states st1 mu st1 m1 st2 m2 ->
         exists st2', exists m2', exists mu',
           intern_incr mu mu' /\
+          globals_separate ge1 mu mu' /\
           sm_locally_allocated mu mu' m1 m2 m1' m2' /\ 
 
           match_states st1' mu' st1' m1' st2' m2' /\
@@ -201,18 +202,19 @@ clear - match_visible. intros. destruct H; subst. eauto.
 (* RESTRIC : clear - match_restrict. intros. destruct H; subst. eauto.*)
 clear - match_validblocks. intros.
     destruct H; subst. eauto.
-clear - inj_initial_cores. intros.
+clear - inj_initial_cores . intros.
     destruct (inj_initial_cores _ _ _ _ _ _ _ _ _ H
          H0 H1 H2 H3 H4 H5 H6 H7)
     as [c2 [INI MS]].
   exists c1, c2. intuition. 
-clear - inj_effcore_diagram. 
+clear - inj_effcore_diagram genvs_dom_eq. 
   intros. destruct H0; subst.
   destruct (inj_effcore_diagram _ _ _ _ _ H _ _ _ H1) as 
 
-    [c2' [m2' [mu' [INC [LAC [MC' [U2 [STEP' PROP]]]]]]]]. 
+    [c2' [m2' [mu' [INC [GSEP [LAC [MC' [U2 [STEP' PROP]]]]]]]]]. 
   exists c2'. exists m2'. exists st1'. exists mu'.
-  split; try assumption. 
+  split; try assumption.
+  split. eapply gsep_domain_eq; eassumption.
   split; try assumption. 
   split. split; trivial. 
   exists U2. split; assumption. 
@@ -299,6 +301,7 @@ Hypothesis order_wf: well_founded order.
         match_states st1 mu st1 m1 st2 m2 ->
         exists st2', exists m2', exists mu',
           intern_incr mu mu' /\
+          globals_separate ge1 mu mu' /\
           sm_locally_allocated mu mu' m1 m2 m1' m2' /\ 
 
           match_states st1' mu' st1' m1' st2' m2' /\
@@ -335,12 +338,13 @@ clear - inj_initial_cores. intros.
     destruct (inj_initial_cores _ _ _ _ _ _ _ _ _ H H0 H1 H2 H3 H4 H5 H6 H7)
     as [c2 [INI MS]].
   exists c1, c2. intuition. 
-clear - inj_effcore_diagram. 
+clear - inj_effcore_diagram genvs_dom_eq. 
   intros. destruct H0; subst.
   destruct (inj_effcore_diagram _ _ _ _ _ H _ _ _ H1) as 
-    [c2' [m2' [mu' [INC [LAC [MC' [U2 [STEP' PROP]]]]]]]]. 
+    [c2' [m2' [mu' [INC [GSEP [LAC [MC' [U2 [STEP' PROP]]]]]]]]]. 
   exists c2'. exists m2'. exists st1'. exists mu'. 
   split; try assumption.
+  split. eapply gsep_domain_eq; eassumption.
   split; try assumption.
   split. split; trivial. 
   exists U2. split; assumption.
@@ -425,6 +429,7 @@ Section EFF_INJ_SIMULATION_STAR.
         match_states st1 mu st1 m1 st2 m2 ->
         exists st2', exists m2', exists mu',
           intern_incr mu mu' /\
+          globals_separate ge1 mu mu' /\
           sm_locally_allocated mu mu' m1 m2 m1' m2' /\ 
 
           match_states st1' mu' st1' m1' st2' m2' /\
@@ -448,11 +453,13 @@ Proof.
   eapply inj_simulation_star_wf.
   apply  (well_founded_ltof _ measure).
   apply inj_after_external.
-  clear - inj_effcore_diagram. intros.
+  clear - inj_effcore_diagram genvs_dom_eq.  intros.
   destruct (inj_effcore_diagram _ _ _ _ _ H _ _ _ H0) 
-    as [c2' [m2' [mu' [INC [LAC [MC' [U2 [STEP' PROP]]]]]]]].
+    as [c2' [m2' [mu' [INC [GSEP [LAC [MC' [U2 [STEP' PROP]]]]]]]]].
   exists c2'. exists m2'. exists mu'. 
   split; try assumption.
+  split; try assumption.
+  (*split. eapply globalsep_domain_eq. eassumption.*)
   split; try assumption. 
   split; try assumption.  
   exists U2. intuition.
@@ -520,6 +527,7 @@ Section EFF_INJ_SIMULATION_STAR_TYPED.
         match_states st1 mu st1 m1 st2 m2 ->
         exists st2', exists m2', exists mu',
           intern_incr mu mu' /\
+          globals_separate ge1 mu mu' /\
           sm_locally_allocated mu mu' m1 m2 m1' m2' /\ 
 
           match_states st1' mu' st1' m1' st2' m2' /\
@@ -545,9 +553,10 @@ Proof.
   intros. eapply inj_after_external with (mu := mu); eauto.
   clear - inj_effcore_diagram. intros.
   destruct (inj_effcore_diagram _ _ _ _ _ H _ _ _ H0) 
-    as [c2' [m2' [mu' [INC [LAC [MC' [U2 [STEP' PROP]]]]]]]].
+    as [c2' [m2' [mu' [INC [GSEP [LAC [MC' [U2 [STEP' PROP]]]]]]]]].
   exists c2'. exists m2'. exists mu'. 
   split; try assumption. 
+  split; try assumption.
   split; try assumption.
   split; try assumption.
   exists U2. intuition.
@@ -613,6 +622,7 @@ Section EFF_INJ_SIMULATION_PLUS.
         match_states st1 mu st1 m1 st2 m2 ->
         exists st2', exists m2', exists mu',
           intern_incr mu mu' /\
+          globals_separate ge1 mu mu' /\
           sm_locally_allocated mu mu' m1 m2 m1' m2' /\ 
 
           match_states st1' mu' st1' m1' st2' m2' /\
@@ -697,6 +707,7 @@ Section EFF_INJ_SIMULATION_PLUS_TYPED.
         match_states st1 mu st1 m1 st2 m2 ->
         exists st2', exists m2', exists mu',
           intern_incr mu mu' /\
+          globals_separate ge1 mu mu' /\
           sm_locally_allocated mu mu' m1 m2 m1' m2' /\ 
 
           match_states st1' mu' st1' m1' st2' m2' /\
@@ -1054,6 +1065,8 @@ destruct (joinD_Some _ _ _ _ _ I); clear I.
            assumption.
          assumption.
 Qed. 
+
+
 
 (*
 Lemma compose_sm_intern_separated:

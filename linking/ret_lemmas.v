@@ -385,7 +385,7 @@ have loctgt_nu_top b: locBlocksTgt nu b -> DomTgt mu_top b.
 
 (* This version is just FALSE in general:
 have nu_nu'_sep: sm_inject_separated' nu nu' m10 m20.
-{ admit. } *)
+{ ad_it. } *)
 
 (*New *)
 Lemma gsep_change_env {V V'} {F F'} (ge: Genv.t V F) (ge': Genv.t V' F') mu1 mu2:
@@ -414,12 +414,13 @@ Lemma gsep_change_env {V V'} {F F'} (ge: Genv.t V F) (ge': Genv.t V' F') mu1 mu2
     rewrite two' in TWO'; discriminate. }
     by rewrite one two.
 Qed.
-                                              
+
 have nu_nu'_gsep: globals_separate (ge (cores_T (Core.i hd1))) nu nu'.
 { apply (@gsep_change_env _ _ _ _ _ _ _ _ (my_ge_T (Core.i hd1))).
   have : (SM_wd nu) by auto.
   rewrite /globals_separate /nu' /nu. move => _ b1 b2 d.
   rewrite replace_locals_as_inj reestablish_as_inj //.
+          
   rewrite /globals_separate in gsep0_top.
   intros.
   by eapply (gsep0_top b1 b2 d); auto.
@@ -768,7 +769,7 @@ have mu0_mu'_sep : sm_inject_separated mu0 mu' m10 m20.
 
 (* Again, this has no reason to hold within a core.
 have mu0_mu'_sep : sm_inject_separated' mu0 mu' m10 m20.
-{ admit. }*)
+{ ad_it. }*)
 
 exists (Inj.mk mu'_wd),(tl mus).
 

@@ -119,6 +119,7 @@ Record SM_simulation_inject := {
     match_state cd mu st1 m1 st2 m2 ->
     exists st2', exists m2', exists cd', exists mu',
       intern_incr mu mu'
+      /\ globals_separate ge2 mu mu' 
       /\ sm_locally_allocated mu mu' m1 m2 m1' m2' 
       /\ match_state cd' mu' st1' m1' st2' m2'
       /\ exists U2,              
@@ -250,6 +251,7 @@ Lemma core_diagram (SMI: SM_simulation_inject):
         match_state SMI cd mu st1 m1 st2 m2 ->
         exists st2', exists m2', exists cd', exists mu',
           intern_incr mu mu' /\
+          globals_separate ge2 mu mu' /\ 
           sm_locally_allocated mu mu' m1 m2 m1' m2' /\ 
           match_state SMI cd' mu' st1' m1' st2' m2' /\
           ((corestep_plus Sem2 ge2 st2 m2 st2' m2') \/
@@ -258,9 +260,10 @@ Lemma core_diagram (SMI: SM_simulation_inject):
 Proof. intros. 
 apply effax2 in H. destruct H as [U1 H]. 
 exploit (effcore_diagram SMI); eauto.
-intros [st2' [m2' [cd' [mu' [INC [LOCALLOC 
-  [MST [U2 [STEP _]]]]]]]]].
+intros [st2' [m2' [cd' [mu' [INC [GSEP [LOCALLOC 
+  [MST [U2 [STEP _]]]]]]]]]].
 exists st2', m2', cd', mu'.
+split; try assumption.
 split; try assumption.
 split; try assumption.
 split; try assumption.

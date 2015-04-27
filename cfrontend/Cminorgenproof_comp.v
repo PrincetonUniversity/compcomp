@@ -2123,7 +2123,8 @@ exists st2' : CMin_core,
   exists m2' mu',
    effstep_plus (cmin_eff_sem hf) tge EmptyEffect
      (CMin_State tfn Sskip tk (Vptr sp Int.zero) te) tm st2' m2' 
-  /\ intern_incr mu mu' /\
+   /\ intern_incr mu mu' /\
+   globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m m2' /\
   MATCH (CSharpMin_State f s k e lenv) mu'
@@ -2139,6 +2140,7 @@ Proof. intros.
   simpl. (* exists (CSharpMin_State f s k e le).
      left. *) intuition. 
     apply intern_incr_refl.
+    apply gsep_refl.
     apply sm_inject_separated_same_sminj.
     apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2153,6 +2155,7 @@ Proof. intros.
    simpl. (*exists (CSharpMin_State f (Csharpminor.Sseq s1 s2) k e le).
       left.  *) intuition. 
     apply intern_incr_refl.
+    apply gsep_refl.
     apply sm_inject_separated_same_sminj.
     apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2184,6 +2187,7 @@ exists st2' : CMin_core,
      effstep_plus (cmin_eff_sem hf) tge EmptyEffect
         (CMin_State tfn Sskip tk (Vptr sp Int.zero) te) tm st2' m2'      
   /\ intern_incr mu mu' /\
+   globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m m2' /\
   MATCH (CSharpMin_State f Csharpminor.Sskip k e lenv) mu' (CSharpMin_State f Csharpminor.Sskip k e lenv) m st2' m2' /\
@@ -2199,6 +2203,7 @@ Proof. intros.
    simpl. (*exists (CSharpMin_State f Csharpminor.Sskip k e le).
       left.  *) intuition. 
     apply intern_incr_refl.
+    apply gsep_refl.
     apply sm_inject_separated_same_sminj.
     apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2261,6 +2266,7 @@ exists st2' : CMin_core,
     effstep_plus (cmin_eff_sem hf) tge (FreeEffect tm 0 (fn_stackspace tfn) sp)
       (CMin_State tfn Sskip tk (Vptr sp Int.zero) te) tm st2' m2'      
   /\ intern_incr mu mu' /\
+   globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m' m2' /\
   MATCH (CSharpMin_Returnstate Vundef k) mu' (CSharpMin_Returnstate Vundef k) m' st2' m2' /\
@@ -2290,6 +2296,7 @@ Proof. intros.
         destruct PRE as [_ [_ [_ [? _]]]].
         eapply H0. eassumption.      
   intuition; simpl. apply intern_incr_refl.
+    apply gsep_refl.
     apply sm_inject_separated_same_sminj.
     simpl. apply sm_locally_allocatedChar.
        apply freshloc_free in P.
@@ -2316,6 +2323,7 @@ exists st2' : CMin_core,
     effstep_plus (cmin_eff_sem hf) tge EmptyEffect
        (CMin_State tfn (Sassign id x) tk (Vptr sp Int.zero) te) tm st2' m2'
   /\ intern_incr mu mu' /\
+   globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m m2' /\
   MATCH (CSharpMin_State f Csharpminor.Sskip k e (PTree.set id v lenv))
@@ -2336,6 +2344,7 @@ Proof. intros.
         constructor. eassumption.
   intuition; simpl.
     apply intern_incr_refl.
+    apply gsep_refl.
     apply sm_inject_separated_same_sminj.
     apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2377,6 +2386,7 @@ exists vv,
           (Vptr sp Int.zero) te) tm st2' m2' /\ 
   Mem.storev chunk tm tv' vv = Some m2' /\
   intern_incr mu mu' /\
+   globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m' m2' /\
   MATCH (CSharpMin_State f Csharpminor.Sskip k e lenv)
@@ -2406,6 +2416,7 @@ Proof. intros.
         eapply SMV; assumption.
   intuition; simpl.
     apply intern_incr_refl.
+    apply gsep_refl.
     apply sm_inject_separated_same_sminj.
     apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2458,6 +2469,7 @@ exists c2' : CMin_core,
         effstep_plus (cmin_eff_sem hf) tge EmptyEffect 
              (CMin_State  tfn (Scall optid (Csharpminor.funsig fd) x x1) tk (Vptr sp Int.zero) te) tm c2' m2'
 /\ intern_incr mu mu' /\
+   globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m m2' /\
   MATCH (CSharpMin_Callstate fd vargs (Csharpminor.Kcall optid f e lenv k)) mu'
@@ -2481,6 +2493,7 @@ Proof. intros.
                       eapply sig_preserved; eauto.
   intuition; simpl.
     apply intern_incr_refl.
+    apply gsep_refl.
     apply sm_inject_separated_same_sminj.
     apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2510,6 +2523,7 @@ exists c2' : CMin_core,
      effstep_plus (cmin_eff_sem hf) tge EmptyEffect 
      (CMin_State tfn (Sifthenelse x x1 x2) tk (Vptr sp Int.zero) te) tm c2' m2' /\
      intern_incr mu mu' /\
+   globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m m2' /\
   MATCH  (CSharpMin_State f (if b then s1 else s2) k e lenv) mu'
@@ -2524,6 +2538,7 @@ Proof. intros.
      apply effstep_plus_one.
        eapply cmin_effstep_ifthenelse; eauto. eapply bool_of_val_inject; eauto.
      apply intern_incr_refl.
+    apply gsep_refl.
      apply sm_inject_separated_same_sminj.
      apply sm_locally_allocatedChar.
        repeat split; try extensionality bb; simpl;
@@ -2546,6 +2561,7 @@ exists c2' : CMin_core,
      effstep_plus (cmin_eff_sem hf) tge EmptyEffect 
      (CMin_State tfn (Sloop x) tk (Vptr sp Int.zero) te) tm c2' m2' /\
      intern_incr mu mu' /\
+   globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m m2' /\
   MATCH (CSharpMin_State f s (Csharpminor.Kseq (Csharpminor.Sloop s) k) e lenv) mu'
@@ -2559,6 +2575,7 @@ Proof. intros.
        econstructor; eauto.
   simpl in *. intuition.
      apply intern_incr_refl.
+    apply gsep_refl.
      apply sm_inject_separated_same_sminj.
      apply sm_locally_allocatedChar.
        repeat split; try extensionality bb; simpl;
@@ -2581,6 +2598,7 @@ exists c2' : CMin_core,
       effstep_plus (cmin_eff_sem hf) tge EmptyEffect 
          (CMin_State tfn (Sblock x) tk (Vptr sp Int.zero) te) tm c2' m2' /\
   intern_incr mu mu' /\
+   globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m m2' /\
         MATCH (CSharpMin_State f s (Csharpminor.Kblock k) e lenv) mu' 
@@ -2593,6 +2611,7 @@ Proof. intros.
        econstructor; eauto.
   simpl in *. intuition.
      apply intern_incr_refl.
+    apply gsep_refl.
      apply sm_inject_separated_same_sminj.
      apply sm_locally_allocatedChar.
        repeat split; try extensionality bb; simpl;
@@ -2616,6 +2635,7 @@ exists c2' : CMin_core,
         MATCH (CSharpMin_State f (Csharpminor.Sexit n) k e lenv) mu'
     (CSharpMin_State f (Csharpminor.Sexit n) k e lenv) m c2' m2'
 /\ intern_incr mu mu' /\
+   globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m m2' /\
   SM_wd mu' /\ sm_valid mu' m m2'.
@@ -2629,6 +2649,7 @@ Proof. intros.
       split; intuition.
       econstructor; eauto. reflexivity.
      apply intern_incr_refl.
+    apply gsep_refl.
      apply sm_inject_separated_same_sminj.
      apply sm_locally_allocatedChar.
        repeat split; try extensionality bb; simpl;
@@ -2668,6 +2689,7 @@ exists c2' : CMin_core,
   /\ MATCH (CSharpMin_State f Csharpminor.Sskip k e lenv) mu'
     (CSharpMin_State f Csharpminor.Sskip k e lenv) m c2' m2'
 /\ intern_incr mu mu' /\
+   globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m m2' /\
   SM_wd mu' /\ sm_valid mu' m m2'.
@@ -2682,6 +2704,7 @@ Proof. intros.
       econstructor; eauto.
       intuition.
      apply intern_incr_refl.
+    apply gsep_refl.
      apply sm_inject_separated_same_sminj.
      apply sm_locally_allocatedChar.
        repeat split; try extensionality bb; simpl;
@@ -2711,6 +2734,7 @@ exists c2' : CMin_core,
        MATCH (CSharpMin_State f (Csharpminor.Sexit n) k e lenv) mu'
     (CSharpMin_State f (Csharpminor.Sexit n) k e lenv) m c2' m2'
 /\ intern_incr mu mu' /\
+   globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m m2' /\
   SM_wd mu' /\ sm_valid mu' m m2'.
@@ -2725,6 +2749,7 @@ Proof. intros.
       econstructor; eauto. auto.
     intuition.
      apply intern_incr_refl.
+    apply gsep_refl.
      apply sm_inject_separated_same_sminj.
      apply sm_locally_allocatedChar.
        repeat split; try extensionality bb; simpl;
@@ -2757,6 +2782,7 @@ Lemma EFF_switch_MSI: forall
                  (CSharpMin_State f (seq_of_lbl_stmt ls) k e lenv) m
                  S m2'
   /\ intern_incr mu mu' /\
+   globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m m2' /\
   SM_wd mu' /\ sm_valid mu' m m2'.
@@ -2774,6 +2800,7 @@ Proof.
     intuition. econstructor; eauto. econstructor; eauto.
     intuition.
      apply intern_incr_refl.
+    apply gsep_refl.
      apply sm_inject_separated_same_sminj.
      apply sm_locally_allocatedChar.
        repeat split; try extensionality bb; simpl;
@@ -2792,6 +2819,7 @@ Proof.
           intuition.
      intuition.
      apply intern_incr_refl.
+    apply gsep_refl.
      apply sm_inject_separated_same_sminj.
      apply sm_locally_allocatedChar.
        repeat split; try extensionality bb; simpl;
@@ -2817,6 +2845,7 @@ exists c2' : CMin_core,
          MATCH (CSharpMin_State f (seq_of_lbl_stmt (select_switch n cases)) k e lenv) mu'
     (CSharpMin_State f (seq_of_lbl_stmt (select_switch n cases)) k e lenv) m c2' m2'
 /\ intern_incr mu mu' /\
+   globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m m2' /\
   SM_wd mu' /\ sm_valid mu' m m2'.
@@ -2859,6 +2888,7 @@ exists c2' : CMin_core,
       effstep_plus (cmin_eff_sem hf) tge (BuiltinEffect tge ef tvargs tm)
            (CMin_State tfn (Sbuiltin optid ef x) tk (Vptr sp Int.zero) te) tm c2' m2' /\
   intern_incr mu mu' /\
+   globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m' m2' /\
   MATCH
@@ -2876,7 +2906,7 @@ Proof. intros. (*
       apply GDE_lemma. apply symbols_preserved. 
       eassumption. eassumption. eassumption. eassumption.
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
-           [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
+           [INCR [SEPARATED [GSEP [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]]].
   eexists; eexists; eexists; split.
       apply effstep_plus_one.
            econstructor; try eassumption.
@@ -2955,6 +2985,7 @@ exists (c2' : CMin_core) m2' mu',
   effstep_plus (cmin_eff_sem hf) tge EmptyEffect
     (CMin_Callstate (AST.Internal x) targs tk) tm c2' m2'
  /\ intern_incr mu mu' /\
+   globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m1 m2' /\ SM_wd mu' /\
   sm_valid mu' m1 m2' /\
@@ -2984,6 +3015,7 @@ Proof. intros.
     eapply effstep_plus_one. simpl. 
        econstructor. assumption. reflexivity. 
   intuition.
+    solve[eapply intern_incr_globals_separate; eauto]. 
   split; intuition.
     econstructor. eexact TRBODY. eauto. eassumption.
     inv MK; simpl in ISCC; contradiction || econstructor; eauto.
@@ -3002,6 +3034,7 @@ forall st1 m1 st1' m1' (U1 : Values.block -> Z -> bool)
        (MC: MATCH st1 mu st1 m1 st2 m2),
 exists st2' m2' mu',
   intern_incr mu mu' /\
+   globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m1 m2 /\
   sm_locally_allocated mu mu' m1 m2 m1' m2' /\
   MATCH st1' mu' st1' m1' st2' m2' /\
@@ -3049,10 +3082,10 @@ induction EFFSTEP; simpl in *.
       exists c2'. exists m2'. exists mu'. 
       intuition.
       exists (FreeEffect m2 0 (fn_stackspace tfn) sp). intuition.
-        apply FreeEffectD in H11. destruct H11 as [? [VB Arith]]; subst.
+        apply FreeEffectD in H13. destruct H13 as [? [VB Arith]]; subst.
         inv MCS. unfold visTgt. rewrite SPlocal. trivial.
-      apply FreeEffectD in H11. destruct H11 as [? [VB Arith]]; subst.
-        inv MCS. rewrite H14 in SPlocal. discriminate. }
+      apply FreeEffectD in H13. destruct H13 as [? [VB Arith]]; subst.
+        inv MCS. rewrite H15 in SPlocal. discriminate. }
 { (*assign*)
       destruct MC as [SMC PRE].
       inv SMC; simpl in *. 
@@ -3073,14 +3106,15 @@ induction EFFSTEP; simpl in *.
       intuition.
       exists (StoreEffect vv (encode_val chunk u)).
       intuition.
-      apply StoreEffectD in H15.
-        destruct H15 as [i [VV Arith]]. subst.
+      
+      apply StoreEffectD in H17.
+        destruct H17 as [i [VV Arith]]. subst.
         destruct vaddr; inv H1.
         inv H3.
         eapply visPropagateR; try eassumption.
         
-      apply StoreEffectD in H15.
-        destruct H15 as [i [VV Arith]]. subst.
+      apply StoreEffectD in H17.
+        destruct H17 as [i [VV Arith]]. subst.
         destruct vaddr; inv H1. 
         eapply StoreEffect_PropagateLeft; try eassumption.
         unfold StoreEffect.
@@ -3122,6 +3156,7 @@ induction EFFSTEP; simpl in *.
          exists m2. 
          exists mu. intuition. 
                 apply intern_incr_refl.
+    apply gsep_refl.
                 apply sm_inject_separated_same_sminj.
                 apply sm_locally_allocatedChar.
                   repeat split; extensionality b;  
@@ -3138,6 +3173,7 @@ induction EFFSTEP; simpl in *.
          exists (CMin_State tfn ts1 tk (Vptr sp Int.zero) te).
          exists m2; exists mu. intuition. 
                 apply intern_incr_refl.
+    apply gsep_refl.
                 apply sm_inject_separated_same_sminj.
                 apply sm_locally_allocatedChar.
                   repeat split; extensionality b;  
@@ -3226,7 +3262,7 @@ induction EFFSTEP; simpl in *.
           apply (Mem.valid_block_free_1 _ _ _ _ _ A).
             eapply SMV; assumption.
       eexists; eexists; exists mu; intuition; simpl.
-       Focus 5. assert (VV: Mem.valid_block m2 sp).
+       Focus 6. assert (VV: Mem.valid_block m2 sp).
                   inv MCS. eapply H3. unfold RNG, DomTgt. rewrite SPlocal. trivial.
                 exists (FreeEffect m2 0 (fn_stackspace tfn) sp).
                 intuition.
@@ -3237,6 +3273,7 @@ induction EFFSTEP; simpl in *.
            apply FreeEffectD in H5. destruct H5 as [? [VB Arith]]; subst. 
                   inv MCS. rewrite SPlocal in *. discriminate.
        apply intern_incr_refl.
+    apply gsep_refl.
         apply sm_inject_separated_same_sminj.
         apply sm_locally_allocatedChar.
           apply freshloc_free_list in H. 
@@ -3266,7 +3303,7 @@ induction EFFSTEP; simpl in *.
             eapply SMV; eassumption.
       eexists; eexists; exists mu.
       intuition. 
-      Focus 5. assert (VV: Mem.valid_block m2 sp).
+      Focus 6. assert (VV: Mem.valid_block m2 sp).
                   inv MCS. eapply H4. unfold RNG, DomTgt. rewrite SPlocal. trivial.
           exists (FreeEffect m2 0 (fn_stackspace tfn) sp).
                 intuition.
@@ -3277,6 +3314,7 @@ induction EFFSTEP; simpl in *.
            apply FreeEffectD in H6. destruct H6 as [? [VB Arith]]; subst. 
                   inv MCS. rewrite SPlocal in *. discriminate.
         apply intern_incr_refl.
+    apply gsep_refl.
         apply sm_inject_separated_same_sminj.
         apply sm_locally_allocatedChar.
           apply freshloc_free_list in H0. 
@@ -3295,10 +3333,11 @@ induction EFFSTEP; simpl in *.
       monadInv TR.
       eexists; eexists; exists mu. 
       intuition.
-      Focus 5. exists EmptyEffect. intuition.
+      Focus 6. exists EmptyEffect. intuition.
                left. eapply effstep_plus_one.
                        constructor.  
       apply intern_incr_refl.
+    apply gsep_refl.
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
           repeat split; try extensionality bb; simpl;
@@ -3314,10 +3353,11 @@ induction EFFSTEP; simpl in *.
       intros [ts' [tk' [xenv' [A [B C]]]]].
       eexists; eexists; exists mu. 
       intuition.
-      Focus 5. exists EmptyEffect. intuition.
+      Focus 6. exists EmptyEffect. intuition.
                left. eapply effstep_plus_one.
                        apply cmin_effstep_goto. eexact A. 
       apply intern_incr_refl.
+    apply gsep_refl.
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
           repeat split; try extensionality bb; simpl;
@@ -3341,10 +3381,11 @@ induction EFFSTEP; simpl in *.
       inv SMC.
       inv MK. simpl.
       eexists; eexists; exists mu; intuition. 
-      Focus 5. exists EmptyEffect. intuition.
+      Focus 6. exists EmptyEffect. intuition.
                left. eapply effstep_plus_one.
                        econstructor; eauto.   
       apply intern_incr_refl.
+    apply gsep_refl.
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
           repeat split; try extensionality bb; simpl;

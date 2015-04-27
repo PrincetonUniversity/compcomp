@@ -564,11 +564,12 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
  }
 { (*effcore_diagram*)
    clear - match_sm_wd12 match_sm_valid12 effcore_diagram12 
-            match_sm_wd23 match_sm_valid23 effcore_diagram23.
+                         match_sm_wd23 match_sm_valid23 effcore_diagram23
+                         genvs_dom_eq23.
    intros. rename st2 into st3. rename m2 into m3.
    destruct cd as [[d12 cc2] d23].
    destruct H0 as [c2 [m2 [mu12 [mu23 [X [J [INV [MC12 [MC23 full]]]]]]]]]; subst.
-   eapply effcore_diagram_trans; eassumption.
+   eapply effcore_diagram_trans;  eassumption.
 }
 { (*halted*)
   clear - match_sm_wd12 core_halted12 match_sm_wd23 core_halted23.

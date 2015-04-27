@@ -1591,6 +1591,7 @@ exists st2' m2' (U2 : block -> Z -> bool),
       effstep_star (Linear_eff_sem hf) tge U2 st2 m2 st2' m2') 
 /\ exists mu',
   intern_incr mu mu' /\
+  globals_separate ge mu mu' /\
   sm_locally_allocated mu mu' m1 m2 m1' m2' /\
   MATCH mu' st1' m1' st2' m2' /\
      (forall  (U1Vis: forall b ofs, U1 b ofs = true -> vis mu b = true)
@@ -1613,6 +1614,7 @@ Proof. intros.
     left. eapply add_branch_correct_eff; eauto.
   exists mu.
   split. apply intern_incr_refl. 
+    split. solve[apply gsep_refl]. 
   split. rewrite sm_locally_allocatedChar.
       intuition. 
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -1636,7 +1638,8 @@ Proof. intros.
      eapply val_inject_incr; try eapply AGREE.
      apply restrict_incr. trivial.
   exists mu.
-  split. apply intern_incr_refl.
+  split. apply intern_incr_refl. 
+    split. solve[apply gsep_refl].
   split. rewrite sm_locally_allocatedChar.
       intuition. 
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -1658,7 +1661,8 @@ Proof. intros.
          specialize (AGREE_R arg). rewrite ARG in AGREE_R.
          inv AGREE_R. trivial.
   exists mu.
-  split. apply intern_incr_refl.
+  split. apply intern_incr_refl. 
+    split. solve[apply gsep_refl].
   split. rewrite sm_locally_allocatedChar.
       intuition. 
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -1689,6 +1693,7 @@ Proof. intros.
        exact symbols_preserved.
   exists mu.
   split. apply intern_incr_refl. 
+    split. solve[apply gsep_refl]. 
   split. rewrite sm_locally_allocatedChar.
       intuition. 
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -1731,6 +1736,7 @@ Proof. intros.
           eauto. eauto. 
   exists mu.
   split. apply intern_incr_refl. 
+    split. solve[apply gsep_refl]. 
   split. rewrite sm_locally_allocatedChar.
       intuition. 
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -1750,6 +1756,7 @@ Proof. intros.
     left. apply effstep_plus_one. econstructor; eauto.
   exists mu.
   split. apply intern_incr_refl. 
+    split. solve[apply gsep_refl]. 
   split. rewrite sm_locally_allocatedChar.
       intuition. 
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -1770,6 +1777,7 @@ Proof. intros.
     left. apply effstep_plus_one. econstructor; eauto. 
   exists mu.
   split. apply intern_incr_refl. 
+    split. solve[apply gsep_refl]. 
   split. rewrite sm_locally_allocatedChar.
       intuition. 
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -1808,7 +1816,8 @@ Proof. intros.
      instantiate (1 := a'). rewrite <- EA'; apply eval_addressing_preserved. 
      exact symbols_preserved. eauto. eauto.
   exists mu.
-  split. apply intern_incr_refl.  
+  split. apply intern_incr_refl. 
+    split. solve[apply gsep_refl].  
   split. rewrite sm_locally_allocatedChar.
       intuition. 
       apply extensionality; intros; rewrite (storev_freshloc _ _ _ _ _ H0). intuition.
@@ -1854,6 +1863,7 @@ Proof. intros.
     symmetry; eapply sig_preserved; eauto.
   exists mu.
   split. apply intern_incr_refl. 
+    split. solve[apply gsep_refl]. 
   split. rewrite sm_locally_allocatedChar.
       intuition. 
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -1893,7 +1903,8 @@ Proof. intros.
       eapply SMV; assumption.
       eapply SMV; assumption.
   exists mu.
-  split. apply intern_incr_refl.  
+  split. apply intern_incr_refl. 
+    split. solve[apply gsep_refl].  
   split. rewrite sm_locally_allocatedChar.
       repeat split; extensionality b; 
           try rewrite (freshloc_free _ _ _ _ _ H2);
@@ -1927,10 +1938,12 @@ Proof. intros.
   left. eapply effstep_plus_one. eapply lin_effexec_Lbuiltin; eauto.
            econstructor. eassumption. reflexivity.
   fold linearize_block. exists mu'.
-  split; trivial. 
-  split; trivial.
+  split. trivial. 
+  split. trivial.
+split. trivial.
   split.
-    split. econstructor; eauto.
+
+  split. econstructor; eauto.
       eapply list_match_stackframes_intern_incr; try eassumption.
         eapply restrict_sm_intern_incr; eassumption.
         apply restrict_sm_WD; trivial.
@@ -1965,6 +1978,7 @@ Proof. intros.
   right; split. simpl; omega. eapply effstep_star_zero.
   exists mu.
   split. apply intern_incr_refl. 
+    split. solve[apply gsep_refl]. 
   split. rewrite sm_locally_allocatedChar.
       intuition. 
       apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -1994,6 +2008,7 @@ Proof. intros.
           rewrite eval_negate_condition. rewrite EC. auto. eauto.
     exists mu.
     split. apply intern_incr_refl. 
+    split. solve[apply gsep_refl]. 
     split. rewrite sm_locally_allocatedChar.
         intuition. 
         apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -2009,6 +2024,7 @@ Proof. intros.
     right; split. simpl; omega. eapply effstep_star_zero.
     exists mu.
     split. apply intern_incr_refl. 
+    split. solve[apply gsep_refl]. 
     split. rewrite sm_locally_allocatedChar.
         intuition. 
         apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -2027,6 +2043,7 @@ Proof. intros.
     right; split. simpl; omega. eapply effstep_star_zero.
     exists mu.
     split. apply intern_incr_refl. 
+    split. solve[apply gsep_refl]. 
     split. rewrite sm_locally_allocatedChar.
         intuition. 
         apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -2042,6 +2059,7 @@ Proof. intros.
   left. apply effstep_plus_one. eapply lin_effexec_Lcond_false. eauto. eauto. 
   exists mu.
     split. apply intern_incr_refl. 
+    split. solve[apply gsep_refl]. 
     split. rewrite sm_locally_allocatedChar.
         intuition. 
         apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -2060,6 +2078,7 @@ Proof. intros.
   right; split. simpl; omega. eapply effstep_star_zero.
     exists mu.
     split. apply intern_incr_refl. 
+    split. solve[apply gsep_refl]. 
     split. rewrite sm_locally_allocatedChar.
         intuition. 
         apply extensionality; intros; rewrite (freshloc_irrefl). intuition.
@@ -2088,7 +2107,8 @@ Proof. intros.
       eapply SMV; assumption.
       eapply SMV; assumption.
   exists mu.
-  split. apply intern_incr_refl.  
+  split. apply intern_incr_refl. 
+    split. solve[apply gsep_refl].  
   split. rewrite sm_locally_allocatedChar.
       repeat split; extensionality b; 
           try rewrite (freshloc_free _ _ _ _ _ H0);
@@ -2130,6 +2150,7 @@ Proof. intros.
   destruct mu'MuR as [A [B [C [D [E F]]]]].
   exists mu'. 
   split. assumption.
+    split. solve[eapply intern_incr_globals_separate; eauto]. 
   split. assumption.
   split.
    split. generalize EQ; intro EQ'; monadInv EQ'. simpl. 
@@ -2186,6 +2207,7 @@ Proof. intros.
   destruct mu'MuR as [A [B [C [D [E F]]]]].
   exists mu'. 
   split. assumption.
+    split. solve[eapply intern_incr_globals_separate; eauto]. 
   split. assumption.
   split.
    split. generalize EQ; intro EQ'; monadInv EQ'. simpl. 
@@ -2245,12 +2267,13 @@ Proof. intros.
   exploit (inlineable_extern_inject _ _ GDE_lemma);
        try eapply ArgsInj; try eapply H; try eassumption.
   intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED 
-         [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].  
+         [LOOR [INC [SEP [GSEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]]].  
   eexists; eexists m''; eexists.
   split. left. apply effstep_plus_one. 
           eapply lin_effexec_function_external; eauto.
           econstructor; eauto.
   exists mu'. 
+  split. assumption.
   split. assumption.
   split. assumption.
   split.
@@ -2296,6 +2319,7 @@ Proof. intros.
   exists mu.
   intuition. 
       apply intern_incr_refl. 
+      solve[apply gsep_refl]. 
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
           try rewrite (freshloc_irrefl); intuition.
@@ -2373,6 +2397,8 @@ assert (GDE:= GDE_lemma).
     exists st2', m2', mu'.
     split; try eapply MU'.
     split; try eapply MU'.
+    
+    split; try eapply MU'. 
     split; try eapply MU'. 
     exists U2. split. assumption. apply MU'. }
 Qed.

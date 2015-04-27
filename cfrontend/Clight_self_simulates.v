@@ -209,9 +209,9 @@ Record match_envs mu
     me_inj:
       forall id1 b1 ty1 id2 b2 ty2, e!id1 = Some(b1, ty1) -> e!id2 = Some(b2, ty2) -> id1 <> id2 -> b1 <> b2;
     me_range:
-      forall id b ty, e!id = Some(b, ty) -> Ple lo b /\ Plt b hi;
+      forall id b ty, e!id = Some(b, ty) -> Ple lo b /\ Plt b hi /\  locBlocksSrc mu b =true;
     me_trange:
-      forall id b ty, te!id = Some(b, ty) -> Ple tlo b /\ Plt b thi;
+      forall id b ty, te!id = Some(b, ty) -> Ple tlo b /\ Plt b thi /\  locBlocksTgt mu b =true;
     me_mapped:
       forall id b' ty,
       te!id = Some(b', ty) -> exists b, restrict (as_inj mu) (vis mu) b = Some(b', 0) /\ e!id = Some(b, ty);
@@ -232,12 +232,12 @@ Lemma match_envs_intern_invariant:
   (forall b chunk v,
     as_inj mu b = None -> Ple lo b /\ Plt b hi -> Mem.load chunk m b 0 = Some v -> Mem.load chunk m' b 0 = Some v) ->
   intern_incr mu mu' ->
-  (forall b, Ple lo b /\ Plt b hi -> as_inj mu' b = as_inj mu b) ->
+  (*(forall b, Ple lo b /\ Plt b hi -> as_inj mu' b = as_inj mu b) ->*)
   (forall b b' delta, as_inj mu' b = Some(b', delta) -> Ple tlo b' /\ Plt b' thi -> as_inj mu' b = as_inj mu b) ->
   forall (WD: SM_wd mu) (WD': SM_wd mu'),
   match_envs mu' e le m' lo hi te tle tlo thi.
 Proof.
-  intros until m'; intros ME LD INCR INV1 INV2. 
+  intros until m'; intros ME LD INCR INV. 
   destruct ME; constructor; eauto. 
 (* vars *)
   intros. generalize (me_vars0 id); intros MV; inv MV.
@@ -248,12 +248,25 @@ Proof.
   intros. exploit me_temps0; eauto. intros [v' [A B]]. 
   exists v'; split; eauto.
   eapply val_inject_incr; try eassumption.
-   eapply intern_incr_restrict; eassumption. 
-(* mapped *)
+  eapply intern_incr_restrict; eassumption.
+  (*range*)
+
+  intros. 
+  destruct (me_range0 _ _ _ H) as [Rng1 [Rng2 Rng3]].
+    eapply INCR in Rng3.
+    intuition.   
+  (*trange*)
+  intros. 
+  destruct (me_trange0 _ _ _ H) as [Rng1 [Rng2 Rng3]].
+    eapply INCR in Rng3.
+    intuition. 
+    (* mapped *)
   intros. exploit me_mapped0; eauto. intros [b [A B]]. exists b; split; auto.
    eapply intern_incr_restrict; eassumption.  
 (* flat *)
-  intros. eapply me_flat0; eauto. rewrite <- H0. symmetry. eapply INV2; eauto.
+  intros. eapply me_flat0; eauto. rewrite <- H0.
+  destruct (me_trange0 _ _ _ H) as [? [? ?]]. 
+  symmetry. eapply INV; eauto.
 Qed.
 
 Definition privBlocksSrc mu b := locBlocksSrc mu b && negb (pubBlocksSrc mu b).
@@ -264,13 +277,12 @@ Lemma match_envs_extern_invariantPriv:
   (forall b chunk v,
     privBlocksSrc mu b = true -> Ple lo b /\ Plt b hi -> Mem.load chunk m b 0 = Some v -> Mem.load chunk m' b 0 = Some v) ->
   extern_incr mu mu' ->
-  (forall b, Ple lo b /\ Plt b hi -> as_inj mu' b = as_inj mu b) ->
-  (forall b b' delta, as_inj mu' b = Some(b', delta) -> Ple tlo b' /\ Plt b' thi -> as_inj mu' b = as_inj mu b) ->
+  (*(forall b, Ple lo b /\ Plt b hi -> as_inj mu' b = as_inj mu b) ->
+  (forall b b' delta, as_inj mu' b = Some(b', delta) -> Ple tlo b' /\ Plt b' thi -> as_inj mu' b = as_inj mu b) ->*)
   forall (WD: SM_wd mu) (WD': SM_wd mu'),
   match_envs mu' e le m' lo hi te tle tlo thi.
 Proof.
-  intros until m'; intros ME LD INCR INV1 INV2.
-  clear INV1 INV2.
+  intros until m'; intros ME LD INCR (*INV1 INV2*).
   destruct ME; constructor; eauto. 
 (* vars *)
   intros. generalize (me_vars0 id); intros MV; inv MV.
@@ -283,11 +295,30 @@ Proof.
   exists v'; split; eauto.
   eapply val_inject_incr; try eassumption.
    eapply extern_incr_restrict; eassumption. 
+(* range *)
+  intros. 
+  destruct (me_range0 _ _ _ H) as [Rng1 [Rng2 Rng3]].
+    rewrite (extern_incr_locBlocksSrc _ _ INCR) in Rng3.
+    intuition. 
+(* trange *)
+  intros. 
+  destruct (me_trange0 _ _ _ H) as [Rng1 [Rng2 Rng3]].
+    rewrite (extern_incr_locBlocksTgt _ _ INCR) in Rng3.
+    intuition. 
 (* mapped *)
   intros. exploit me_mapped0; eauto. intros [b [A B]]. exists b; split; auto.
    eapply extern_incr_restrict; eassumption.  
 (* flat *)
-  intros. eapply me_flat0; eauto. rewrite <- H0. symmetry. eapply INV2; eauto.
+  intros. eapply me_flat0; eauto. rewrite <- H0.
+  destruct (me_trange0 _ _ _ H) as [Rng1 [Rng2 Rng3]]. 
+  rewrite H0.
+  rewrite (extern_incr_locBlocksTgt _ _ INCR) in Rng3.
+  destruct (joinD_Some _ _ _ _ _ H0) as [EXT' | [EXT' LOC']]; clear H0.
+    assert (LocBF: locBlocksTgt mu' b' = false).
+      eapply extern_DomRng'; eassumption.
+    rewrite LocBF in Rng3; discriminate.
+      rewrite <- (extern_incr_local _ _ INCR) in LOC'.
+        apply local_in_all in LOC'; trivial.
 Qed.
 
 (*
@@ -959,12 +990,32 @@ Proof.
 
   (* range *)
   exploit alloc_variables_range. eexact H. eauto. 
-  rewrite PTree.gempty. intuition congruence.
+  rewrite PTree.gempty. intros [X | [M M']]. discriminate. 
+  destruct (in_dec peq id (var_names vars)). 
+    unfold var_names in i. apply in_map_iff in i. 
+    destruct i as [[i t] [I IN]]. subst id. 
+    destruct (F _ _ IN) as [bb [? [? _]]]. simpl in H2.
+    rewrite H2 in H3. inv H3. intuition. 
+  destruct (G _ n).
+    rewrite H2 in H3. 
+    rewrite PTree.gempty in H3. congruence. 
+
 
   (* trange *)
   exploit alloc_variables_range. eexact A. eauto. 
-  rewrite PTree.gempty. intuition congruence.
-
+  rewrite PTree.gempty. intros [X | [TM TM']]. discriminate.
+  destruct (in_dec peq id (var_names vars)). 
+    unfold var_names in i. apply in_map_iff in i. 
+    destruct i as [[i t] [I IN]]. subst id. simpl in H2.
+    destruct (F _ _ IN) as [bb [? [? ?]]]. 
+    destruct H5 as [tb [TEi AI']].
+      rewrite H2 in TEi; inv TEi.
+      rewrite (as_inj_locBlocks _ _ _ _ WD' AI') in H4.
+      intuition.      
+  destruct (G _ n).
+    rewrite H2 in H4. 
+    rewrite PTree.gempty in H4. congruence.
+    
   (* mapped *)
   destruct (In_dec ident_eq id (var_names vars)).
   unfold var_names in i. exploit list_in_map_inv; eauto. 
@@ -1566,7 +1617,7 @@ Proof.
 (* call *)
   eapply match_envs_intern_invariant; eauto. 
   intros. apply LOAD; auto. xomega.
-  intros. apply INJ1; auto; xomega.
+  (*intros. apply INJ1. auto; xomega.*)
   intros. eapply INJ2; eauto; xomega.
   eapply IHmatch_cont; eauto. 
   intros; apply LOAD; auto. inv H0; xomega.
@@ -1574,43 +1625,45 @@ Proof.
   intros; eapply INJ2; eauto. inv H0; xomega.
 Qed.
 
-Lemma match_cont_extern_invariantPriv:
+Lemma match_cont_extern_invariantPriv: (*Obsolete *)
   forall mu' m' mu k tk m bound tbound,
   match_cont mu k tk m bound tbound ->
   (forall b chunk v,
     privBlocksSrc mu b = true -> Plt b bound -> 
     Mem.load chunk m b 0 = Some v -> Mem.load chunk m' b 0 = Some v) ->
   extern_incr mu mu' ->
-  (forall b, Plt b bound -> as_inj mu' b = as_inj mu b) ->
+  (*(forall b, Plt b bound -> as_inj mu' b = as_inj mu b) ->
   (forall b b' delta, as_inj mu' b = Some(b', delta) -> Plt b' tbound -> 
-                      as_inj mu' b = as_inj mu b) ->
-  forall (WD: SM_wd mu) (WD': SM_wd mu'),
+                      as_inj mu' b = as_inj mu b) ->*)
+ forall (GSEP : globals_separate tge mu mu')
+        (WD: SM_wd mu) (WD': SM_wd mu'),
   match_cont mu' k tk m' bound tbound.
 Proof.
-  induction 1; intros LOAD INCR INJ1 INJ2; econstructor; eauto.
-  (* globalenvs *)
-  clear INJ2 INJ1.
-  admit.
-  (*inv H. constructor; intros; eauto.
+  induction 1; intros LOAD INCR SEP; econstructor; eauto.
+(* globalenvs *)
+  inv H. constructor; intros; eauto.
     specialize (DOMAIN _ H).
     eapply extern_incr_restrict; try eassumption.
-  assert (restrict (as_inj mu) (vis mu) b1 = Some (b2, delta)). 
+  assert (restrict (as_inj mu) (vis mu) b1 = Some (b2, delta)).
     destruct (restrictD_Some _ _ _ _ _ H); clear H.
-    (*rewrite (INJ2 _ _ _ H3) in H3.*)
-     rewrite (extern_incr_vis _ _ INCR).
-     apply restrictI_Some; trivial. xomega.
-  eapply IMAGE; eauto.*)
+    rewrite <- (extern_incr_vis _ _ INCR) in H4.
+    remember (as_inj mu b1) as d; apply eq_sym in Heqd.
+    destruct d.
+      destruct p.
+      rewrite (extern_incr_as_inj _ _ INCR WD' _ _ _ Heqd) in H3; 
+          inv H3. apply restrictI_Some; trivial.
+    specialize (SEP _ _ _ Heqd H3).
+      unfold isGlobalBlock, genv2blocksBool in SEP. simpl in SEP.
+      rewrite varinfo_preserved, GV, orb_true_r in SEP; inv SEP. 
+  eapply IMAGE; eauto.
 (* call *)
   eapply match_envs_extern_invariantPriv; eauto. 
   intros. apply LOAD; auto. xomega.
-  intros. apply INJ1; auto; xomega.
-  intros. eapply INJ2; eauto; xomega.
 
   eapply IHmatch_cont; eauto. 
   intros; apply LOAD; auto. inv H0; xomega.
-  intros; apply INJ1. inv H0; xomega.
-  intros; eapply INJ2; eauto. inv H0; xomega.
-Qed.
+  Qed.
+
 
 (** Invariance by assignment to location "above" *)
 
@@ -1632,7 +1685,8 @@ Qed.
 
 (** Invariance by external calls *)
 
-(*Lemma match_cont_extcallPriv:
+
+Lemma match_cont_extcallPriv:
   forall mu k tk m bound tbound tm mu' m',
   match_cont mu k tk m bound tbound ->
   Mem.unchanged_on (fun b ofs => privBlocksSrc mu b = true) m m' ->
@@ -1643,24 +1697,26 @@ Qed.
   forall (WD: SM_wd mu) (WD': SM_wd mu') (SMV: sm_valid mu m tm),
   match_cont mu' k tk m' bound tbound.
 Proof.
-  intros. (*destruct H2 as [H2 [H2Dom H2Tgt]].*)
+  
+  intros. 
   eapply match_cont_extern_invariantPriv; eauto. 
-  - intros. eapply Mem.load_unchanged_on; eauto. 
-  - intros. destruct (as_inj mu b) as [[b' delta] | ] eqn:?.
+  intros. eapply Mem.load_unchanged_on; eauto.
+ (* intros. (*destruct H2 as [H2 [H2Dom H2Tgt]].*)
+  eapply match_cont_extern_invariantPriv; eauto. 
+  intros. eapply Mem.load_unchanged_on; eauto. 
+  intros. destruct (as_inj mu b) as [[b' delta] | ] eqn:?.
      eapply extern_incr_as_inj; eassumption.
   destruct SMV as [SMVD _].
     destruct (as_inj mu' b) as [[b' delta] | ] eqn:?; auto.
     exploit as_inj_DomRng; try eassumption. intros [D' T'] .
-    
-
-    (*exploit H2; eauto. unfold Mem.valid_block in H2Dom.*) intros [A B]. 
+    exploit H2; eauto. unfold Mem.valid_block in H2Dom. intros [A B]. 
       specialize (H2Dom _ A D'). xomegaContradiction.
   intros. destruct (as_inj mu b) as [[b'' delta''] | ] eqn:?.
       eapply extern_incr_as_inj; eassumption.
     exploit as_inj_DomRng; try eassumption. intros [D' T'].
     exploit H2; eauto. intros [A B].  
-    unfold Mem.valid_block in H2Tgt. specialize (H2Tgt _  B T'). xomegaContradiction.
-Qed.*)
+    unfold Mem.valid_block in H2Tgt. specialize (H2Tgt _  B T'). xomegaContradiction.*)
+Qed.
 
 (** Invariance by change of bounds *)
 
@@ -1798,6 +1854,8 @@ inv ME; econstructor; try eassumption.
   intros. specialize (me_vars0 id).
     eapply match_var_replace_locals; eassumption.
   rewrite replace_locals_as_inj, replace_locals_vis; trivial.
+  rewrite replace_locals_locBlocksSrc; trivial.
+  rewrite replace_locals_locBlocksTgt; trivial.
   rewrite replace_locals_as_inj, replace_locals_vis; trivial.
   rewrite replace_locals_as_inj; trivial.
 Qed. 
@@ -1854,13 +1912,15 @@ inv ME; econstructor; try eassumption.
     eapply val_inject_incr; try eassumption.
     red; intros. destruct (restrictD_Some _ _ _ _ _ H); clear H.
     eapply restrictI_Some; trivial. apply HFS; trivial. 
+  rewrite replace_externs_locBlocksSrc; trivial.
+  rewrite replace_externs_locBlocksTgt; trivial.
   rewrite replace_externs_as_inj, replace_externs_vis.
     intros. destruct (me_mapped0 _ _ _ H) as [b [Rb Eb]]; clear H.
     exists b; split; trivial.
     destruct (restrictD_Some _ _ _ _ _ Rb); clear Rb.
     eapply restrictI_Some; trivial. apply HFS; trivial. 
   rewrite replace_externs_as_inj. assumption.
-Qed. 
+Qed.  
 
 Lemma match_cont_replace_externs mu k tk m1 bound tbound : forall
         (MCONT : match_cont mu k tk m1 bound tbound) FS FT
@@ -1954,6 +2014,8 @@ Proof.
   intros. 
     rewrite restrict_sm_all, vis_restrict_sm, restrict_nest; try assumption.
     apply (me_temps0 _ _ H).
+  rewrite restrict_sm_locBlocksSrc; trivial.
+  rewrite restrict_sm_locBlocksTgt; trivial.
   intros.
     rewrite restrict_sm_all, vis_restrict_sm, restrict_nest; try assumption.
     apply (me_mapped0 _ _ _ H).
@@ -2439,7 +2501,7 @@ split.
                 intros. apply andb_true_iff in H; destruct H. 
                   rewrite H. split; simpl; trivial. rewrite H in H0. simpl in *. apply negb_true_iff in H0; trivial.
        xomega.
-       xomega.
+       instantiate (1:= m2). xomega.
        eassumption. 
        eassumption.
        eassumption.
@@ -2763,8 +2825,9 @@ Lemma MATCH_effcore_diagram: forall st1 m1 st1' m1'
                 list_disjoint (var_names (fn_params f)) (var_names (fn_temps f))),
    exists st2' m2' U2, effstep_plus (CL_eff_sem1 hf) tge U2 st2 m2 st2' m2'
 /\ exists mu', MATCH st1' mu' st1' m1' st2' m2' /\
-    intern_incr mu mu' /\
-    (*sm_inject_separated mu mu' m1 m2 /\*)
+               intern_incr mu mu' /\
+               globals_separate ge mu mu' /\
+    sm_inject_separated mu mu' m1 m2 /\
     sm_locally_allocated mu mu' m1 m2 m1' m2' /\
     (forall 
        (U1Hyp: forall b ofs, U1 b ofs = true -> vis mu b = true)
@@ -2843,7 +2906,8 @@ destruct CS; intros;
     split; intros.
       eapply assign_loc_forward. apply H2. apply SMV; trivial.
       eapply assign_loc_forward. apply X. eapply SMV; trivial.
-  split. apply intern_incr_refl. 
+      split. apply intern_incr_refl.
+      split. apply gsep_refl.
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -2941,7 +3005,8 @@ destruct CS; intros;
       eapply match_envs_set_temp; eauto.
       rewrite restrict_sm_all in B; trivial.
     intuition. 
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. apply gsep_refl. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -2986,7 +3051,8 @@ destruct CS; intros;
       intros; subst; auto.
       specialize (DISJ _ _ H2); auto.
     intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. apply gsep_refl. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3014,7 +3080,7 @@ destruct CS; intros;
     try eapply D; try eassumption. 
 (*  apply match_globalenvs_preserves_globals; eauto with compat.*)
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
-           [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
+           [INCR [SEPARATED [GSEP [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]]].
   eexists; exists tm'; eexists.
   split. eapply effstep_plus_one. econstructor; eauto.
   exists mu'.
@@ -3036,7 +3102,7 @@ destruct CS; intros;
       eapply match_envs_intern_invariant; try eassumption.
         intros. eapply Mem.load_unchanged_on; try eassumption.
           intros. red. apply restrictI_None. left; trivial.
-        intros. eapply intern_as_inj_preserved1; try eassumption. red; xomega.
+        (*intros. eapply intern_as_inj_preserved1; try eassumption. red; xomega.*)
         intros. rewrite H2. apply eq_sym. 
                 eapply intern_as_inj_preserved2; try eassumption. red; xomega.
         eapply match_cont_intern_invariant; try eassumption.
@@ -3052,6 +3118,7 @@ destruct CS; intros;
   split; trivial.
   split; trivial.
   split; trivial.
+  split; trivial.
   clear - H0 D WD MINJ. 
   intros. eapply BuiltinEffect_Propagate; eassumption. }
 
@@ -3061,7 +3128,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto with compat. econstructor; eauto with compat.
            intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. apply gsep_refl. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3077,7 +3145,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto. 
            intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. apply gsep_refl. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3093,7 +3162,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto.
            intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. apply gsep_refl. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3109,7 +3179,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto.
            intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. apply gsep_refl. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3138,7 +3209,8 @@ destruct CS; intros;
   exists mu; split.
     split. destruct b; econstructor; eauto with compat.
            intuition.  
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. apply gsep_refl. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3154,7 +3226,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto with compat. econstructor; eauto with compat.
            intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. apply gsep_refl. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3170,7 +3243,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto with compat. econstructor; eauto with compat.
            intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. apply gsep_refl. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3190,7 +3264,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto.
            intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. apply gsep_refl. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3207,7 +3282,8 @@ destruct CS; intros;
     split. econstructor; eauto. 
            simpl; auto.
            intuition.
-  apply intern_incr_refl. 
+  apply intern_incr_refl.
+  apply gsep_refl. 
   apply sm_inject_separated_same_sminj.
   apply sm_locally_allocatedChar.
       intuition. 
@@ -3222,7 +3298,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto.
            intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. apply gsep_refl. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3244,7 +3321,8 @@ destruct CS; intros;
       eapply freelist_forward; try eassumption.
       eapply SMV; assumption.
       eapply SMV; assumption.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. apply gsep_refl. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3291,7 +3369,8 @@ destruct CS; intros;
       eapply freelist_forward; try eassumption.
       eapply SMV; assumption.
       eapply SMV; assumption. 
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. apply gsep_refl. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3325,7 +3404,8 @@ destruct CS; intros;
       eapply SMV; assumption.
       eapply SMV; assumption. 
 
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. apply gsep_refl. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3363,7 +3443,8 @@ destruct CS; intros;
            econstructor; eauto. 
            eauto.
        intuition.
-  apply intern_incr_refl. 
+  apply intern_incr_refl.
+  apply gsep_refl. 
   apply sm_inject_separated_same_sminj.
   apply sm_locally_allocatedChar.
       intuition. 
@@ -3379,7 +3460,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto with compat.
        intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. apply gsep_refl. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3400,7 +3482,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto with compat.
        intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. apply gsep_refl. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3415,7 +3498,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto.
        intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. apply gsep_refl. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3434,7 +3518,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto.
            intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. apply gsep_refl. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3487,6 +3572,7 @@ destruct CS; intros;
     intros [PG' GLOB'].           
     intuition.
     split; auto.
+    split. solve[eapply intern_incr_globals_separate; eauto].
     split. (*sm_inject_separated goal*)
     { clear - LocAlloc E F SMV. 
       split; intros. split. remember (DomSrc mu b1) as q. 
@@ -3513,7 +3599,8 @@ destruct CS; intros;
     split. econstructor; eauto with compat.
            eapply match_envs_set_opttemp; eauto.
     intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. apply gsep_refl. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3574,8 +3661,9 @@ assert (GDE: genvs_domain_eq ge tge).
 { (*after_external *)
   intros. eapply MATCH_afterExternal. eapply MemInjMu. eassumption. eassumption.
      eassumption. eassumption. eassumption. eassumption. eassumption. eassumption. 
-     eassumption. eassumption. eassumption. eassumption. eassumption. eassumption. 
-     eassumption. eassumption. eassumption. eassumption. eassumption. eassumption. 
+     eassumption. eassumption.
+     eassumption. eassumption. eassumption. eassumption. eassumption. 
+     eassumption. eassumption. eassumption. eassumption. eassumption.  
     }
 { (*effcore_diagram *)
   intros.

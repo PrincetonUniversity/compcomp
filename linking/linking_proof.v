@@ -22,7 +22,7 @@ Require Import inj_lemmas.
 Require Import join_sm.
 Require Import reach_lemmas.
 Require Import compcert_linking.
-Require Import compcert_linking_lemmas.s  z
+Require Import compcert_linking_lemmas.
 Require Import disjointness.
 Require Import rc_semantics.
 Require Import rc_semantics_lemmas.
@@ -392,7 +392,7 @@ have U1_DEF': forall b ofs, U1 b ofs -> vis mupkg b.
 
 move/(_ _ _ _ _ MATCH).
 move=> []c2' []m2' []cd' []mu_top0.
-move=> []INCR (*[]SEP*) []LOCALLOC []MATCH' []U2 []STEP' PERM.
+move=> []INCR []GSEP []LOCALLOC []MATCH' []U2 []STEP' PERM.
 
 have fwd2: mem_forward m2 m2'.
 { case: STEP'=> step; first by apply effstep_plus_fwd in step.
@@ -443,11 +443,13 @@ split.
    exists erefl=> /=.
    have rcvis: REACH_closed m1' (vis mu').
    { by apply match_visible in MATCH'; apply: MATCH'. }
-   have GSEP: (globals_separate my_ge mupkg mu_top').
-   { 
+   have GSEP': (globals_separate my_ge mupkg mu_top').
+   {
+     eapply gsep_domain_eq; eauto.
+     apply genvs_domain_eq_sym; eauto.
    }
    apply (@head_inv_step _ _ _ _ _ sims my_ge my_ge_S 
-     mupkg m1 m2 mu_top' m1' m2' fwd2 (head_valid hdinv) INCR LOCALLOC rcvis
+     mupkg m1 m2 mu_top' m1' m2' fwd2 (head_valid hdinv) INCR GSEP' LOCALLOC rcvis
      (c INV) (d INV) pf c1' c2'' _ _ mus
      (STACK.pop (CallStack.callStack (s1 INV))) 
      (STACK.pop (CallStack.callStack (s2 INV))) U1 n U2 hdinv frameall)=> //=.
@@ -461,7 +463,11 @@ split.
    by move: (effax1 ESTEP0)=> []; move/corestep_fwd.
    move=> ? ? X; move: (PERM U1_DEF' _ _ X)=> []Y Z; split=> //.
    by eapply effstepN_valid in STEPN; eauto.
-   by apply: (head_valid hdinv).
+     by apply: (head_valid hdinv).
+     {
+     eapply gsep_domain_eq; eauto.
+     apply genvs_domain_eq_sym; eauto.
+     }
    by apply match_visible in MATCH'; apply: MATCH'.
    by apply: (head_rel hdinv). } 
 
@@ -565,7 +571,7 @@ have mu_wd: SM_wd mu.
 have INV': R data (Inj.mk mu_wd) st1 m1 st2 m2.
 { by apply: INV. }
 
-case: (aft2 my_ge_S HLT1 POP1 INV' AFT1)=> 
+case: (aft2 my_ge_S my_ge_T HLT1 POP1 INV' AFT1)=> 
   rv2 []st2'' []st2' []cd' []mu' []HLT2 CTX2 POP2 AFT2 INV''.
 exists st2',m2,cd',mu'.
 split=> //; first by rewrite eq1.

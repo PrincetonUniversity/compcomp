@@ -2862,6 +2862,7 @@ Lemma Match_effcore_diagram:
      effstep_plus (LTL_eff_sem hf) tge U2 st2 m2 st2' m2' 
   /\ exists mu',
      intern_incr mu mu' /\
+     globals_separate ge mu mu' /\
      sm_inject_separated mu mu' m1 m2 /\
      sm_locally_allocated mu mu' m1 m2 m1' m2' /\
      MATCH mu' st1' m1' st2' m2' /\
@@ -2894,7 +2895,8 @@ induction CS;
   exists mu.
   (*for some reason, calling intuition here seems to delete the assumption WTF,
     which is, however, needed... So we proceed in smaller steps*)
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
          repeat split; extensionality b; 
@@ -2917,6 +2919,7 @@ induction CS;
     auto.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
          repeat split; extensionality b; 
@@ -2941,6 +2944,7 @@ induction CS;
     auto.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
          repeat split; extensionality b; 
@@ -2966,6 +2970,7 @@ induction CS;
     auto.
   exists mu. 
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
          repeat split; extensionality b; 
@@ -2991,6 +2996,7 @@ induction CS;
     auto.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
          repeat split; extensionality b; 
@@ -3035,6 +3041,7 @@ induction CS;
     auto.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
          repeat split; extensionality bb; 
@@ -3058,6 +3065,7 @@ induction CS;
     auto.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
          repeat split; extensionality bb; 
@@ -3110,6 +3118,7 @@ induction CS;
     auto.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
          repeat split; extensionality bb; 
@@ -3207,6 +3216,7 @@ induction CS;
     auto.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
          repeat split; extensionality bb; 
@@ -3270,6 +3280,7 @@ induction CS;
     auto.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
          repeat split; extensionality bb; 
@@ -3335,6 +3346,7 @@ induction CS;
     auto.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
          repeat split; extensionality bb; 
@@ -3356,6 +3368,7 @@ induction CS;
     auto.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
          repeat split; extensionality bb; 
@@ -3421,6 +3434,7 @@ induction CS;
           eapply SMV; assumption.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
          repeat split; extensionality bb; 
@@ -3567,6 +3581,7 @@ induction CS;
               eapply SMV; assumption.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. assert (FWD2' : mem_forward m1' m2').
             destruct a2'; inv STORE2'.
@@ -3790,6 +3805,7 @@ induction CS;
     auto.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
          repeat split; extensionality bb; 
@@ -3874,6 +3890,7 @@ induction CS;
          rewrite andb_true_r; trivial. 
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
         rewrite (freshloc_free _ _ _ _ _  P).
@@ -3909,7 +3926,7 @@ induction CS;
     eapply add_equations_args_inject; try eassumption.
       inv WTI. eapply Val.has_subtype_list; eauto. apply wt_regset_list; auto.     
   exploit (inlineable_extern_inject ge tge); try eapply PRE; try eassumption; try apply GDE_lemma.
-  intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].
+  intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [GSEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]]].
   assert (E: map ls1 (map R args') = reglist ls1 args').
   { unfold reglist. rewrite list_map_compose. auto. }
   rewrite E in TEC, ArgsInj; clear E.
@@ -3942,6 +3959,7 @@ induction CS;
          reflexivity.
   simpl. 
   exists mu'.
+  split; trivial.
   split; trivial.
   split; trivial.
   split; trivial.
@@ -3989,6 +4007,7 @@ induction CS;
      auto.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
          repeat split; extensionality bb; 
@@ -4015,6 +4034,7 @@ induction CS;
     auto.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
          repeat split; extensionality bb; 
@@ -4057,6 +4077,7 @@ induction CS;
       destruct q; trivial; contradiction.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
          repeat split; extensionality bb; 
@@ -4097,6 +4118,7 @@ induction CS;
       destruct q; trivial; contradiction.    
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
          repeat split; extensionality bb; 
@@ -4154,6 +4176,7 @@ induction CS;
     auto.
   exists mu'.
   split. assumption.
+    split. solve[eapply intern_incr_globals_separate; eauto].   
   split. assumption.
   split. assumption.
   assert (IncVis: inject_incr (restrict (as_inj mu) (vis mu)) (restrict (as_inj mu') (vis mu'))).
@@ -4196,7 +4219,7 @@ induction CS;
 { (* external function : only nonobservables*)  
   specialize (EFhelpers _ _ OBS); intros OBS'.   
   exploit (inlineable_extern_inject ge tge); try eapply PRE; try eassumption; try apply GDE_lemma. 
-  intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].
+  intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [GSEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]]].
   simpl in FUN; inv FUN.
   eexists; exists m''; eexists; split.
     apply effstep_plus_one. econstructor; eauto. 
@@ -4205,6 +4228,7 @@ induction CS;
     econstructor; eauto. 
     exact symbols_preserved. exact varinfo_preserved.*)
   exists mu'.
+  split. assumption. 
   split. assumption. 
   split. assumption. 
   split. assumption.
@@ -4259,6 +4283,7 @@ induction CS;
     auto.
   exists mu.
   split. apply intern_incr_refl. 
+  split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
          repeat split; extensionality b'; 
@@ -4350,7 +4375,7 @@ assert (GDE:= GDE_lemma).
   { intros. eapply MATCH_afterExternal with (mu := mu); try eassumption. }
 (* effcore_diagram*)
   { intros. exploit Match_effcore_diagram; eauto. 
-    intros [st2' [m2' [U2 [CS2 [mu' [? [? [? [? [? [? ?]]]]]]]]]]].
+    intros [st2' [m2' [U2 [CS2 [mu' [? [? [? [? [? [? [? ?]]]]]]]]]]]].
     exists st2', m2', mu'.
     repeat (split; try assumption).
     exists U2. split; try assumption. left; assumption. }

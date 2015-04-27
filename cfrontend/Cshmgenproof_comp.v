@@ -2250,6 +2250,7 @@ exists (st2' : CSharpMin_core) (m2' : mem) (mu' : SM_Injection),
          Mem.perm m1 b1 (ofs - delta1) Max Nonempty))))
   /\
   intern_incr mu mu' /\
+  globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m1 m2 /\
   sm_locally_allocated mu mu' m1 m2 m1' m2' /\
   MATCH st1' mu' st1' m1' st2' m2'.
@@ -2323,7 +2324,8 @@ Proof.
                        eapply Mem.store_valid_access_3; try eassumption. omega. 
                        constructor. 
         intuition. 
-        apply intern_incr_refl. 
+        apply intern_incr_refl.
+        apply gsep_refl.
         apply sm_inject_separated_same_sminj.
         apply sm_locally_allocatedChar.
           repeat split; extensionality b.
@@ -2388,7 +2390,8 @@ Proof.
                    elim n; trivial. 
         clear H9 EffStep'.
         intuition. 
-        apply intern_incr_refl. 
+        apply intern_incr_refl.
+        apply gsep_refl. 
         apply sm_inject_separated_same_sminj.
         apply sm_locally_allocatedChar.
           repeat split; extensionality b.
@@ -2427,7 +2430,8 @@ Proof.
                econstructor. eassumption.
                intuition.
       intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+        apply gsep_refl. 
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2462,7 +2466,8 @@ Proof.
                  rewrite H3. auto.
                intuition.
       intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+        apply gsep_refl. 
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2489,7 +2494,7 @@ Proof.
     exploit (inlineable_extern_inject _ _ GDE_lemma); 
        try eapply H0; try eassumption. 
     intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
-           [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
+           [INCR [SEPARATED [GSEP [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]]].
     eexists; eexists; eexists mu'.
     split. eexists.
       split. apply effstep_plus_one.
@@ -2524,7 +2529,8 @@ Proof.
              constructor.
            intuition.
   intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+        apply gsep_refl. 
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2545,7 +2551,8 @@ Proof.
            apply csharpmin_effstep_skip_seq.
          intuition.
   intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+        apply gsep_refl. 
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2565,7 +2572,8 @@ Proof.
              econstructor; eauto.
            intuition. 
   intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+        apply gsep_refl. 
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2586,7 +2594,8 @@ Proof.
              econstructor; eauto.
            intuition. 
   intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+        apply gsep_refl. 
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2617,7 +2626,8 @@ Proof.
            apply csharpmin_effstep_ifthenelse with (v := tv) (b := b); auto.
          intuition.
   intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+        apply gsep_refl. 
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality bb; 
@@ -2647,7 +2657,8 @@ Proof.
         econstructor.
     intuition.
   intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+        apply gsep_refl. 
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2675,7 +2686,8 @@ Proof.
            intuition. 
   clear H0 H.
   intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+        apply gsep_refl. 
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2704,7 +2716,8 @@ Proof.
                econstructor. 
         intuition.
   intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+        apply gsep_refl. 
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2722,7 +2735,8 @@ Proof.
            apply effstep_plus_one. constructor.
            intuition.
   intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+        apply gsep_refl. 
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2744,7 +2758,8 @@ Proof.
              eapply effstep_plus_one. constructor. 
            intuition.
   intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+        apply gsep_refl. 
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2779,7 +2794,8 @@ Proof.
       eapply SMV; assumption.
       eapply SMV; assumption.
   intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+        apply gsep_refl. 
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2829,7 +2845,8 @@ Proof.
       eapply SMV; assumption.
       eapply SMV; assumption.
   intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+        apply gsep_refl. 
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2872,7 +2889,8 @@ Proof.
       eapply SMV; assumption.
       eapply SMV; assumption.
   intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+        apply gsep_refl. 
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2908,7 +2926,8 @@ Proof.
              econstructor. eauto.
         intuition. 
   intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+        apply gsep_refl. 
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2934,7 +2953,8 @@ Proof.
          intuition.
   clear H0 H. 
   intuition.
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+        apply gsep_refl. 
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2953,7 +2973,8 @@ Proof.
              constructor.
          intuition.
   intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+        apply gsep_refl. 
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2972,7 +2993,8 @@ Proof.
              constructor. 
          intuition.
   intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+        apply gsep_refl. 
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -2996,7 +3018,8 @@ Proof.
              constructor. simpl. eexact A. 
          intuition.
   intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+        apply gsep_refl. 
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 
@@ -3033,7 +3056,8 @@ Proof.
            simpl. eassumption.
         intuition.
   intuition.
-    constructor.
+  solve [eapply intern_incr_globals_separate; eauto].
+  constructor.
       simpl. econstructor; try eassumption.
          unfold transl_function. rewrite EQ0; simpl. auto.         
          constructor.
@@ -3055,7 +3079,8 @@ Proof.
              constructor.
          intuition.
   intuition. 
-      apply intern_incr_refl. 
+      apply intern_incr_refl.
+        apply gsep_refl. 
       apply sm_inject_separated_same_sminj.
       apply sm_locally_allocatedChar.
       repeat split; extensionality b; 

@@ -2076,7 +2076,8 @@ Lemma match_cont_extern_invariantPriv:
   forall mu' m' mu cenv k tk m bound tbound,
   match_cont mu cenv k tk m bound tbound ->
   (forall b chunk v,
-    privBlocksSrc mu b = true -> Plt b bound -> Mem.load chunk m b 0 = Some v -> Mem.load chunk m' b 0 = Some v) ->
+    privBlocksSrc mu b = true -> Plt b bound ->
+    Mem.load chunk m b 0 = Some v -> Mem.load chunk m' b 0 = Some v) ->
   extern_incr mu mu' ->
  forall (GSep : globals_separate tge mu mu')
         (WD: SM_wd mu) (WD': SM_wd mu'),
@@ -3344,7 +3345,8 @@ Lemma MATCH_effcore_diagram: forall st1 m1 st1' m1'
      effstep_plus (CL_eff_sem2 hf) tge U2 st2 m2 st2' m2'
 /\ exists mu',
      MATCH st1' mu' st1' m1' st2' m2' /\
-    intern_incr mu mu' /\
+     intern_incr mu mu' /\
+     globals_separate ge mu mu' /\
     sm_inject_separated mu mu' m1 m2 /\
     sm_locally_allocated mu mu' m1 m2 m1' m2' /\
     (forall 
@@ -3412,7 +3414,8 @@ destruct CS; intros;
     split; intros.
       eapply assign_loc_forward. apply H2. apply SMV; trivial.
       apply SMV; trivial.
-  split. apply intern_incr_refl. 
+      split. apply intern_incr_refl.
+      split. solve[apply gsep_refl].
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3482,7 +3485,8 @@ destruct CS; intros;
     split; intros.
       eapply assign_loc_forward. apply H2. apply SMV; trivial.
       eapply assign_loc_forward. apply X. eapply SMV; trivial.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3580,7 +3584,8 @@ destruct CS; intros;
       eapply match_envs_set_temp; eauto.
       rewrite restrict_sm_all in B; trivial.
     intuition. 
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3624,7 +3629,8 @@ destruct CS; intros;
       econstructor; eauto. 
       intros. econstructor; eauto.
     intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3652,7 +3658,7 @@ destruct CS; intros;
     try eapply D; try eassumption. 
 (*  apply match_globalenvs_preserves_globals; eauto with compat.*)
   intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
-           [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
+           [INCR [SEPARATED [GSEP [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]]].
   eexists; exists tm'; eexists.
   split. eapply effstep_plus_one. econstructor; eauto.
   exists mu'.
@@ -3690,6 +3696,7 @@ destruct CS; intros;
   split; trivial.
   split; trivial.
   split; trivial.
+  split; trivial.
   clear - H0 D WD MINJ. 
   intros. eapply BuiltinEffect_Propagate; eassumption. }
 
@@ -3699,7 +3706,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto with compat. econstructor; eauto with compat.
            intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3715,7 +3723,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto. 
            intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3731,7 +3740,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto.
            intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3747,7 +3757,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto.
            intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3776,7 +3787,8 @@ destruct CS; intros;
   exists mu; split.
     split. destruct b; econstructor; eauto with compat.
            intuition.  
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3792,7 +3804,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto with compat. econstructor; eauto with compat.
            intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3808,7 +3821,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto with compat. econstructor; eauto with compat.
            intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3827,7 +3841,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto.
            intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3842,7 +3857,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto with compat. simpl; rewrite H2; rewrite H4; auto. 
            intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3857,7 +3873,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto.
            intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3879,7 +3896,8 @@ destruct CS; intros;
       eapply freelist_forward; try eassumption.
       eapply SMV; assumption.
       eapply SMV; assumption.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3926,7 +3944,8 @@ destruct CS; intros;
       eapply freelist_forward; try eassumption.
       eapply SMV; assumption.
       eapply SMV; assumption. 
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -3960,7 +3979,8 @@ destruct CS; intros;
       eapply SMV; assumption.
       eapply SMV; assumption. 
 
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -4000,7 +4020,8 @@ destruct CS; intros;
            econstructor; eauto. rewrite addr_taken_seq_of_labeled_statement. 
            apply compat_cenv_select_switch. eauto with compat.
        intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -4017,7 +4038,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto with compat.
        intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -4038,7 +4060,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto with compat.
        intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -4053,7 +4076,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto.
        intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -4074,7 +4098,8 @@ destruct CS; intros;
   exists mu; split.
     split. econstructor; eauto.
            intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -4132,7 +4157,8 @@ destruct CS; intros;
              eassumption. split; eassumption. eassumption.
          intros [PG' GLOB'].           
          intuition.
-     split; trivial.
+         split; trivial.
+         split. solve [eapply intern_incr_globals_separate; eauto].
      split. (*sm_inject_separated goal*)
          clear - LocAlloc E F SMV. (*EQ P Q X Y Z. red.*)
            split; intros. split. remember (DomSrc mu b1) as q. destruct q; simpl in *; trivial. apply eq_sym in Heqq. rewrite E in H0. congruence. apply SMV. apply Heqq. 
@@ -4174,7 +4200,8 @@ destruct CS; intros;
     split. econstructor; eauto with compat.
            eapply match_envs_set_opttemp; eauto.
     intuition.
-  split. apply intern_incr_refl. 
+  split. apply intern_incr_refl.
+      split. solve[apply gsep_refl]. 
   split. apply sm_inject_separated_same_sminj.
   split. apply sm_locally_allocatedChar.
       intuition. 
@@ -4238,6 +4265,7 @@ assert (GDE: genvs_domain_eq ge tge).
    exploit MATCH_effcore_diagram; try eassumption.
     intros [st2' [m2' [U2 [CSTgt [mu' MU]]]]].
     exists st2', m2', mu'.
+    split. eapply MU.
     split. eapply MU.
     split. eapply MU.
     split. eapply MU.

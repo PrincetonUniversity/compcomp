@@ -320,7 +320,7 @@ Proof. intros.
 assert (WDR: SM_wd (restrict_sm mu X)).
    apply restrict_sm_WD; assumption.
 split.
-  rewrite vis_restrict_sm.
+  rewrite vis_restrict_sm. 
   rewrite restrict_sm_nest; intuition.
 split. unfold vis.
   rewrite restrict_sm_locBlocksSrc, restrict_sm_frgnBlocksSrc.
@@ -394,7 +394,8 @@ Lemma MATCH_effcore_diagram: forall
        (MTCH: MATCH mu st1 m1 st2 m2),
 exists st2' m2' U2 mu',
    effstep (rtl_eff_sem hf) tge U2 st2 m2 st2' m2'
-  /\ intern_incr mu mu'
+   /\ intern_incr mu mu'
+  /\ globals_separate ge mu mu'
   /\ sm_locally_allocated mu mu' m1 m2 m1' m2'
   /\ MATCH mu' st1' m1' st2' m2'
   /\ SM_wd mu' /\ sm_valid mu' m1' m2'
@@ -416,7 +417,8 @@ Proof. intros.
 { (* nop *)
   eexists; eexists; eexists; exists mu; split.
     eapply rtl_effstep_exec_Inop; eauto.
-  split. apply intern_incr_refl. 
+    split. apply intern_incr_refl.
+    split. solve [apply gsep_refl].
   split. rewrite sm_locally_allocatedChar.
          repeat split; extensionality bb; 
           try rewrite freshloc_irrefl; intuition. 
@@ -441,6 +443,7 @@ Proof. intros.
     instantiate (1 := v2). rewrite <- EVALOP'.
      apply eval_operation_preserved. exact symbols_preserved. 
   split. apply intern_incr_refl. 
+    split. solve [apply gsep_refl].
   split. rewrite sm_locally_allocatedChar.
          repeat split; extensionality bb; 
           try rewrite freshloc_irrefl; intuition. 
@@ -475,7 +478,8 @@ Proof. intros.
     assert (eval_addressing tge tsp addr trs ## args = Some a').
       rewrite <- EA'. apply eval_addressing_preserved. exact symbols_preserved. 
     eapply rtl_effstep_exec_Iload; eauto.
-  split. apply intern_incr_refl.  
+  split. apply intern_incr_refl. 
+    split. solve [apply gsep_refl]. 
   split. rewrite sm_locally_allocatedChar.
          repeat split; extensionality bb; 
           try rewrite freshloc_irrefl; intuition. 
@@ -511,7 +515,8 @@ Proof. intros.
     assert (eval_addressing tge tsp addr trs ## args = Some a').
       rewrite <- EA'. apply eval_addressing_preserved. exact symbols_preserved.
     eapply rtl_effstep_exec_Istore; eauto.
-  split. apply intern_incr_refl.  
+  split. apply intern_incr_refl. 
+    split. solve [apply gsep_refl]. 
   split. rewrite sm_locally_allocatedChar.
       repeat split; apply extensionality; intros bb; 
       try rewrite (storev_freshloc _ _ _ _ _ H1); 
@@ -551,7 +556,8 @@ Proof. intros.
   eexists; eexists; eexists; exists mu; split.
     eapply rtl_effstep_exec_Icall with (fd := transf_fundef fd); eauto.
     apply sig_preserved.
-  split. apply intern_incr_refl.  
+  split. apply intern_incr_refl. 
+    split. solve [apply gsep_refl]. 
   split. rewrite sm_locally_allocatedChar.
          repeat split; extensionality bb; 
           try rewrite freshloc_irrefl; intuition. 
@@ -585,7 +591,8 @@ Proof. intros.
       eapply free_forward; try eassumption.
       eapply SMV; assumption.
       eapply SMV; assumption.
-  split. apply intern_incr_refl.  
+  split. apply intern_incr_refl. 
+    split. solve [apply gsep_refl]. 
   split. rewrite sm_locally_allocatedChar.
       repeat split; apply extensionality; intros bb; 
           try rewrite (freshloc_free _ _ _ _ _ H2);
@@ -612,15 +619,16 @@ Proof. intros.
   inv H. 
   exploit (inlineable_extern_inject ge tge); try eassumption.
     eapply regset_get_list; eassumption.
-  intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]]. 
+  intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [GSEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]]]. 
  
   eexists; eexists; eexists; exists mu'; split.
     eapply rtl_effstep_exec_Ibuiltin; eauto.
   split. assumption.
   split. assumption.
-  split. 
+  split. assumption.
     split.
-      constructor; auto.
+split. (*?*)
+    constructor; auto.
         eapply list_match_frames_intern_incr; try eassumption.
           eapply restrict_sm_intern_incr; eassumption.
           apply restrict_sm_WD; trivial.
@@ -657,7 +665,8 @@ Proof. intros.
   intros EC. 
   eexists; eexists; eexists; exists mu; split.
     eapply rtl_effstep_exec_Icond; eauto. 
-  split. apply intern_incr_refl.  
+  split. apply intern_incr_refl. 
+    split. solve [apply gsep_refl]. 
   split. rewrite sm_locally_allocatedChar.
          repeat split; extensionality bb; 
           try rewrite freshloc_irrefl; intuition. 
@@ -679,6 +688,7 @@ Proof. intros.
     eapply rtl_effstep_exec_Ijumptable; eauto.
        rewrite list_nth_z_map. rewrite H1. simpl; eauto.  
   split. apply intern_incr_refl. 
+    split. solve [apply gsep_refl].
   split. rewrite sm_locally_allocatedChar.
          repeat split; extensionality bb; 
           try rewrite freshloc_irrefl; intuition. 
@@ -700,7 +710,8 @@ Proof. intros.
   rewrite (local_in_all _ WDR _ _ _ H4) in SPB; inv SPB.
   eexists; eexists; eexists; exists mu; split.
     eapply rtl_effstep_exec_Ireturn; eauto. 
-  split. apply intern_incr_refl.  
+  split. apply intern_incr_refl. 
+    split. solve [apply gsep_refl]. 
   split. rewrite sm_locally_allocatedChar.
       repeat split; apply extensionality; intros bb; 
           try rewrite (freshloc_free _ _ _ _ _ H0);
@@ -735,7 +746,8 @@ Proof. intros.
      eauto; try apply Zle_refl.
   eexists; eexists; eexists; exists mu'; split.
     eapply rtl_effstep_exec_function_internal; eauto.
-  split. assumption. 
+    split. assumption.
+    split. solve[eapply intern_incr_globals_separate; eauto]. 
   split. assumption. 
   split. 
     split. constructor; auto.
@@ -783,12 +795,13 @@ Proof. intros.
   specialize (EFhelpers _ _ OBS); intros. 
   exploit (inlineable_extern_inject ge tge); try eassumption.
   intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED
-      [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]]. 
+      [LOOR [INC [SEP [GSEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]]]. 
  
   eexists; eexists; eexists; exists mu'; split.
     eapply rtl_effstep_exec_function_external; eauto.
   split. assumption.
   split. assumption.
+  split . assumption.
   split. 
     split. constructor; auto.
       eapply list_match_frames_intern_incr; try eassumption.
@@ -811,7 +824,8 @@ Proof. intros.
   inv STACKS. inv H1.
   eexists; eexists; eexists; exists mu; split.  
     eapply rtl_effstep_exec_return; eauto. 
-  split. apply intern_incr_refl.  
+  split. apply intern_incr_refl. 
+    split. solve [apply gsep_refl]. 
   split. rewrite sm_locally_allocatedChar.
          repeat split; extensionality bb; 
           try rewrite freshloc_irrefl; intuition. 
@@ -1364,9 +1378,10 @@ assert (GDE:= GDE_lemma).
   { apply MATCH_afterExternal. assumption. }
 (*effcorediagram*)
 { intros. exploit MATCH_effcore_diagram; try eassumption.
-  intros [st2' [m2' [U2 [mu' [CS' [INC 
-     [LocAlloc [MTCH' [WD' [SMV' HU2]]]]]]]]]].
+  intros [st2' [m2' [U2 [mu' [CS' [INC [GSEP
+     [LocAlloc [MTCH' [WD' [SMV' HU2]]]]]]]]]]].
   exists st2', m2', mu'.
+  split; trivial.
   split; trivial.
   split; trivial.
   split; trivial.
