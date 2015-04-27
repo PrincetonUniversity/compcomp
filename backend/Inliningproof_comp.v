@@ -15,20 +15,20 @@ Require Import Inliningspec.
 Require Import RTL.
 
 Require Import mem_lemmas.
-Require Import core_semantics.
+Require Import semantics.
 Require Import reach.
 Require Import effect_semantics.
-Require Import StructuredInjections.
-Require Import effect_simulations.
+Require Import structured_injections.
+Require Import simulations.
 Require Import effect_properties.
-Require Import effect_simulations_lemmas.
+Require Import simulations_lemmas.
 
 
 Require Export Axioms.
 Require Import RTL_coop.
 Require Import RTL_eff.
 
-Load Santiago_tactics.
+(*Load Santiago_tactics.*)
 
 (* The rewriters *)
 Hint Rewrite vis_restrict_sm: restrict.
@@ -292,7 +292,7 @@ Lemma tr_moves_init_regs':
                                       tr_moves f.(fn_code) pc1 (sregs ctx1 rsrcs) (sregs ctx2 rdsts) pc2 ->
                                       (forall r, In r rdsts -> Ple r ctx2.(mreg)) ->
                                       list_forall2 (val_reg_charact F ctx1 rs1) vl rsrcs ->
-                                      exists rs2, core_semantics_lemmas.corestep_star (rtl_eff_sem hf) tge
+                                      exists rs2, semantics_lemmas.corestep_star (rtl_eff_sem hf) tge
                                                                                       (RTL_State stk f sp pc1 rs1) m
                                                                                       (RTL_State stk f sp pc2 rs2) m
                                                   /\ agree_regs F ctx2 (init_regs vl rdsts) rs2
@@ -300,15 +300,15 @@ Lemma tr_moves_init_regs':
 Proof.
   induction rdsts; simpl; intros.
   (* rdsts = nil *)
-  inv H0. exists rs1; split. apply core_semantics_lemmas.corestep_star_zero. split. apply agree_regs_init. auto.
+  inv H0. exists rs1; split. apply semantics_lemmas.corestep_star_zero. split. apply agree_regs_init. auto.
   (* rdsts = a :: rdsts *)
   inv H2. inv H0. 
-  exists rs1; split. apply core_semantics_lemmas.corestep_star_zero. split. apply agree_regs_init. auto.
+  exists rs1; split. apply semantics_lemmas.corestep_star_zero. split. apply agree_regs_init. auto.
   simpl in H0. inv H0.
   exploit IHrdsts; eauto. intros [rs2 [A [B C]]].
   exists (rs2#(sreg ctx2 a) <- (rs2#(sreg ctx1 b1))).
-  split. eapply core_semantics_lemmas.corestep_star_trans; eauto. 
-  eapply core_semantics_lemmas.corestep_star_one.
+  split. eapply semantics_lemmas.corestep_star_trans; eauto. 
+  eapply semantics_lemmas.corestep_star_one.
   eapply  rtl_corestep_exec_Iop; eauto.
   split. destruct H3 as [[P Q] | [P Q]].
   subst a1. eapply agree_set_reg_undef; eauto.

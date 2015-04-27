@@ -40,6 +40,7 @@ Require Cminorgen.
 Require SelectionNEW.
 Require RTLgen.
 Require Tailcall.
+Require Inlining.
 Require Renumber.
 Require Allocation.
 Require Tunneling.
@@ -55,6 +56,7 @@ Require Cminorgenproof_comp.
 Require Selectionproof_comp.
 Require RTLgenproof_comp.
 Require Tailcallproof_comp.
+Require Inliningproof_comp.
 Require Renumberproof_comp.
 Require Allocproof_comp.
 Require Tunnelingproof_comp.
