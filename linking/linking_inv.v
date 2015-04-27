@@ -307,10 +307,6 @@ Lemma isGlob_iffS' ix1 ix2 b :
   isGlobalBlock (ge (cores_S ix1)) b <-> isGlobalBlock (ge (cores_S ix2)) b. 
 Proof. by split; rewrite -!isGlob_iffS. Qed.
 
-Lemma isGlob_iffT' ix1 ix2 b :
-  isGlobalBlock (ge (cores_T ix1)) b <-> isGlobalBlock (ge (cores_T ix2)) b. 
-Proof. by split; rewrite -!isGlob_iffT. Qed.
-
 Lemma isGlob_iffST' ix1 ix2 b :
   isGlobalBlock (ge (cores_S ix1)) b <-> isGlobalBlock (ge (cores_T ix2)) b. 
 Proof. by split; rewrite -isGlob_iffS -isGlob_iffT. Qed.
@@ -759,13 +755,14 @@ eapply gsep0.
 apply: Build_disjinv.
 by rewrite predI01.
 by rewrite predI01.
+{
 move=> b; move/andP=> /= []fS lS.
 case: rel=> _ _ _; case=> d1 d2; move/(_ b)=> H _ _ _; apply: H.
 apply/andP; split=> //=.
 move: (frgnS_sub_vis fS); case/orP=> H.
 move: d1; move/DisjointP; move/(_ b); rewrite H.
 by move: lS; rewrite /in_mem /= => ->; case.
-by [].
+by []. }
 move=> b1 b2 d0; rewrite /foreign_of /=.
 case: rel=> _ _ _; case=> d1 d2 _ H _ _.
 case fS: (frgnS _)=> // J or; apply: H=> //. 

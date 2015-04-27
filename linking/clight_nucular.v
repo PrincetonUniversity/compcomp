@@ -880,7 +880,7 @@ case; move {c m c' m'}.
 { move=> f lbl k e te m s' k' H H2 []A B; split=> //.
   by apply: (cont_inv_find_label B H). }
 { move=> f vargs k m e te m' Hfun H []A B; split=> //.
-  by apply: (function_entry1_state_inv A Hfun).
+  apply: (function_entry1_state_inv B A Hfun).
   apply: (cl_cont_inv_fwd p)=> WD; first by apply: (function_entry1_mem_wd WD A Hfun).
   by apply: (function_entry1_forward _ _ _ _ _ _ Hfun). }
 { move=> v optid f e te k m H []A B /= [][]C D E; split=> //.

@@ -131,7 +131,7 @@ BACKEND=\
 CFRONTEND=Ctypes.v Cop.v Csyntax.v Csem.v Cstrategy.v Cexec.v \
   Initializers.v Initializersproof.v \
   SimplExpr.v SimplExprspec.v SimplExprproof.v \
-  Clight.v Clight_coop.v Clight_eff.v Clight_self_simulates.v ClightBigstep.v \
+  Clight.v Clight_lemmas.v Clight_coop.v Clight_eff.v Clight_self_simulates.v ClightBigstep.v \
   SimplLocals.v SimplLocalsproof.v SimplLocalsproof_comp.v \
   Cshmgen.v Cshmgenproof.v Cshmgenproof_comp.v \
   Csharpminor.v Csharpminor_coop.v Csharpminor_eff.v \
@@ -170,7 +170,7 @@ LINKING=cast.v pos.v stack.v seq_lemmas.v pred_lemmas.v \
   disjointness.v reach_lemmas.v rc_semantics.v rc_semantics_lemmas.v \
   linking_inv.v ret_lemmas.v call_lemmas.v linking_proof.v \
   context.v context_equiv.v \
-  jstep.v safe_clight_rc.v CompositionalComplements.v 
+  jstep.v safe_clight_rc.v clight_nucular.v CompositionalComplements.v 
 
 
 # Putting everything together (in driver/)

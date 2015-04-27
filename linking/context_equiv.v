@@ -220,7 +220,6 @@ Variable sims :
   SM_simulation_inject s.(sem) t.(sem) s.(ge) t.(ge).
 Variable ge_top : ge_ty.                                                     
 Variable domeq_S : forall ix : 'I_N, genvs_domain_eq ge_top (Prog.sems pS ix).(ge).
-Variable domeq_T : forall ix : 'I_N, genvs_domain_eq ge_top (Prog.sems pT ix).(ge). 
 Variable find_symbol_ST : 
   forall (ix : 'I_N) id bf, 
   Genv.find_symbol (ge (Prog.sems pS ix)) id = Some bf -> 
@@ -229,6 +228,9 @@ Variable find_symbol_ST :
 Lemma equiv (Hmain : Prog.main pS = Prog.main pT) : Equiv_ctx ge_top plt pS pT.
 Proof.
 rewrite /Equiv_ctx=> C args1 args2 m1 m2 j Inv Hsafe. 
+have domeq_T : forall ix : 'I_N, genvs_domain_eq ge_top (Prog.sems pT ix).(ge). 
+{ move=> ix; apply genvs_domain_eq_trans with (ge2 := ge (Prog.sems pS ix))=> //.
+  by case: (sims ix). }
 have sim: CompCert_wholeprog_sim 
           (link_ctx C pS plt) (link_ctx C pT plt) ge_top ge_top (Prog.main pS).
 { apply: link=> ix; rewrite /Prog.sems/apply_ctx/extend_sems. 
@@ -281,16 +283,21 @@ Variable sims :
   SM_simulation_inject s.(sem) t.(sem) s.(ge) t.(ge).
 Variable ge_top : ge_ty.                                                     
 Variable domeq_S : forall ix : 'I_N, genvs_domain_eq ge_top (Prog.sems pS ix).(ge).
-Variable domeq_T : forall ix : 'I_N, genvs_domain_eq ge_top (Prog.sems pT ix).(ge). 
 Variable find_symbol_ST : 
   forall (ix : 'I_N) id bf, 
   Genv.find_symbol (ge (Prog.sems pS ix)) id = Some bf -> 
   Genv.find_symbol (ge (Prog.sems pT ix)) id = Some bf.
 
+Lemma domeq_T : forall ix : 'I_N, genvs_domain_eq ge_top (Prog.sems pT ix).(ge). 
+Proof. 
+move=> ix; apply genvs_domain_eq_trans with (ge2 := ge (Prog.sems pS ix))=> //.
+by case: (sims ix). 
+Qed.
+
 Lemma refines (Hmain : Prog.main pS = Prog.main pT) 
       (EM : ClassicalFacts.excluded_middle) : Prog_refines ge_top plt pS pT.
 Proof.
-rewrite /Equiv_ctx=> C args1 args2 m1 m2 j Inv tbeh Hhas2.
+move=> C args1 args2 m1 m2 j Inv tbeh Hhas2.
 have sim: CompCert_wholeprog_sim 
           (link_ctx C pS plt) (link_ctx C pT plt) ge_top ge_top (Prog.main pS).
 { apply: link=> ix; rewrite /Prog.sems/apply_ctx/extend_sems. 
@@ -299,7 +306,7 @@ have sim: CompCert_wholeprog_sim
   by case e: (lt_dec ix N)=> [pf|pf] //; apply: (Ctx.valid_C C).
   by case e: (lt_dec ix N)=> [pf|pf] //; apply: (Ctx.sim_C C).
   by case e: (lt_dec ix N)=> [pf|pf] //; apply: (Ctx.domeq_C C).
-  by case e: (lt_dec ix N)=> [pf|pf] //; apply: (Ctx.domeq_C C). }
+  case e: (lt_dec ix N)=> [pf|pf] //; last by apply: (Ctx.domeq_C C). by apply: domeq_T. }
 have target_det: corestep_fun (link_ctx C pT plt). 
 { apply: linking_det=> ix; rewrite /Prog.sems/apply_ctx/extend_sems.
   by case e: (lt_dec ix N)=> [pf|pf] //; apply Ctx.det_C. }
@@ -326,6 +333,52 @@ by left; exists c1; split.
 {
 case=> Init1 Hwrong; exists Going_wrong; split; last by constructor.
 by right; split.
+}
+Qed.
+
+(* An alternative proof of equiv, relying on behavior_equiv. *)
+Lemma equiv' (Hmain : Prog.main pS = Prog.main pT) 
+      (EM : ClassicalFacts.excluded_middle) : Equiv_ctx ge_top plt pS pT.
+Proof.
+move=> C args1 args2 m1 m2 j Inv Hsafe.
+have sim: CompCert_wholeprog_sim 
+          (link_ctx C pS plt) (link_ctx C pT plt) ge_top ge_top (Prog.main pS).
+{ apply: link=> ix; rewrite /Prog.sems/apply_ctx/extend_sems. 
+  by move=> ??; case e: (lt_dec ix N)=> [pf|pf] //; apply find_symbol_ST.
+  by case e: (lt_dec ix N)=> [pf|pf] //; apply: (Ctx.rclosed_C C).
+  by case e: (lt_dec ix N)=> [pf|pf] //; apply: (Ctx.valid_C C).
+  by case e: (lt_dec ix N)=> [pf|pf] //; apply: (Ctx.sim_C C).
+  by case e: (lt_dec ix N)=> [pf|pf] //; apply: (Ctx.domeq_C C).
+  case e: (lt_dec ix N)=> [pf|pf] //; last by apply: (Ctx.domeq_C C). by apply: domeq_T. }
+have target_det: corestep_fun (link_ctx C pT plt). 
+{ apply: linking_det=> ix; rewrite /Prog.sems/apply_ctx/extend_sems.
+  by case e: (lt_dec ix N)=> [pf|pf] //; apply Ctx.det_C. }
+
+have [beh Hhas1]: (exists beh, prog_has_behavior plt C pS args1 m1 beh).
+{ by apply: behavior_exists. }
+
+case: Hhas1.
+{ 
+case=> c1 []Init1 Hhas1; move: (Init1)=> Init1'.
+eapply @core_initial 
+  with (Sem1 := link_ctx C pS plt) (Sem2 := link_ctx C pT plt) 
+       (ge1 := ge_top) (ge2 := ge_top) (halt_inv := cc_halt_inv)
+       (j := j) (main := Prog.main pS) (m1 := m1) (m2 := m2) (w := sim)
+  in Init1; eauto.
+case: Init1=> mu []cd []c2 []_ []Init2 Hmatch.
+case: (behavior_equiv (Prog.main pS) sim target_det EM c1 c2 m1 m2 Termination).
+by exists cd, mu.
+by case: Hsafe=> x []; rewrite Init1'; case=> <-.
+move=> H1 H2; rewrite /prog_terminates /prog_has_behavior; split; case;
+ try solve[case=> _ ? //].
+* case=> c; rewrite Init1'; case; case=> ?; subst c1=> H.
+  left; exists c2; split=> //; first by rewrite -Hmain. by apply: (H2 H).
+* case=> c; rewrite -Hmain Init2; case; case=> ?; subst c2=> H.
+  by left; exists c1; split=> //; apply: (H1 H).
+}
+{
+case=> Init1 Hwrong; case: Hsafe=> x []Hinit Hsafe. 
+by elimtype False; apply: Init1; exists x.
 }
 Qed.
 

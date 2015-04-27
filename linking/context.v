@@ -40,3 +40,51 @@ Record t (ge_top : ge_ty) : Type := {
   ; domeq_C : genvs_domain_eq ge_top (ge C)
   }.
 End Ctx.
+
+(** Every Clight program (up to a few syntactic restrictions: no repeated function 
+ definitions, function temporary id's disjoint from parameter names) is a valid 
+ program context. *)
+
+Require Import Clight.
+Require Import Clight_coop.
+Require Import Clight_eff.
+Require Import Clight_lemmas.
+Require Import Clight_self_simulates.
+Require Import safe_clight_rc. 
+Require Import clight_nucular. Import CLIGHT_NUKE.
+
+Notation Clight_prog := (AST.program fundef Ctypes.type).
+
+Definition mk_Clight_Modsem hf (p : Clight_prog) :=
+  @Modsem.mk fundef Ctypes.type (Genv.globalenv p) CL_core (CL_eff_sem1 hf).
+
+Section Clight_Ctx.
+Variable is_i64_helper_empty_trace : (* The following should be provable but isn't, 
+                                        due to a misspecification of i64_helpers 
+                                        (they should all have empty trace)! *)
+  forall F V hf ef (ge : Genv.t F V) name sg vargs m t vres m',
+  I64Helpers.is_I64_helper hf name sg ->
+  external_call ef ge vargs m t vres m' -> 
+  t = E0.
+
+Program Definition mk_Clight_Ctx hf (p : Clight_prog)
+           (R: list_norepet (map fst (prog_defs p)))
+           (DISJ: forall vf f, Genv.find_funct (Genv.globalenv p) vf = Some (Internal f) -> 
+                  list_disjoint (var_names (fn_params f)) (var_names (fn_temps f)))
+           (ge_top : ge_ty) (pf : genvs_domain_eq ge_top (Genv.globalenv p)) :=
+  @Ctx.Build_t ge_top (mk_Clight_Modsem hf p) _ _ _ _ pf.
+Next Obligation.
+apply Clight_self_simulates.transl_program_correct; auto.
+Qed.
+Next Obligation.
+apply Clight_RC.
+Qed.
+Next Obligation.
+apply Clight_Nuke.
+Qed.
+Next Obligation.
+intros m *; simpl; intros H H2.
+eapply clight_corestep_fun in H; eauto; inv H; auto.
+Qed.
+
+End Clight_Ctx.
