@@ -295,15 +295,15 @@ Qed.
 
 
 
-
-
+(*The following deserves its own lemma*)
+{
 apply (gsep_domain_eq _ _ g2 g3); try assumption.
   
   assert (WD12: SM_wd mu12) by (eapply match_sm_wd12; eauto).
   assert (WD23: SM_wd mu23) by (eapply match_sm_wd23; eauto).
   assert (WD12': SM_wd mu12') by (eapply match_sm_wd12; eauto).
   assert (WD23': SM_wd mu23') by (eapply match_sm_wd23; eauto).
-    assert (HH: meminj_preserves_globals g2 (extern_of mu23')).
+    assert (pglobals: meminj_preserves_globals g2 (extern_of mu23')).
     eapply match_genv23; eauto.
   assert (INCR: Values.inject_incr (as_inj mu12) (as_inj mu12')) by (eapply intern_incr_as_inj; eauto).
   assert (GLUE: (locBlocksTgt mu12 = locBlocksSrc mu23 /\
@@ -315,37 +315,32 @@ apply (gsep_domain_eq _ _ g2 g3); try assumption.
     apply genvs_domain_eq_sym; assumption. }
     intros  b1 b3 d3 map13 map13'.
     
-  destruct (compose_sm_as_injD _ _ _ _ _ map13' WD12' WD23') as [b2 [d1 [d2 [map1 [map2 extra]]]]].
-  destruct (compose_sm_as_injD_None _ _ _ WD12 WD23 GLUE map13) as [map12| [b2' [d [map12 map23]]]].
+  destruct (compose_sm_as_injD _ _ _ _ _ map13' WD12' WD23') as [b2 [d1 [d2 [map12 [map23 extra]]]]].
+  destruct (compose_sm_as_injD_None _ _ _ WD12 WD23 GLUE map13) as [map12'| [b2' [d [map12' map23']]]].
   
   - assert (isGlobalBlock g2 b2 = false).
     eapply gsep12; eauto.
     destruct (isGlobalBlock g2 b3) eqn:isglob; [ | reflexivity].
-    unfold isGlobalBlock in isglob; simpl in isglob.
-    destruct (Genv.invert_symbol g2 b3) eqn:invsym.
-    + apply Genv.invert_find_symbol in invsym. apply HH in invsym.
-      
-      
-    /\
-            (forall b, isGlobalBlock ge b = true -> frgnBlocksSrc mu12' b = true)).
-      admit.    
-      destruct H0 as [A B].
-      apply B in isglob.
-      destruct A as [A1 [A2 A3]].
+    apply (meminj_preserves_globals_isGlobalBlock _ _ pglobals) in isglob.
+    apply WD23' in isglob. destruct isglob as [extS extT].
+    rewrite <- (as_inj_extBlocks _ _ _ _ WD23' map23) in extT.
+    rewrite <- (intern_incr_extBlocksSrc _ _ InjIncr23) in extT.
+    destruct GLUE as [GLUEloc GLUEext].
+    rewrite <- GLUEext in extT.
+    apply as_injD_None in map12'. destruct map12' as [extmap12 locmap12].
+    rewrite (intern_incr_extern _ _ InjIncr12) in extmap12.
+    rewrite (intern_incr_extBlocksTgt _ _ InjIncr12) in extT.
+    unfold as_inj, join in map12. rewrite extmap12 in map12.
+    apply WD12' in map12.
+    destruct map12 as [locS locT].
+    destruct WD12' as [disj_src disj_tgt _].
+    destruct (disj_tgt b2) as [theFalse | theFalse];
+    rewrite theFalse in * ; discriminate.
+  - assert (HH:as_inj mu12' b1 = Some (b2', d))
+      by (eapply INCR; auto).
+    rewrite HH in map12; inversion map12; subst.
+    eapply gsep23; eauto.}
 
-
-
-
-
-
-
-
-
-  
-  apply gsep_compose.  
-  solve [eapply gsep_domain_eq; eauto].
-  solve [auto].
-   
 split. unfold compose_sm; simpl.
          destruct mu12. destruct mu12'. destruct mu23. destruct mu23'.
          destruct INV' as [INVa' [INVb' [INVc' INVd']]].

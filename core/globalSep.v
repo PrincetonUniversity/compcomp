@@ -112,7 +112,7 @@ destruct (compose_meminjD_None _ _ _ locmap) as [locmap' | [b'' [ofs'' [locmap1 
   destruct SMWD1 as [disj_src _].
   destruct (disj_src b1) as [theFalse | theFalse]; rewrite theFalse in *; discriminate.
 Qed.  
-    
+    (*
 Lemma gsep_compose:
   forall {F V} (ge:  Genv.t F V) mu12 mu23 mu12' mu23',
     SM_wd mu12 ->
@@ -133,18 +133,18 @@ Lemma gsep_compose:
     destruct (isGlobalBlock ge b3) eqn:isglob; [ | reflexivity].
     assert (meminj_preserves_globals ge (extern_of mu12') /\
             (forall b, isGlobalBlock ge b = true -> frgnBlocksSrc mu12' b = true)).
-      admit.    
+      ad_it.    
       destruct H0 as [A B].
       apply B in isglob.
       destruct A as [A1 [A2 A3]].
       
-      admit.
+      ad_it.
   - assert (HH:as_inj mu12' b1 = Some (b2', d))
       by (eapply INCR; auto).
     rewrite HH in map1; inversion map1; subst.
     eapply gsep23; eauto.
 Qed.
-
+*)
 Lemma meminj_preserves_globals_extern_incr_separate {F V:Type} (ge: Genv.t F V) mu nu: 
   forall (INC: extern_incr mu nu)
          (PG: meminj_preserves_globals ge (as_inj mu))
