@@ -24,6 +24,8 @@ Require Import Relations.
 
 Require Import full_composition.
 
+
+
 Definition entrypoints_compose 
   (ep12 ep23 ep13 : list (val * val * signature)): Prop :=
   forall v1 v3 sig, In (v1,v3,sig) ep13 =
@@ -84,6 +86,10 @@ Lemma effcore_diagram_trans: forall
 (match_core23 : core_data23 -> SM_Injection -> C2 -> mem -> C3 -> mem -> Prop)
 (core_ord23 : core_data23 -> core_data23 -> Prop)
 (genvs_dom_eq23 : genvs_domain_eq g2 g3)
+(match_genv23 : 
+    forall d mu c1 m1 c2 m2 (MC :  match_core23 d mu c1 m1 c2 m2),
+    meminj_preserves_globals g2 (extern_of mu) /\
+    (forall b, isGlobalBlock g2 b = true -> frgnBlocksSrc mu b = true))
 (eff_diagram23 : forall (st1 : C2) (m1 : mem) (st1' : C2) (m1' : mem)
                    (U1 : block -> Z -> bool),
                  effstep Sem2 g2 U1 st1 m1 st1' m1' ->
@@ -240,6 +246,101 @@ Proof.
       globals_separate ge (compose_sm mu12 mu23) (compose_sm mu12' mu23').
     ad_it.
     Qed. *)
+Lemma compose_sm_as_injD_None:
+  forall (mu1 mu2 : SM_Injection) b1,
+       SM_wd mu1 ->
+       SM_wd mu2 ->
+    (locBlocksTgt mu1 = locBlocksSrc mu2 /\
+         extBlocksTgt mu1 = extBlocksSrc mu2) ->
+       as_inj (compose_sm mu1 mu2) b1 = None ->
+         as_inj mu1 b1 = None  \/
+         exists b2 d, (as_inj mu1 b1 = Some (b2, d) /\ as_inj mu2 b2 = None).
+Proof.
+intros mu1 mu2 b1 SMWD1 SMWD2 [GLUEloc GLUEext].
+unfold as_inj, join, compose_sm; simpl.
+destruct (Values.compose_meminj (extern_of mu1) (extern_of mu2) b1) as [[b2 delta]| ] eqn:extmap.
+discriminate.
+destruct (Values.compose_meminj (local_of mu1) (local_of mu2) b1) as [[b2 delta]| ] eqn:locmap.
+discriminate.
+intros tautology.
+destruct (compose_meminjD_None _ _ _ extmap) as [extmap' | [b' [ofs' [extmap1 extmap2]]]];
+destruct (compose_meminjD_None _ _ _ locmap) as [locmap' | [b'' [ofs'' [locmap1 locmap2]]]].
+- rewrite extmap'; simpl.  rewrite locmap'; auto.
+- rewrite extmap'; simpl. right.
+  exists b'', ofs''. split.  
+  + auto.
+  + destruct (extern_of mu2 b'') as [[b0 d]| ] eqn:extmap0.
+    * apply SMWD2 in extmap0. apply SMWD1 in locmap1.
+      destruct locmap1; destruct extmap0.
+      rewrite GLUEloc in *.
+      destruct SMWD2 as [disj_src _].
+      destruct (disj_src b'') as [theFalse | theFalse]; rewrite theFalse in *; discriminate.
+    * assumption.
+- rewrite extmap1; simpl. right.
+  exists b', ofs'. split.
+  + reflexivity.
+  + rewrite extmap2; simpl.
+    destruct (local_of mu2 b') as [[b0 d]| ] eqn:locmap0.
+    * apply SMWD2 in locmap0. apply SMWD1 in extmap1.
+      destruct extmap1; destruct locmap0.
+      rewrite GLUEext in *.
+      destruct SMWD2 as [disj_src _].
+      destruct (disj_src b') as [theFalse | theFalse]; rewrite theFalse in *; discriminate.
+    * assumption.
+- apply SMWD1 in extmap1; apply SMWD1 in locmap1.
+  destruct locmap1; destruct extmap1.
+  destruct SMWD1 as [disj_src _].
+  destruct (disj_src b1) as [theFalse | theFalse]; rewrite theFalse in *; discriminate.
+Qed.  
+
+
+
+
+
+apply (gsep_domain_eq _ _ g2 g3); try assumption.
+  
+  assert (WD12: SM_wd mu12) by (eapply match_sm_wd12; eauto).
+  assert (WD23: SM_wd mu23) by (eapply match_sm_wd23; eauto).
+  assert (WD12': SM_wd mu12') by (eapply match_sm_wd12; eauto).
+  assert (WD23': SM_wd mu23') by (eapply match_sm_wd23; eauto).
+    assert (HH: meminj_preserves_globals g2 (extern_of mu23')).
+    eapply match_genv23; eauto.
+  assert (INCR: Values.inject_incr (as_inj mu12) (as_inj mu12')) by (eapply intern_incr_as_inj; eauto).
+  assert (GLUE: (locBlocksTgt mu12 = locBlocksSrc mu23 /\
+           extBlocksTgt mu12 = extBlocksSrc mu23))
+    by (destruct INV' as [A [B ?]]; split; assumption).
+    assert (gsep12: globals_separate g2 mu12 mu12') by assumption.
+    assert (gsep23: globals_separate g2 mu23 mu23').
+    { eapply gsep_domain_eq. eauto.
+    apply genvs_domain_eq_sym; assumption. }
+    intros  b1 b3 d3 map13 map13'.
+    
+  destruct (compose_sm_as_injD _ _ _ _ _ map13' WD12' WD23') as [b2 [d1 [d2 [map1 [map2 extra]]]]].
+  destruct (compose_sm_as_injD_None _ _ _ WD12 WD23 GLUE map13) as [map12| [b2' [d [map12 map23]]]].
+  
+  - assert (isGlobalBlock g2 b2 = false).
+    eapply gsep12; eauto.
+    destruct (isGlobalBlock g2 b3) eqn:isglob; [ | reflexivity].
+    unfold isGlobalBlock in isglob; simpl in isglob.
+    destruct (Genv.invert_symbol g2 b3) eqn:invsym.
+    + apply Genv.invert_find_symbol in invsym. apply HH in invsym.
+      
+      
+    /\
+            (forall b, isGlobalBlock ge b = true -> frgnBlocksSrc mu12' b = true)).
+      admit.    
+      destruct H0 as [A B].
+      apply B in isglob.
+      destruct A as [A1 [A2 A3]].
+
+
+
+
+
+
+
+
+
   
   apply gsep_compose.  
   solve [eapply gsep_domain_eq; eauto].

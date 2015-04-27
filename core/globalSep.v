@@ -15,7 +15,7 @@ Require Import Globalenvs.
 Require Import structured_injections.
 Require Import reach.
 Require Import mem_lemmas.
-
+Require Import simulations_lemmas.
 
 Definition globals_separate {F V:Type} (ge: Genv.t F V) mu nu :=
     forall b1 b2 d, as_inj mu b1 = None ->
@@ -66,14 +66,84 @@ Lemma gsep_trans':
   eapply gsep_trans; eauto.
 Qed.
 
-
-(*Lemma gsep_compose:
+Lemma compose_sm_as_injD_None:
+  forall (mu1 mu2 : SM_Injection) b1,
+       SM_wd mu1 ->
+       SM_wd mu2 ->
+    (locBlocksTgt mu1 = locBlocksSrc mu2 /\
+         extBlocksTgt mu1 = extBlocksSrc mu2) ->
+       as_inj (compose_sm mu1 mu2) b1 = None ->
+         as_inj mu1 b1 = None  \/
+         exists b2 d, (as_inj mu1 b1 = Some (b2, d) /\ as_inj mu2 b2 = None).
+Proof.
+intros mu1 mu2 b1 SMWD1 SMWD2 [GLUEloc GLUEext].
+unfold as_inj, join, compose_sm; simpl.
+destruct (Values.compose_meminj (extern_of mu1) (extern_of mu2) b1) as [[b2 delta]| ] eqn:extmap.
+discriminate.
+destruct (Values.compose_meminj (local_of mu1) (local_of mu2) b1) as [[b2 delta]| ] eqn:locmap.
+discriminate.
+intros tautology.
+destruct (compose_meminjD_None _ _ _ extmap) as [extmap' | [b' [ofs' [extmap1 extmap2]]]];
+destruct (compose_meminjD_None _ _ _ locmap) as [locmap' | [b'' [ofs'' [locmap1 locmap2]]]].
+- rewrite extmap'; simpl.  rewrite locmap'; auto.
+- rewrite extmap'; simpl. right.
+  exists b'', ofs''. split.  
+  + auto.
+  + destruct (extern_of mu2 b'') as [[b0 d]| ] eqn:extmap0.
+    * apply SMWD2 in extmap0. apply SMWD1 in locmap1.
+      destruct locmap1; destruct extmap0.
+      rewrite GLUEloc in *.
+      destruct SMWD2 as [disj_src _].
+      destruct (disj_src b'') as [theFalse | theFalse]; rewrite theFalse in *; discriminate.
+    * assumption.
+- rewrite extmap1; simpl. right.
+  exists b', ofs'. split.
+  + reflexivity.
+  + rewrite extmap2; simpl.
+    destruct (local_of mu2 b') as [[b0 d]| ] eqn:locmap0.
+    * apply SMWD2 in locmap0. apply SMWD1 in extmap1.
+      destruct extmap1; destruct locmap0.
+      rewrite GLUEext in *.
+      destruct SMWD2 as [disj_src _].
+      destruct (disj_src b') as [theFalse | theFalse]; rewrite theFalse in *; discriminate.
+    * assumption.
+- apply SMWD1 in extmap1; apply SMWD1 in locmap1.
+  destruct locmap1; destruct extmap1.
+  destruct SMWD1 as [disj_src _].
+  destruct (disj_src b1) as [theFalse | theFalse]; rewrite theFalse in *; discriminate.
+Qed.  
+    
+Lemma gsep_compose:
   forall {F V} (ge:  Genv.t F V) mu12 mu23 mu12' mu23',
+    SM_wd mu12 ->
+    SM_wd mu23 ->
+    SM_wd mu12' ->
+    SM_wd mu23' ->
+    Values.inject_incr (as_inj mu12) (as_inj mu12') ->
+    (locBlocksTgt mu12 = locBlocksSrc mu23 /\
+         extBlocksTgt mu12 = extBlocksSrc mu23) ->
     globals_separate ge mu12 mu12' ->
     globals_separate ge mu23 mu23' ->
     globals_separate ge (compose_sm mu12 mu23) (compose_sm mu12' mu23').
-  ad_it.
-Qed.*)
+  intros ? ? ge mu12 mu23 mu12' mu23' WD12 WD23 WD12' WD23' INCR GLUE gsep12 gsep23 b1 b3 d3 map13 map13'.
+  destruct (compose_sm_as_injD _ _ _ _ _ map13' WD12' WD23') as [b2 [d1 [d2 [map1 [map2 extra]]]]].
+  destruct (compose_sm_as_injD_None _ _ _ WD12 WD23 GLUE map13) as [map12| [b2' [d [map12 map23]]]].
+  - assert (isGlobalBlock ge b2 = false).
+    eapply gsep12; eauto.
+    destruct (isGlobalBlock ge b3) eqn:isglob; [ | reflexivity].
+    assert (meminj_preserves_globals ge (extern_of mu12') /\
+            (forall b, isGlobalBlock ge b = true -> frgnBlocksSrc mu12' b = true)).
+      admit.    
+      destruct H0 as [A B].
+      apply B in isglob.
+      destruct A as [A1 [A2 A3]].
+      
+      admit.
+  - assert (HH:as_inj mu12' b1 = Some (b2', d))
+      by (eapply INCR; auto).
+    rewrite HH in map1; inversion map1; subst.
+    eapply gsep23; eauto.
+Qed.
 
 Lemma meminj_preserves_globals_extern_incr_separate {F V:Type} (ge: Genv.t F V) mu nu: 
   forall (INC: extern_incr mu nu)
