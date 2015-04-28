@@ -1303,7 +1303,8 @@ Proof.
   intros. inv H. eauto. 
 Qed.
 
-(*COMMENT: I'm suspicious about entry points. We might not need it.*)
+(*COMMENT: I'm suspicious about entry points. We might not need it.
+  COFRRECT: Not needed. Will remove. *)
 Definition entry_points_ok entrypoints:= 
   forall (v1 v2 : val) (sig : signature),
     In (v1, v2, sig) entrypoints -> 
@@ -1399,10 +1400,10 @@ Lemma MATCH_initial_core:
     (v : val) (vals1 : list val) (c1 : RTL_core) 
     (m1 : mem) (j : meminj) (vals2 : list val) (m2 : mem)
     (DomS DomT : block -> bool)
-    (R : list_norepet (map fst (prog_defs SrcProg)))
-    (entrypoints : list (val * val * signature))
-    (entry_ok : entry_points_ok entrypoints)
-    (init_mem : exists m0 : mem, Genv.init_mem SrcProg = Some m0)
+    (*R : list_norepet (map fst (prog_defs SrcProg))*)
+    (*entrypoints : list (val * val * signature)*)
+    (*entry_ok : entry_points_ok entrypoints*)
+    (*init_mem : exists m0 : mem, Genv.init_mem SrcProg = Some m0*)
     (Ini: initial_core (rtl_eff_sem hf) ge v vals1 = Some c1)
     (MINJ: Mem.inject j m1 m2)
     (VInj: Forall2 (val_inject j) vals1 vals2)
@@ -1414,6 +1415,8 @@ Lemma MATCH_initial_core:
     (InitMem : exists m0 : mem, Genv.init_mem SrcProg = Some m0 
                                 /\ Ple (Mem.nextblock m0) (Mem.nextblock m1)  (*Not needed/ Can remove just this one ineq*)
                                 /\ Ple (Mem.nextblock m0) (Mem.nextblock m2))
+    (GFI: globalfunction_ptr_inject ge j)
+    (GDE: genvs_domain_eq ge tge)
     (HDomS: forall b : block, DomS b = true -> Mem.valid_block m1 b)
     (HDomT: forall b : block, DomT b = true -> Mem.valid_block m2 b),
   exists c2 : RTL_core,
@@ -1491,12 +1494,12 @@ Proof.
     as [AA [BB [CC [DD [EE [FF GG]]]]]].
   remember (val_casted.val_has_type_list_func vals1 (sig_args (funsig (Internal f))) &&
                                               val_casted.vals_defined vals1) as vc.
-  destruct vc; inv H2. 
+  destruct vc; inv H2.
   split. 
   { specialize (Genv.find_funct_ptr_not_fresh SrcProg). intros FFP.
-    destruct init_mem as [m0 INIT_MEM].
+    (*destruct init_mem as [m0 INIT_MEM].
     specialize (FFP _ _ _ INIT_MEM Heqzz). 
-    destruct (valid_init_is_global _ R _ INIT_MEM _ FFP) as [id Hid].
+    destruct (valid_init_is_global _ R _ INIT_MEM _ FFP) as [id Hid].*)
     destruct (proj_sumbool
                 (zlt
                    match
@@ -1535,7 +1538,7 @@ Proof.
         intros [symb ID].
         split. apply REACH_nil. rewrite (find_symbol_isGlobal _ _ _ ID). 
         trivial.
-        apply joinI. left. solve[eapply A; eauto].
+        apply joinI. left. eapply B.
         eapply valid_init_is_global; eauto. }
       { (*IMAGE*)
         unfold as_inj; simpl.
@@ -3720,10 +3723,10 @@ Qed.
 
 (** ** Behold the theorem *)
 Theorem transl_program_correct:
-  forall (R: list_norepet (map fst (prog_defs SrcProg)))
-         (entrypoints : list (val * val * signature))
-         (entry_ok : entry_points_ok entrypoints)
-         (init_mem: exists m0, Genv.init_mem SrcProg = Some m0),
+  forall (*R: list_norepet (map fst (prog_defs SrcProg))*)
+         (*entrypoints : list (val * val * signature)*)
+         (*entry_ok : entry_points_ok entrypoints*)
+         (*init_mem: exists m0, Genv.init_mem SrcProg = Some m0*),
     SM_simulation.SM_simulation_inject (rtl_eff_sem hf)
                                        (rtl_eff_sem hf) ge tge.
   intros.
