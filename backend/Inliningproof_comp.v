@@ -29,8 +29,15 @@ Require Import RTL_coop.
 Require Import RTL_eff.
 
 (*Load Santiago_tactics.*)
+Ltac open_Hyp:= match goal with
+                     | [H: and _ _ |- _] => destruct H
+                     | [H: exists _, _ |- _] => destruct H
+                 end.
 
 (* The rewriters *)
+Section PRESERVATION.
+
+
 Hint Rewrite vis_restrict_sm: restrict.
 Hint Rewrite restrict_sm_all: restrict.
 Hint Rewrite restrict_sm_frgnBlocksSrc: restrict.
@@ -1890,7 +1897,6 @@ Section MS_RSI. (* Match Stacks: restricted Structured injections*)
 End MS_RSI.
 
 (* OLD PROOF
-(** ** Behold the theorem *)
 Theorem transl_program_correct:
   forall (R: list_norepet (map fst (prog_defs SrcProg)))
          (entrypoints : list (val * val * signature))
@@ -2709,6 +2715,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
                                 exists (mu' : SM_Injection),
                                   intern_incr mu mu' /\
                                   (*sm_inject_separated mu mu' m1 m2 /\*)
+                                  globals_separate ge mu mu' /\
                                   sm_locally_allocated mu mu' m1 m2 m1' m2' /\
                                   MATCH st1' mu' st1' m1' st2' m2'.
   intros.
@@ -2730,6 +2737,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
   exists mu.
   intuition.
 
+  apply gsep_refl.
   loc_alloc_solve.
   unfold MATCH.
   intuition.
@@ -2761,6 +2769,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
   econstructor; eauto. 
   split; auto.
   intuition.
+  apply gsep_refl.
   loc_alloc_solve.
   unfold MATCH.
   intuition.
@@ -2792,6 +2801,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
 
   exists mu.
   intuition.
+  apply gsep_refl.
   loc_alloc_solve.
   unfold MATCH;
     intuition.
@@ -2844,6 +2854,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
 
   exists mu.
   intuition.
+  apply gsep_refl.
   loc_alloc_solve.
 
   destruct a; simpl in H1; try discriminate.
@@ -2909,6 +2920,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
   
   exists mu.
   intuition.
+  apply gsep_refl.
   loc_alloc_solve.
 
   unfold MATCH.
@@ -2936,6 +2948,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
   
   exists mu.
   intuition.
+  apply gsep_refl.
   loc_alloc_solve.
 
   unfold MATCH;
@@ -2996,6 +3009,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
   
   exists mu.
   intuition.
+  apply gsep_refl.
   loc_alloc_solve.
   
   assert (Mem.inject (as_inj mu) m1' m2').
@@ -3052,6 +3066,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
   
   exists mu.
   intuition.
+  apply gsep_refl.
   loc_alloc_solve.
 
   unfold MATCH.
@@ -3089,6 +3104,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
 
   exists mu.
   intuition.
+  apply gsep_refl.
   loc_alloc_solve.
 
   unfold MATCH;
@@ -3125,7 +3141,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
       try eapply H1; try eassumption.
     apply symbols_preserved. 
     intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
-                                                          [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
+                                                          [INCR [SEPARATED [GSEP [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]]].
     exists (RTL_State stk' f' (Vptr sp' Int.zero) (spc ctx pc')
                       (rs'#(sreg ctx res) <- vres')), tm'.
     split. eexists.
@@ -3198,6 +3214,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
   apply Empty_Effect_implication.
 
   exists mu. intuition.
+  apply gsep_refl.
   loc_alloc_solve.
 
   unfold MATCH.
@@ -3220,6 +3237,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
   apply Empty_Effect_implication.
   
   exists mu. intuition.
+  apply gsep_refl.
   loc_alloc_solve.
 
   unfold MATCH.
@@ -3263,6 +3281,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
 
   exists mu.
   intuition.
+  apply gsep_refl.
   loc_alloc_solve.
 
   unfold MATCH;
@@ -3322,6 +3341,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
   
   exists mu.
   intuition.
+  apply gsep_refl.
   loc_alloc_solve. 
   
   unfold MATCH;
@@ -3369,7 +3389,8 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
   rewrite H5.
   exists mu'. 
   intuition.
-
+  eapply intern_incr_globals_separate; eauto.
+  
   unfold MATCH; intuition.
   unfold globals_separate.
   rewrite H6.
@@ -3500,10 +3521,12 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
   apply Empty_Effect_implication.
 
   exists mu'; intuition.
+  eapply intern_incr_globals_separate; eauto.
 
   (*First SEP*)
 
   unfold MATCH; intuition.
+  
   constructor; eauto.
   assert (SM_wd (restrict_sm mu (vis mu))).
   apply restrict_sm_WD; auto.
@@ -3547,7 +3570,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
       try eapply H0; try eassumption.
     apply symbols_preserved. 
     intros [mu' [vres' [tm' [EC [RESINJ [MINJ' [UNMAPPED [OUTOFREACH 
-                                                            [INCR [SEPARATED [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]].
+                                                            [INCR [SEPARATED [GSEP [LOCALLOC [WD' [VAL' RC']]]]]]]]]]]]]].
     eexists; eexists. 
     split. eexists.
     split. left. 
@@ -3607,6 +3630,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
   apply Empty_Effect_implication.
 
   exists mu. intuition.
+  apply gsep_refl.
   loc_alloc_solve.
 
   unfold MATCH; intuition.
@@ -3626,6 +3650,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
   apply Empty_Effect_implication.
 
   exists mu. intuition.
+  apply gsep_refl.
   loc_alloc_solve.
 
 
@@ -3660,6 +3685,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
   apply Empty_Effect_implication.
 
   exists mu. intuition.
+  apply gsep_refl.
   loc_alloc_solve.
 
   unfold MATCH; intuition.
@@ -3678,6 +3704,8 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
   apply Empty_Effect_implication.
 
   exists mu. intuition.
+  eapply intern_incr_globals_separate; eauto.
+  
   apply sm_locally_allocatedChar.
   repeat split; extensionality b0;
   rewrite freshloc_irrefl;
@@ -3700,7 +3728,7 @@ Theorem transl_program_correct:
                                        (rtl_eff_sem hf) ge tge.
   intros.
 
-  eapply effect_simulations_lemmas.inj_simulation_star with (match_states:= MATCH)(measure:= RTL_measure); eauto with trans_correct.
+  eapply simulations_lemmas.inj_simulation_star with (match_states:= MATCH)(measure:= RTL_measure); eauto with trans_correct.
   
   (*Initial Core*)
   intros; eapply MATCH_initial_core; eauto.
@@ -3729,7 +3757,7 @@ Theorem transl_program_correct:
     apply A in H2.
     assert (Mem.valid_block m1 (Mem.nextblock m1)).
     eapply Mem.valid_block_inject_1; eauto.
-    clear - H7; unfold Mem.valid_block in H7.
+    clear - H8; unfold Mem.valid_block in H8.
     xomega.
 
     destruct (P (Mem.nextblock m0) (Mem.nextblock m2)); auto.
@@ -3738,7 +3766,7 @@ Theorem transl_program_correct:
     apply A in H2.
     assert (Mem.valid_block m2 (Mem.nextblock m2)).
     eapply Mem.valid_block_inject_2; eauto.
-    clear - H7; unfold Mem.valid_block in H7.
+    clear - H8; unfold Mem.valid_block in H8.
     xomega.
     
     intros b LT.    
@@ -3755,3 +3783,5 @@ Theorem transl_program_correct:
    exists st2', m2', mu'.
    intuition; exists U2;intuition. }
 Qed.
+
+End PRESERVATION.

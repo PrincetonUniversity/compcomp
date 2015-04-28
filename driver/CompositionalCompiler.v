@@ -104,6 +104,7 @@ Definition transf_rtl_program (f: RTL.program) : res Asm_comp.program :=
    @@ print print_RTL
    @@ Tailcall.transf_program
    @@ print print_RTL_tailcall
+   @@@ Inlining.transf_program
    @@ Renumber.transf_program
   @@@ Allocation.transf_program
    @@ print print_LTL
@@ -263,21 +264,26 @@ Proof.
   repeat rewrite compose_print_identity in H.
   simpl in H. 
   set (p1 := Tailcall.transf_program p) in *.
-  set (p2 := Renumber.transf_program p1) in *.
-  destruct (Allocation.transf_program p2) as [p3|] eqn:?; simpl in H; try discriminate.
-  set (p4 := Tunneling.tunnel_program p3) in *.
-  destruct (Linearize.transf_program p4) as [p5|] eqn:?; simpl in H; try discriminate.
-  set (p6 := CleanupLabels.transf_program p5) in *.
-  destruct (Stacking.transf_program p6) as [p7|] eqn:?; simpl in H; try discriminate.
+  destruct (Inlining.transf_program p1) as [p2|] eqn:?; simpl in H; try discriminate.
+  set (p3 := Renumber.transf_program p2) in *.
+  destruct (Allocation.transf_program p3) as [p4|] eqn:?; simpl in H; try discriminate.
+  set (p5 := Tunneling.tunnel_program p4) in *.
+  destruct (Linearize.transf_program p5) as [p6|] eqn:?; simpl in H; try discriminate.
+  set (p7 := CleanupLabels.transf_program p6) in *.
+  destruct (Stacking.transf_program p7) as [p8|] eqn:?; simpl in H; try discriminate.
   eapply eff_sim_trans.
     eapply Tailcallproof_comp.transl_program_correct. 
   eapply TransformLNR in LNR.
+  eapply eff_sim_trans.
+    eapply Inliningproof_comp.transl_program_correct; eauto.
+
+    eapply TransformLNR in LNR.
   eapply eff_sim_trans.
     eapply Renumberproof_comp.transl_program_correct.
   eapply TransformLNR in LNR.
   eapply eff_sim_trans.
     eapply Allocproof_comp.transl_program_correct.
-    instantiate (1:=p3). auto.
+    instantiate (1:=p4). auto.
   eapply TransformLNR_partial in LNR. 2: eauto.
   eapply eff_sim_trans.
     eapply Tunnelingproof_comp.transl_program_correct.
