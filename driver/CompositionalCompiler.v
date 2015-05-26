@@ -42,6 +42,7 @@ Require RTLgen.
 Require Tailcall.
 Require Inlining.
 Require Renumber.
+Require CSE.
 Require Allocation.
 Require Tunneling.
 Require Linearize.
@@ -58,6 +59,7 @@ Require RTLgenproof_comp.
 Require Tailcallproof_comp.
 Require Inliningproof_comp.
 Require Renumberproof_comp.
+Require CSEproof_comp.
 Require Allocproof_comp.
 Require Tunnelingproof_comp.
 Require Linearizeproof_comp.
@@ -106,6 +108,7 @@ Definition transf_rtl_program (f: RTL.program) : res Asm_comp.program :=
    @@ print print_RTL_tailcall
    @@@ Inlining.transf_program
    @@ Renumber.transf_program
+  @@@ CSE.transf_program
   @@@ Allocation.transf_program
    @@ print print_LTL
    @@ Tunneling.tunnel_program
@@ -266,11 +269,12 @@ Proof.
   set (p1 := Tailcall.transf_program p) in *.
   destruct (Inlining.transf_program p1) as [p2|] eqn:?; simpl in H; try discriminate.
   set (p3 := Renumber.transf_program p2) in *.
-  destruct (Allocation.transf_program p3) as [p4|] eqn:?; simpl in H; try discriminate.
-  set (p5 := Tunneling.tunnel_program p4) in *.
-  destruct (Linearize.transf_program p5) as [p6|] eqn:?; simpl in H; try discriminate.
-  set (p7 := CleanupLabels.transf_program p6) in *.
-  destruct (Stacking.transf_program p7) as [p8|] eqn:?; simpl in H; try discriminate.
+  destruct (CSE.transf_program p3) as [p4|] eqn:?; simpl in H; try discriminate.
+  destruct (Allocation.transf_program p4) as [p5|] eqn:?; simpl in H; try discriminate.
+  set (p6 := Tunneling.tunnel_program p5) in *.
+  destruct (Linearize.transf_program p6) as [p7|] eqn:?; simpl in H; try discriminate.
+  set (p8 := CleanupLabels.transf_program p7) in *.
+  destruct (Stacking.transf_program p8) as [p9|] eqn:?; simpl in H; try discriminate.
   eapply eff_sim_trans.
     eapply Tailcallproof_comp.transl_program_correct. 
   eapply TransformLNR in LNR.
@@ -278,32 +282,35 @@ Proof.
     eapply Inliningproof_comp.transl_program_correct.
     unfold p1 in Heqr. exact Heqr.
     apply LNR.  
-  eapply TransformLNR_partial in LNR.  2: eauto.
+  eapply TransformLNR_partial with (q:=p2) in LNR.  2: eauto.
   eapply eff_sim_trans.
   eapply Renumberproof_comp.transl_program_correct.
-  eapply TransformLNR in LNR.
+  eapply eff_sim_trans.
+    eapply CSEproof_comp.transl_program_correct.
+    unfold p3 in Heqr0. exact Heqr0.
   eapply eff_sim_trans.
     eapply Allocproof_comp.transl_program_correct.
-    instantiate (1:=p4). auto.
-    eapply TransformLNR_partial in LNR.  2: eauto.
+    instantiate (1:=p5). auto. 
   eapply eff_sim_trans.
     eapply Tunnelingproof_comp.transl_program_correct.
-  eapply TransformLNR in LNR. 
   eapply eff_sim_trans.
     eapply Linearizeproof_comp.transl_program_correct. 
     eassumption. 
-  eapply TransformLNR_partial in LNR. 2: eauto.
   eapply eff_sim_trans.
     eapply CleanupLabelsproof_comp.transl_program_correct.
-    eapply TransformLNR in LNR.
   eapply eff_sim_trans.
   eapply Stackingproof_comp.transl_program_correct.
   
     eexact Asmgenproof_comp.return_address_exists. eassumption.
-    eassumption. 
+    eapply TransformLNR. 
+    eapply TransformLNR_partial. 2: eassumption. 
+    eapply TransformLNR. 
+    eapply TransformLNR_partial. 2: eassumption. 
+    eapply TransformLNR_partial. 2: eassumption. 
+    eapply TransformLNR.  assumption.
+
     apply Asmgenproof_comp.transl_program_correct. 
     eassumption.
-    
 Qed.
 
 (** Prove the existence of a structured simulation between Cminor and Asm, 
@@ -388,25 +395,26 @@ Proof.
   set (p1 := Tailcall.transf_program p) in *.
   destruct (Inlining.transf_program p1) as [p2|] eqn:?; simpl in H; try discriminate.
   set (p3 := Renumber.transf_program p2) in *.
-  destruct (Allocation.transf_program p3) as [p4|] eqn:?; simpl in H; try discriminate.
-  set (p5 := Tunneling.tunnel_program p4) in *.
-  destruct (Linearize.transf_program p5) as [p6|] eqn:?; simpl in H; try discriminate.
-  set (p7 := CleanupLabels.transf_program p6) in *.
-  destruct (Stacking.transf_program p7) as [p8|] eqn:?; simpl in H; try discriminate.
+  destruct (CSE.transf_program p3) as [p4|] eqn:?; simpl in H; try discriminate.
+  destruct (Allocation.transf_program p4) as [p5|] eqn:?; simpl in H; try discriminate.
+  set (p6 := Tunneling.tunnel_program p5) in *.
+  destruct (Linearize.transf_program p6) as [p7|] eqn:?; simpl in H; try discriminate.
+  set (p8 := CleanupLabels.transf_program p7) in *.
+  destruct (Stacking.transf_program p8) as [p9|] eqn:?; simpl in H; try discriminate.
   
-  generalize (Tailcallproof_comp.symbols_preserved p s); intro Heqr7.
-  apply Inliningproof_comp.symbols_preserved with (s:=s) in Heqr.
-  generalize (Renumberproof_comp.symbols_preserved p2 s); intro Heqr5.
-  apply Allocproof_comp.symbols_preserved with (s:=s) in Heqr0.
-  generalize (Tunnelingproof_comp.symbols_preserved p4 s); intro Heqr4.
-  apply Linearizeproof_comp.symbols_preserved with (id:=s) in Heqr1.
-  generalize (CleanupLabelsproof_comp.symbols_preserved p6 s); intro Heqr3.
-  apply Stackingproof_comp.symbols_preserved with (id:=s) in Heqr2.
-  apply Asmgenproof_comp.symbols_preserved with (id:=s) in H.
-  rewrite H, Heqr2; unfold p7; rewrite Heqr3, Heqr1. 
-  unfold p5; rewrite Heqr4. rewrite Heqr0.
-  unfold p3; rewrite Heqr5; unfold p1; rewrite Heqr; auto.
-
+  rewrite <- (Tailcallproof_comp.symbols_preserved p s).
+  unfold p1 in *.
+  erewrite <- (Inliningproof_comp.symbols_preserved); try eauto. clear Heqr.
+  erewrite <- (Renumberproof_comp.symbols_preserved); try eauto.
+  unfold p3 in *.
+  erewrite <- (CSEproof_comp.symbols_preserved); try eauto. clear Heqr0.
+  erewrite <- (Allocproof_comp.symbols_preserved); try eauto. clear Heqr1.
+  unfold p6 in *.
+  erewrite <- (Tunnelingproof_comp.symbols_preserved); try eauto.
+  erewrite <- (Linearizeproof_comp.symbols_preserved); try eauto. clear Heqr2.
+  erewrite <- (CleanupLabelsproof_comp.symbols_preserved); try eauto.
+  erewrite <- (Stackingproof_comp.symbols_preserved); try eauto. 
+  erewrite <- (Asmgenproof_comp.symbols_preserved); try eauto. 
 Qed.
 
 Theorem transf_cminor_program_preserves_syms:

@@ -1187,140 +1187,6 @@ Qed.
 
 (*NEW*) Variable hf : I64Helpers.helper_functions.
 
-Lemma MATCH_initial: forall v 
-  (vals1 : list val) c1 (m1 : mem) (j : meminj)
-  (vals2 : list val) (m2 : mem) (DomS DomT : Values.block -> bool)
-  (Ini : initial_core (rtl_eff_sem hf) ge v vals1 = Some c1)
-  (Inj: Mem.inject j m1 m2)
-  (VInj: Forall2 (val_inject j) vals1 vals2)
-  (PG: meminj_preserves_globals ge j)
-  (R : list_norepet (map fst (prog_defs prog)))
-  (J: forall b1 b2 d, j b1 = Some (b2, d) -> 
-                      DomS b1 = true /\ DomT b2 = true)
-  (RCH: forall b, REACH m2
-        (fun b' : Values.block => isGlobalBlock tge b' || getBlocks vals2 b') b =
-         true -> DomT b = true)
-  (InitMem : exists m0 : mem, Genv.init_mem prog = Some m0 
-      /\ Ple (Mem.nextblock m0) (Mem.nextblock m1) 
-      /\ Ple (Mem.nextblock m0) (Mem.nextblock m2))
-  (GDE: genvs_domain_eq ge tge)
-  (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
-  (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
-exists c2,
-  initial_core (rtl_eff_sem hf) tge v vals2 = Some c2 /\
-  MATCH
-    (initial_SM DomS DomT
-       (REACH m1
-          (fun b : Values.block => isGlobalBlock ge b || getBlocks vals1 b))
-       (REACH m2
-          (fun b : Values.block => isGlobalBlock tge b || getBlocks vals2 b))
-       j) c1 m1 c2 m2.
-Proof.
-intros.
-  inversion Ini.
-  unfold RTL_initial_core in H0. unfold ge in *. unfold tge in *.
-  destruct v; inv H0.
-  remember (Int.eq_dec i Int.zero) as z; destruct z; inv H1. clear Heqz.
-  remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz; inv H0. 
-    apply eq_sym in Heqzz.
-  destruct f; try discriminate.
-  case_eq (val_casted.val_has_type_list_func vals1 
-            (sig_args (funsig (Internal f))) 
-           && val_casted.vals_defined vals1).
-  2: solve[intros H2; rewrite H2 in H1; inv H1].
-  intros H2; rewrite H2 in H1. 
-
-  simpl; revert H1; case_eq 
-    (zlt (match match Zlength vals1 with 0%Z => 0%Z
-                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
-                     end
-               with 0%Z => 0%Z
-                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
-               end) Int.max_unsigned).
-  intros l _.
-  2: solve[inversion 2].
-
-  simpl. inversion 1. inv H1. clear H3.
-  exploit funct_ptr_translated; eauto. intros [tf [FP TF]].
-    unfold tge in FP. rewrite FP. (*monadInv TF. *)
-    unfold rtl_eff_sem, rtl_coop_sem. simpl.
-    case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
-
-  assert (Zlength vals2 = Zlength vals1) as ->. 
-  { apply forall_inject_val_list_inject in VInj. clear - VInj. 
-    induction VInj; auto. rewrite !Zlength_cons, IHVInj; auto. }
-  unfold transf_fundef in TF. simpl in TF. 
-(*  change (fn_sig (transf_function f)) with (funsig (Internal x)).*)
-  assert (val_casted.val_has_type_list_func vals2
-          (sig_args (funsig tf)) =true) as ->.
-  { eapply val_casted.val_list_inject_hastype; eauto.
-    eapply forall_inject_val_list_inject; eauto.
-    destruct (val_casted.vals_defined vals1); auto.
-    rewrite andb_comm in H2; simpl in H2. solve[inv H2].
-    assert (sig_args (funsig tf)
-          = sig_args (funsig (Internal f))) as ->.
-    { specialize (sig_preserved (Internal f)). simpl. intros. 
-      rewrite (H0 _ TF). reflexivity. }
-    destruct (val_casted.val_has_type_list_func vals1
-      (sig_args (funsig (Internal f)))); auto. }
-
-  assert (val_casted.vals_defined vals2=true) as ->.
-  { eapply val_casted.val_list_inject_defined.
-    eapply forall_inject_val_list_inject; eauto.
-    destruct (val_casted.vals_defined vals1); auto.
-    rewrite andb_comm in H2; inv H2. }
-
-  simpl. monadInv TF. eexists; split. 
-  simpl; revert H1; case_eq 
-    (zlt (match match Zlength vals1 with 0%Z => 0%Z
-                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
-                     end
-               with 0%Z => 0%Z
-                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
-               end) Int.max_unsigned).
-  solve[simpl; auto].
-  intros CONTRA. solve[elimtype False; auto].
-  2: intros CONTRA; solve[elimtype False; auto].
-
-  clear e e0.
-  destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
-     VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
-    as [AA [BB [CC [DD [EE [FF GG]]]]]].
-  remember (val_casted.val_has_type_list_func vals1 (sig_args (funsig (Internal f))) &&
-         val_casted.vals_defined vals1) as vc.
-  destruct vc; inv H2. 
-  split. simpl.
-    eapply match_states_call; try eassumption.
-      econstructor. 
-      apply eq_sym in Heqvc. apply andb_true_iff in Heqvc. 
-        apply val_casted.val_has_type_list_func_charact. 
-        apply Heqvc. 
-      unfold transf_fundef, transf_partial_fundef, bind.
-        rewrite EQ. trivial. 
-      unfold vis, initial_SM; simpl.
-        eapply val_list_inject_incr.
-          Focus 2. apply forall_inject_val_list_inject.
-                    eapply restrict_forall_vals_inject; try eassumption.
-          intros bb Hbb. apply Hbb.
-          red; intros. destruct (restrictD_Some _ _ _ _ _ H2). 
-            apply restrictI_Some. 
-              unfold as_inj; simpl. apply joinI. left. 
-                apply restrictI_Some.  assumption. 
-                apply REACH_nil. rewrite H4; intuition.
-              apply REACH_nil. rewrite H4; intuition.
-  rewrite initial_SM_as_inj.
-  intuition.
-    (*as in selectionproofEFF*)
-      red; intros. specialize (Genv.find_funct_ptr_not_fresh prog). intros.
-         destruct InitMem as [m0 [INIT_MEM [? ?]]].
-         specialize (H3 _ _ _ INIT_MEM H2). 
-         destruct (valid_init_is_global _ R _ INIT_MEM _ H3) as [id Hid]. 
-           destruct PG as [PGa [PGb PGc]]. split. eapply PGa; eassumption.
-         unfold isGlobalBlock. 
-          apply orb_true_iff. left. apply genv2blocksBool_char1.
-            simpl. exists id; eassumption.
- Qed. 
-
 Lemma MATCH_atExternal: forall (mu : SM_Injection) (c1 : RTL_core) (m1 : mem) (c2 : RTL_core)
   (m2 : mem) (e : external_function) (vals1 : list val) (ef_sig : signature),
 MATCH mu c1 m1 c2 m2 ->
@@ -1722,8 +1588,7 @@ Lemma MATCH_effcore_diagram:
   forall st1 m1 st1' m1' (U1 : block -> Z -> bool)
       (CS: effstep (rtl_eff_sem hf) ge U1 st1 m1 st1' m1')
       st2 mu m2 
-      (MTCH: MATCH mu st1 m1 st2 m2)
-      (LNR: list_norepet (map fst (prog_defs prog))),
+      (MTCH: MATCH mu st1 m1 st2 m2),
   exists st2' m2' (U2 : block -> Z -> bool),
      effstep (rtl_eff_sem hf) tge U2 st2 m2 st2' m2' 
   /\ exists mu',
@@ -2404,9 +2269,129 @@ induction CS;
     eapply regset_set; assumption. }
 Qed.
 
-Theorem transl_program_correct:
-  forall (LNR: list_norepet (map fst (prog_defs prog)))
-         (init_mem: exists m0, Genv.init_mem prog = Some m0),
+Lemma MATCH_initial: forall v 
+  (vals1 : list val) c1 (m1 : mem) (j : meminj)
+  (vals2 : list val) (m2 : mem) (DomS DomT : Values.block -> bool)
+  (Ini : initial_core (rtl_eff_sem hf) ge v vals1 = Some c1)
+  (Inj: Mem.inject j m1 m2)
+  (VInj: Forall2 (val_inject j) vals1 vals2)
+  (PG: meminj_preserves_globals ge j)
+  (J: forall b1 b2 d, j b1 = Some (b2, d) -> 
+                      DomS b1 = true /\ DomT b2 = true)
+  (RCH: forall b, REACH m2
+        (fun b' : Values.block => isGlobalBlock tge b' || getBlocks vals2 b') b =
+         true -> DomT b = true)
+  (GFI: globalfunction_ptr_inject ge j)
+  (GDE: genvs_domain_eq ge tge)
+  (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
+  (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
+exists c2,
+  initial_core (rtl_eff_sem hf) tge v vals2 = Some c2 /\
+  MATCH
+    (initial_SM DomS DomT
+       (REACH m1
+          (fun b : Values.block => isGlobalBlock ge b || getBlocks vals1 b))
+       (REACH m2
+          (fun b : Values.block => isGlobalBlock tge b || getBlocks vals2 b))
+       j) c1 m1 c2 m2.
+Proof.
+intros.
+  inversion Ini.
+  unfold RTL_initial_core in H0. unfold ge in *. unfold tge in *.
+  destruct v; inv H0.
+  remember (Int.eq_dec i Int.zero) as z; destruct z; inv H1. clear Heqz.
+  remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz; inv H0. 
+    apply eq_sym in Heqzz.
+  destruct f; try discriminate.
+  case_eq (val_casted.val_has_type_list_func vals1 
+            (sig_args (funsig (Internal f))) 
+           && val_casted.vals_defined vals1).
+  2: solve[intros H2; rewrite H2 in H1; inv H1].
+  intros H2; rewrite H2 in H1. 
+
+  simpl; revert H1; case_eq 
+    (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0%Z => 0%Z
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
+  intros l _.
+  2: solve[inversion 2].
+
+  simpl. inversion 1. inv H1. clear H3.
+  exploit funct_ptr_translated; eauto. intros [tf [FP TF]].
+    unfold tge in FP. rewrite FP. (*monadInv TF. *)
+    unfold rtl_eff_sem, rtl_coop_sem. simpl.
+    case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
+
+  assert (Zlength vals2 = Zlength vals1) as ->. 
+  { apply forall_inject_val_list_inject in VInj. clear - VInj. 
+    induction VInj; auto. rewrite !Zlength_cons, IHVInj; auto. }
+  unfold transf_fundef in TF. simpl in TF. 
+(*  change (fn_sig (transf_function f)) with (funsig (Internal x)).*)
+  assert (val_casted.val_has_type_list_func vals2
+          (sig_args (funsig tf)) =true) as ->.
+  { eapply val_casted.val_list_inject_hastype; eauto.
+    eapply forall_inject_val_list_inject; eauto.
+    destruct (val_casted.vals_defined vals1); auto.
+    rewrite andb_comm in H2; simpl in H2. solve[inv H2].
+    assert (sig_args (funsig tf)
+          = sig_args (funsig (Internal f))) as ->.
+    { specialize (sig_preserved (Internal f)). simpl. intros. 
+      rewrite (H0 _ TF). reflexivity. }
+    destruct (val_casted.val_has_type_list_func vals1
+      (sig_args (funsig (Internal f)))); auto. }
+
+  assert (val_casted.vals_defined vals2=true) as ->.
+  { eapply val_casted.val_list_inject_defined.
+    eapply forall_inject_val_list_inject; eauto.
+    destruct (val_casted.vals_defined vals1); auto.
+    rewrite andb_comm in H2; inv H2. }
+
+  simpl. monadInv TF. eexists; split. 
+  simpl; revert H1; case_eq 
+    (zlt (match match Zlength vals1 with 0%Z => 0%Z
+                      | Z.pos y' => Z.pos y'~0 | Z.neg y' => Z.neg y'~0
+                     end
+               with 0%Z => 0%Z
+                 | Z.pos y' => Z.pos y'~0~0 | Z.neg y' => Z.neg y'~0~0
+               end) Int.max_unsigned).
+  solve[simpl; auto].
+  intros CONTRA. solve[elimtype False; auto].
+  2: intros CONTRA; solve[elimtype False; auto].
+
+  clear e e0.
+  destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
+     VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
+    as [AA [BB [CC [DD [EE [FF GG]]]]]].
+  remember (val_casted.val_has_type_list_func vals1 (sig_args (funsig (Internal f))) &&
+         val_casted.vals_defined vals1) as vc.
+  destruct vc; inv H2. 
+  split. simpl.
+    eapply match_states_call; try eassumption.
+      econstructor. 
+      apply eq_sym in Heqvc. apply andb_true_iff in Heqvc. 
+        apply val_casted.val_has_type_list_func_charact. 
+        apply Heqvc. 
+      unfold transf_fundef, transf_partial_fundef, bind.
+        rewrite EQ. trivial. 
+      unfold vis, initial_SM; simpl.
+        eapply val_list_inject_incr.
+          Focus 2. apply forall_inject_val_list_inject.
+                    eapply restrict_forall_vals_inject; try eassumption.
+          intros bb Hbb. apply Hbb.
+          red; intros. destruct (restrictD_Some _ _ _ _ _ H2). 
+            apply restrictI_Some. 
+              unfold as_inj; simpl. apply joinI. left. 
+                apply restrictI_Some.  assumption. 
+                apply REACH_nil. rewrite H4; intuition.
+              apply REACH_nil. rewrite H4; intuition.
+  rewrite initial_SM_as_inj.
+  intuition.
+ Qed. 
+
+Theorem transl_program_correct: 
 SM_simulation.SM_simulation_inject (rtl_eff_sem hf)
   (rtl_eff_sem hf) ge tge.
 Proof.
@@ -2429,50 +2414,7 @@ assert (GDE:= GDE_lemma).
   intros x. eapply MATCH_PG. 
 (*initial_core*)
   { intros.
-    eapply (MATCH_initial _ _ _); eauto.
-    destruct init_mem as [m0 INIT].
-    exists m0; split; auto.
-    unfold meminj_preserves_globals in H2.    
-    destruct H2 as [A [B C]].
-
-    assert (P: forall p q, {Ple p q} + {Plt q p}).
-      intros p q.
-      case_eq (Pos.leb p q).
-      intros TRUE.
-      apply Pos.leb_le in TRUE.
-      left; auto.
-      intros FALSE.
-      apply Pos.leb_gt in FALSE.
-      right; auto.
-
-    cut (forall b, Plt b (Mem.nextblock m0) -> 
-           exists id, Genv.find_symbol ge id = Some b). intro D.
-    
-    split.
-    destruct (P (Mem.nextblock m0) (Mem.nextblock m1)); auto.
-    exfalso. 
-    destruct (D _ p).
-    apply A in H2.
-    assert (Mem.valid_block m1 (Mem.nextblock m1)).
-      eapply Mem.valid_block_inject_1; eauto.
-    clear - H8; unfold Mem.valid_block in H8.
-    xomega.
-
-    destruct (P (Mem.nextblock m0) (Mem.nextblock m2)); auto.
-    exfalso. 
-    destruct (D _ p).
-    apply A in H2.
-    assert (Mem.valid_block m2 (Mem.nextblock m2)).
-      eapply Mem.valid_block_inject_2; eauto.
-    clear - H8; unfold Mem.valid_block in H8.
-    xomega.
-    
-    intros b LT.    
-    unfold ge. 
-    apply valid_init_is_global with (b0 := b) in INIT.
-    eapply INIT; auto.
-    apply LNR.
-    apply LT. }
+    eapply (MATCH_initial _ _ _); eauto. }
 (*halted*) 
   { intros. destruct H as [MC [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]]. 
     destruct c1; inv H0. destruct stack; inv H1.
