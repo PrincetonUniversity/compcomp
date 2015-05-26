@@ -275,16 +275,17 @@ Proof.
     eapply Tailcallproof_comp.transl_program_correct. 
   eapply TransformLNR in LNR.
   eapply eff_sim_trans.
-    eapply Inliningproof_comp.transl_program_correct; eauto.
-
-    eapply TransformLNR in LNR.
+    eapply Inliningproof_comp.transl_program_correct.
+    unfold p1 in Heqr. exact Heqr.
+    apply LNR.  
+  eapply TransformLNR_partial in LNR.  2: eauto.
   eapply eff_sim_trans.
-    eapply Renumberproof_comp.transl_program_correct.
+  eapply Renumberproof_comp.transl_program_correct.
   eapply TransformLNR in LNR.
   eapply eff_sim_trans.
     eapply Allocproof_comp.transl_program_correct.
     instantiate (1:=p4). auto.
-  eapply TransformLNR_partial in LNR. 2: eauto.
+    eapply TransformLNR_partial in LNR.  2: eauto.
   eapply eff_sim_trans.
     eapply Tunnelingproof_comp.transl_program_correct.
   eapply TransformLNR in LNR. 
@@ -294,14 +295,15 @@ Proof.
   eapply TransformLNR_partial in LNR. 2: eauto.
   eapply eff_sim_trans.
     eapply CleanupLabelsproof_comp.transl_program_correct.
-  eapply TransformLNR in LNR. 
+    eapply TransformLNR in LNR.
   eapply eff_sim_trans.
-    eapply Stackingproof_comp.transl_program_correct.
+  eapply Stackingproof_comp.transl_program_correct.
+  
     eexact Asmgenproof_comp.return_address_exists. eassumption.
+    eassumption. 
+    apply Asmgenproof_comp.transl_program_correct. 
     eassumption.
-  eapply TransformLNR_partial in LNR. 2: eauto.
-  apply Asmgenproof_comp.transl_program_correct. 
-    eassumption.
+    
 Qed.
 
 (** Prove the existence of a structured simulation between Cminor and Asm, 
@@ -381,25 +383,30 @@ Proof.
   intros. 
   unfold transf_rtl_program in H.
   repeat rewrite compose_print_identity in H.
-  simpl in H. 
+  simpl in H.
+  
   set (p1 := Tailcall.transf_program p) in *.
-  set (p2 := Renumber.transf_program p1) in *.
-  destruct (Allocation.transf_program p2) as [p3|] eqn:?; simpl in H; try discriminate.
-  set (p4 := Tunneling.tunnel_program p3) in *.
-  destruct (Linearize.transf_program p4) as [p5|] eqn:?; simpl in H; try discriminate.
-  set (p6 := CleanupLabels.transf_program p5) in *.
-  destruct (Stacking.transf_program p6) as [p7|] eqn:?; simpl in H; try discriminate.
-  generalize (Tailcallproof_comp.symbols_preserved p s); intro Heqr5.
-  generalize (Renumberproof_comp.symbols_preserved p1 s); intro Heqr4.
-  apply Allocproof_comp.symbols_preserved with (s:=s) in Heqr.
-  generalize (Tunnelingproof_comp.symbols_preserved p3 s); intro Heqr3.
-  apply Linearizeproof_comp.symbols_preserved with (id:=s) in Heqr0.
-  generalize (CleanupLabelsproof_comp.symbols_preserved p5 s); intro Heqr2.
-  apply Stackingproof_comp.symbols_preserved with (id:=s) in Heqr1.
+  destruct (Inlining.transf_program p1) as [p2|] eqn:?; simpl in H; try discriminate.
+  set (p3 := Renumber.transf_program p2) in *.
+  destruct (Allocation.transf_program p3) as [p4|] eqn:?; simpl in H; try discriminate.
+  set (p5 := Tunneling.tunnel_program p4) in *.
+  destruct (Linearize.transf_program p5) as [p6|] eqn:?; simpl in H; try discriminate.
+  set (p7 := CleanupLabels.transf_program p6) in *.
+  destruct (Stacking.transf_program p7) as [p8|] eqn:?; simpl in H; try discriminate.
+  
+  generalize (Tailcallproof_comp.symbols_preserved p s); intro Heqr7.
+  apply Inliningproof_comp.symbols_preserved with (s:=s) in Heqr.
+  generalize (Renumberproof_comp.symbols_preserved p2 s); intro Heqr5.
+  apply Allocproof_comp.symbols_preserved with (s:=s) in Heqr0.
+  generalize (Tunnelingproof_comp.symbols_preserved p4 s); intro Heqr4.
+  apply Linearizeproof_comp.symbols_preserved with (id:=s) in Heqr1.
+  generalize (CleanupLabelsproof_comp.symbols_preserved p6 s); intro Heqr3.
+  apply Stackingproof_comp.symbols_preserved with (id:=s) in Heqr2.
   apply Asmgenproof_comp.symbols_preserved with (id:=s) in H.
-  rewrite H, Heqr1; unfold p6; rewrite Heqr2, Heqr0. 
-  unfold p4; rewrite Heqr3, Heqr.
-  unfold p2; rewrite Heqr4; unfold p1; rewrite Heqr5; auto.
+  rewrite H, Heqr2; unfold p7; rewrite Heqr3, Heqr1. 
+  unfold p5; rewrite Heqr4. rewrite Heqr0.
+  unfold p3; rewrite Heqr5; unfold p1; rewrite Heqr; auto.
+
 Qed.
 
 Theorem transf_cminor_program_preserves_syms:
