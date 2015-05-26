@@ -8,7 +8,7 @@ Require Import Events.
 Require Import Globalenvs.
 
 Require Import mem_lemmas. (*for mem_forward*)
-Require Import core_semantics.
+Require Import semantics.
 Require Import effect_semantics.
 
 Require Import Cop. (*for sem_cast*)
@@ -386,12 +386,14 @@ Qed.
 
 Definition clight_eff_sem  
   :  @EffectSem Clight.genv CL_core.
+Proof.
 eapply Build_EffectSem with (sem := CL_coop_sem hf _ FE_FWD)
          (effstep:=clight_effstep).
 eapply clightstep_effax1. 
 apply clightstep_effax2. 
 eapply clight_effstep_valid.
 Defined.
+
 End EFFSEM.
 
 Lemma function_entry1_UNCH: forall f vargs m e le m', 
@@ -444,12 +446,14 @@ Proof. intros. inv H.
 Qed.
 
 Definition CL_eff_sem1: @EffectSem Clight.genv CL_core.
+Proof.
   eapply (clight_eff_sem function_entry1).
   apply function_entry1_forward. 
   apply function_entry1_UNCH.
 Defined.
 
 Definition CL_eff_sem2: @EffectSem Clight.genv CL_core.
+Proof.
   eapply (clight_eff_sem function_entry2).
   apply function_entry2_forward. 
   apply function_entry2_UNCH.

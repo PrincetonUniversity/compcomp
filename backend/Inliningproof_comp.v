@@ -15,24 +15,20 @@ Require Import Inliningspec.
 Require Import RTL.
 
 Require Import mem_lemmas.
-Require Import semantics.
+Require Import core_semantics.
 Require Import reach.
 Require Import effect_semantics.
-Require Import structured_injections.
-Require Import simulations.
+Require Import StructuredInjections.
+Require Import effect_simulations.
 Require Import effect_properties.
-Require Import simulations_lemmas.
+Require Import effect_simulations_lemmas.
 
 
 Require Export Axioms.
 Require Import RTL_coop.
 Require Import RTL_eff.
 
-(*Load Santiago_tactics.*)
-Ltac open_Hyp:= match goal with
-                     | [H: and _ _ |- _] => destruct H
-                     | [H: exists _, _ |- _] => destruct H
-                 end.
+Load Santiago_tactics.
 
 (* The rewriters *)
 Hint Rewrite vis_restrict_sm: restrict.
@@ -83,16 +79,6 @@ Qed.
 
 Lemma GDE_lemma: genvs_domain_eq ge tge.
 Proof.
-  (* OLD
-    unfold genvs_domain_eq, genv2blocks.
-    simpl; split; intros. 
-     split; intros; destruct H as [id Hid].
-       rewrite <- symbols_preserved in Hid.
-       exists id; trivial.
-     rewrite symbols_preserved in Hid.
-       exists id; trivial.
-       ad_it.
-    (*rewrite varinfo_preserved. intuition.*) *)
   unfold genvs_domain_eq, genv2blocks.
   simpl; split; intros. 
   split; intros; destruct H as [id Hid].
@@ -296,7 +282,7 @@ Lemma tr_moves_init_regs':
                                       tr_moves f.(fn_code) pc1 (sregs ctx1 rsrcs) (sregs ctx2 rdsts) pc2 ->
                                       (forall r, In r rdsts -> Ple r ctx2.(mreg)) ->
                                       list_forall2 (val_reg_charact F ctx1 rs1) vl rsrcs ->
-                                      exists rs2, semantics_lemmas.corestep_star (rtl_eff_sem hf) tge
+                                      exists rs2, core_semantics_lemmas.corestep_star (rtl_eff_sem hf) tge
                                                                                       (RTL_State stk f sp pc1 rs1) m
                                                                                       (RTL_State stk f sp pc2 rs2) m
                                                   /\ agree_regs F ctx2 (init_regs vl rdsts) rs2
@@ -304,15 +290,15 @@ Lemma tr_moves_init_regs':
 Proof.
   induction rdsts; simpl; intros.
   (* rdsts = nil *)
-  inv H0. exists rs1; split. apply semantics_lemmas.corestep_star_zero. split. apply agree_regs_init. auto.
+  inv H0. exists rs1; split. apply core_semantics_lemmas.corestep_star_zero. split. apply agree_regs_init. auto.
   (* rdsts = a :: rdsts *)
   inv H2. inv H0. 
-  exists rs1; split. apply semantics_lemmas.corestep_star_zero. split. apply agree_regs_init. auto.
+  exists rs1; split. apply core_semantics_lemmas.corestep_star_zero. split. apply agree_regs_init. auto.
   simpl in H0. inv H0.
   exploit IHrdsts; eauto. intros [rs2 [A [B C]]].
   exists (rs2#(sreg ctx2 a) <- (rs2#(sreg ctx1 b1))).
-  split. eapply semantics_lemmas.corestep_star_trans; eauto. 
-  eapply semantics_lemmas.corestep_star_one.
+  split. eapply core_semantics_lemmas.corestep_star_trans; eauto. 
+  eapply core_semantics_lemmas.corestep_star_one.
   eapply  rtl_corestep_exec_Iop; eauto.
   split. destruct H3 as [[P Q] | [P Q]].
   subst a1. eapply agree_set_reg_undef; eauto.
@@ -1893,273 +1879,7 @@ Section MS_RSI. (* Match Stacks: restricted Structured injections*)
   Qed.
 End MS_RSI.
 
-(* OLD PROOF
-(** ** Behold the theorem *)
-Theorem transl_program_correct:
-  forall (R: list_norepet (map fst (prog_defs SrcProg)))
-         (entrypoints : list (val * val * signature))
-         (entry_ok : entry_points_ok entrypoints)
-         (init_mem: exists m0, Genv.init_mem SrcProg = Some m0),
-    SM_simulation.SM_simulation_inject (rtl_eff_sem hf)
-                                       (rtl_eff_sem hf) ge tge (*entrypoints*).
-  intros.
-  (*eapply sepcomp.effect_simulations_lemmas.inj_simulation_star_wf.*)
-  eapply effect_simulations_lemmas.inj_simulation_star with (match_states:= MATCH)(measure:= RTL_measure).
 
-  Lemma environment_equality: (exists m0:mem, Genv.init_mem SrcProg = Some m0) -> 
-                              genvs_domain_eq ge tge.
-    intros.
-    ad_it.
-    Qed.
-  (*
-    destruct H0 as [b0]; exists b0;
-    rewriter_back;
-    [rewrite symbols_preserved| rewrite <- symbols_preserved| rewrite varinfo_preserved| rewrite <- varinfo_preserved]; reflexivity.
-  Qed.*)
-  Hint Resolve environment_equality: trans_correct.
-  auto with trans_correct.
-
-  Lemma MATCH_wd: forall (d : RTL_core) (mu : SM_Injection) (c1 : RTL_core) 
-                         (m1 : mem) (c2 : RTL_core) (m2 : mem) (MC:MATCH d mu c1 m1 c2 m2), SM_wd mu.
-    intros. eapply MC. Qed.
-  Hint Resolve MATCH_wd: trans_correct.
-  eauto with trans_correct.
-
-  Lemma MATCH_RC: forall (d : RTL_core) (mu : SM_Injection) (c1 : RTL_core) 
-                         (m1 : mem) (c2 : RTL_core) (m2 : mem) (MC:
-                                                                  MATCH d mu c1 m1 c2 m2), REACH_closed m1 (vis mu).
-    intros. eapply MC. Qed.
-  Hint Resolve MATCH_RC: trans_correct.
-  eauto with trans_correct.
-
-
-  Lemma MATCH_restrict: forall (d : RTL_core) (mu : SM_Injection) (c1 : RTL_core) 
-                               (m1 : mem) (c2 : RTL_core) (m2 : mem) (X : block -> bool) (MC: MATCH d mu c1 m1 c2 m2)(HX: forall b : block, vis mu b = true -> X b = true)(RC0:REACH_closed m1 X), MATCH d (restrict_sm mu X) c1 m1 c2 m2.
-    intros.
-    destruct MC as [MC [RC [PG [GF [VAL [WDmu INJ]]]]]].
-    assert (WDR: SM_wd (restrict_sm mu X)).
-    apply restrict_sm_WD; assumption.
-    split; try rewrite vis_restrict_sm; try rewrite restrict_sm_all; try rewrite restrict_sm_frgnBlocksSrc.
-    rewrite restrict_sm_nest; assumption.
-    intuition.
-
-    (*meminj_preserves_globals*)
-    rewrite <- restrict_sm_all.
-    eapply restrict_sm_preserves_globals; auto.
-    intros.
-    apply HX.
-    unfold vis.
-    rewrite GF; auto. 
-    apply orb_true_r.
-
-    (* sm_valid  *)
-    unfold sm_valid; split; intros;
-    red in VAL; destruct VAL as [H0 H1].
-    apply H0; unfold DOM; erewrite <- restrict_sm_DomSrc; eauto.
-    apply H1; unfold RNG; erewrite <- restrict_sm_DomTgt; eauto.
-    
-    (*  Mem.inject *)
-    apply inject_restrict; try assumption.
-  Qed.
-
-  Hint Resolve MATCH_restrict: trans_correct.
-  auto with trans_correct.
-
-  Lemma MATCH_valid:  forall (d : RTL_core) (mu : SM_Injection) (c1 : RTL_core) 
-                             (m1 : mem) (c2 : RTL_core) (m2 : mem)
-                             (MC: MATCH d mu c1 m1 c2 m2), sm_valid mu m1 m2.
-    intros.
-    apply MC.
-  Qed.
-
-  Hint Resolve MATCH_valid: trans_correct.
-  eauto with trans_correct.
-
-  (* Here there is a goal missing*)
-
-  Lemma MATCH_PG:  forall (d : RTL_core) (mu : SM_Injection) (c1 : RTL_core) 
-                          (m1 : mem) (c2 : RTL_core) (m2 : mem)(
-                            MC: MATCH d mu c1 m1 c2 m2),
-                     meminj_preserves_globals ge (extern_of mu) /\
-                     (forall b : block,
-                        isGlobalBlock ge b = true -> frgnBlocksSrc mu b = true).
-  Proof.
-    intros.
-    assert (GF: forall b, isGlobalBlock ge b = true -> frgnBlocksSrc mu b = true).
-    apply MC.
-    split; trivial.
-    rewrite <- match_genv_meminj_preserves_extern_iff_all; trivial.
-    apply MC. apply MC.
-  Qed.
-  Hint Resolve MATCH_PG: trans_correct.
-  eauto with trans_correct.
-
-  Lemma Match_Halted: forall (cd : RTL_core) (mu : SM_Injection) (c1 : RTL_core) 
-                             (m1 : mem) (c2 : RTL_core) (m2 : mem) (v1 : val)
-        (MC: MATCH cd mu c1 m1 c2 m2)(HALT: halted (rtl_eff_sem hf) c1 = Some v1),
-                      exists v2 : val,
-                        Mem.inject (as_inj mu) m1 m2 /\
-                        val_inject (restrict (as_inj mu) (vis mu)) v1 v2 /\
-                        halted (rtl_eff_sem hf) c2 = Some v2.
-  Proof.
-    intros.
-    unfold MATCH in MC; destruct MC as [H0 H1].
-    inv H0; simpl in *; inv HALT. 
-    Print match_states.
-    inv MS. 
-    exists v'; split; try assumption. eapply H1.
-
-    inv H0.
-    split; trivial.
-    rewrite <- restrict_sm_all; assumption.
-    inv H0.
-    inv MS0.
-    rewrite RET in RET0; inv RET0.
-    inv H0.
-    inv MS.
-    rewrite RET in RET0; inv RET0.
-    inv H0.
-  Qed.
-  Hint Resolve Match_Halted: trans_correct.
-  eauto with trans_correct.
-
-
-  Lemma at_external_lemma: forall (mu : SM_Injection) (c1 : RTL_core) (m1 : mem) 
-                                  (c2 : RTL_core) (m2 : mem) (e : external_function) 
-                                  (vals1 : list val) (ef_sig : signature)(MC: MATCH c1 mu c1 m1 c2 m2) (ATE: at_external (rtl_eff_sem hf) c1 = Some (e, ef_sig, vals1)),
-                             Mem.inject (as_inj mu) m1 m2 /\ 
-                             (exists vals2 : list val, Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\ at_external (rtl_eff_sem hf) c2 = Some (e, ef_sig, vals2)).
-    intros.
-    split. inv MC; apply H0.
-    inv MC; simpl in *. inv H; inv ATE.
-    destruct fd; inv H1. inv FD; simpl in *. 
-    destruct (BuiltinEffects.observableEF_dec hf e0); inv H2.
-    exists args'.
-    split. apply val_list_inject_forall_inject.
-    autorewrite with restrict in VINJ; assumption.
-    trivial.
-  Qed.
-  Hint Resolve at_external_lemma: trans_correct.
-  eauto with trans_correct.
-
-  Lemma Match_AfterExternal: 
-    forall (mu : SM_Injection) (st1 : RTL_core) (st2 : RTL_core) (m1 : mem) (e : external_function) (vals1 : list val) (m2 : mem) (ef_sig : signature) (vals2 : list val) (e' : external_function) (ef_sig' : signature) 
-           (MemInjMu : Mem.inject (as_inj mu) m1 m2)
-           (MatchMu : MATCH st1 mu st1 m1 st2 m2)
-           (AtExtSrc : at_external (rtl_eff_sem hf) st1 = Some (e, ef_sig, vals1))
-           (AtExtTgt : at_external (rtl_eff_sem hf) st2 = Some (e', ef_sig', vals2))
-           (ValInjMu : Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2)
-           (pubSrc' : block -> bool)
-           (pubSrcHyp : pubSrc' =
-                        (fun b : block =>
-                           locBlocksSrc mu b && REACH m1 (exportedSrc mu vals1) b))
-           (pubTgt' : block -> bool)
-           (pubTgtHyp : pubTgt' =
-                        (fun b : block =>
-                           locBlocksTgt mu b && REACH m2 (exportedTgt mu vals2) b))
-           (nu : SM_Injection)
-           (NuHyp : nu = replace_locals mu pubSrc' pubTgt')
-           (nu' : SM_Injection)
-           (ret1 : val)
-           (m1' : mem)
-           (ret2 : val)
-           (m2' : mem)
-           (INC : extern_incr nu nu')
-           (SEP : sm_inject_separated nu nu' m1 m2)
-           (WDnu' : SM_wd nu')
-           (SMvalNu' : sm_valid nu' m1' m2')
-           (MemInjNu' : Mem.inject (as_inj nu') m1' m2')
-           (RValInjNu' : val_inject (as_inj nu') ret1 ret2)
-           (FwdSrc : mem_forward m1 m1')
-           (FwdTgt : mem_forward m2 m2')
-           (frgnSrc' : block -> bool)
-           (frgnSrcHyp : frgnSrc' =
-                         (fun b : block =>
-                            DomSrc nu' b &&
-                                   (negb (locBlocksSrc nu' b) &&
-                                         REACH m1' (exportedSrc nu' (ret1 :: nil)) b)))
-           (frgnTgt' : block -> bool)
-           (frgnTgtHyp : frgnTgt' =
-                         (fun b : block =>
-                            DomTgt nu' b &&
-                                   (negb (locBlocksTgt nu' b) &&
-                                         REACH m2' (exportedTgt nu' (ret2 :: nil)) b)))
-           (mu' : SM_Injection)
-           (Mu'Hyp : mu' = replace_externs nu' frgnSrc' frgnTgt')
-           (UnchPrivSrc : Mem.unchanged_on
-                            (fun (b : block) (_ : Z) =>
-                               locBlocksSrc nu b = true /\ pubBlocksSrc nu b = false) m1 m1')
-           (UnchLOOR : Mem.unchanged_on (local_out_of_reach nu m1) m2 m2'),
-    exists (st1' st2' : RTL_core),
-      after_external (rtl_eff_sem hf) (Some ret1) st1 = Some st1' /\
-      after_external (rtl_eff_sem hf) (Some ret2) st2 = Some st2' /\
-      MATCH st1' mu' st1' m1' st2' m2'.
-  Proof. intros. 
-         destruct MatchMu as [MC [RC [PG [GF [VAL [WDmu [INJ GFP]]]]]]].
-         inv MC; simpl in *; inv AtExtSrc.
-         destruct fd; inv H0.
-         destruct fd'; inv AtExtTgt.
-         inv FD.
-         destruct (BuiltinEffects.observableEF_dec hf e1); inv H0; inv H1.
-         rename o into OBS.
-         exists (RTL_Returnstate stk ret1). eexists.
-         split. reflexivity.
-         split. reflexivity.
-         assert (INCvisNu': inject_incr
-                              (restrict (as_inj nu')
-                                        (vis
-                                           (replace_externs nu'
-                                                            (fun b : Values.block =>
-                                                               DomSrc nu' b &&
-                                                                      (negb (locBlocksSrc nu' b) &&
-                                                                            REACH m1' (exportedSrc nu' (ret1 :: nil)) b))
-                                                            (fun b : Values.block =>
-                                                               DomTgt nu' b &&
-                                                                      (negb (locBlocksTgt nu' b) &&
-                                                                            REACH m2' (exportedTgt nu' (ret2 :: nil)) b))))) (as_inj nu')).
-         unfold vis. rewrite replace_externs_frgnBlocksSrc, replace_externs_locBlocksSrc.
-         apply restrict_incr. 
-         assert (RC': REACH_closed m1' (mapped (as_inj nu'))).
-         eapply inject_REACH_closed; eassumption.
-         assert (PHnu': meminj_preserves_globals (Genv.globalenv SrcProg) (as_inj nu')).
-         subst. clear - INC SEP PG GF WDmu WDnu'.
-         apply meminj_preserves_genv2blocks in PG.
-         destruct PG as [PGa [PGb PGc]].
-         apply meminj_preserves_genv2blocks.
-         split; intros.
-         specialize (PGa _ H).
-         apply joinI; left. apply INC.
-         rewrite replace_locals_extern.
-         apply foreign_in_extern.
-         assert (GG: isGlobalBlock ge b = true).
-         unfold isGlobalBlock, ge. apply genv2blocksBool_char1 in H.
-         rewrite H. trivial.
-         destruct (frgnSrc _ WDmu _ (GF _ GG)) as [bb2 [dd [FF FT2]]].
-         rewrite (foreign_in_all _ _ _ _ FF) in PGa. inv PGa.
-         assumption.
-         split; intros. specialize (PGb _ H).
-         apply joinI; left. apply INC.
-         rewrite replace_locals_extern. 
-         assert (GG: isGlobalBlock ge b = true). (*4 goals*)
-         unfold isGlobalBlock, ge. apply genv2blocksBool_char2 in H.
-         rewrite H. intuition. (*3 goals*)
-         destruct (frgnSrc _ WDmu _ (GF _ GG)) as [bb2 [dd [FF FT2]]].
-         rewrite (foreign_in_all _ _ _ _ FF) in PGb. inv PGb.
-         apply foreign_in_extern; eassumption. (*2 goals*)
-         eapply (PGc _ _ delta H). specialize (PGb _ H). clear PGa PGc.
-         remember (as_inj mu b1) as d.
-         destruct d; apply eq_sym in Heqd. (*3 goals*)
-         destruct p. 
-         apply extern_incr_as_inj in INC; trivial. (*3 goals*)
-         rewrite replace_locals_as_inj in INC.
-         rewrite (INC _ _ _ Heqd) in H0. trivial. (*3 goals*)
-         destruct SEP as [SEPa _].
-         rewrite replace_locals_as_inj, replace_locals_DomSrc, replace_locals_DomTgt in SEPa. 
-         destruct (SEPa _ _ _ Heqd H0).
-         destruct (as_inj_DomRng _ _ _ _ PGb WDmu).
-         congruence. (*1 goal*)
-         assert (RR1: REACH_closed m1'
-                                   (fun b : Values.block =>  *)
 Lemma Match_AfterExternal: 
   forall (mu : SM_Injection) (st1 : RTL_core) (st2 : RTL_core) (m1 : mem) (e : external_function) (vals1 : list val) (m2 : mem) (ef_sig : signature) (vals2 : list val) (e' : external_function) (ef_sig' : signature) 
          (MemInjMu : Mem.inject (as_inj mu) m1 m2)
@@ -2235,7 +1955,7 @@ Proof. intros.
                                                              DomTgt nu' b &&
                                                                     (negb (locBlocksTgt nu' b) &&
                                                                           REACH m2' (exportedTgt nu' (ret2 :: nil)) b))))) (as_inj nu')).
-       (*unfold vis. rewrite replace_externs_frgnBlocksSrc, replace_externs_locBlocksSrc.*)
+       unfold vis. rewrite replace_externs_frgnBlocksSrc, replace_externs_locBlocksSrc.
        apply restrict_incr. 
        assert (RC': REACH_closed m1' (mapped (as_inj nu'))).
        eapply inject_REACH_closed; eassumption.
@@ -2243,13 +1963,9 @@ Proof. intros.
        eapply meminj_preserves_globals_extern_incr_separate. eassumption.
        rewrite replace_locals_as_inj. assumption.
        assumption. 
-
-       { (*Here is the only place SEP is used*)
        specialize (genvs_domain_eq_isGlobal _ _ GDE_lemma). intros GL.
        red. unfold ge in GL. rewrite GL. apply SEP.
-       } 
-       clear SEP.
-       
+
        assert (RR1: REACH_closed m1'
                                  (fun b : Values.block =>
                                     locBlocksSrc nu' b
@@ -2312,7 +2028,7 @@ Proof. intros.
        destruct IHL. inv H.
        apply andb_true_iff in H. simpl in H. 
        destruct H as[DomNu' Rb']. 
-       clear INC INCvisNu' UnchLOOR UnchPrivSrc.
+       clear INC SEP INCvisNu' UnchLOOR UnchPrivSrc.
        remember (locBlocksSrc nu' b) as d.
        destruct d; simpl; trivial. apply eq_sym in Heqd.
        apply andb_true_iff.
@@ -2454,9 +2170,8 @@ Proof. intros.
          apply REACH_nil. apply orb_true_iff. right. 
          apply frgnSrc_shared; trivial. 
          trivial.
-         clear - PGnu'. red.
-
-         rewrite replace_externs_as_inj in *; assumption.
+         clear - PGnu' SEP. red. red in SEP.
+         rewrite replace_locals_as_inj, replace_externs_as_inj in *; assumption.
          
          rewrite replace_externs_local. 
          red in INC. rewrite replace_locals_local in INC.
@@ -2574,38 +2289,6 @@ Lemma intern_incr_localloc_vis: forall mu mu' m1 m2 m1' m2',
   apply orb_comm.
 Qed.
 
-(* OLD VERSION
-    apply (meminj_preserves_incr_sep ge (as_inj mu) H9 m1 m2); eauto.
-    apply intern_incr_as_inj; auto.
-    apply sm_inject_separated_mem; auto.
-
-    eapply intern_incr_meminj_preserves_globals_as_inj in H17.
-    destruct H17 as [H00 H01]; apply H01; auto.
-    eexact H20.
-    exact H12.
-    split; eauto.
-    assumption.
-
-
-(* internal function, inlined *)
-inversion FB; subst.
-repeat open_Hyp.
-exploit alloc_left_mapped_sm_inject; try eassumption.
-(* sp' is local *)
-destruct MS0; unfold locBlocksTgt in SL; unfold restrict_sm in SL; destruct mu; simpl in *; assumption.
-(* offset is representable *)
-instantiate (1 := dstk ctx). generalize (Zmax2 (fn_stacksize f) 0). omega.
-(* size of target block is representable *)
-intros. right. exploit SSZ2; eauto with mem. inv FB; omega.
-(* we have full permissions on sp' at and above dstk ctx *)
-intros. apply Mem.perm_cur. apply Mem.perm_implies with Freeable; auto with mem.
-eapply range_private_perms; eauto. xomega.
-(* offset is aligned *)
-replace (fn_stacksize f - 0) with (fn_stacksize f) by omega.
-inv FB. apply min_alignment_sound; auto.
-(* nobody maps to (sp, dstk ctx...) *)
-END OF OLD PART *)
-
 Lemma injection_almost_equality_restrict: forall mu mu' m1 m2 m1' m2' stk f,
                                             Mem.alloc m1 0 (fn_stacksize f) = (m1', stk) ->
                                             intern_incr mu mu' ->
@@ -2668,6 +2351,8 @@ Lemma loc_privete_restrict:
   erewrite <- (as_inj_locBlocks) in SL'; eauto.
   erewrite SL'; rewrite orb_true_l; eauto.
 Qed.
+
+(*HERE*)
 
 Ltac extend_smart:=  let x := fresh "x" in extensionality x.
 Ltac rewrite_freshloc := match goal with

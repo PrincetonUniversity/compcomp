@@ -11,7 +11,7 @@ Require Import Globalenvs.
 Require Import Cminor.
 
 Require Import mem_lemmas. (*for mem_forward and wd_mem*)
-Require Import core_semantics.
+Require Import semantics.
 Require Import val_casted.
 Require Import BuiltinEffects.
 
@@ -276,6 +276,7 @@ Lemma CMin_after_at_external_excl : forall retv q q',
 Qed.
 
 Definition CMin_core_sem : CoreSemantics genv CMin_core mem.
+Proof.
   eapply (@Build_CoreSemantics _ _ _ 
     CMin_initial_core
     CMin_at_external
@@ -307,6 +308,7 @@ Qed.
 
 Program Definition cmin_coop_sem : 
   CoopCoreSem Cminor.genv CMin_core.
+Proof.
 apply Build_CoopCoreSem with (coopsem := CMin_core_sem).
   apply CMin_forward.
 Defined.

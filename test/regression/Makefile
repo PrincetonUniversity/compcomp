@@ -17,12 +17,17 @@ TESTS=int32 int64 floats floats-basics \
 
 TESTS_COMP=attribs1 bitfields1 bitfields2 bitfields3 bitfields4 \
   bitfields5 bitfields6 bitfields7 bitfields8 \
-  builtins-$(ARCH) packedstruct1 packedstruct2
+  #Because the compiler does not yet enable inlining, we don't support 
+  #certain standard CompCert compiler builtins:
+  #builtins-$(ARCH) packedstruct1 packedstruct2
 
 # Can run, both in compiled mode and in interpreter mode,
 # but produce processor-dependent results, so no reference output in Results
 
-TESTS_DIFF=NaNs
+TESTS_DIFF=
+## As per an email from Xavier, the NaN test should not be enabled until 
+## we've enabled function inlining. It's not expected to pass otherwise.
+#TESTS_DIFF=NaNs
 
 # Other tests: should compile to .s without errors (but expect warnings)
 

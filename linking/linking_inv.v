@@ -18,7 +18,6 @@ Require Import pred_lemmas.
 Require Import seq_lemmas.
 Require Import wf_lemmas.
 Require Import reestablish.
-Require Import core_semantics_tcs.
 Require Import inj_lemmas.
 Require Import join_sm.
 Require Import reach_lemmas.
@@ -44,11 +43,11 @@ Unset Printing Implicit Defensive.
 Require Import Values.   
 Require Import nucular_semantics.
 
-(* This file proves the main linking simulation result (see               *)
-(* linking/linking_spec.v for the specification of the theorem that's     *)
-(* proved).                                                               *)
+(** * Linking Invariant *)
 
-Import Wholeprog_simulation.
+(** This file states the simulation invariant used in Theorem 2. *)
+
+Import Wholeprog_sim.
 Import SM_simulation.
 Import Linker. 
 Import Modsem.
@@ -85,33 +84,24 @@ Section linkingInv.
 
 Variable N : pos.
 
-Variable cores_S' cores_T : 'I_N -> Modsem.t. 
-
+Variable cores_S cores_T : 'I_N -> Modsem.t. 
+Variable rclosed_S : forall i : 'I_N, RCSem.t (cores_S i).(sem) (cores_S i).(ge).
 Variable nucular_T : forall i : 'I_N, Nuke_sem.t (cores_T i).(sem).
 
 Variable fun_tbl : ident -> option 'I_N.
 
-Variable sims' : forall i : 'I_N, 
-  let s := cores_S' i in
+Variable sims : forall i : 'I_N, 
+  let s := cores_S i in
   let t := cores_T i in
   SM_simulation_inject s.(sem) t.(sem) s.(ge) t.(ge).
 
 Variable my_ge : ge_ty.
-Variable my_ge_S : forall (i : 'I_N), genvs_domain_eq my_ge (cores_S' i).(ge).
+Variable my_ge_S : forall (i : 'I_N), genvs_domain_eq my_ge (cores_S i).(ge).
 Variable my_ge_T : forall (i : 'I_N), genvs_domain_eq my_ge (cores_T i).(ge).
 
-Let types := fun i : 'I_N => (sims' i).(core_data).
+Let types := fun i : 'I_N => (sims i).(core_data).
 Let ords : forall i : 'I_N, types i -> types i -> Prop 
-  := fun i : 'I_N => (sims' i).(core_ord).
-
-Let cores_S (ix : 'I_N) := 
-  Modsem.mk (cores_S' ix).(ge) (RC.effsem (cores_S' ix).(sem)).
-
-Lemma sims : forall i : 'I_N,
-  let s := cores_S i in
-  let t := cores_T i in
-  SM_simulation_inject s.(sem) t.(sem) s.(ge) t.(ge).  
-Proof. by move=> ix; apply: rc_sim; apply: (sims' ix). Qed.
+  := fun i : 'I_N => (sims i).(core_ord).
 
 Let linker_S := effsem N cores_S fun_tbl.
 Let linker_T := effsem N cores_T fun_tbl.
@@ -158,25 +148,23 @@ split=> b G; first by apply: (E _ (B _ G)).
 by apply: (F _ (C _ G)).
 Qed.
 
-(* Initial core asserts that we match w/ SM_injection                     *)
-(*   initial_SM DomS DomT                                                 *)
-(*     (REACH m1 (fun b => isGlobalBlock ge1 b || getBlocks vals1 b))     *)
-(*     (REACH m2 (fun b => isGlobalBlock ge2 b || getBlocks vals2 b)) j)  *)
-(* where the clauses beginning REACH... give frgnSrc/Tgt respectively.    *)
-(*                                                                        *)
-(* I.e., we establish initially that                                      *)
-(*                                                                        *)
-(*   fun b => isGlobalBlock ge1 b || getBlocks vals1 b                    *)
-(*                                                                        *)
-(* is a subset of the visible set for the injection of the initialized    *)
-(* core.                                                                  *)
-(*                                                                        *)
-(* We record this fact (really, a slight modification of the invariant    *)
-(* that accounts for return values as well) as an invariant of execution  *)
-(* for both the head and tail cores. Then the guarantees we get from RC   *)
-(* executions (that write effects are limited to blocks in the RC of      *)
-(* initial args, rets, local blocks) imply that effects are also a        *)
-(* subset of the visible region for each core.                            *)
+(** Initial core asserts that we match w/ SM_injection
+  [initial_SM DomS DomT
+    (REACH m1 (fun b => isGlobalBlock ge1 b || getBlocks vals1 b))
+    (REACH m2 (fun b => isGlobalBlock ge2 b || getBlocks vals2 b)) j)]
+where the clauses beginning REACH... give frgnSrc/Tgt respectively. *)
+
+(** I.e., we establish initially that
+  [fun b => isGlobalBlock ge1 b || getBlocks vals1 b]
+is a subset of the visible set for the injection of the initialized
+core. *)
+
+(** We record this fact (really, a slight modification of the invariant
+that accounts for return values as well) as an invariant of execution
+for both the head and tail cores. Then the guarantees we get from RC
+executions (that write effects are limited to blocks in the RC of
+initial args, rets, local blocks) imply that effects are also a
+subset of the visible region for each core. *)
 
 Section glob_lems.
 
@@ -318,10 +306,6 @@ Lemma isGlob_iffS' ix1 ix2 b :
   isGlobalBlock (ge (cores_S ix1)) b <-> isGlobalBlock (ge (cores_S ix2)) b. 
 Proof. by split; rewrite -!isGlob_iffS. Qed.
 
-Lemma isGlob_iffT' ix1 ix2 b :
-  isGlobalBlock (ge (cores_T ix1)) b <-> isGlobalBlock (ge (cores_T ix2)) b. 
-Proof. by split; rewrite -!isGlob_iffT. Qed.
-
 Lemma isGlob_iffST' ix1 ix2 b :
   isGlobalBlock (ge (cores_S ix1)) b <-> isGlobalBlock (ge (cores_T ix2)) b. 
 Proof. by split; rewrite -isGlob_iffS -isGlob_iffT. Qed.
@@ -332,10 +316,15 @@ Section vis_inv.
 
 Import Core.
 
-Record vis_inv (c : t cores_S) mu : Type :=
-  { vis_sup : {subset (RC.roots my_ge c.(Core.c)) <= vis mu} }.
+Record vis_inv (c : t cores_S) (B : block -> bool) mu : Type :=
+  { vis_sup : {subset (RC.roots my_ge (RC.mk c.(Core.c) B)) <= vis mu} }.
 
 End vis_inv.
+
+(** ** Callstack Frame Invariant *)
+
+(** [frame_inv] is the invariant that relates a pair of (source--target) cores 
+  at a given frame on the source--target callstacks. *)
 
 Record frame_inv 
   cd0 mu0 m10 m1 e1 ef_sig1 vals1 m20 m2 e2 ef_sig2 vals2 : Prop :=
@@ -356,7 +345,9 @@ Record frame_inv
   ; frame_vinj  : Forall2 (val_inject (restrict (as_inj mu0) (vis mu0))) vals1 vals2  
 
     (* source state invariants *)
-  ; frame_vis   : vis_inv c mu0
+  ; frame_vis   : exists B, 
+                  [/\ vis_inv c B mu0
+                    & RCSem.I (rclosed_S c.(i)) c.(Core.c) m10 B]
 
     (* target mu invariants *)
   ; frame_domt  : DomTgt mu0 = valid_block_dec m20
@@ -488,13 +479,18 @@ Import Core.
 Variables (c : t cores_S) (d : t cores_T). 
 Variable  (pf : c.(i)=d.(i)).
 
-Record head_inv cd (mu : Inj.t) mus m1 m2 : Type :=
+(** ** Running Cores Invariant *)
+
+Record head_inv cd (mu : Inj.t) mus m1 m2 : Prop :=
   { head_match : (sims c.(i)).(match_state) cd mu 
                  c.(Core.c) m1 (cast'' pf d.(Core.c)) m2 
   ; head_rel   : All (rel_inv_pred m1 mu) mus 
-  ; head_vis   : vis_inv c mu 
+  ; head_vis   : exists B, 
+                 [/\ vis_inv c B mu 
+                   & RCSem.I (rclosed_S c.(i)) c.(Core.c) m1 B]
   ; head_domt  : DomTgt mu = valid_block_dec m2 
   ; head_nukeI : Nuke_sem.I (nucular_T d.(i)) d.(Core.c) m2
+  ; head_gfi   : globalfunction_ptr_inject my_ge (as_inj mu)
   }.
 
 End head_inv.
@@ -618,7 +614,7 @@ Qed.
 
 Lemma head_valid : sm_valid mu m1 m2.
 Proof.
-by case: inv=> // A _ _ _ _; apply: (match_validblocks _ A).
+by case: inv=> // A _ _ _ _ _; apply: (match_validblocks _ A).
 Qed.
 
 Lemma head_atext_inj ef sig args : 
@@ -729,13 +725,13 @@ by [].
 apply: Build_disjinv.
 by rewrite predI01.
 by rewrite predI01.
-move=> b; move/andP=> /= []fS lS.
+{ move=> b; move/andP=> /= []fS lS.
 case: rel=> _ _; case=> d1 d2; move/(_ b)=> H _ _ _; apply: H.
 apply/andP; split=> //=.
 move: (frgnS_sub_vis fS); case/orP=> H.
 move: d1; move/DisjointP; move/(_ b); rewrite H.
 by move: lS; rewrite /in_mem /= => ->; case.
-by [].
+by []. }
 move=> b1 b2 d0; rewrite /foreign_of /=.
 case: rel=> _ _; case=> d1 d2 _ H _ _.
 case fS: (frgnS _)=> // J or; apply: H=> //. 
@@ -771,6 +767,7 @@ Qed.
 Let lo' := replace_locals mu pubS' pubT'.
 
 Lemma lo_wd : SM_wd lo'.
+Proof.
 move: vinj'=> H.
 exploit eff_after_check1; eauto.
 by move: (head_match inv); apply/match_sm_wd.
@@ -811,7 +808,7 @@ rewrite replace_locals_locBlocksSrc in lS.
 apply/andP; split=> //.
 apply: (REACH_mono 
   (fun b0 : block =>
-    isGlobalBlock (ge (cores_S' new_ix)) b0 || getBlocks vals1 b0))=> //.
+    isGlobalBlock (ge (cores_S new_ix)) b0 || getBlocks vals1 b0))=> //.
 move=> b0; case/orP.
 by move/globs_in_frgn; apply: frgnsrc_sub_exportedsrc.
 by move=> get; apply/orP; left.
@@ -828,7 +825,7 @@ have ->: pubS' b1.
   by rewrite replace_locals_locBlocksSrc in lS.
   apply: (REACH_mono 
   (fun b0 : block =>
-    isGlobalBlock (ge (cores_S' new_ix)) b0 || getBlocks vals1 b0))=> //.
+    isGlobalBlock (ge (cores_S new_ix)) b0 || getBlocks vals1 b0))=> //.
   move=> b0; case/orP.
   by move/globs_in_frgn; apply: frgnsrc_sub_exportedsrc.
   by move=> get; apply/orP; left. }
@@ -893,7 +890,7 @@ Qed.
 
 Lemma lo_head_inv : @head_inv c d pf cd lo mus m1 m2.
 Proof.
-case: inv=> mtch all vis domt.
+case: inv=> mtch all vis domt nuk gfi.
 apply: Build_head_inv=> //.
 clear - all; elim: mus all=> // mu0 mus' IH /= []rel rall.
 split; last by apply: IH.
@@ -917,8 +914,10 @@ by rewrite replace_locals_foreign.
 by rewrite /Consistent /= replace_locals_as_inj.
 case: rel=> _ _ _ H b; case/andP=> /= H2 H3; apply: H. 
 by apply/andP; split=> //=; move: H2; rewrite lo_vis.
-by case: vis=> rvis; apply: Build_vis_inv; rewrite lo_vis.
+case: vis=> B; case=> H ?; exists B; split=> //. 
+by apply: Build_vis_inv; rewrite lo_vis; case: H.
 by rewrite replace_locals_DomTgt.
+by rewrite /lo /= /lo' /= replace_locals_as_inj.
 Qed.
 
 End head_inv_leakout.
@@ -1157,7 +1156,8 @@ split=> /=.
 split; first by apply: (head_rel inv).
 by case: tlinv.
 split. 
-exists pf,sig_pf,cd,e,sig,args1,e,sig,args2; split=> //.
+exists pf,sig_pf,cd,e,sig,args1,e,sig,args2.
+apply: Build_frame_inv=> //.
 by apply: (head_match inv).
 by apply: (head_vis inv).
 by apply: (head_domt inv).
@@ -1258,6 +1258,16 @@ case e: (extern_of mu' b1)=> [[x y]|].
 case: incr=> _; case=> eq.
 by rewrite eq in e1; rewrite e1 in e.
 by case: incr; move/(_ _ _ _ L)=> -> _; case=> -> ->.
+Qed.
+
+Lemma globalfunction_ptr_inject_intern_incr F V (mu mu' : Inj.t) (ge : Genv.t F V) :
+  intern_incr mu mu' -> 
+  globalfunction_ptr_inject ge (as_inj mu) ->
+  globalfunction_ptr_inject ge (as_inj mu').
+Proof.
+move/intern_incr_as_inj; move/(_ (Inj_wd _)).
+rewrite /globalfunction_ptr_inject=> H H2 b f Hfind.
+by case: (H2 _ _ Hfind); split=> //; apply: H.
 Qed.
 
 Section step_lems.
@@ -1427,34 +1437,31 @@ apply all_relinv_step with (s1 := STACK.pop s1) (s2 := STACK.pop s2)=> //.
 by apply: (IH all all2 _ _ frall').
 Qed.
 
-Lemma vis_inv_step (c c' : Core.t cores_S) :
-  vis_inv c mu -> 
-  RC.args (Core.c c)=RC.args (Core.c c') -> 
-  RC.rets (Core.c c)=RC.rets (Core.c c') -> 
-  RC.locs (Core.c c') 
-    = (fun b => RC.locs (Core.c c) b
-             || freshloc m1 m1' b 
-             || RC.reach_set (ge (cores_S (Core.i c))) (Core.c c) m1 b) ->
+Lemma vis_inv_step (c c' : Core.t cores_S) B :
+  vis_inv c B mu -> 
   REACH_closed m1 (vis mu) -> 
-  vis_inv c' mu'.
+  vis_inv c' (REACH m1' (fun b => structured_injections.freshloc m1 m1' b
+                || RC.reach_set (ge (cores_S (Core.i c))) (RC.mk (Core.c c) B) m1 b)) mu'.
 Proof.
-move=> E A B C rc; move: E.
+move=> E rc; move: E.
 case=> E; apply: Build_vis_inv=> b F.
 move: F; rewrite/RC.roots/in_mem/=; move/orP=> [|F].
-rewrite -A -B=> F. 
+move=> F.
 by apply: (intern_incr_vis _ _ incr); apply: E; apply/orP; left.
-case G: (RC.locs (Core.c c) b). 
+case G: (B b).
 by apply: (intern_incr_vis _ _ incr); apply: E; apply/orP; right.
-move: G F; rewrite C=> -> /=; case/orP=> H.
+move: F=> H.
+apply: visrc; apply: (REACH_mono _ _ _ _ _ H)=> b0 H2. 
+case: {H2}(orP H2)=> H2.
 move: alloc; rewrite sm_locally_allocatedChar /vis; case. 
-by move=> _ []_ []-> _; rewrite H -orb_assoc orb_comm.
-suff: vis mu b. 
+by move=> _ []_ []-> _; rewrite H2 -orb_assoc orb_comm.
+suff: vis mu b0. 
 rewrite /vis; case: incr=> _ []_ []sub1 []_ []_ []_ []<- _; case/orP.
 by move/sub1=> ->.
 by move=> ->; rewrite orb_comm.
-apply: rc; apply: (REACH_mono _ _ _ _ _ H)=> //.
-move=> b0 H2; move: (E b0); rewrite /in_mem /=; apply.
-apply: (RC.roots_domains_eq _ H2).
+apply: rc; apply: (REACH_mono _ _ _ _ _ H2)=> b2 H3. 
+move: (E b2); rewrite /in_mem /=; apply.
+apply: (RC.roots_domains_eq _ H3).
 by apply: genvs_domain_eq_sym; apply: (my_ge_S (Core.i c)).
 Qed.
 
@@ -1463,32 +1470,30 @@ Lemma head_inv_step
     cd cd' mus s1 s2 U n V :
   head_inv pf cd mu mus m1 m2 -> 
   frame_all mus m1 m2 s1 s2 -> 
-  RC.args (Core.c c)=RC.args c' -> 
-  RC.rets (Core.c c)=RC.rets c' -> 
-  RC.locs c' = (fun b => RC.locs (Core.c c) b 
-    || freshloc m1 m1' b
-    || RC.reach_set (ge (cores_S (Core.i c))) (Core.c c) m1 b) ->
   effect_semantics.effstep 
     (sem (cores_S (Core.i c))) (ge (cores_S (Core.i c))) U 
     (Core.c c) m1 c' m1' -> 
   effect_semantics.effstepN 
     (sem (cores_T (Core.i d))) (ge (cores_T (Core.i d))) n V 
     (Core.c d) m2 d' m2' -> 
-  mem_wd.valid_genv (ge (cores_T (Core.i d))) m2 ->
+  mem_welldefined.valid_genv (ge (cores_T (Core.i d))) m2 ->
   match_state (sims (Core.i (Core.upd c c'))) cd' mu'
     (Core.c (Core.upd c c')) m1'
     (cast'' pf (Core.c (Core.upd d d'))) m2' -> 
-  RC.locs c' 
-    = (fun b => RC.locs (Core.c c) b
-             || freshloc m1 m1' b 
-             || RC.reach_set (ge (cores_S (Core.i c))) (Core.c c) m1 b) ->
   @head_inv (Core.upd c c') (Core.upd d d') pf cd' mu' mus m1' m2'.
 Proof.
-move=> hdinv frame args rets mylocs effstep effstepN vgenv mtch locs.
+move=> hdinv frame effstep effstepN vgenv mtch.
 apply: Build_head_inv=> //.
 by apply: (all_relinv_step frame); apply: (head_rel hdinv).
-+ case: hdinv=> hdmtch ? A ? ?; apply: (vis_inv_step A)=> //.
-  by apply match_visible in hdmtch.
+case: hdinv=> hdmtch ?; case=> B0 []?????.
+set B := REACH m1' 
+  (fun b => structured_injections.freshloc m1 m1' b
+         || RC.reach_set (ge (cores_S (Core.i c))) 
+              (RC.mk (Core.c c) B0) m1 b).
+{ exists B; rewrite /B; move {B}; split=> //. 
+  by apply: vis_inv_step=> //; apply match_visible in hdmtch. 
+  apply RCSem.step_ax=> //.
+  by apply effax1 in effstep; case: effstep. }
 move: alloc; case/sm_locally_allocatedChar=> _ []-> []_ []H1 []_ H2.
 rewrite (head_domt hdinv); extensionality b.
 case e: (freshloc m2 m2' b). 
@@ -1502,6 +1507,7 @@ case f: (valid_block_dec m2 b)=> [y|//].
 by case: (fwd2 y)=> H4; elimtype False; apply: H3; apply: H4.
 apply effstepN_corestepN in effstepN; simpl.
 by apply: (Nuke_sem.nucular_stepN _ _ effstepN)=> //; apply: (head_nukeI hdinv).
+by case: hdinv=> *; apply: (globalfunction_ptr_inject_intern_incr incr).
 Qed.
 
 End step_lems.
@@ -1512,7 +1518,9 @@ Import CallStack.
 Import Linker.
 Import STACK.
 
-Require Import mem_wd.
+Require Import mem_welldefined.
+
+(** ** Top-Level Invariant *)
 
 Record R (data : sig_data N (fun ix : 'I_N => (sims ix).(core_data))) 
          (mu : SM_Injection)
@@ -1532,8 +1540,7 @@ Record R (data : sig_data N (fun ix : 'I_N => (sims ix).(core_data)))
            (mu_top : Inj.t) mus, 
     [/\ mu = mu_top
       , exists pf2 : projT1 data = c.(Core.i),
-          @head_inv c d pf (cast_ty (lift_eq _ pf2) (projT2 data)) 
-          mu_top mus m1 m2 
+        @head_inv c d pf (cast_ty (lift_eq _ pf2) (projT2 data)) mu_top mus m1 m2 
       & tail_inv mus (pop s1) (pop s2) m1 m2] 
 
     (* side conditions *)
@@ -1632,7 +1639,7 @@ Proof. by rewrite /inContext /callStackSize R_len_callStack. Qed.
 Lemma R_wd : SM_wd mu.
 Proof.
 case: (R_inv pf)=> pf2 []pf_sig []mu_top []mus []eq []pf3 [].
-by move/match_sm_wd=> wd _ _ _ _ _; rewrite eq.
+by move/match_sm_wd=> wd _ _ _ _ _ _; rewrite eq.
 Qed.
 
 End R_lems.
@@ -1645,38 +1652,11 @@ Context (my_cores : 'I_N -> t) c1 sg ix v vs
 Lemma initCore_ix : ix = Core.i c1.
 Proof.
 move: init1; rewrite /init1 /initCore.
-by case: (core_semantics.initial_core _ _ _ _)=> // c;
+by case: (semantics.initial_core _ _ _ _)=> // c;
   case; case: c1=> ? ? ?; case.
 Qed.
 
 End initCore_lems.
-
-Section initCore_lems2.
-
-Context c1 sg ix v vs (init1 : initCore cores_S sg ix v vs = Some c1).
-
-Lemma initCore_args : RC.args (Core.c c1) = vs.
-Proof.
-move: init1; rewrite /initCore /= /RC.initial_core.
-case: (initial_core _ _ _ _)=> // c. 
-by case; case: c1=> ?; case=> ? ? ? ? ? /=; case=> _ _ ->.
-Qed.
-
-Lemma initCore_rets : RC.rets (Core.c c1) = [::].
-Proof.
-move: init1; rewrite /initCore /= /RC.initial_core.
-case: (initial_core _ _ _ _)=> // c. 
-by case; case: c1=> ?; case=> ? ? ? ? ? /=; case=> _ _ _ ->.
-Qed.
-
-Lemma initCore_locs : RC.locs (Core.c c1) = (fun _ => false).
-Proof.
-move: init1; rewrite /initCore /= /RC.initial_core.
-case: (initial_core _ _ _ _)=> // c. 
-by case; case: c1=> ?; case=> ? ? ? ? ? /=; case=> _ _ _ _ ->.
-Qed.
-
-End initCore_lems2.
 
 End linkingInv.
 

@@ -12,11 +12,11 @@ Require Import Stacklayout.
 Require Import Conventions.
 
 (*LENB: again, we import the modified Asm*)
-Require Import AsmEFF. 
+Require Import Asm_comp. 
 Require Import Asm_coop. 
 
 Require Import mem_lemmas. (*for mem_forward*)
-Require Import core_semantics.
+Require Import semantics.
 Require Import effect_semantics.
 Require Import BuiltinEffects.
 Require Import load_frame.
@@ -407,13 +407,14 @@ Qed.
 
 Program Definition Asm_eff_sem : 
   @EffectSem genv state.
+Proof.
 eapply Build_EffectSem with (sem := Asm_coop_sem hf).
 apply asmstep_effax1.
 apply asmstep_effax2.
 apply asm_effstep_valid. 
 Defined.
 
-Require Import core_semantics_lemmas.
+Require Import semantics_lemmas.
 
 Lemma Asm_eff_sem_det : corestep_fun Asm_eff_sem.
 Proof.

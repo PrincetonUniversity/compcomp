@@ -23,6 +23,7 @@ Require Constprop.
 Require Tailcall.
 Require Allocation.
 Require Compiler.
+Require CompositionalCompiler.
 
 (* Standard lib *)
 Require Import ExtrOcamlBasic.
@@ -93,22 +94,45 @@ Extract Constant Linearize.enumerate_aux => "Linearizeaux.enumerate_aux".
 Extract Constant SimplExpr.first_unused_ident => "Camlcoq.first_unused_ident".
 Extraction Inline SimplExpr.ret SimplExpr.error SimplExpr.bind SimplExpr.bind2.
 
-(* Compiler *)
-Extract Constant Compiler.print_Clight => "PrintClight.print_if".
-Extract Constant Compiler.print_Cminor => "PrintCminor.print_if".
-Extract Constant Compiler.print_RTL => "PrintRTL.print_rtl".
-Extract Constant Compiler.print_RTL_tailcall => "PrintRTL.print_tailcall".
-Extract Constant Compiler.print_RTL_inline => "PrintRTL.print_inlining".
-Extract Constant Compiler.print_RTL_constprop => "PrintRTL.print_constprop".
-Extract Constant Compiler.print_RTL_cse => "PrintRTL.print_cse".
-Extract Constant Compiler.print_LTL => "PrintLTL.print_if".
-Extract Constant Compiler.print_Mach => "PrintMach.print_if".
-Extract Constant Compiler.print => "fun (f: 'a -> unit) (x: 'a) -> f x; x".
-(*Extraction Inline Compiler.apply_total Compiler.apply_partial.*)
+(* I64Helpers *)
+Extract Constant I64Helpers.get_helper =>
+  "fun s sg ->
+     Errors.OK (Camlcoq.intern_string (Camlcoq.camlstring_of_coqstring s))".
+Extract Constant I64Helpers.get_builtin =>
+  "fun s sg ->
+     Errors.OK (Camlcoq.intern_string (Camlcoq.camlstring_of_coqstring s))".
+
+(* CompositionalCompiler *)
+Extract Constant CompositionalCompiler.print_Clight => "PrintClight.print_if".
+Extract Constant CompositionalCompiler.print_Cminor => "PrintCminor.print_if".
+Extract Constant CompositionalCompiler.print_RTL => "PrintRTL.print_rtl".
+Extract Constant CompositionalCompiler.print_RTL_tailcall => "PrintRTL.print_tailcall".
+(*Extract Constant CompositionalCompiler.print_RTL_inline => "PrintRTL.print_inlining".*)
+(*Extract Constant CompositionalCompiler.print_RTL_constprop => "PrintRTL.print_constprop".*)
+(*Extract Constant CompositionalCompiler.print_RTL_cse => "PrintRTL.print_cse".*)
+Extract Constant CompositionalCompiler.print_LTL => "PrintLTL.print_if".
+Extract Constant CompositionalCompiler.print_Mach => "PrintMach.print_if".
+Extract Constant CompositionalCompiler.print => "fun (f: 'a -> unit) (x: 'a) -> f x; x".
+(*Extraction Inline CompositionalCompiler.apply_total CompositionalCompiler.apply_partial.*)
 
 (* Processor-specific extraction directives *)
 
-Load extractionMachdep.
+Require Asm.
+Require Asm_comp.
+
+(*Load extractionMachdep.*)
+
+(* Additional extraction directives specific to the IA32 port 
+(originally from ia32/extractionMachdep.v, copied here temporarily. *)
+
+Require SelectOp.
+
+(* SelectOp *)
+
+Extract Constant SelectOp.symbol_is_external =>
+  "fun id -> Configuration.system = ""macosx"" && C2C.atom_is_extern id".
+
+(* END additional directives *)
 
 (* Avoid name clashes *)
 Extraction Blacklist List String Int.
@@ -125,9 +149,9 @@ Set Extraction AccessOpaque.
 
 (* Go! *)
 Cd "extraction".
-(* Recursive Extraction Library Compiler. *)
+(* Recursive Extraction Library CompositionalCompiler. *)
 Separate Extraction
-   Compiler.transf_c_program Compiler.transf_cminor_program
+   CompositionalCompiler.transf_c_program CompositionalCompiler.transf_cminor_program
    Cexec.do_initial_state Cexec.do_step Cexec.at_final_state
    Initializers.transl_init Initializers.constval
    Csyntax.Eindex Csyntax.Epreincr
@@ -135,4 +159,5 @@ Separate Extraction
    RTL.instr_defs RTL.instr_uses
    Machregs.mregs_for_operation Machregs.mregs_for_builtin
    Machregs.two_address_op
-   Nan.default_pl Nan.choose_binop_pl.
+   Nan.default_pl Nan.choose_binop_pl
+   Coqlib.sum_left_map.

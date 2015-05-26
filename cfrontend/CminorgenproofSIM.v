@@ -18,8 +18,8 @@ Require Import Csharpminor_coop.
 Require Import CminorgenproofRestructured.
 
 Require Import mem_lemmas.
-Require Import core_semantics.
-Require Import core_semantics_lemmas.
+Require Import semantics.
+Require Import semantics_lemmas.
 
 Require Import Coq.Program.Equality.
 Require Import BuiltinEffects.

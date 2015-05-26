@@ -10,7 +10,7 @@ Require Import Smallstep.
 Require Import Op.
 Require Import Registers.
 
-Require Import core_semantics.
+Require Import semantics.
 Require Import val_casted.
 
 Require Import RTL.
@@ -208,6 +208,7 @@ Definition RTL_after_external (vret: option val)(c: RTL_core): option RTL_core :
 
 Lemma corestep_not_external: forall (ge : genv) (m : mem) (q : RTL_core) (m' : mem) (q' : RTL_core),
                                RTL_corestep ge q m q' m' -> RTL_at_external q = None.
+Proof.
   intros. inv H; try reflexivity. 
   simpl. destruct (observableEF_dec hf ef); simpl; trivial. 
   exfalso. eapply EFhelpers; eassumption. 
@@ -218,15 +219,18 @@ Lemma corestep_not_halted: forall (ge : genv) (m : mem) (q : RTL_core) (m' : mem
 Proof. intros. inv H; try reflexivity. Qed.
 
 Lemma external_xor_halted: forall q : RTL_core, RTL_at_external q = None \/ RTL_halted q = None.
+Proof.
   destruct q; simpl; try (left; reflexivity); try (right; reflexivity).
 Qed.
 
 Lemma after_xor_at_external: forall (retv : option val) (q q' : RTL_core),
                                RTL_after_external retv q = Some q' -> RTL_at_external q' = None.
+Proof.
   intros. destruct q; destruct q'; try destruct f; destruct retv; simpl in *; try discriminate; try reflexivity.
 Qed.
 
 Definition RTL_core_sem : CoreSemantics genv RTL_core mem.
+Proof.
   eapply (@Build_CoreSemantics _ _ _ 
             RTL_initial_core
             RTL_at_external
@@ -259,6 +263,7 @@ Qed.
 
 Program Definition rtl_coop_sem : 
   CoopCoreSem genv RTL_core.
+Proof.
 apply Build_CoopCoreSem with (coopsem := RTL_core_sem).
   apply rtl_coop_forward.
 Defined.

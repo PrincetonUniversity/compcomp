@@ -13,7 +13,7 @@ Require Import Cminor_coop.
 Require Import Csharpminor.
 
 Require Import mem_lemmas. (*for mem_forward*)
-Require Import core_semantics.
+Require Import semantics.
 Require Import val_casted.
 Require Import BuiltinEffects.
 
@@ -236,31 +236,9 @@ Definition CSharpMin_initial_core (ge:genv) (v: val) (args:list val): option CSh
           else None
      | _ => None
     end.
- (*
-Parameter CSharpMin_MainIdent:ident.
-
-Definition CSharpMin_make_initial_core (ge:genv) (v: val) (args:list val): option CSharpMin_core :=
-   match Genv.find_symbol ge CSharpMin_MainIdent with
-        None => None
-      | Some b => match Genv.find_funct_ptr ge b with
-                              None => None
-                            | Some f => match funsig f with
-                                                   {| sig_args := sargs; sig_res := sres |} => 
-                                                       match sargs, sres with 
-                                                          nil, Some Tint => Some (CSharpMin_Callstate f nil Kstop) (*args = nil???*)
-                                                       | _ , _ => None
-                                                       end
-                                                 end
-                            end
-    end.*)
-(*Original Csharpminor_semantics has this for initial states: 
-      Genv.find_symbol ge p.(prog_main) = Some b ->
-      Genv.find_funct_ptr ge b = Some f ->
-      funsig f = mksignature nil (Some Tint) ->
-      initial_state p (Callstate f nil Kstop m0).
- ie esseantially the same as Cminor*)
 
 Definition CSharpMin_core_sem : CoreSemantics genv CSharpMin_core mem.
+Proof.
   eapply (@Build_CoreSemantics _ _ _ 
     CSharpMin_initial_core
     CSharpMin_at_external
@@ -300,51 +278,9 @@ Qed.
 
 Program Definition csharpmin_coop_sem : 
   CoopCoreSem Csharpminor.genv CSharpMin_core.
+Proof.
 apply Build_CoopCoreSem with (coopsem := CSharpMin_core_sem).
   apply CSharpMin_forward.
 Defined.
-(*
-Definition coopstep g c m c' m' :=
-   CSharpMin_corestep g c m c' m'.
-
-Lemma csharpmin_coopstep_not_at_external: forall ge m q m' q',
-  coopstep ge q m q' m' -> CSharpMin_at_external q = None.
-Proof.
-  intros.
-  eapply CSharpMin_corestep_not_at_external. apply H. 
-Qed.
-
-Lemma csharpmin_coopstep_not_halted :
-  forall ge m q m' q', coopstep ge q m q' m' -> CSharpMin_halted q = None.
-Proof.
-  intros.
-  eapply CSharpMin_corestep_not_halted. apply H.
-Qed.
-
-Program Definition csharpmin_core_sem : 
-  CoreSemantics Csharpminor.genv CSharpMin_core mem :=
-  @Build_CoreSemantics _ _ _ 
-    CSharpMin_initial_core
-    CSharpMin_at_external
-    CSharpMin_after_external
-    CSharpMin_halted
-    coopstep
-    csharpmin_coopstep_not_at_external
-    csharpmin_coopstep_not_halted 
-    CSharpMin_at_external_halted_excl
-    CSharpMin_after_at_external_excl.
-
-(************************NOW SHOW THAT WE ALSO HAVE A COOPSEM******)
-
-Lemma csharpmin_coop_forward : forall g c m c' m' (CS: coopstep g c m c' m'), 
-      mem_lemmas.mem_forward m m'.
-Proof. intros. eapply CSharpMin_forward. apply CS. Qed.
-
-Program Definition csharpmin_coop_sem : 
-  CoopCoreSem Csharpminor.genv CSharpMin_core.
-apply Build_CoopCoreSem with (coopsem := csharpmin_core_sem).
-  apply csharpmin_coop_forward.
-Defined.
-*)
 
 End CSHARPMINOR_COOP.

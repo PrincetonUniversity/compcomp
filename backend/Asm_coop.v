@@ -13,10 +13,10 @@ Require Import Stacklayout.
 Require Import Conventions.
 
 (*LENB: We don't import CompCert's original Asm.v, but the modified one*)
-Require Import AsmEFF. 
+Require Import Asm_comp. 
 
 Require Import mem_lemmas. (*for mem_forward*)
-Require Import core_semantics.
+Require Import semantics.
 Require Import val_casted.
 Require Import BuiltinEffects.
 Require Import load_frame.
@@ -247,6 +247,7 @@ Lemma Asm_corestep_not_halted : forall ge m q m' q',
   Qed.
  
 Definition Asm_core_sem : CoreSemantics genv state mem.
+Proof.
   eapply (@Build_CoreSemantics _ _ _ 
             Asm_initial_core
             Asm_at_external
@@ -365,6 +366,7 @@ Qed.
    
 Program Definition Asm_coop_sem : 
   CoopCoreSem genv state.
+Proof.
 apply Build_CoopCoreSem with (coopsem := Asm_core_sem).
   apply Asm_forward.
 Defined.

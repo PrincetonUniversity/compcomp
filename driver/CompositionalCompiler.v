@@ -10,7 +10,7 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(** The whole compiler and its proof of semantic preservation *)
+(** * The whole compiler and its proof of semantic preservation *)
 
 (** Libraries. *)
 Require Import Coqlib.
@@ -30,7 +30,7 @@ Require RTL.
 Require LTL.
 Require Linear.
 Require Mach.
-Require AsmEFF.
+Require Asm_comp.
 (** Translation passes. *)
 Require Initializers.
 Require SimplExpr.
@@ -40,43 +40,34 @@ Require Cminorgen.
 Require SelectionNEW.
 Require RTLgen.
 Require Tailcall.
-(*Require Inlining.*)
 Require Renumber.
-(*Require Constprop.
-Require CSE.*)
 Require Allocation.
 Require Tunneling.
 Require Linearize.
 Require CleanupLabels.
 Require Stacking.
-Require AsmgenEFF.
+Require Asmgen_comp.
 (** Proofs of semantic preservation. *)
 Require SimplExprproof.
-Require SimplLocalsproofEFF.
-Require CshmgenproofEFF.
-Require CminorgenproofEFF.
-Require SelectionproofEFF.
-Require RTLgenproofEFF.
-Require TailcallproofEFF.
-(*Require Inliningproof.*)
-Require RenumberproofEFF.
-(*Require Constpropproof.
-Require CSEproof.*)
-Require AllocproofEFF.
-Require TunnelingproofEFF.
-Require LinearizeproofEFF.
-Require CleanupLabelsproofEFF.
-Require StackingproofEFF.
-Require AsmgenproofEFF.
+Require SimplLocalsproof_comp.
+Require Cshmgenproof_comp.
+Require Cminorgenproof_comp.
+Require Selectionproof_comp.
+Require RTLgenproof_comp.
+Require Tailcallproof_comp.
+Require Renumberproof_comp.
+Require Allocproof_comp.
+Require Tunnelingproof_comp.
+Require Linearizeproof_comp.
+Require CleanupLabelsproof_comp.
+Require Stackingproof_comp.
+Require Asmgenproof_comp.
 
 (** Pretty-printers (defined in Caml). *)
 Parameter print_Clight: Clight.program -> unit.
 Parameter print_Cminor: Cminor.program -> unit.
 Parameter print_RTL: RTL.program -> unit.
 Parameter print_RTL_tailcall: RTL.program -> unit.
-(*Parameter print_RTL_inline: RTL.program -> unit.
-Parameter print_RTL_constprop: RTL.program -> unit.
-Parameter print_RTL_cse: RTL.program -> unit.*)
 Parameter print_LTL: LTL.program -> unit.
 Parameter print_Mach: Mach.program -> unit.
 
@@ -102,24 +93,16 @@ Notation "a @@ b" :=
 Definition print {A: Type} (printer: A -> unit) (prog: A) : A :=
   let unused := printer prog in prog.
 
-(** We define three translation functions for whole programs: one
-  starting with a C program, one with a Cminor program, one with an
-  RTL program.  The three translations produce Asm programs ready for
-  pretty-printing and assembling. *)
+(** We define three translation functions: one starting with a C program, one
+  with a Cminor program, one with an RTL program.  The three translations
+  produce Asm programs ready for pretty-printing and assembling. *)
 
-Definition transf_rtl_program (f: RTL.program) : res AsmEFF.program :=
+Definition transf_rtl_program (f: RTL.program) : res Asm_comp.program :=
    OK f
    @@ print print_RTL
    @@ Tailcall.transf_program
    @@ print print_RTL_tailcall
-(*  @@@ Inlining.transf_program*)
    @@ Renumber.transf_program
-(*  @@ print print_RTL_inline*)
-(*   @@ Constprop.transf_program*)
-(*  @@ Renumber.transf_program*)
-(*   @@ print print_RTL_constprop
-  @@@ CSE.transf_program
-   @@ print print_RTL_cse*)
   @@@ Allocation.transf_program
    @@ print print_LTL
    @@ Tunneling.tunnel_program
@@ -127,16 +110,16 @@ Definition transf_rtl_program (f: RTL.program) : res AsmEFF.program :=
    @@ CleanupLabels.transf_program
   @@@ Stacking.transf_program
    @@ print print_Mach
-  @@@ AsmgenEFF.transf_program.
+  @@@ Asmgen_comp.transf_program.
 
-Definition transf_cminor_program (p: Cminor.program) : res AsmEFF.program :=
+Definition transf_cminor_program (p: Cminor.program) : res Asm_comp.program :=
    OK p
    @@ print print_Cminor
   @@@ SelectionNEW.sel_program
   @@@ RTLgen.transl_program
   @@@ transf_rtl_program.
 
-Definition transf_clight_program (p: Clight.program) : res AsmEFF.program :=
+Definition transf_clight_program (p: Clight.program) : res Asm_comp.program :=
   OK p 
    @@ print print_Clight
   @@@ SimplLocals.transf_program
@@ -144,11 +127,10 @@ Definition transf_clight_program (p: Clight.program) : res AsmEFF.program :=
   @@@ Cminorgen.transl_program
   @@@ transf_cminor_program.
 
-(*Definition transf_c_program (p: Csyntax.program) : res Asm.program :=
+Definition transf_c_program (p: Csyntax.program) : res Asm_comp.program :=
   OK p 
   @@@ SimplExpr.transl_program
   @@@ transf_clight_program.
-*)
 
 (** Force [Initializers] and [Cexec] to be extracted as well. *)
 
@@ -161,7 +143,7 @@ Lemma print_identity:
   forall (A: Type) (printer: A -> unit) (prog: A),
   print printer prog = prog.
 Proof.
-  intros; unfold print. (*destruct (printer prog);*) auto. 
+  intros; unfold print. auto.
 Qed.
 
 Lemma compose_print_identity:
@@ -170,7 +152,6 @@ Lemma compose_print_identity:
 Proof.
   intros. destruct x; simpl. rewrite print_identity. auto. auto. 
 Qed.
-
 
 Lemma fst_transform_globdef_eq A B V (f : A -> B) (gv : ident*globdef A V) :
   fst (transform_program_globdef f gv) = fst gv.
@@ -251,38 +232,26 @@ Proof. intros; erewrite <-list_norepet_transform; eauto. Qed.
 
 (** * Semantic preservation *)
 
-(** We prove that the [transf_program] translations preserve semantics
-  by constructing the following simulations:
-- Forward simulations from [Cstrategy] / [Cminor] / [RTL] to [Asm]
-  (composition of the forward simulations for each pass).
-- Backward simulations for the same languages
-  (derived from the forward simulation, using receptiveness of the source
-  language and determinacy of [Asm]).
-- Backward simulation from [Csem] to [Asm]
-  (composition of two backward simulations).
-
-These results establish the correctness of the whole compiler! *)
-
-Require Import effect_simulations.
-Require Import effect_simulations_trans.
+Require Import simulations.
+Require Import simulations_trans.
 Require Import Globalenvs.
 Require Import Cminor_eff.
 Require Import Clight_eff.
 Require Import RTL_eff.
 Require Import Asm_eff.
 
-(* See CompCert's Selectionproof.v, in which the same assumption is made: *)
+(** See CompCert's backend/Selectionproof.v, in which the same assumption is
+  made (l. 690).  We pull it out to the top-level because all of our language semantics
+  are now parameterized by [hf], in order to properly classify I64 helper
+  functions as nonobservable. *)
 
 Parameter hf : I64Helpers.helper_functions.
 Axiom HelpersOK: I64Helpers.get_helpers = OK hf.
 
-(* We pull it out to the top-level because all of our language semantics 
-   are now parameterized by [hf], in order to properly classify I64 helper
-   functions as nonobservable. *)
+(** Prove the existence of a structured simulation between RTL and Asm. *)
 
 Theorem transf_rtl_program_correct:
-  forall p tp m0 (INIT: Genv.init_mem p = Some m0)
-  (LNR: list_norepet (map fst (prog_defs p))),
+  forall p tp (LNR: list_norepet (map fst (prog_defs p))),
   transf_rtl_program p = OK tp ->
   SM_simulation.SM_simulation_inject (rtl_eff_sem hf) (Asm_eff_sem hf)
       (Genv.globalenv p) (Genv.globalenv tp).
@@ -299,60 +268,39 @@ Proof.
   set (p6 := CleanupLabels.transf_program p5) in *.
   destruct (Stacking.transf_program p6) as [p7|] eqn:?; simpl in H; try discriminate.
   eapply eff_sim_trans.
-    eapply TailcallproofEFF.transl_program_correct. 
-    assumption. exists m0. assumption.
-  apply Genv.init_mem_transf with (transf:= Tailcall.transf_fundef)
-      in INIT.
+    eapply Tailcallproof_comp.transl_program_correct. 
   eapply TransformLNR in LNR.
   eapply eff_sim_trans.
-    eapply RenumberproofEFF.transl_program_correct.
-    eapply LNR.
-    exists m0. apply INIT. 
-  eapply Genv.init_mem_transf with (transf:= Renumber.transf_fundef)
-      in INIT.
+    eapply Renumberproof_comp.transl_program_correct.
   eapply TransformLNR in LNR.
   eapply eff_sim_trans.
-    eapply AllocproofEFF.transl_program_correct.
+    eapply Allocproof_comp.transl_program_correct.
     instantiate (1:=p3). auto.
-    eapply LNR.
-    exists m0. apply INIT.  
-  eapply Genv.init_mem_transf_partial in INIT.  2: eauto.
-  eapply TransformLNR_partial in LNR.  2: eauto.
+  eapply TransformLNR_partial in LNR. 2: eauto.
   eapply eff_sim_trans.
-    eapply TunnelingproofEFF.transl_program_correct.
-    eassumption.
-    exists m0. apply INIT. 
-  eapply Genv.init_mem_transf in INIT. 
+    eapply Tunnelingproof_comp.transl_program_correct.
   eapply TransformLNR in LNR. 
   eapply eff_sim_trans.
-    eapply LinearizeproofEFF.transl_program_correct. 
+    eapply Linearizeproof_comp.transl_program_correct. 
     eassumption. 
-    eassumption.
-    exists m0. apply INIT. 
-  eapply Genv.init_mem_transf_partial in INIT. 2: eauto.
   eapply TransformLNR_partial in LNR. 2: eauto.
   eapply eff_sim_trans.
-    eapply CleanupLabelsproofEFF.transl_program_correct.
-    eassumption.
-    exists m0. apply INIT. 
-  eapply Genv.init_mem_transf in INIT.
+    eapply CleanupLabelsproof_comp.transl_program_correct.
   eapply TransformLNR in LNR. 
   eapply eff_sim_trans.
-    eapply StackingproofEFF.transl_program_correct.
-    eexact AsmgenproofEFF.return_address_exists. eassumption.
+    eapply Stackingproof_comp.transl_program_correct.
+    eexact Asmgenproof_comp.return_address_exists. eassumption.
     eassumption.
-    exists m0. apply INIT. 
-  eapply Genv.init_mem_transf_partial in INIT. 2: eauto.
   eapply TransformLNR_partial in LNR. 2: eauto.
-  apply AsmgenproofEFF.transl_program_correct. 
+  apply Asmgenproof_comp.transl_program_correct. 
     eassumption.
-    eassumption.
-    exists m0. apply INIT.
 Qed.
 
+(** Prove the existence of a structured simulation between Cminor and Asm, 
+    relying on [transf_rtl_program_correct] above. *)
+
 Theorem transf_cminor_program_correct:
-  forall p tp m0 (INIT: Genv.init_mem p = Some m0)
-  (LNR: list_norepet (map fst (prog_defs p))),
+  forall p tp (LNR: list_norepet (map fst (prog_defs p))),
   transf_cminor_program p = OK tp ->
   SM_simulation.SM_simulation_inject (cmin_eff_sem hf) (Asm_eff_sem hf)
       (Genv.globalenv p) (Genv.globalenv tp).
@@ -364,30 +312,26 @@ Proof.
   destruct (SelectionNEW.sel_program p) as [p1|] eqn:?; simpl in H; try discriminate.
   destruct (RTLgen.transl_program p1) as [p2|] eqn:?; simpl in H; try discriminate.
   eapply eff_sim_trans.
-    eapply SelectionproofEFF.transl_program_correct.
+    eapply Selectionproof_comp.transl_program_correct.
      apply BuiltinEffects.get_helpers_correct. apply HelpersOK.
-     unfold SelectionNEW.sel_program. unfold bind.
-     rewrite HelpersOK. trivial.
-     assumption.
-     exists m0. eassumption.
   unfold SelectionNEW.sel_program in Heqr. unfold bind in Heqr.
      rewrite HelpersOK in Heqr. inv Heqr. 
-  eapply Genv.init_mem_transf in INIT. 
   eapply TransformLNR in LNR.   
   eapply eff_sim_trans.
-    eapply RTLgenproofEFF.transl_program_correct.
+    eapply RTLgenproof_comp.transl_program_correct.
      eassumption.
-     eassumption.
-     exists m0. apply INIT.
-  eapply Genv.init_mem_transf_partial in INIT. 2: eauto.
   eapply TransformLNR_partial in LNR.  
     eapply transf_rtl_program_correct; try eassumption. 
     unfold  RTLgen.transl_program in Heqr0. eassumption. 
 Qed.
 
+(** Prove the existence of a structured simulation between Clight and Asm, 
+    relying on [transf_cminor_program_correct] above. *)
+
+(** This is Theorem 3, Compiler Correctness in on pg. 11 (Clight->x86 Asm). *)
+
 Theorem transf_clight_program_correct:
-  forall p tp m0 (INIT: Genv.init_mem p = Some m0)
-  (LNR: list_norepet (map fst (prog_defs p))),
+  forall p tp (LNR: list_norepet (map fst (prog_defs p))),
   transf_clight_program p = OK tp ->
   SM_simulation.SM_simulation_inject (CL_eff_sem1 hf) 
       (Asm_eff_sem hf)
@@ -401,26 +345,92 @@ Proof.
   destruct (Cshmgen.transl_program p1) as [p2|] eqn:?; simpl in H; try discriminate.
   destruct (Cminorgen.transl_program p2) as [p3|] eqn:?; simpl in H; try discriminate.
   eapply eff_sim_trans.
-    eapply SimplLocalsproofEFF.transl_program_correct. eassumption.
+    eapply SimplLocalsproof_comp.transl_program_correct. eassumption.
      eassumption. 
-     exists m0; eassumption.
-  eapply Genv.init_mem_transf_partial in INIT. 2: eauto.
   eapply TransformLNR_partial in LNR. 2: eauto.
   eapply eff_sim_trans.
-    eapply CshmgenproofEFF.transl_program_correct. 
+    eapply Cshmgenproof_comp.transl_program_correct. 
     eassumption.
     eassumption.
-    exists m0; eassumption.
- 
-  eapply Genv.init_mem_transf_partial2 in INIT. Focus 2. eapply Heqr0. 
   eapply TransformLNR_partial2 in LNR; eauto.
-   
   eapply eff_sim_trans.
-    eapply CminorgenproofEFF.transl_program_correct. 
+    eapply Cminorgenproof_comp.transl_program_correct. 
     eassumption.
     eassumption.
-    exists m0; eassumption. 
-  eapply Genv.init_mem_transf_partial in INIT. 2: eauto.
   eapply TransformLNR_partial in LNR. 2: eauto.
   eapply transf_cminor_program_correct; eassumption. 
+Qed.
+
+(** Prove that global symbols are preserved by compilation. *)
+
+Theorem transf_rtl_program_preserves_syms:
+  forall p tp, 
+  transf_rtl_program p = OK tp ->
+  forall s : ident,
+  Genv.find_symbol (Genv.globalenv tp) s =
+  Genv.find_symbol (Genv.globalenv p) s.
+Proof.
+  intros. 
+  unfold transf_rtl_program in H.
+  repeat rewrite compose_print_identity in H.
+  simpl in H. 
+  set (p1 := Tailcall.transf_program p) in *.
+  set (p2 := Renumber.transf_program p1) in *.
+  destruct (Allocation.transf_program p2) as [p3|] eqn:?; simpl in H; try discriminate.
+  set (p4 := Tunneling.tunnel_program p3) in *.
+  destruct (Linearize.transf_program p4) as [p5|] eqn:?; simpl in H; try discriminate.
+  set (p6 := CleanupLabels.transf_program p5) in *.
+  destruct (Stacking.transf_program p6) as [p7|] eqn:?; simpl in H; try discriminate.
+  generalize (Tailcallproof_comp.symbols_preserved p s); intro Heqr5.
+  generalize (Renumberproof_comp.symbols_preserved p1 s); intro Heqr4.
+  apply Allocproof_comp.symbols_preserved with (s:=s) in Heqr.
+  generalize (Tunnelingproof_comp.symbols_preserved p3 s); intro Heqr3.
+  apply Linearizeproof_comp.symbols_preserved with (id:=s) in Heqr0.
+  generalize (CleanupLabelsproof_comp.symbols_preserved p5 s); intro Heqr2.
+  apply Stackingproof_comp.symbols_preserved with (id:=s) in Heqr1.
+  apply Asmgenproof_comp.symbols_preserved with (id:=s) in H.
+  rewrite H, Heqr1; unfold p6; rewrite Heqr2, Heqr0. 
+  unfold p4; rewrite Heqr3, Heqr.
+  unfold p2; rewrite Heqr4; unfold p1; rewrite Heqr5; auto.
+Qed.
+
+Theorem transf_cminor_program_preserves_syms:
+  forall p tp,
+  transf_cminor_program p = OK tp ->
+  forall s : ident,
+  Genv.find_symbol (Genv.globalenv tp) s =
+  Genv.find_symbol (Genv.globalenv p) s.
+Proof.
+  intros.
+  unfold transf_cminor_program in H.
+  repeat rewrite compose_print_identity in H.
+  simpl in H. 
+  destruct (SelectionNEW.sel_program p) as [p1|] eqn:?; simpl in H; try discriminate.
+  destruct (RTLgen.transl_program p1) as [p2|] eqn:?; simpl in H; try discriminate.
+  apply transf_rtl_program_preserves_syms with (s:=s) in H; rewrite H.
+  apply RTLgenproof_comp.symbols_preserved with (s:=s) in Heqr0; rewrite Heqr0.
+  generalize (Selectionproof_comp.symbols_preserved p hf s); intros H2.
+  revert Heqr; unfold SelectionNEW.sel_program, bind.
+  rewrite HelpersOK; inversion 1; rewrite H2; auto.
+Qed.
+
+Theorem transf_clight_program_preserves_syms:
+  forall p tp,
+  transf_clight_program p = OK tp ->
+  forall s : ident,
+  Genv.find_symbol (Genv.globalenv tp) s =
+  Genv.find_symbol (Genv.globalenv p) s.
+Proof.
+  intros.
+  unfold transf_clight_program in H.
+  repeat rewrite compose_print_identity in H.
+  simpl in H. 
+  destruct (SimplLocals.transf_program p) as [p1|] eqn:?; simpl in H; try discriminate.
+  destruct (Cshmgen.transl_program p1) as [p2|] eqn:?; simpl in H; try discriminate.
+  destruct (Cminorgen.transl_program p2) as [p3|] eqn:?; simpl in H; try discriminate.
+  apply SimplLocalsproof_comp.symbols_preserved with (s := s) in Heqr.
+  apply Cshmgenproof_comp.symbols_preserved with (s := s) in Heqr0.
+  apply CminorgenproofRestructured.symbols_preserved with (s := s) in Heqr1.
+  apply transf_cminor_program_preserves_syms with (s := s) in H.
+  rewrite H, Heqr1, Heqr0, Heqr; auto.
 Qed.

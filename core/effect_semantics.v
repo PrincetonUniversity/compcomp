@@ -9,61 +9,41 @@ Require Import Globalenvs.
 Require Import Axioms.
 
 Require Import mem_lemmas. (*needed for definition of mem_forward etc*)
-Require Import core_semantics.
-Require Import core_semantics_lemmas.
-Require Import StructuredInjections.
+Require Import semantics.
+Require Import semantics_lemmas.
+Require Import structured_injections.
+
+(** * Effect Semantics *)
+
+(** Effect semantics augment interaction semantics with effects, in the form 
+    of a set of locations [block -> Z -> bool] associated with each internal 
+    step of the semantics. *)
+
+(** Unlike general interaction semantics, which are paremetric in the type of
+    memory, effect semantics are specialized to CompCert memories. *)
  
 Record EffectSem {G C} :=
-  { sem :> CoopCoreSem G C;
+  { (** [sem] is a cooperating interaaction semantics. *)
+    sem :> CoopCoreSem G C
 
-    effstep: G -> (block -> Z -> bool) -> C -> mem -> C -> mem -> Prop;
+    (** The step relation of the new semantics. *)
+  ; effstep: G -> (block -> Z -> bool) -> C -> mem -> C -> mem -> Prop
 
-    effax1: forall M g c m c' m',
+    (** The next three fields axiomatize [effstep] and its relation to the
+        underlying step relation of [sem]. *)
+  ; effax1: forall M g c m c' m',
        effstep g M c m c' m' ->
             corestep sem g c m c' m'  
-         /\ Mem.unchanged_on (fun b ofs => M b ofs = false) m m';
-
-    effax2: forall g c m c' m',
+         /\ Mem.unchanged_on (fun b ofs => M b ofs = false) m m'
+  ; effax2: forall g c m c' m',
        corestep sem g c m c' m' ->
-       exists M, effstep g M c m c' m';
-
-    effstep_valid: forall M g c m c' m',
+       exists M, effstep g M c m c' m'
+  ; effstep_valid: forall M g c m c' m',
        effstep g M c m c' m' ->
        forall b z, M b z = true -> Mem.valid_block m b
   }.
 
-(** This module defines an effect semantics typeclass, for building 
-    functors over effsem-like objects.  *)
-
-Module Effsem.
-Class t {G C : Type} : Type :=
-  { sem :> CoopCoreSem G C;
-    effstep: G -> (block -> Z -> bool) -> C -> mem -> C -> mem -> Prop;
-    effax1: forall M g c m c' m',
-       effstep g M c m c' m' ->
-            corestep sem g c m c' m'  
-         /\ Mem.unchanged_on (fun b ofs => M b ofs = false) m m';
-    effax2: forall g c m c' m',
-       corestep sem g c m c' m' ->
-       exists M, effstep g M c m c' m';
-    effstep_valid: forall M g c m c' m',
-       effstep g M c m c' m' ->
-       forall b z, M b z = true -> Mem.valid_block m b }.
-End Effsem.
-
-Instance effsem_instance (G C : Type) (sem : @EffectSem G C) : @Effsem.t G C :=
-  Effsem.Build_t G C  
-    sem
-    (effstep sem)
-    (effax1 sem) 
-    (effax2 sem)
-    (effstep_valid sem).
-
-Definition effstep_fun {G C : Type} (sem : @EffectSem G C) :=
-  forall (m m' m'' : mem) ge c c' c'' U U',
-  effstep sem ge U c m c' m' -> 
-  effstep sem ge U' c m c'' m'' -> 
-  U=U' /\ c'=c'' /\ m'=m''.
+(** * Lemmas and auxiliary definitions *)
 
 Section effsemlemmas.
   Context {G C:Type} (Sem: @EffectSem G C) (g:G).

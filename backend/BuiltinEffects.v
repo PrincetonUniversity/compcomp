@@ -10,11 +10,11 @@ Require Import Ctypes. (*for type and access_mode*)
 Require Import mem_lemmas. (*needed for definition of valid_block_dec etc*)
 
 Require Import Axioms.
-Require Import StructuredInjections.
+Require Import structured_injections.
 Require Import reach. 
 Require Import effect_semantics. 
 Require Import effect_properties.
-Require Import effect_simulations. 
+Require Import simulations. 
 
 Require Import I64Helpers.
 
@@ -248,7 +248,7 @@ Definition i64_helpers_correct: Prop :=
   /\(forall x, builtin_implements hf.(i64_neg) sig_l_l (x::nil) (Val.negl x))
   /\(forall x y, builtin_implements hf.(i64_add) sig_ll_l (x::y::nil) (Val.addl x y))
   /\(forall x y, builtin_implements hf.(i64_sub) sig_ll_l (x::y::nil) (Val.subl x y))
-  /\(forall x y, builtin_implements hf.(i64_mul) sig_ll_l (x::y::nil) (Val.mull' x y)) (*LENB: Compcert had sig_ii here*)
+  /\(forall x y, builtin_implements hf.(i64_mul) sig_ii_l (x::y::nil) (Val.mull' x y)) (*LENB: Compcert had sig_ii here*)
   /\(forall x y z, Val.divls x y = Some z -> helper_implements hf.(i64_sdiv) sig_ll_l (x::y::nil) z)
   /\(forall x y z, Val.divlu x y = Some z -> helper_implements hf.(i64_udiv) sig_ll_l (x::y::nil) z)
   /\(forall x y z, Val.modls x y = Some z -> helper_implements hf.(i64_smod) sig_ll_l (x::y::nil) z)

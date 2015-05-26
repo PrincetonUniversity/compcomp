@@ -11,33 +11,33 @@ Set Implicit Arguments.
 Require Import pos.
 Require Import cast.
 
-(* This file defines a generalized lexicographic order on dependently     *)
-(* typed products.  It exposes the following interface:                   *)
-(*                                                                        *)
-(* Assumptions:                                                           *)
-(* Variable N : nat.                                                      *)
-(* Variable N_pos : (0 < N)%coq_nat.                                      *)
-(* Variable types : 'I_N -> Type.                                         *)
-(* Variable ords  : forall i : 'I_N, types i -> types i -> Prop.          *)
-(* Variable wf_ords : forall i : 'I_N, well_founded (@ords i).            *)
-(*                                                                        *)
-(* Exported:                                                              *)
-(* t        : Type                                                        *)
-(* mk       : (forall i : 'I_N, types i) -> t                             *)
-(* get      : (i : 'I_N) (d : t), types i                                 *)
-(* set      : {i : 'I_N} (d : t) (x : types i), t                         *)
-(*                                                                        *)
-(* ord      : t -> t -> Prop                                              *)
-(* wf_ord   : well_founded ord                                            *)
-(* ord_set  : (i : 'I_N) (d : t) (x : types i),                           *)
-(*            ords i x (get i d) -> ord (set d x) d                       *)
-(* gss      : (i : 'I_N) (x : types i) (d : t), get i (set i x d) = x     *)
-(* gso      : (i j : 'I_N) (x : types i) (d : t),                         *)
-(*            i <> j -> get j (set i x d) = get j d                       *)
-(*                                                                        *)
-(* In addition, it defines a WF order on the \Sigma-type                  *)
-(*   \Sigma ix : 'I_N. T ix                                               *)
+(** * Well-Founded Orders *)
 
+(** This file defines a generalized lexicographic order on dependently
+typed products.  It exposes the following interface: *)
+
+(** Assumptions: 
+- [Variable N : nat.] 
+- [Variable N_pos : (0 < N)%coq_nat.] 
+- [Variable types : 'I_N -> Type.] 
+- [Variable ords  : forall i : 'I_N, types i -> types i -> Prop.] 
+- [Variable wf_ords : forall i : 'I_N, well_founded (@ords i).] *)
+
+(** Exported: 
+- [t        : Type] 
+- [mk       : (forall i : 'I_N, types i) -> t] 
+- [get      : (i : 'I_N) (d : t), types i] 
+- [set      : {i : 'I_N} (d : t) (x : types i), t] 
+- [ord      : t -> t -> Prop] 
+- [wf_ord   : well_founded ord] 
+- [ord_set  : (i : 'I_N) (d : t) (x : types i), 
+               ords i x (get i d) -> ord (set d x) d] 
+- [gss      : (i : 'I_N) (x : types i) (d : t), get i (set i x d) = x] 
+- [gso      : (i j : 'I_N) (x : types i) (d : t), 
+               i <> j -> get j (set i x d) = get j d] *)
+
+(** In addition, it defines a WF order on the [\Sigma]-type 
+      [\Sigma ix : 'I_N. T ix] *)
 
 Lemma ord_dec (N : nat) (i j : 'I_N) : {i=j} + {~i=j}.
 Proof. 
@@ -158,6 +158,7 @@ Lemma wf_ord : well_founded ord.
 Proof. by rewrite/ord; apply: wf_funct; apply: wf_ord'. Qed.
 
 Definition cast_ty (T1 T2: Type) (pf: T1=T2) (x : T1) : T2.
+Proof.
 rewrite pf in x; refine x.
 Defined. 
 
@@ -225,8 +226,8 @@ End lex.
 
 End Lex.
 
-(* The following defines a wf-order on the type                           *)
-(*   \Sigma ix : 'I_N. T ix                                               *)
+(** The following defines a wf-order on the type
+      \Sigma ix : 'I_N. T ix *)
 
 Section sig_ord.
 

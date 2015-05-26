@@ -17,17 +17,22 @@ Require Import val_casted.
 Require Import BuiltinEffects.
 Require Import load_frame.
 
-Require Import core_semantics.
-Require Import core_semantics_lemmas.
-Require Import mem_wd.
+Require Import semantics.
+Require Import semantics_lemmas.
+Require Import mem_welldefined.
 Require Import mem_lemmas.
 Require Import reach.
 Require Import nucular_semantics.
 
 (*LENB: We don't import CompCert's original Asm.v, but the modified one*)
-Require Import AsmEFF.
+Require Import Asm_comp.
 Require Import Asm_coop.  
 Notation SP := ESP (only parsing).
+
+(** * CompCert IA32 Asm is [nucular] *)
+
+(** This file proves that CompCert IA32 Asm is a [nucular] semantics, as defined
+in core/nucular_semantics.v. *)
 
 Notation "a # b" := (a b) (at level 1, only parsing).
 Notation "a # b <- c" := (Pregmap.set b c a) (at level 1, b at next level).
@@ -160,29 +165,6 @@ red; intros.
       specialize (H r). rewrite H1 in H. apply H.
   intros N; discriminate.
 Qed. 
-
-(*Lemma regmap_valid_undef_regs m: forall L rs rd v,
-      regmap_valid m rs -> val_valid v m -> 
-      regmap_valid m (undef_regs L rs # rd <- v).
-Proof. intros L. 
-destruct L; simpl; intros. 
-  apply regmap_valid_assign; eauto.
-red; intros.
-  remember (undef_regs L (rs # rd <- v) # p <- Vundef r)
-     as u. 
-  destruct u; simpl; trivial.
-  apply eq_sym in Hequ. apply undef_regsD in Hequ.
-  destruct Hequ.
-    destruct (PregEq.eq r p). 
-      subst. rewrite Pregmap.gss in H2. inv H2.
-    rewrite Pregmap.gso in H2; trivial. 
-    destruct (PregEq.eq r rd). 
-      subst. rewrite Pregmap.gss in H2. subst v; apply H0.
-    rewrite Pregmap.gso in H2; trivial. 
-      specialize (H r). rewrite H2 in H. apply H.
-  intros N; discriminate.
-Qed. 
-*)  
 
 Lemma loader_valid_forward m m' lf: loader_valid m lf ->
       mem_forward m m' -> loader_valid m' lf.
@@ -730,6 +712,8 @@ Definition Inv (c: state) (m:mem): Prop :=
   | Asm_CallstateOut _ vals rs lf =>
        regmap_valid m rs /\ loader_valid m lf /\ vals_valid m vals
   end. 
+
+(** ** Proof that CompCert Asm is a nucular semantics. *)
 
 Theorem Asm_is_nuc: Nuke_sem.t (Asm_core_sem hf).
 Proof.

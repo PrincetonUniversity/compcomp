@@ -8,7 +8,7 @@ Require Import Events.
 Require Import Globalenvs.
 
 Require Import mem_lemmas. (*for mem_forward*)
-Require Import core_semantics.
+Require Import semantics.
 Require Import effect_semantics.
 
 Require Import CminorSel.
@@ -273,6 +273,7 @@ Qed.
  
 Program Definition cminsel_eff_sem : 
   @EffectSem genv CMinSel_core.
+Proof.
 eapply Build_EffectSem with (sem := cminsel_coop_sem hf)(effstep:=cminsel_effstep).
 apply cminselstep_effax1.
 apply cminselstep_effax2.

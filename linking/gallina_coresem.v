@@ -3,8 +3,8 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-Require Import compcert. Import CompcertCommon.
-Require Import core_semantics.
+Require Import compcert_imports. Import CompcertCommon.
+Require Import semantics.
 
 (* This file demonstrates one method for building "Gallina" core          *)
 (* semantics.  That is, core semantics for which the step relation is     *)

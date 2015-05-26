@@ -8,7 +8,7 @@ Require Import Events.
 Require Import Globalenvs.
 
 Require Import mem_lemmas. (*for mem_forward*)
-Require Import core_semantics.
+Require Import semantics.
 Require Import effect_semantics.
 
 Require Import Op. (*for eval_operation etc*)
@@ -215,6 +215,7 @@ Qed.
 
 Program Definition LTL_eff_sem : 
   @EffectSem genv LTL_core.
+Proof.
 eapply Build_EffectSem with (sem := LTL_coop_sem hf)(effstep:=ltl_effstep).
 apply ltlstep_effax1.
 apply ltlstep_effax2.

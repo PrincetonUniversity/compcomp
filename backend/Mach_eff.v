@@ -17,7 +17,7 @@ Require Import Mach.
 Require Import Mach_coop. 
 
 Require Import mem_lemmas. (*for mem_forward*)
-Require Import core_semantics.
+Require Import semantics.
 Require Import effect_semantics.
 Require Import BuiltinEffects.
 Require Import load_frame.
@@ -376,6 +376,7 @@ Qed.
 
 Program Definition Mach_eff_sem : 
   @EffectSem genv Mach_core.
+Proof.
 eapply Build_EffectSem with 
  (sem := Mach_coop_sem hf return_address_offset).
 apply machstep_effax1.

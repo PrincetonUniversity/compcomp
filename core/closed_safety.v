@@ -1,7 +1,7 @@
-Require Import compcert. Import CompcertLibraries.
+Require Import compcert_imports. Import CompcertLibraries.
 
-Require Import core_semantics.
-Require Import core_semantics_lemmas.
+Require Import semantics.
+Require Import semantics_lemmas.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -26,6 +26,33 @@ Fixpoint safeN (n : nat) (c : C) (m : M) : Prop :=
         | Some i => True
       end
   end.
+
+Fixpoint safeN_det (n : nat) (c : C) (m : M) : Prop :=
+  match n with
+    | O => True
+    | S n' => 
+      match halted sem c with
+        | None => exists c', exists m', 
+                    corestep sem ge c m c' m' /\ safeN_det n' c' m'
+        | Some i => True
+      end
+  end.
+
+Lemma det_safeN_det n c m : 
+  corestep_fun sem -> 
+  safeN_det n c m -> 
+  safeN n c m.
+Proof.
+intros Hfun; revert c m; induction n; simpl; auto.
+intros c m.
+destruct (halted sem c); auto.
+intros [c' [m' [Hstep Hsafe]]].
+split.
+exists c', m'; auto.
+intros c'' m'' Hstep'.
+destruct (Hfun _ _ _ _ _ _ _ Hstep Hstep').
+subst c' m'; apply IHn; auto.
+Qed.
 
 Lemma safe_downward1 n c m : safeN (S n) c m -> safeN n c m.
 Proof.
@@ -72,6 +99,42 @@ rewrite Heq in H0.
 eapply safe_corestep_forward in H0; eauto.
 Qed.
 
+Lemma safe_corestep_backward:
+  forall c m c' m' n,
+    corestep_fun sem ->
+    corestep sem ge c m c' m' -> safeN (n - 1) c' m' -> safeN n c m.
+Proof.
+simpl; intros.
+revert c m c' m' H H0 H1.
+induction n; simpl; intros; auto.
+erewrite corestep_not_halted; eauto.
+split.
+exists c', m'; auto.
+intros c'' m'' Hstep.
+assert (Heq: (n = S n - 1)%nat) by omega.
+rewrite Heq; simpl.
+assert (n - 0 = n)%nat as -> by omega.
+destruct (H _ _ _ _ _ _ _ H0 Hstep).
+subst c''; subst m''; auto.
+Qed.
+
+Lemma safe_corestepN_backward:
+  forall c m c' m' n n0,
+    corestep_fun sem ->
+    corestepN sem ge n0 c m c' m' -> safeN (n - n0) c' m' -> safeN n c m.
+Proof.
+simpl; intros.
+revert c m c' m' n H H0 H1.
+induction n0; intros; auto.
+simpl in H0; inv H0.
+solve[assert (Heq: (n = n - 0)%nat) by omega; rewrite Heq; auto].
+simpl in H0. destruct H0 as [c2 [m2 [STEP STEPN]]].
+assert (H2: safeN (n - 1 - n0) c' m'). 
+eapply safe_downward in H1; eauto. omega.
+specialize (IHn0 _ _ _ _ (n - 1)%nat H STEPN H2). 
+eapply safe_corestep_backward; eauto.
+Qed.
+
 Lemma corestep_star_fun : 
   corestep_fun sem -> 
   forall c m c' m' c'' m'' n,
@@ -93,3 +156,51 @@ eapply IHn; eauto.
 Qed.
 
 End closed_safety.
+
+(** Behaviors-related stuff; should probably go in a new file. *)
+
+Definition terminates {G C M} (csem : CoreSemantics G C M) 
+    (ge : G) (c : C) (m : M) :=
+  exists c' m', corestep_star csem ge c m c' m' 
+  /\ exists v, halted csem c' = Some v.
+
+Definition safe {G C M} (csem : CoreSemantics G C M) ge c m :=
+  forall n, safeN csem ge n c m.
+
+Definition forever_steps_or_halted {G C M} (csem : CoreSemantics G C M) ge c m :=
+  forall n, safeN_det csem ge n c m.
+
+Lemma safeN_safeN_det G C M (csem : CoreSemantics G C M) ge c m n :
+  safeN csem ge n c m -> 
+  safeN_det csem ge n c m.
+Proof.
+revert c m; induction n; auto.
+intros c m; simpl.
+destruct (halted csem c); auto.
+intros [[c' [m' Hhlt]] H].
+exists c', m'; split; auto.
+Qed.
+
+Lemma safe_forever_steps_or_halted G C M (csem : CoreSemantics G C M) ge c m :
+  safe csem ge c m -> 
+  forever_steps_or_halted csem ge c m.
+Proof.
+intros H n; specialize (H n); apply safeN_safeN_det; auto.
+Qed.
+
+Inductive behavior : Type := Termination | Divergence | Going_wrong.
+
+Inductive has_behavior {G C M} (csem : CoreSemantics G C M) ge c m : behavior -> Prop :=
+  | Terminates : 
+      terminates csem ge c m -> has_behavior csem ge c m Termination
+  | Diverges : 
+      forever_steps_or_halted csem ge c m -> ~terminates csem ge c m -> 
+      has_behavior csem ge c m Divergence
+  | Goes_wrong :
+      ~safe csem ge c m -> has_behavior csem ge c m Going_wrong.
+
+Inductive behavior_refines : behavior -> behavior -> Prop :=
+  | Equitermination : behavior_refines Termination Termination 
+  | Equidivergence : behavior_refines Divergence Divergence
+  | Any_going_wrong : forall any, behavior_refines any Going_wrong.
+

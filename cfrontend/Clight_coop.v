@@ -14,12 +14,13 @@ Require Import Cop.
 
 Require Import Clight. 
 Require Import mem_lemmas. (*for mem_forward*)
-Require Import core_semantics.
+Require Import semantics.
 Require Import BuiltinEffects.
 
 Require Import val_casted.
 
 Section CLIGHT_COOP.
+
 Variable hf : I64Helpers.helper_functions.
 
 Inductive CL_core: Type :=
@@ -44,7 +45,7 @@ Definition CL_at_external (c: CL_core) : option (external_function * signature *
       match fd with
         Internal f => None
       | External ef targs tres => 
-          if observableEF_dec hf ef 
+          if observableEF_dec hf ef && vals_def args
           then Some (ef, ef_sig ef, args)
           else None
       end
@@ -64,48 +65,23 @@ Definition CL_after_external (rv: option val) (c: CL_core) : option CL_core :=
         end
    | _ => None
   end.
-(*Previously we had this: but afterEtxernal clause in ChmgenproofEFF (MATCH)
-  requires to have Returnstates
-Definition CL_after_external (rv: option val) (c: CL_core) : option CL_core :=
-  match c with
-     CL_Callstate fd vargs (Clight.Kcall optid f e lenv k) =>
-        match fd with
-          Internal _ => None
-        | External ef tps tp =>
-            match rv, optid with
-              Some v, _ => Some(CL_State f Sskip k e (set_opttemp optid v lenv))
-            |   None, None    => Some(CL_State f Sskip k e lenv)
-            | _ , _ => None
-            end
-        end
-   | _ => None
-  end.
-*)
-(*
-Definition CL_after_external (vret: option val) (c: CL_core) : option CL_core :=
-  match c with 
-    CL_Callstate fd args k => 
-         match fd with
-            Internal f => None
-          | External ef targs tres => match vret with
-                             None => Some (CL_Returnstate Vundef k)
-                           | Some v => Some (CL_Returnstate v k)
-                           end
-         end
-  | _ => None
-  end.
-*)       
+
 Definition CL_halted (q : CL_core): option val :=
     match q with 
-       CL_Returnstate v Kstop => Some v
+       CL_Returnstate v Kstop => 
+         if vals_def (v::nil) then Some v
+         else None
      | _ => None
     end.
    
 (** Transition relation *)
+
 Section SEMANTICS.
+
 Variable function_entry: function -> list val -> mem -> env -> temp_env -> mem -> Prop.
 
 Variable ge: genv.
+
 Inductive clight_corestep: CL_core -> mem-> CL_core -> mem -> Prop :=
 
   | clight_corestep_assign:   forall f a1 a2 k e le m loc ofs v2 v m',
@@ -215,13 +191,6 @@ Inductive clight_corestep: CL_core -> mem-> CL_core -> mem -> Prop :=
       clight_corestep (CL_Callstate (Internal f) vargs k) m
         (CL_State f f.(fn_body) k e le) m'
 
-(*All external calls in this language at handled by atExternal
-  | step_external_function: forall ef targs tres vargs k m vres t m',
-      external_call ef ge vargs m t vres m' ->
-      clight_corestep (CL_Callstate (External ef targs tres) vargs k) m
-         (CL_Returnstate vres k) m'
-*)
-
   | clight_corestep_returnstate: forall v optid f e le k m,
       clight_corestep (CL_Returnstate v (Kcall optid f e le k)) m
         (CL_State f Sskip k e (set_opttemp optid v le)) m.
@@ -267,6 +236,7 @@ End SEMANTICS.
 
 Definition CL_core_sem (FE:function -> list val -> mem -> env -> temp_env -> mem -> Prop)
          : CoreSemantics genv CL_core mem.
+Proof.
   eapply (@Build_CoreSemantics _ _ _ 
       CL_initial_core CL_at_external CL_after_external 
        CL_halted (clight_corestep FE)). 
@@ -299,6 +269,7 @@ Definition CL_coop_sem
            (FE:function -> list val -> mem -> env -> temp_env -> mem -> Prop)
            (HFE: forall f vargs m e le m', FE f vargs m e le m'-> mem_forward m m')
            : CoopCoreSem genv CL_core.
+Proof.
 apply Build_CoopCoreSem with (coopsem := CL_core_sem FE).
   apply CL_forward. apply HFE.
 Defined.

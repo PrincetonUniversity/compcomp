@@ -10,9 +10,9 @@ Require Import Axioms.
 
 Require Import Extensionality.
 Require Import mem_lemmas. (*needed for definition of mem_forward etc*)
-Require Import core_semantics.
+Require Import semantics.
 Require Import effect_semantics.
-Require Import StructuredInjections.
+Require Import structured_injections.
 
 Definition vis mu := fun b => locBlocksSrc mu b || frgnBlocksSrc mu b.
 Definition visTgt mu := fun b => locBlocksTgt mu b || frgnBlocksTgt mu b.
