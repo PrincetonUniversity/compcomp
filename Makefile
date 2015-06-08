@@ -111,7 +111,7 @@ BACKEND=\
   Renumber.v Renumberproof.v Renumberproof_comp.v \
   RTLtyping.v \
   Kildall.v Liveness.v \
-  ConstpropOp.v Constprop.v ConstpropOpproof.v Constpropproof.v \
+  ConstpropOp.v Constprop.v ConstpropOpproof.v Constpropproof.v Constpropproof_comp.v \
   CombineOp.v CSE.v CombineOpproof.v CSEproof.v CSEproof_comp.v\
   Machregs.v Locations.v Conventions1.v Conventions.v \
   LTL.v LTL_coop.v LTL_eff.v \

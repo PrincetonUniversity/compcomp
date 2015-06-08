@@ -42,6 +42,7 @@ Require RTLgen.
 Require Tailcall.
 Require Inlining.
 Require Renumber.
+Require Constprop.
 Require CSE.
 Require Allocation.
 Require Tunneling.
@@ -59,6 +60,7 @@ Require RTLgenproof_comp.
 Require Tailcallproof_comp.
 Require Inliningproof_comp.
 Require Renumberproof_comp.
+Require Constpropproof_comp.
 Require CSEproof_comp.
 Require Allocproof_comp.
 Require Tunnelingproof_comp.
@@ -106,9 +108,14 @@ Definition transf_rtl_program (f: RTL.program) : res Asm_comp.program :=
    @@ print print_RTL
    @@ Tailcall.transf_program
    @@ print print_RTL_tailcall
-   @@@ Inlining.transf_program
+  @@@ Inlining.transf_program
    @@ Renumber.transf_program
+(*   @@ print print_RTL_inline*)
+   @@ Constprop.transf_program
+   @@ Renumber.transf_program
+(*   @@ print print_RTL_constprop*)
   @@@ CSE.transf_program
+(*   @@ print print_RTL_cse*)
   @@@ Allocation.transf_program
    @@ print print_LTL
    @@ Tunneling.tunnel_program
@@ -269,12 +276,14 @@ Proof.
   set (p1 := Tailcall.transf_program p) in *.
   destruct (Inlining.transf_program p1) as [p2|] eqn:?; simpl in H; try discriminate.
   set (p3 := Renumber.transf_program p2) in *.
-  destruct (CSE.transf_program p3) as [p4|] eqn:?; simpl in H; try discriminate.
-  destruct (Allocation.transf_program p4) as [p5|] eqn:?; simpl in H; try discriminate.
-  set (p6 := Tunneling.tunnel_program p5) in *.
-  destruct (Linearize.transf_program p6) as [p7|] eqn:?; simpl in H; try discriminate.
-  set (p8 := CleanupLabels.transf_program p7) in *.
-  destruct (Stacking.transf_program p8) as [p9|] eqn:?; simpl in H; try discriminate.
+  set (p4 := Constprop.transf_program p3) in *.
+  set (p5 := Renumber.transf_program p4) in *.
+  destruct (CSE.transf_program p5) as [p6|] eqn:?; simpl in H; try discriminate.
+  destruct (Allocation.transf_program p6) as [p7|] eqn:?; simpl in H; try discriminate.
+  set (p8 := Tunneling.tunnel_program p7) in *.
+  destruct (Linearize.transf_program p8) as [p9|] eqn:?; simpl in H; try discriminate.
+  set (p10 := CleanupLabels.transf_program p9) in *.
+  destruct (Stacking.transf_program p10) as [p11|] eqn:?; simpl in H; try discriminate.
   eapply eff_sim_trans.
     eapply Tailcallproof_comp.transl_program_correct. 
   eapply TransformLNR in LNR.
@@ -286,11 +295,15 @@ Proof.
   eapply eff_sim_trans.
   eapply Renumberproof_comp.transl_program_correct.
   eapply eff_sim_trans.
+  eapply Constpropproof_comp.transl_program_correct.
+  eapply eff_sim_trans.
+  eapply Renumberproof_comp.transl_program_correct.
+  eapply eff_sim_trans.
     eapply CSEproof_comp.transl_program_correct.
-    unfold p3 in Heqr0. exact Heqr0.
+    unfold p5, p4, p3 in Heqr0. exact Heqr0.
   eapply eff_sim_trans.
     eapply Allocproof_comp.transl_program_correct.
-    instantiate (1:=p5). auto. 
+    instantiate (1:=p7). auto. 
   eapply eff_sim_trans.
     eapply Tunnelingproof_comp.transl_program_correct.
   eapply eff_sim_trans.
@@ -307,7 +320,7 @@ Proof.
     eapply TransformLNR. 
     eapply TransformLNR_partial. 2: eassumption. 
     eapply TransformLNR_partial. 2: eassumption. 
-    eapply TransformLNR.  assumption.
+    eapply TransformLNR. eapply TransformLNR. eapply TransformLNR.  assumption.
 
     apply Asmgenproof_comp.transl_program_correct. 
     eassumption.
@@ -395,21 +408,25 @@ Proof.
   set (p1 := Tailcall.transf_program p) in *.
   destruct (Inlining.transf_program p1) as [p2|] eqn:?; simpl in H; try discriminate.
   set (p3 := Renumber.transf_program p2) in *.
-  destruct (CSE.transf_program p3) as [p4|] eqn:?; simpl in H; try discriminate.
-  destruct (Allocation.transf_program p4) as [p5|] eqn:?; simpl in H; try discriminate.
-  set (p6 := Tunneling.tunnel_program p5) in *.
-  destruct (Linearize.transf_program p6) as [p7|] eqn:?; simpl in H; try discriminate.
-  set (p8 := CleanupLabels.transf_program p7) in *.
-  destruct (Stacking.transf_program p8) as [p9|] eqn:?; simpl in H; try discriminate.
+  set (p4 := Constprop.transf_program p3) in *.
+  set (p5 := Renumber.transf_program p4) in *.
+  destruct (CSE.transf_program p5) as [p6|] eqn:?; simpl in H; try discriminate.
+  destruct (Allocation.transf_program p6) as [p7|] eqn:?; simpl in H; try discriminate.
+  set (p8 := Tunneling.tunnel_program p7) in *.
+  destruct (Linearize.transf_program p8) as [p9|] eqn:?; simpl in H; try discriminate.
+  set (p10 := CleanupLabels.transf_program p9) in *.
+  destruct (Stacking.transf_program p10) as [p11|] eqn:?; simpl in H; try discriminate.
   
   rewrite <- (Tailcallproof_comp.symbols_preserved p s).
   unfold p1 in *.
   erewrite <- (Inliningproof_comp.symbols_preserved); try eauto. clear Heqr.
   erewrite <- (Renumberproof_comp.symbols_preserved); try eauto.
-  unfold p3 in *.
+  unfold p5, p4, p3 in *.
+  erewrite <- (Constpropproof_comp.symbols_preserved); try eauto.
+  erewrite <- (Renumberproof_comp.symbols_preserved); try eauto.
   erewrite <- (CSEproof_comp.symbols_preserved); try eauto. clear Heqr0.
   erewrite <- (Allocproof_comp.symbols_preserved); try eauto. clear Heqr1.
-  unfold p6 in *.
+  unfold p8 in *.
   erewrite <- (Tunnelingproof_comp.symbols_preserved); try eauto.
   erewrite <- (Linearizeproof_comp.symbols_preserved); try eauto. clear Heqr2.
   erewrite <- (CleanupLabelsproof_comp.symbols_preserved); try eauto.
