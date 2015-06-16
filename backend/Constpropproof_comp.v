@@ -1004,15 +1004,7 @@ Definition FORWARD m m' :=
   (forall b, Mem.valid_block m b ->
         (forall ofs : Z, ~ Mem.perm m b ofs Max Writable) ->
         forall ofs ch, Mem.load ch m' b ofs = Mem.load ch m b ofs).
-(*The following definition is closer to ec_readonly, but proving store_FORWARDis more difficult
-Definition FORWARD m m' :=
-  mem_forward m m' /\
-  (forall b ofs chunk,
-    Mem.valid_block m b ->
-    (forall ofs', ofs <= ofs' < ofs + size_chunk chunk ->
-                          ~(Mem.perm m b ofs' Max Writable)) ->
-    Mem.load chunk m' b ofs = Mem.load chunk m b ofs).
-*)
+
 Lemma FORWARD_refl m: FORWARD m m.
 Proof. intros; split.
   apply mem_forward_refl.
@@ -1030,6 +1022,33 @@ Proof. intros.
    apply FWD1a; assumption.
    intros ofs1 N. apply (H0 ofs1). apply FWD1a; assumption.
 Qed.
+
+(*The following definition is closer to ec_readonly, but proving store_FORWARDis more difficult*)
+Definition FORWARD_ecr m m' :=
+  mem_forward m m' /\
+  (forall b ofs chunk,
+    Mem.valid_block m b ->
+    (forall ofs', ofs <= ofs' < ofs + size_chunk chunk ->
+                          ~(Mem.perm m b ofs' Max Writable)) ->
+    Mem.load chunk m' b ofs = Mem.load chunk m b ofs).
+
+Lemma FORWARD_ecr_refl m: FORWARD_ecr m m.
+Proof. intros; split.
+  apply mem_forward_refl.
+  intuition.
+Qed.
+
+Lemma FORWARD_ecr_trans m1 m2 m3:
+       FORWARD_ecr m1 m2 -> FORWARD_ecr m2 m3 -> FORWARD_ecr m1 m3.
+Proof. intros.
+  destruct H as [FWD1a FWD1b].
+  destruct H0 as [FWD2a FWD2b].
+  split; intros. eapply mem_forward_trans; eassumption.
+  rewrite FWD2b; try eassumption.
+   apply FWD1b; eassumption.
+   apply FWD1a; assumption.
+   intros ofs1 X N. apply (H0 ofs1 X). apply FWD1a; assumption.
+Qed.
 (*
 Lemma FORWARD_trans m1 m2 m3:
        FORWARD m1 m2 -> FORWARD m2 m3 -> FORWARD m1 m3.
@@ -1045,6 +1064,18 @@ Qed.*)
 
 Lemma store_FORWARD ch m b ofs v m': 
       Mem.store ch m b ofs v = Some m' -> FORWARD m m'.
+Proof. intros.
+split. eapply store_forward; eassumption.
+intros. eapply Mem.load_store_other; try eassumption.
+destruct (eq_block b0 b); subst. 2: left; trivial.
+  elim (H1 ofs).
+  eapply Mem.perm_max. 
+    eapply Mem.store_valid_access_3; try eassumption.
+    specialize (size_chunk_pos ch); intros; omega.
+Qed.
+(*
+Lemma store_FORWARD_ecr ch m b ofs v m': 
+      Mem.store ch m b ofs v = Some m' -> FORWARD_ecr m m'.
 Proof. intros.
 split. eapply store_forward; eassumption.
 intros. eapply Mem.load_store_other; try eassumption.
@@ -1068,7 +1099,7 @@ left; intros N; subst.*)
     eapply Mem.store_valid_access_3; try eassumption.
     specialize (size_chunk_pos ch); intros; omega.
 Qed.
-
+*)
 Lemma free_FORWARD m b lo hi m': 
       Mem.free m b lo hi = Some m' -> FORWARD m m'.
 Proof. intros.
@@ -2384,11 +2415,18 @@ Lemma MATCH_initial: forall v
   (RCH: forall b, REACH m2
         (fun b' : Values.block => isGlobalBlock tge b' || getBlocks vals2 b') b =
          true -> DomT b = true)
-  (InitMem : exists m0 : mem, Genv.init_mem prog = Some m0 
+  (Ini: forall b gv, Genv.find_var_info ge b = Some gv ->
+                     gvar_readonly gv && negb (gvar_volatile gv) = true ->
+                     Genv.load_store_init_data ge m1 b 0 (gvar_init gv) /\
+                     Mem.valid_block m1 b /\ (forall ofs : Z, ~ Mem.perm m1 b ofs Max Writable))
+
+                       
+                     
+  (*(InitMem : exists m0 : mem, Genv.init_mem prog = Some m0 
       (*/\ Ple (Mem.nextblock m0) (Mem.nextblock m1) 
       /\ Ple (Mem.nextblock m0) (Mem.nextblock m2) *)
       /\ FORWARD m0 m1
-      /\ FORWARD m0 m2)
+      /\ FORWARD m0 m2)*)
   (GFI: globalfunction_ptr_inject j)
   (GDE: genvs_domain_eq ge tge)
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
@@ -2440,15 +2478,18 @@ Proof. intros. unfold ge in *. unfold tge in *.
      VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
     as [AA [BB [CC [DD [EE [FF GG]]]]]].
   split.
-    econstructor; eauto. (* red. intros. 
+    econstructor; eauto. 
+    red. intros. 
     assert (GAC:  global_approx_charact ge gapp).
       apply make_global_approx_correct. red; intros.
       rewrite PTree.gempty in H1. discriminate.
-    specialize (GAC _ _ _ H H0). admit. NEED forward m0 m1? Or take (parts of)
+    specialize (GAC _ _ _ H H0). clear AA BB CC DD EE FF GG.
+    apply (Ini0 b0 _ GAC (eq_refl _)). 
+    (*(*admit. NEED forward m0 m1? Or take (parts of)
       init_mem_characterization and init_mem_characterization_2 to specify the conditions m1 sjould satisfy
     unfold Genv.load_store_init_data. global_approx_charact .
        unfold gapp, ge. apply make_global_approx_correct.  *)
-     destruct InitMem as [m0 [InitM0 [FWD1 FWD2]]].
+     (*destruct InitMem as [m0 [InitM0 [FWD1 FWD2]]].*)
      clear AA BB CC (*Heq*). clear GG FF EE DD.
      (*red; intros.*) clear RCH (*entry_points_ok*) PG VInj Inj J.
      (*MAYBE take mem_match_approx as invariant, not FORWRD? *)
@@ -2460,7 +2501,7 @@ Proof. intros. unfold ge in *. unfold tge in *.
               intros. eapply FWD1. assumption. apply InitMemApproxC.
      split. eapply FWD1; eassumption.
        intros; intros N. eapply (InitMemApproxC ofs).
-         eapply FWD1; assumption.*)
+         eapply FWD1; assumption.*)*)
     constructor.
     rewrite initial_SM_as_inj.
       unfold vis, initial_SM; simpl.
