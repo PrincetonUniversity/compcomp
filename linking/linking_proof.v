@@ -325,7 +325,8 @@ eapply Build_Wholeprog_sim
   suff [H2|H2]: isGlobalBlock my_ge b1 \/ getBlocks vals1 b1.
   by apply: REACH_nil; apply/orP; left; rewrite -(isGlob_iffS my_ge_S).
   by apply: REACH_nil; apply/orP; right.
-  by move: (orP H).
+  apply/orP; case: (orP H); [|by move=> ->; rewrite orbC].
+  by move/isGlob_iffS;  move/(_ _ my_ge_S)=> ->.
 
   by apply RCSem.init_ax with (v := Vptr b Int.zero).
 
@@ -347,7 +348,7 @@ set c1 := peekCore st1.
 set c2 := peekCore st2.
 
 have [c1_B [c1_vis c1_I]]: 
-  exists B, [/\ vis_inv my_ge c1 B mu 
+  exists B, [/\ vis_inv c1 B mu 
               & RCSem.I (rclosed_S c1.(Core.i)) c1.(Core.c) m1 B].
 { case: INV; rewrite /c1 /c2 /=; case=> ? []? []? []? []Hmueq []?.
   by case=> _ _ []B []c1_vis c1_I; exists B; split=> //; subst. }
@@ -385,10 +386,7 @@ have U1_DEF': forall b ofs, U1 b ofs -> vis mupkg b.
   apply match_visible in MATCH; apply: MATCH.
   apply (REACH_mono (fun b => 
     b \in RC.roots (ge (cores_S (Core.i c1))) (RC.mk (Core.c c1) c1_B)))=> //.
-  move=> b0 roots; case: c1_vis; subst; apply. 
-  move: roots; apply: (RC.roots_domains_eq 
-    (ge1 := ge (cores_S (Core.i c1))) (ge2 := my_ge))=> //.
-  by apply: genvs_domain_eq_sym; apply: my_ge_S. }
+  by move=> b0 roots; case: c1_vis; subst; apply. }
 
 move/(_ _ _ _ _ MATCH).
 move=> []c2' []m2' []cd' []mu_top0.
@@ -448,7 +446,7 @@ split.
      eapply gsep_domain_eq; eauto.
      apply genvs_domain_eq_sym; eauto.
    }
-   apply (@head_inv_step _ _ _ _ _ sims my_ge my_ge_S 
+   apply (@head_inv_step _ _ _ _ _ sims my_ge 
      mupkg m1 m2 mu_top' m1' m2' fwd2 (head_valid hdinv) INCR GSEP' LOCALLOC rcvis
      (c INV) (d INV) pf c1' c2'' _ _ mus
      (STACK.pop (CallStack.callStack (s1 INV))) 
@@ -571,7 +569,7 @@ have mu_wd: SM_wd mu.
 have INV': R data (Inj.mk mu_wd) st1 m1 st2 m2.
 { by apply: INV. }
 
-case: (aft2 my_ge_S my_ge_T HLT1 POP1 INV' AFT1)=> 
+case: (aft2 my_ge_T HLT1 POP1 INV' AFT1)=> 
   rv2 []st2'' []st2' []cd' []mu' []HLT2 CTX2 POP2 AFT2 INV''.
 exists st2',m2,cd',mu'.
 split=> //; first by rewrite eq1.

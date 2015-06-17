@@ -936,7 +936,7 @@ apply: Build_head_inv=> //.
 {(*vis_inv*) 
 
 have [hd1_B [hd1_vis hd1_I]]: 
-  exists B, [/\ vis_inv my_ge hd1 B mu0 
+  exists B, [/\ vis_inv hd1 B mu0 
               & RCSem.I (rclosed_S hd1.(Core.i)) hd1.(Core.c) m10 B].
 { move: frameall; rewrite mus_eq /=; case; case=> pft []sgt []cd1 []e1t []efs1.
   case=> vals1 []e2t []efs2 []vals2; case=> ?????????; case=> B []vis I _ _ _ _ _ _ _.
@@ -1001,25 +1001,12 @@ have subF: {subset frgnBlocksSrc mu0 <= frgnSrc'}.
          -> P (Core.i hd1') (Core.c hd1')).
     by apply: cast_indnatdep'. }
   have eq_hd1''': 
-    RC.roots my_ge (RC.mk (Core.c hd1') [predU getBlocks [:: rv1] & hd1_B])
+    RC.roots (ge (cores_S (Core.i hd1'))) (RC.mk (Core.c hd1') [predU getBlocks [:: rv1] & hd1_B])
     = (fun b =>
          getBlocks [:: rv1] b
          || RC.roots (ge (cores_S (Core.i hd1))) 
                      (RC.mk (Core.c hd1) hd1_B) b).
-  { rewrite -eq_hd1'' /RC.roots; extensionality b0.
-    have glob_eq: isGlobalBlock my_ge b0
-                = isGlobalBlock (ge (cores_S (Core.i hd1'))) b0. 
-    { suff: isGlobalBlock my_ge b0 
-        <-> isGlobalBlock (ge (cores_S (Core.i hd1'))) b0.
-      case: (isGlobalBlock _ _)=> //.
-      case: (isGlobalBlock _ _)=> //.
-      case=> //.
-      by move/(_ erefl).         
-      case: (isGlobalBlock _ _)=> //.
-      case=> //.
-      by move=> _; move/(_ erefl).               
-      by rewrite -(isGlob_iffS my_ge_S). }
-    by rewrite -glob_eq. }
+  { by rewrite -eq_hd1'' /RC.roots; extensionality b0. }
   rewrite eq_hd1''' in H.
   case: (orP H).
   { move=> get1; case: (getBlocks_inject _ _ _ vinj'' _ get1)=> x []y [].
@@ -1037,19 +1024,7 @@ have subF: {subset frgnBlocksSrc mu0 <= frgnSrc'}.
     have vis0_b: vis mu0 b.
     { apply: vis_sub.
       rewrite /in_mem /=; move: RB; rewrite /RC.roots.
-      have glob_eq: isGlobalBlock my_ge b
-                  = isGlobalBlock (ge (cores_S (Core.i hd1))) b. 
-      { suff: isGlobalBlock my_ge b 
-          <-> isGlobalBlock (ge (cores_S (Core.i hd1))) b.
-        case: (isGlobalBlock _ _)=> //.
-        case: (isGlobalBlock _ _)=> //.
-        case=> //.
-        by move/(_ erefl).         
-        case: (isGlobalBlock _ _)=> //.
-        case=> //.
-        by move=> _; move/(_ erefl).               
-        by rewrite -(isGlob_iffS my_ge_S). } 
-      by rewrite -glob_eq. }
+      by case/orP=> -> //; rewrite orbC. }
     { case: (orP vis0_b); first by move=> ->.
       by move=> L; apply/orP; right; apply: subF. } } 
 }(*END {subset RC.roots ...}*)
