@@ -434,13 +434,11 @@ have mu_new_rel_inv_all:
          (nucular_T := nucular_T)=> //.
   by move: (head_match hdinv)=> mtch; apply match_visible in mtch. }
 
-have mu_new_vis_inv: vis_inv my_ge c1 (getBlocks args1) mu_new'.
+have mu_new_vis_inv: vis_inv c1 (getBlocks args1) mu_new'.
 { apply: Build_vis_inv=> // b; rewrite /in_mem /= => Y.
   rewrite /vis /mu_new /frgnS /exportedSrc /=.
   move: Y; rewrite /RC.roots; case/orP.
   move=> H1.
-  have H1': isGlobalBlock (ge (cores_S (Core.i c1))) b.
-  { by rewrite -(isGlob_iffS my_ge_S). }
   by apply: REACH_nil; apply/orP; left.
   by move=> getB; apply: REACH_nil; apply/orP; right. }
 

@@ -318,7 +318,7 @@ Section vis_inv.
 Import Core.
 
 Record vis_inv (c : t cores_S) (B : block -> bool) mu : Type :=
-  { vis_sup : {subset (RC.roots my_ge (RC.mk c.(Core.c) B)) <= vis mu} }.
+  { vis_sup : {subset (RC.roots (cores_S c.(i)).(ge) (RC.mk c.(Core.c) B)) <= vis mu} }.
 
 End vis_inv.
 
@@ -380,9 +380,9 @@ Definition sm_inject_separated' (mu mu' : SM_Injection) (m1 m2 : Memory.mem) :=
 Record rel_inv mu0 mu m10 m20 m1 (*new*) : Prop :=
   { (* invariants relating mu0,mu *)    
     frame_incr       : incr mu0 mu
-(*; frame_sep        : sm_inject_separated mu0 mu m10 m20*)
   ; new_sep          : sm_inject_separated' mu0 mu m10 m20                          
-  ; frame_gsep       : globals_separate my_ge mu0 mu (*Note: my_ge has the same domain as any ge*)
+(*NOTE: my_ge has the same domain as any ge*)
+  ; frame_gsep       : globals_separate my_ge mu0 mu 
   ; frame_disj       : disjinv mu0 mu 
   ; frame_rc         : {subset [predI REACH m1 (vis mu) & locBlocksSrc mu0]
                        <= pubBlocksSrc mu0}
@@ -1763,14 +1763,15 @@ Qed.
 Lemma vis_inv_step (c c' : Core.t cores_S) B :
   vis_inv c B mu -> 
   REACH_closed m1 (vis mu) -> 
+  Core.i c = Core.i c' ->
   vis_inv c' (REACH m1' (fun b => structured_injections.freshloc m1 m1' b
                 || RC.reach_set (ge (cores_S (Core.i c))) (RC.mk (Core.c c) B) m1 b)) mu'.
 Proof.
-move=> E rc; move: E.
+move=> E rc Heq; move: E.
 case=> E; apply: Build_vis_inv=> b F.
 move: F; rewrite/RC.roots/in_mem/=; move/orP=> [|F].
 move=> F.
-by apply: (intern_incr_vis _ _ incr); apply: E; apply/orP; left.
+by apply: (intern_incr_vis _ _ incr); apply: E; apply/orP; left; rewrite Heq.
 case G: (B b).
 by apply: (intern_incr_vis _ _ incr); apply: E; apply/orP; right.
 move: F=> H.
@@ -1785,7 +1786,7 @@ by move=> ->; rewrite orb_comm.
 apply: rc; apply: (REACH_mono _ _ _ _ _ H2)=> b2 H3. 
 move: (E b2); rewrite /in_mem /=; apply.
 apply: (RC.roots_domains_eq _ H3).
-by apply: genvs_domain_eq_sym; apply: (my_ge_S (Core.i c)).
+by apply: genvs_domain_eq_refl.
 Qed.
 
 Lemma head_inv_step 
@@ -1981,8 +1982,7 @@ Qed.
 
 End initCore_lems.
 
-          End linkingInv.
-          
+End linkingInv.
 
 Lemma vis_sub_DomSrc (mu0 : Inj.t) : {subset vis mu0 <= DomSrc mu0}.
 Proof.
