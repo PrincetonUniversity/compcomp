@@ -269,3 +269,24 @@ apply Build_CoopCoreSem with (coopsem := RTL_core_sem).
 Defined.
 
 End RELSEM.
+
+Lemma RTL_initial_coreD (g: genv) (v:val)(args: list val) c:
+  RTL_initial_core g v args = Some c -> 
+  exists b f, v= Vptr b Int.zero /\ 
+   Genv.find_funct_ptr g b = Some (Internal f) /\ 
+   val_casted.val_has_type_list_func args (sig_args (fn_sig f)) = true /\
+   val_casted.vals_defined args = true /\ Z.lt (4*(2*(Zlength args))) Int.max_unsigned
+  /\ c = RTL_Callstate nil (Internal f) args.
+intros. destruct v; inv H.
+destruct (Int.eq_dec i Int.zero); inv H1. exists b. 
+destruct (Genv.find_funct_ptr g b); inv H0. 
+destruct f; inv H1. exists f. 
+remember (4 * (2 * Zlength args)) as l. simpl in *. rewrite <- Heql in *. clear Heql.
+remember (val_casted.val_has_type_list_func args (sig_args (fn_sig f)) &&
+         val_casted.vals_defined args &&
+        (zlt l Int.max_unsigned)) as z. simpl in *.
+destruct z; inv H0.  
+apply andb_true_eq in Heqz. destruct Heqz.
+apply andb_true_eq in H. destruct H. intuition.
+unfold zlt in H0.  destruct (Z_lt_dec l Int.max_unsigned). trivial. inv H0. 
+Qed.

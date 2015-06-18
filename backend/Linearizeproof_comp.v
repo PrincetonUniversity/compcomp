@@ -1199,7 +1199,6 @@ induction l; simpl in *. contradiction.
 Qed.
 
 Lemma MATCH_afterExternal: forall
-      (GDE : genvs_domain_eq ge tge)
       mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
       (MemInjMu : Mem.inject (as_inj mu) m1 m2)
       (MatchMu: MATCH mu st1 m1 st2 m2)
@@ -1467,7 +1466,6 @@ Lemma MATCH_initial: forall v (vals1 : list val) c1 (m1 : mem) (j : meminj)
         (fun b' : Values.block => isGlobalBlock tge b' || getBlocks vals2 b') b =
          true -> DomT b = true)
   (GFI: globalfunction_ptr_inject ge j)
-  (GDE: genvs_domain_eq ge tge)
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
@@ -1551,7 +1549,7 @@ Proof. intros.
   simpl in H0. inv H0.
 
   destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
-     VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
+     VInj J RCH PG GDE_lemma HDomS HDomT _ (eq_refl _))
     as [AA [BB [CC [DD [EE [FF GG]]]]]].
   split.
 
@@ -1605,7 +1603,6 @@ exists st2' m2' (U2 : block -> Z -> bool),
 Proof. intros.
   destruct MTCH as [MS [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
   assert (SymbPres := symbols_preserved).
-  assert (GDE:= GDE_lemma).
   induction CS; intros; try (inv MS).
 
 { (* start of block, at an [add_branch] *)
@@ -1932,7 +1929,7 @@ Proof. intros.
     eapply agree_regs_list in AGREE.
     rewrite restrict_sm_all, vis_restrict_sm, restrict_nest in AGREE; trivial.
     eapply decode_longs_inject; eassumption.
-  exploit (inlineable_extern_inject ge tge); try eassumption.
+  exploit (inlineable_extern_inject _ _ GDE_lemma); try eassumption.   
   intros [mu' [v' [m'' [TEC [ResInj [MINJ' [UNMAPPED [LOOR [INC [SEP [LOCALLOC [WD' [SMV' RC']]]]]]]]]]]]].  
   eexists; eexists; eexists; split.
   left. eapply effstep_plus_one. eapply lin_effexec_Lbuiltin; eauto.
@@ -2332,13 +2329,15 @@ Theorem transl_program_correct:
   SM_simulation.SM_simulation_inject (LTL_eff_sem  hf)
   (Linear_eff_sem hf) ge tge.
 Proof.
-intros.
-assert (GDE:= GDE_lemma). 
  eapply simulations_lemmas.inj_simulation_plus with
   (match_states:=fun x mu st m st' m' => MATCH mu st m st' m')
   (measure:=measure).
 (*genvs_dom_eq*)
-  assumption.
+  apply GDE_lemma.
+(*ginfos_preserved*)
+ split; red; intros.
+   rewrite varinfo_preserved. apply gvar_info_refl.
+   rewrite symbols_preserved. trivial.
 (*match_wd*)
   intros; apply H.
 (*match_visible*)
@@ -2390,7 +2389,7 @@ assert (GDE:= GDE_lemma).
 (*atExternal*)
   { eapply MATCH_atExternal; eassumption. }
 (*afterExternal*)
-  { eapply MATCH_afterExternal. assumption. }
+  { eapply MATCH_afterExternal. }
 (*effcorediagram*)
   { intros. exploit MATCH_effcorediagram; eauto.
     intros [st2' [m2' [U2 [CS' [mu' MU']]]]].

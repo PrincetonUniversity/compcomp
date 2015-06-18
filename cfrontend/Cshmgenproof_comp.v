@@ -1824,7 +1824,6 @@ Lemma MATCH_initial: forall v vals1 c1 m1 j vals2 m2 (DomS DomT : block -> bool)
           (fun b' : block => isGlobalBlock tge b' || getBlocks vals2 b') b = true ->
           DomT b = true)
       (GFI: globalfunction_ptr_inject ge j)
-      (GDE: genvs_domain_eq ge tge)
       (HDomS: forall b : block, DomS b = true -> Mem.valid_block m1 b)
       (HDomT: forall b : block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
@@ -1901,7 +1900,7 @@ intros.
   { destruct f; simpl. eexists; eexists. reflexivity. }
   destruct H as [targs [tres Tfun]].
   destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
-     VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
+     VInj J RCH PG GDE_lemma HDomS HDomT _ (eq_refl _))
     as [AA [BB [CC [DD [EE [FF GG]]]]]].
   split.
     eapply match_callstate; try eassumption.
@@ -1933,8 +1932,7 @@ Lemma MATCH_afterExternal: forall
          FE f vargs m e lenv m' -> 
          Mem.unchanged_on
             (fun (b : block) (z : Z) => EmptyEffect b z = false) m m')
-      (GDE : genvs_domain_eq ge tge)
-      mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
+       mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
       (MemInjMu : Mem.inject (as_inj mu) m1 m2)
       (MatchMu: MATCH st1 mu st1 m1 st2 m2)
       (AtExtSrc : at_external (clight_eff_sem hf FE FE_FWD FE_UNCH) st1 = Some (e, ef_sig, vals1))
@@ -3167,6 +3165,18 @@ intros.
   (match_states:=MATCH) (measure:=fun x => O).
 (*genvs_dom_eq*)
   apply GDE_lemma.
+(*ginfos_preserved*)
+ split; red; intros.
+   unfold gvar_info_eq.
+   remember (Genv.find_var_info ge b) as v; symmetry in Heqv.
+   destruct v. 
+     destruct (var_info_translated _ _ Heqv) as [w [W TW]].
+     rewrite W. inv TW; simpl in *. intuition.
+   remember (Genv.find_var_info tge b) as tv; symmetry in Heqtv.
+   destruct tv; trivial. 
+     destruct (var_info_rev_translated _ _ Heqtv) as [w [W TW]].
+     rewrite W in Heqv. discriminate.
+  rewrite symbols_preserved. trivial.
 (*MATCH_wd*)
   apply MATCH_wd. 
 (*MATCH_reachclosed*)
@@ -3179,8 +3189,7 @@ intros.
   apply MATCH_PG.
 (*MATCHinitial*)
   { intros.
-    eapply (MATCH_initial _ _ _); eauto. 
-    apply GDE_lemma. }
+    eapply (MATCH_initial _ _ _); eauto. }
 (*halted*) 
   { intros. destruct H as [MC [RC [PG [GF [Glob [VAL [WD INJ]]]]]]]. 
     destruct c1; inv H0. destruct k; inv H1.
@@ -3192,7 +3201,7 @@ intros.
 (* at_external*)
   { apply MATCH_atExternal. }
 (* after_external*)
-  { apply MATCH_afterExternal. apply GDE_lemma. }
+  { apply MATCH_afterExternal. }
 (* effcore_diagram*)
  { intros. exploit Match_effcore_diagram; try eassumption.
     intros [st2' [m2' [mu' [[U2 CS2] MU']]]].

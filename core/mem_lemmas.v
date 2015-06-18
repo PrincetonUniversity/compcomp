@@ -11,6 +11,12 @@ Require Import Globalenvs.
 
 Require Import Extensionality.
 
+Lemma Forall2_length {A B} {f:A -> B -> Prop} {l1 l2} (F:Forall2 f l1 l2): length l1 = length l2.
+Proof. induction F; trivial. simpl; rewrite IHF. trivial. Qed.
+
+Lemma Forall2_Zlength {A B} {f:A -> B -> Prop} {l1 l2} (F:Forall2 f l1 l2): Zlength l1 = Zlength l2.
+Proof. do 2 rewrite Zlength_correct. rewrite (Forall2_length F). trivial. Qed.
+
 Lemma pos_succ_plus_assoc: forall n m,
     (Pos.succ n + m = n + Pos.succ m)%positive.
 Proof. intros. 
@@ -173,20 +179,33 @@ Qed.
 
 (* A minimal preservation property we sometimes require. *)
 
+Definition readonly m1 b m2 :=
+    (forall ofs : Z, ~ Mem.perm m1 b ofs Max Writable) ->
+    forall ofs ch, Mem.load ch m2 b ofs = Mem.load ch m1 b ofs.
+
+Definition readonly_refl m b: readonly m b m.
+  Proof. red; intros. trivial. Qed. 
+
 Definition mem_forward (m1 m2:mem) :=
-  (forall b, Mem.valid_block m1 b ->
-    Mem.valid_block m2 b /\ 
-    forall ofs p, Mem.perm m2 b ofs Max p -> Mem.perm m1 b ofs Max p).
+  forall b, Mem.valid_block m1 b ->
+    (Mem.valid_block m2 b 
+     /\ (forall ofs p, Mem.perm m2 b ofs Max p -> Mem.perm m1 b ofs Max p)
+     /\ readonly m1 b m2).
 
 Lemma mem_forward_refl: forall m, mem_forward m m.
-Proof. intros m b H. split; eauto. Qed. 
+Proof. intros m b H. split; trivial.
+  split; eauto. apply readonly_refl.
+Qed. 
 
 Lemma mem_forward_trans: forall m1 m2 m3, 
   mem_forward m1 m2 -> mem_forward m2 m3 -> mem_forward m1 m3.
 Proof. intros. intros  b Hb.
-  destruct (H _ Hb). 
-  destruct (H0 _ H1).
-  split; eauto. 
+  destruct (H _ Hb) as [? [? ?]]. 
+  destruct (H0 _ H1) as [? [? ?]].
+  split; eauto.
+  split; eauto.
+  red; intros. rewrite H6. apply H3. trivial.
+   intros z N. apply H2 in N. apply (H7 _ N).
 Qed. 
 
 Lemma forward_unchanged_trans: forall P m1 m2 m3,
@@ -498,7 +517,7 @@ Lemma fwd_maxpermorder: forall m1 m2 (FWD: mem_forward m1 m2) (b:block)
   Mem.perm_order'' (PMap.get b (Mem.mem_access m1) ofs Max)
                    (PMap.get b (Mem.mem_access m2) ofs Max).
 Proof.
-  intros. destruct (FWD b); try assumption. 
+  intros. destruct (FWD b) as [? [? RD]]; try assumption. 
   remember ((PMap.get b (Mem.mem_access m2) ofs Max)) as z.
   destruct z; apply eq_sym in Heqz; simpl  in *.
   remember ((PMap.get b (Mem.mem_access m1) ofs Max)) as zz.
@@ -628,39 +647,97 @@ Lemma store_forward: forall m b ofs v ch m'
       (M:Mem.store ch m b ofs v = Some m'),
       mem_forward m m'.
 Proof. intros.
-   split; intros.
+  split; intros.
     eapply Mem.store_valid_block_1; eassumption.
+  split; intros.
     eapply Mem.perm_store_2; eassumption.
+  red; intros. 
+    eapply Mem.load_store_other; try eassumption.
+    destruct (eq_block b0 b); subst. 2: left; trivial.
+    elim (H0 ofs).
+    eapply Mem.perm_max. 
+    eapply Mem.store_valid_access_3; try eassumption.
+    specialize (size_chunk_pos ch); intros; omega.
+Qed.
+
+Lemma storebytes_nil m b ofs m': Mem.storebytes m b ofs nil = Some m' -> 
+  forall ch bb z, Mem.load ch m' bb z = Mem.load ch m bb z.
+Proof. intros.
+  remember (Mem.load ch m' bb z) as u'; symmetry in Hequ'; destruct u'.
+      symmetry.
+      eapply Mem.load_unchanged_on; try eassumption.
+      instantiate (1:= fun b ofs => True).
+      split; intros.
+        split; intros.
+          eapply Mem.perm_storebytes_2; eassumption.
+          eapply Mem.perm_storebytes_1; eassumption.
+      rewrite (Mem.storebytes_mem_contents _ _ _ _ _ H).
+      destruct (eq_block b0 b); subst. rewrite PMap.gss; trivial.
+      rewrite PMap.gso; trivial.
+    intros; simpl; trivial.
+
+    remember (Mem.load ch m bb z) as u; symmetry in Hequ; destruct u; trivial. 
+      rewrite <- Hequ'; clear Hequ'.
+      eapply Mem.load_unchanged_on; try eassumption.
+      instantiate (1:= fun b ofs => True).
+      split; intros.
+        split; intros.
+          eapply Mem.perm_storebytes_1; eassumption.
+          eapply Mem.perm_storebytes_2; eassumption.
+      rewrite (Mem.storebytes_mem_contents _ _ _ _ _ H). 
+      destruct (eq_block b0 b); subst. rewrite PMap.gss; trivial.
+      rewrite PMap.gso; trivial.
+    intros; simpl; trivial.
 Qed.
 
 Lemma storebytes_forward: forall m b ofs bytes m'
       (M: Mem.storebytes m b ofs bytes = Some m'),
       mem_forward m m'.
 Proof. intros.
-   split; intros.
+  split; intros.
     eapply Mem.storebytes_valid_block_1; eassumption.
+  split; intros.
     eapply Mem.perm_storebytes_2; eassumption.
+  red; intros. 
+  destruct bytes.
+    eapply storebytes_nil; eassumption. 
+  eapply Mem.load_storebytes_other; try eassumption.
+    destruct (eq_block b0 b); subst. 2: left; trivial.
+    apply Mem.storebytes_range_perm in M.
+    elim (H0 ofs). eapply Mem.perm_max. eapply M. simpl; xomega.
 Qed.
 
 Lemma alloc_forward: 
       forall m lo hi m' b
       (A: Mem.alloc m lo hi = (m',b)),
       mem_forward m m'.
-Proof.
-intros.
-  split; intros.
+Proof. intros.
+split; intros.
   eapply Mem.valid_block_alloc; eassumption.
+split; intros.
   eapply Mem.perm_alloc_4; try eassumption.
   intros N; subst. eapply (Mem.fresh_block_alloc _ _ _ _ _ A H).
+red; intros. eapply Mem.load_alloc_unchanged; try eassumption.
 Qed.
 
 Lemma free_forward: forall b z0 z m m'
       (M: Mem.free m b z0 z = Some m'),
       mem_forward m m'.
 Proof. intros.
-  split; intros.
-  eapply Mem.valid_block_free_1; eassumption. 
-  eapply Mem.perm_free_3; eassumption. 
+split; intros.
+  eapply Mem.valid_block_free_1; eassumption.
+split; intros. 
+  eapply Mem.perm_free_3; eassumption.
+red; intros. eapply Mem.load_free; try eassumption.
+  destruct (zlt z0 z).
+    left; intros N; subst.
+    eapply (H0 z0).
+    eapply Mem.perm_max.
+    eapply Mem.perm_implies. 
+      eapply Mem.free_range_perm; try eassumption.
+      omega.
+    constructor.
+  right; left; trivial.
 Qed.
 
 Lemma freelist_forward: forall l m m'
@@ -1098,10 +1175,11 @@ Lemma external_call_mem_forward:
     (vargs : list val) (m1 : mem) (t : trace) (vres : val) (m2 : mem),
     external_call ef ge vargs m1 t vres m2 -> mem_forward m1 m2.
 Proof.
-intros.
-intros b Hb.
+intros. intros b Hb.
 split; intros. eapply external_call_valid_block; eauto.
-eapply external_call_max_perm; eauto.
+split. intros. eapply external_call_max_perm; eauto.
+red; intros. eapply ec_readonly. apply (external_call_spec ef). eassumption. eassumption.
+  intros. apply H0.
 Qed.
 
 Definition val_has_type_opt' (v: option val) (ty: typ) :=

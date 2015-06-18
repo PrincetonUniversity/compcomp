@@ -25,7 +25,7 @@ Require Import internal_diagram_trans.
 Require Import interpolants.
 Require Import interpolation_proofs.
 
-Require Import mem_interpolation_defs. (*I think this is required/name hasn't changed (?)*)
+(*Require Import mem_interpolation_defs. I think this is required/name hasn't changed (?)*)
 
 Require Import full_composition.
 
@@ -291,6 +291,43 @@ Context {F1 V1 C1 F2 V2 C2 F3 V3 C3:Type}
         (g2 : Genv.t F2 V2)
         (g3 : Genv.t F3 V3).
 
+Lemma load_store_init_data_inject m1 m2 j1 
+       (J: forall b, isGlobalBlock g1 b = true -> j1 b = Some(b,0))
+       (PG1 : meminj_preserves_globals g1 j1) 
+       (Inj12 : Mem.inject j1 m1 m2)
+       (FindVars: forall i b, Genv.find_symbol g1 i = Some b -> Genv.find_symbol g2 i = Some b):
+      forall il k b
+      (LDI: Genv.load_store_init_data g1 m1 b k il)
+      (G: isGlobalBlock g1 b = true),
+   Genv.load_store_init_data g2 m2 b k il.
+Proof. 
+  induction il; simpl in *; intros. trivial.
+  assert (Inj: forall ofs v1 chunk, Mem.load chunk m1 b ofs = Some v1 ->
+      exists v2 : val,
+      Mem.load chunk m2 b ofs = Some v2 /\ val_inject j1 v1 v2).
+  { intros. specialize (Mem.load_inject j1 m1 m2 _ _ _ _ _ _ Inj12 H (J _ G)). rewrite Zplus_0_r; trivial. }
+  destruct a.
+  { destruct LDI; split; eauto.
+      destruct (Inj _ _ _ H) as [v [A B]]. inv B; trivial. }
+  { destruct LDI; split; eauto.
+      destruct (Inj _ _ _ H) as [v [A B]]. inv B; trivial. }
+  { destruct LDI; split; eauto.
+      destruct (Inj _ _ _ H) as [v [A B]]. inv B; trivial. }
+  { destruct LDI; split; eauto.
+      destruct (Inj _ _ _ H) as [v [A B]]. inv B; trivial. }
+  { destruct LDI; split; eauto.
+      destruct (Inj _ _ _ H) as [v [A B]]. inv B; trivial. }
+  { destruct LDI; split; eauto.
+      destruct (Inj _ _ _ H) as [v [A B]]. inv B; trivial. }
+  { apply IHil; assumption. }
+  { destruct LDI as [[b' [FS LD]] LSI].
+    split; eauto. 
+    destruct (Inj _ _ _ LD) as [v [A B]]. inv B.
+    rewrite J in H1.
+      inv H1. rewrite Int.add_zero in A.
+      exists b2; eauto.
+    eapply find_symbol_isGlobal; eassumption. } 
+Qed.
 
 Theorem eff_sim_trans: forall 
         (SIM12: @SM_simulation_inject _ _ _ _ _ _ Sem1 Sem2 g1 g2)
@@ -301,13 +338,13 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
   intros.
   destruct SIM12 
     as [core_data12 match_core12 core_ord12 core_ord_wf12 
-      match_sm_wd12 genvs_dom_eq12 match_genv12
+      match_sm_wd12 genvs_dom_eq12 ginfos_pres12 match_genv12
       match_visible12 (*match_junk_inv12 match_restrict12*)
       match_sm_valid12 core_initial12 effcore_diagram12
       core_halted12 core_at_external12 eff_after_external12].  
   destruct SIM23 
     as [core_data23 match_core23 core_ord23 core_ord_wf23 
-      match_sm_wd23 genvs_dom_eq23 match_genv23
+      match_sm_wd23 genvs_dom_eq23 ginfos_pres23 match_genv23
       match_visible23 (*match_junk_inv23 match_restrict23*)
       match_sm_valid23 core_initial23 effcore_diagram23
       core_halted23 core_at_external23 eff_after_external23].
@@ -336,7 +373,19 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
   destruct INV as [INVa [INVb [INVc INVd]]].
   eapply (compose_sm_wd); eauto. }
 { (*genvs_domain_eq*)
-  eapply genvs_domain_eq_trans; eassumption. }
+  clear - genvs_dom_eq12 genvs_dom_eq23. eapply genvs_domain_eq_trans; eassumption. }
+{ (* ginfos_preserved *) 
+  clear - ginfos_pres12 ginfos_pres23.
+  destruct ginfos_pres12 as [GvarInfo12 GfindSymb12].
+  destruct ginfos_pres23 as [GvarInfo23 GfindSymb23].
+  split; red; intros.
+    specialize (GvarInfo12 b). specialize (GvarInfo23 b). unfold gvar_info_eq in *.
+    destruct (Genv.find_var_info g1 b); destruct (Genv.find_var_info g3 b); trivial.
+    destruct (Genv.find_var_info g2 b); try contradiction. 
+    destruct GvarInfo12 as [A [B C]]. rewrite A, B, C. assumption.
+    destruct (Genv.find_var_info g2 b); try contradiction.
+    destruct (Genv.find_var_info g2 b); try contradiction.
+  apply GfindSymb23. apply GfindSymb12. assumption. }
 { (*match_genv*)
   clear - genvs_dom_eq12 match_sm_wd12 match_genv12 match_genv23.
   intros. rename c2 into c3. rename m2 into m3.
@@ -393,7 +442,7 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
     split; intros. eapply match_sm_valid12. apply H.
     eapply match_sm_valid23. apply H. }
 { (*initial_core*)
-  clear - genvs_dom_eq12 core_initial12 genvs_dom_eq23 core_initial23.
+  clear - genvs_dom_eq12 ginfos_pres12 core_initial12 genvs_dom_eq23 ginfos_pres23 core_initial23.
    intros. rename m2 into m3. rename v into v3. rename vals2 into vals3. 
     (*assert (HT: Forall2 Val.has_type vals1 (sig_args sig)). 
       eapply forall_valinject_hastype; eassumption.*)
@@ -479,18 +528,45 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
     f_equal; auto. 
     rewrite <-(genvs_domain_eq_isGlobal _ _ GDE); auto. }
 
-    destruct (core_initial12 _ _ _ _ _ vals2 _ 
+  assert (MRR2: mem_respects_readonly g2 m2). 
+    { red; intros b gv'; intros.
+      clear YY H0 H1 H2 H3 H4 H5 core_initial23 core_initial12 X Y.
+      destruct ginfos_pres12 as [GVars12 FS12].
+      destruct ginfos_pres23 as [GVars23 FS23].
+      specialize (find_var_info_isGlobal _ _ _ H10); intros GB.
+      specialize (meminj_preserves_globals_isGlobalBlock _ _ PG2 _ GB); intros J2b.
+      rewrite <- (genvs_domain_eq_isGlobal _ _ genvs_dom_eq12) in GB. 
+      specialize (meminj_preserves_globals_isGlobalBlock _ _ PG1 _ GB); intros J1b.
+      specialize (GVars12 b); red in GVars12. rewrite H10 in GVars12.
+      remember (Genv.find_var_info g1 b) as fvi. symmetry in Heqfvi.
+      destruct fvi; inv GVars12; try contradiction.
+      destruct H1 as [GVrd GVvol]; rename H0 into GVInit.
+      rewrite <- GVrd, <- GVvol, <- GVInit in *.
+      destruct (H6 _ _ Heqfvi H11) as [LDinit1 [VB1 NPerm1]].
+      split. eapply load_store_init_data_inject; try eassumption.
+             intros. eapply meminj_preserves_globals_isGlobalBlock; eassumption.
+      split. eapply Mem.valid_block_inject_2; eassumption.
+      intros z N. 
+      specialize (GVars23 b); red in GVars23. rewrite H10 in GVars23.
+      remember (Genv.find_var_info g3 b) as fvi3. symmetry in Heqfvi3.
+      destruct fvi3; inv GVars23; try contradiction.
+      destruct H1 as [GVrd3 GVvol3]; rename H0 into GVInit3.
+      rewrite GVrd, GVvol, GVInit, GVrd3, GVvol3, GVInit3 in *.
+      destruct (H7 _ _ Heqfvi3 H11) as [LDinit3 [VB3 NPerm3]].
+      eapply (NPerm3 z). exploit (Mem.perm_inject j2); try eassumption. 
+      rewrite Zplus_0_r; trivial. }
+
+  destruct (core_initial12 _ _ _ _ _ vals2 _ 
        DomS (fun b => match j2 b with None => false
                       | Some (b3,d) => DomT b3 end) H Inj12)
      as [d12 [c2 [Ini2 MC12]]]; try assumption.
-      (*eapply forall_valinject_hastype; eassumption.*)
-      intros. destruct (X b1) as [_ J1Comp]. 
+    { intros. destruct (X b1) as [_ J1Comp]. 
               destruct J1Comp as [b3 [dd COMP]]. exists b2, d; trivial.
               specialize (H4 _ _ _ COMP).
               destruct (compose_meminjD_Some _ _ _ _ _ COMP)
                 as [bb2 [dd1 [dd2 [J1 [J2 D]]]]]; subst; clear COMP.
-              rewrite J1 in H8; inv H8. rewrite J2. apply H4.
-      intros.
+              rewrite J1 in H10; inv H10. rewrite J2. apply H4. }
+    { intros.
         assert (Q: forall b,  isGlobalBlock g2 b || getBlocks vals2 b = true ->
                    exists jb d, j2 b = Some (jb, d) /\ 
                            isGlobalBlock g3 jb || getBlocks vals3 jb = true).
@@ -505,23 +581,23 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
         destruct (REACH_inject _ _ _ Inj23 
             (fun b' : block => isGlobalBlock g2 b' || getBlocks vals2 b')
             (fun b' : block => isGlobalBlock g3 b' || getBlocks vals3 b')
-            Q _ H8) as [b3 [d2 [J2 R3]]].
+            Q _ H10) as [b3 [d2 [J2 R3]]].
         rewrite J2.
         destruct (Y _ _ _ J2) as [b1 [d COMP]].
-        apply (H4 _ _ _ COMP).
-      intros b2 Hb2. remember (j2 b2) as d.
+        apply (H4 _ _ _ COMP). }
+    { intros b2 Hb2. remember (j2 b2) as d.
         destruct d; inv Hb2; apply eq_sym in Heqd. destruct p.
-        eapply Mem.valid_block_inject_1; eassumption.
-    destruct (core_initial23 _ _ _ _ _ vals3 _ 
-       (fun b => match j2 b with None => false | Some (b3,d) => DomT b3 end) DomT Ini2 Inj23)
-     as [d23 [c3 [Ini3 MC23]]]; try assumption. 
-       intros b2 b3 d2 J2. rewrite J2.
+        eapply Mem.valid_block_inject_1; eassumption. }
+  destruct (core_initial23 _ _ _ _ _ vals3 _ 
+        (fun b => match j2 b with None => false | Some (b3,d) => DomT b3 end) DomT Ini2 Inj23)
+        as [d23 [c3 [Ini3 MC23]]]; try assumption. 
+    { intros b2 b3 d2 J2. rewrite J2.
          destruct (Y _ _ _ J2) as [b1 [d COMP]].
-         destruct (H4 _ _ _ COMP). split; trivial.
-    intros b2 Hb2. remember (j2 b2) as d.
+         destruct (H4 _ _ _ COMP). split; trivial. }
+    { intros b2 Hb2. remember (j2 b2) as d.
         destruct d; inv Hb2; apply eq_sym in Heqd. destruct p.
-        eapply Mem.valid_block_inject_1; eassumption.
-    remember (initial_SM DomS
+        eapply Mem.valid_block_inject_1; eassumption. }
+  remember (initial_SM DomS
             (fun b : block =>
              match j2 b with
              | Some (b3, _) => DomT b3
@@ -555,8 +631,8 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
     assert (H7':exists (b2 : block) (d1 : Z), j1 b0 = Some (b2, d1)) by (exists b1, delta1; auto).
     apply X in H7'.
     destruct H7' as [b2 [delta2 HH]].
-    clear - HH H8.
-    unfold compose_meminj in HH; rewrite H8 in HH; simpl.
+    clear - HH H10.
+    unfold compose_meminj in HH; rewrite H10 in HH; simpl.
     destruct (j2 b1) eqn:result2.
     destruct p as [b2' delta2']; exists b2', delta2'; auto.
     inversion HH.

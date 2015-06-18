@@ -985,20 +985,6 @@ induction MS; econstructor; eauto.
   eapply match_stackframes_replace_externs; eassumption.
 Qed.
 (*
-Definition FORWARD' m m' :=
-  mem_forward m m' /\
-  (forall b, Mem.valid_block m b ->
-        (forall ofs : Z, ~ Mem.perm m b ofs Max Writable) ->
-        forall ofs, ZMap.get ofs (PMap.get b (Mem.mem_contents m')) = 
-                    ZMap.get ofs (PMap.get b (Mem.mem_contents m))).
-*)
-(*
-Definition FORWARD m m' :=
-  mem_forward m m' /\
-  (forall b ofs, Mem.valid_block m b ->
-        ~ Mem.perm m b ofs Max Writable ->
-        forall ch, Mem.load ch m' b ofs = Mem.load ch m b ofs).*)
-
 Definition FORWARD m m' :=
   mem_forward m m' /\
   (forall b, Mem.valid_block m b ->
@@ -1134,27 +1120,101 @@ split. eapply external_call_mem_forward; eassumption.
 intros.
 eapply ec_readonly. apply (external_call_spec ef). eassumption. eassumption.
 intros. apply H1.
+Qed.*)
+
+Lemma mem_match_approx_forward m1 m2 (FWD: mem_forward m1 m2) (M:mem_match_approx m1):
+      mem_match_approx m2.
+Proof. red; intros.
+  destruct (M _ _ _ H H0) as [M1 [M2 M3]].
+  split. eapply Genv.load_store_init_data_invariant. 2: eassumption. 
+         intros. apply FWD; eassumption.
+  split. apply FWD; assumption.
+  intros ofs N. apply (M3 ofs). apply FWD; assumption.
 Qed.
 
-Lemma rtl_coop_FORWARD : forall g c m c' m' (CS: RTL_corestep hf g c m c' m'), 
-     FORWARD m m'.
-Proof. intros.
-       inv CS; try apply FORWARD_refl.
-         (*Storev*)
-          destruct a; simpl in H1; inv H1. 
-          eapply store_FORWARD; eassumption.
-         (*FREE*)
-          eapply free_FORWARD; eassumption. 
-         (*builtin*) 
-          eapply external_call_FORWARD; eassumption.
-         eapply free_FORWARD; eassumption. 
-         eapply alloc_FORWARD; eassumption.
-         (*Helper*)
-          eapply external_call_FORWARD; eassumption.
+Lemma MATCH_initial: forall v
+  (vals1 : list val) c1 (m1 : mem) (j : meminj)
+  (vals2 : list val) (m2 : mem) (DomS DomT : Values.block -> bool)
+  (Ini :initial_core (rtl_eff_sem hf) ge v vals1 = Some c1)
+  (Inj: Mem.inject j m1 m2)
+  (VInj: Forall2 (val_inject j) vals1 vals2)
+  (PG: meminj_preserves_globals ge j)
+  (*(R : list_norepet (map fst (prog_defs prog)))*)
+  (J: forall b1 b2 d, j b1 = Some (b2, d) -> 
+                      DomS b1 = true /\ DomT b2 = true)
+  (RCH: forall b, REACH m2
+        (fun b' : Values.block => isGlobalBlock tge b' || getBlocks vals2 b') b =
+         true -> DomT b = true)
+  (RdOnly: mem_respects_readonly ge m1)
+  (GFI: globalfunction_ptr_inject j)
+  (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
+  (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
+exists n2 c2,
+  initial_core (rtl_eff_sem hf) tge v vals2 = Some c2 /\
+  MATCH n2
+    (initial_SM DomS DomT
+       (REACH m1
+          (fun b : Values.block => isGlobalBlock ge b || getBlocks vals1 b))
+       (REACH m2
+          (fun b : Values.block => isGlobalBlock tge b || getBlocks vals2 b))
+       j) c1 m1 c2 m2. 
+Proof. intros. unfold ge in *. unfold tge in *.
+  apply RTL_initial_coreD in Ini.
+  destruct Ini as [b [f [V1 [Heqzz [valsHT [valsDEF [valsLEN HC1]]]]]]]. subst.
+  specialize (Forall2_Zlength VInj). intros ZlengthEq.
+(*  simpl in Ini.
+  remember (Int.eq_dec i Int.zero) as z; destruct z; inv H0. clear Heqz.
+  remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz; inv H1. 
+    apply eq_sym in Heqzz.
+  destruct f; try discriminate.
+  case_eq (val_casted.val_has_type_list_func vals1
+           (sig_args (funsig (Internal f))) && val_casted.vals_defined vals1). 
+  2: solve[intros Heq; rewrite Heq in H0; inv H0].
+  intros Heq; rewrite Heq in H0; inv H0.*)
+  apply function_ptr_translated in Heqzz. simpl in Heqzz.
+  exists O. exists (RTL_Callstate nil (Internal (transf_function gapp f)) vals2).
+  split. 
+    (*destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
+    subst. inv A.*) unfold tge in Heqzz. (*rewrite D in Heqzz. inv Heqzz.*)
+    unfold rtl_eff_sem; simpl. rewrite Heqzz.
+    case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
+(*    rewrite D. *)
+    assert (val_casted.vals_defined vals2=true) as ->.
+    { eapply val_casted.val_list_inject_defined.
+      eapply forall_inject_val_list_inject; eauto.
+      destruct (val_casted.vals_defined vals1); auto.
+      (*rewrite andb_comm in Heq; inv Heq.*) }
+    simpl. (* apply andb_true_iff in Heq. destruct Heq. *)
+       exploit val_casted.val_list_inject_hastype.
+           eapply forall_inject_val_list_inject; eauto. 
+           assumption. eassumption. 
+       simpl; intros VHTL. rewrite VHTL. simpl.
+    rewrite <- ZlengthEq, proj_sumbool_is_true. trivial. apply valsLEN.
+
+    intros CONTRA. solve[elimtype False; auto].
+  destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
+     VInj J RCH PG GDE_lemma HDomS HDomT _ (eq_refl _))
+    as [AA [BB [CC [DD [EE [FF GG]]]]]].
+  split.
+    econstructor; eauto. 
+    red. intros. 
+    assert (GAC:  global_approx_charact ge gapp).
+      apply make_global_approx_correct. red; intros.
+      rewrite PTree.gempty in H1. discriminate.
+    specialize (GAC _ _ _ H H0). clear AA BB CC DD EE FF GG.
+    apply (RdOnly b0 _ GAC (eq_refl _)). 
+    constructor.
+    rewrite initial_SM_as_inj.
+      unfold vis, initial_SM; simpl.
+      apply forall_inject_val_list_inject.
+      eapply restrict_forall_vals_inject; try eassumption.
+        intros. apply REACH_nil. rewrite H; intuition.
+    rewrite initial_SM_as_inj.
+      eapply inject_restrict; eassumption.
+  rewrite initial_SM_as_inj.
+  intuition.
 Qed.
 
-(*Obsolete - version with hypothesis (SEP : globals_separate tge nu nu') 
-  is proven below
 Lemma MATCH_afterExternal: forall
       n1 mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
       (MemInjMu : Mem.inject (as_inj mu) m1 m2)
@@ -1173,15 +1233,14 @@ Lemma MATCH_afterExternal: forall
        nu (NuHyp: nu = replace_locals mu pubSrc' pubTgt')
        nu' ret1 m1' ret2 m2' 
        (INC: extern_incr nu nu')
-       (SEP: sm_inject_separated nu nu' m1 m2)
+       (SEP: globals_separate tge nu nu')
+(*       (SEP: sm_inject_separated nu nu' m1 m2)*)
        (WDnu': SM_wd nu')
        (SMvalNu': sm_valid nu' m1' m2')
        (MemInjNu': Mem.inject (as_inj nu') m1' m2')
        (RValInjNu': val_inject (as_inj nu') ret1 ret2)
-       (*(FwdSrc: mem_forward m1 m1')
-       (FwdTgt: mem_forward m2 m2')*)
-       (FwdSrc: FORWARD m1 m1')
-       (FwdTgt: FORWARD m2 m2')
+       (FwdSrc: mem_forward m1 m1')
+       (FwdTgt: mem_forward m2 m2')
        (frgnSrc' : block -> bool)
        (frgnSrcHyp: frgnSrc' =
              (fun b : block => DomSrc nu' b &&
@@ -1227,40 +1286,12 @@ assert (RC': REACH_closed m1' (mapped (as_inj nu'))).
         eapply inject_REACH_closed; eassumption.
 assert (PGnu': meminj_preserves_globals (Genv.globalenv prog) (as_inj nu')).
     subst. clear - INC SEP PG GFP Glob WDmu WDnu'.
-    apply meminj_preserves_genv2blocks in PG.
-    destruct PG as [PGa [PGb PGc]].
-    apply meminj_preserves_genv2blocks.
-    split; intros.
-      specialize (PGa _ H).
-      apply joinI; left. apply INC.
-      rewrite replace_locals_extern.
-      assert (GG: isGlobalBlock ge b = true).
-          unfold isGlobalBlock, ge. apply genv2blocksBool_char1 in H.
-          rewrite H. trivial.
-      destruct (frgnSrc _ WDmu _ (Glob _ GG)) as [bb2 [dd [FF FT2]]].
-      rewrite (foreign_in_all _ _ _ _ FF) in PGa. inv PGa.
-      apply foreign_in_extern; eassumption.
-    split; intros. specialize (PGb _ H).
-      apply joinI; left. apply INC.
-      rewrite replace_locals_extern.
-      assert (GG: isGlobalBlock ge b = true).
-          unfold isGlobalBlock, ge. apply genv2blocksBool_char2 in H.
-          rewrite H. intuition.
-      destruct (frgnSrc _ WDmu _ (Glob _ GG)) as [bb2 [dd [FF FT2]]].
-      rewrite (foreign_in_all _ _ _ _ FF) in PGb. inv PGb.
-      apply foreign_in_extern; eassumption.
-    eapply (PGc _ _ delta H). specialize (PGb _ H). clear PGa PGc.
-      remember (as_inj mu b1) as d.
-      destruct d; apply eq_sym in Heqd.
-        destruct p. 
-        apply extern_incr_as_inj in INC; trivial.
-        rewrite replace_locals_as_inj in INC.
-        rewrite (INC _ _ _ Heqd) in H0. trivial.
-      destruct SEP as [SEPa _].
-        rewrite replace_locals_as_inj, replace_locals_DomSrc, replace_locals_DomTgt in SEPa. 
-        destruct (SEPa _ _ _ Heqd H0).
-        destruct (as_inj_DomRng _ _ _ _ PGb WDmu).
-        congruence.
+    eapply meminj_preserves_globals_extern_incr_separate. eassumption.
+    rewrite replace_locals_as_inj. assumption.
+    assumption. 
+    specialize (genvs_domain_eq_isGlobal _ _ GDE_lemma). intros GL.
+    red. unfold ge in GL. rewrite GL. apply SEP.
+
 assert (RR1: REACH_closed m1'
   (fun b : Values.block =>
    locBlocksSrc nu' b
@@ -1373,6 +1404,8 @@ assert (GFnu': forall b, isGlobalBlock (Genv.globalenv prog) b = true ->
           unfold DomSrc. rewrite (frgnBlocksSrc_extBlocksSrc _ WDnu' _ Glob). intuition.
           apply REACH_nil. unfold exportedSrc.
           rewrite (frgnSrc_shared _ WDnu' _ Glob). intuition.
+
+
 assert (LL: local_of mu = local_of nu').
   destruct INC. rewrite replace_locals_local in H0. eapply H0. 
 assert (WDnuRE: SM_wd
@@ -1485,143 +1518,7 @@ intuition.
   red; intros. destruct (GFP _ _ H1). split; trivial.
   eapply extern_incr_as_inj; try eassumption.
   rewrite replace_locals_as_inj. assumption.
-Qed.*)
-
-Lemma RTL_initial_coreD (g: genv) (v:val)(args: list val) c:
-  RTL_initial_core g v args = Some c -> 
-  exists b f, v= Vptr b Int.zero /\ 
-   Genv.find_funct_ptr g b = Some (Internal f) /\ 
-   val_casted.val_has_type_list_func args (sig_args (fn_sig f)) = true /\
-   val_casted.vals_defined args = true /\ Z.lt (4*(2*(Zlength args))) Int.max_unsigned
-  /\ c = RTL_Callstate nil (Internal f) args.
-intros. destruct v; inv H.
-destruct (Int.eq_dec i Int.zero); inv H1. exists b. 
-destruct (Genv.find_funct_ptr g b); inv H0. 
-destruct f; inv H1. exists f. 
-remember (4 * (2 * Zlength args)) as l. simpl in *. rewrite <- Heql in *. clear Heql.
-remember (val_casted.val_has_type_list_func args (sig_args (fn_sig f)) &&
-         val_casted.vals_defined args &&
-        (zlt l Int.max_unsigned)) as z. simpl in *.
-destruct z; inv H0.  
-apply andb_true_eq in Heqz. destruct Heqz.
-apply andb_true_eq in H. destruct H. intuition.
-unfold zlt in H0.  destruct (Z_lt_dec l Int.max_unsigned). trivial. inv H0. 
 Qed.
-
-Lemma Forall2_length {A B} {f:A -> B -> Prop} {l1 l2} (F:Forall2 f l1 l2): length l1 = length l2.
-Proof. induction F; trivial. simpl; rewrite IHF. trivial. Qed.
-
-Lemma Forall2_Zlength {A B} {f:A -> B -> Prop} {l1 l2} (F:Forall2 f l1 l2): Zlength l1 = Zlength l2.
-Proof. do 2 rewrite Zlength_correct. rewrite (Forall2_length F). trivial. Qed.
-
-(*Obsolete -- version without entrypoints is (almost) proven below
-Lemma MATCH_initial: forall (v1 v2 : val) (sig : signature) entrypoints
-  (EP: In (v1, v2, sig) entrypoints)
-  (entry_points_ok : forall (v1 v2 : val) (sig : signature),
-                  In (v1, v2, sig) entrypoints ->
-                  exists
-                    (b : Values.block) f1 f2,
-                    v1 = Vptr b Int.zero /\
-                    v2 = Vptr b Int.zero /\
-                    Genv.find_funct_ptr ge b = Some f1 /\
-                    Genv.find_funct_ptr tge b = Some f2)
-  (vals1 : list val) c1 (m1 : mem) (j : meminj)
-  (vals2 : list val) (m2 : mem) (DomS DomT : Values.block -> bool)
-  (Ini :initial_core (rtl_eff_sem hf) ge v1 vals1 = Some c1)
-  (Inj: Mem.inject j m1 m2)
-  (VInj: Forall2 (val_inject j) vals1 vals2)
-  (PG: meminj_preserves_globals ge j)
-  (R : list_norepet (map fst (prog_defs prog)))
-  (J: forall b1 b2 d, j b1 = Some (b2, d) -> 
-                      DomS b1 = true /\ DomT b2 = true)
-  (RCH: forall b, REACH m2
-        (fun b' : Values.block => isGlobalBlock tge b' || getBlocks vals2 b') b =
-         true -> DomT b = true)
-  (InitMem : exists m0 : mem, Genv.init_mem prog = Some m0 
-      (*/\ Ple (Mem.nextblock m0) (Mem.nextblock m1) 
-      /\ Ple (Mem.nextblock m0) (Mem.nextblock m2)*)
-      /\ FORWARD m0 m1
-      /\ FORWARD m0 m2)
-  (GDE: genvs_domain_eq ge tge)
-  (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
-  (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
-exists n2 c2,
-  initial_core (rtl_eff_sem hf) tge v2 vals2 = Some c2 /\
-  MATCH n2
-    (initial_SM DomS DomT
-       (REACH m1
-          (fun b : Values.block => isGlobalBlock ge b || getBlocks vals1 b))
-       (REACH m2
-          (fun b : Values.block => isGlobalBlock tge b || getBlocks vals2 b))
-       j) c1 m1 c2 m2. 
-Proof. intros. unfold ge in *. unfold tge in *.
-  apply RTL_initial_coreD in Ini.
-  destruct Ini as [b [f [V1 [Heqzz [valsHT [valsDEF [valsLEN HC1]]]]]]]. subst.
-  specialize (Forall2_Zlength VInj). intros ZlengthEq.
-(*  simpl in Ini.
-  remember (Int.eq_dec i Int.zero) as z; destruct z; inv H0. clear Heqz.
-  remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz; inv H1. 
-    apply eq_sym in Heqzz.
-  destruct f; try discriminate.
-  case_eq (val_casted.val_has_type_list_func vals1
-           (sig_args (funsig (Internal f))) && val_casted.vals_defined vals1). 
-  2: solve[intros Heq; rewrite Heq in H0; inv H0].
-  intros Heq; rewrite Heq in H0; inv H0.*)
-  apply function_ptr_translated in Heqzz. simpl in Heqzz.
-  exists O. exists (RTL_Callstate nil (Internal (transf_function gapp f)) vals2).
-  split. 
-    destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
-    subst. inv A. unfold tge in Heqzz. rewrite D in Heqzz. inv Heqzz.
-    unfold rtl_eff_sem; simpl.
-    case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
-    rewrite D. 
-    assert (val_casted.vals_defined vals2=true) as ->.
-    { eapply val_casted.val_list_inject_defined.
-      eapply forall_inject_val_list_inject; eauto.
-      destruct (val_casted.vals_defined vals1); auto.
-      (*rewrite andb_comm in Heq; inv Heq.*) }
-    simpl. (* apply andb_true_iff in Heq. destruct Heq. *)
-       exploit val_casted.val_list_inject_hastype.
-           eapply forall_inject_val_list_inject; eauto. 
-           assumption. eassumption. 
-       simpl; intros VHTL. rewrite VHTL. simpl.
-    rewrite <- ZlengthEq, proj_sumbool_is_true. trivial. apply valsLEN.
-
-    intros CONTRA. solve[elimtype False; auto].
-  destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
-     VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
-    as [AA [BB [CC [DD [EE [FF GG]]]]]].
-  split.
-    econstructor; eauto.
-     destruct InitMem as [m0 [InitM0 [FWD1 FWD2]]].
-     clear AA BB CC (*Heq*). clear GG FF EE DD.
-     red; intros. clear RCH entry_points_ok PG VInj Inj J.
-     exploit mem_match_approx_init; try eassumption.
-     intros [InitMemApproxA [InitMemApproxB InitMemApproxC]].
-     split. eapply Genv.load_store_init_data_invariant; try eassumption.
-              intros. eapply FWD1. assumption. apply InitMemApproxC.
-     split. eapply FWD1; eassumption.
-       intros; intros N. eapply (InitMemApproxC ofs).
-         eapply FWD1; assumption.
-    constructor.
-    rewrite initial_SM_as_inj.
-      unfold vis, initial_SM; simpl.
-      apply forall_inject_val_list_inject.
-      eapply restrict_forall_vals_inject; try eassumption.
-        intros. apply REACH_nil. rewrite H; intuition.
-    rewrite initial_SM_as_inj.
-      eapply inject_restrict; eassumption.
-  rewrite initial_SM_as_inj.
-  intuition.
-      red; intros. specialize (Genv.find_funct_ptr_not_fresh prog). intros.
-         destruct InitMem as [m0 [INIT_MEM [? ?]]].
-         specialize (H0 _ _ _ INIT_MEM H). 
-         destruct (valid_init_is_global _ R _ INIT_MEM _ H0) as [id Hid]. 
-           destruct PG as [PGa [PGb PGc]]. split. eapply PGa; eassumption.
-         unfold isGlobalBlock. 
-          apply orb_true_iff. left. apply genv2blocksBool_char1.
-            simpl. exists id; eassumption.
-Qed.*)
 
 Lemma annot_strength_reduction_observable: forall t a text app targs args,
       (t, a) = annot_strength_reduction app targs args ->
@@ -1674,8 +1571,7 @@ left; trivial.
 Qed.
 
 Lemma MATCH_effcore_diagram: 
-  forall (GDE : genvs_domain_eq ge tge)
-      st1 m1 st1' m1' (U1 : block -> Z -> bool)
+  forall st1 m1 st1' m1' (U1 : block -> Z -> bool)
        (CS: effstep (rtl_eff_sem hf) ge U1 st1 m1 st1' m1')
       n1 st2 mu m2 
 (*      (EffSrc: forall b ofs, U1 b ofs = true -> vis mu b = true)*)
@@ -2091,7 +1987,7 @@ Opaque builtin_strength_reduction.
     apply H1.
     (* exact symbols_preserved. exact varinfo_preserved.*)
   split; trivial.
-  split. eapply gsep_domain_eq; eassumption.
+  split. eapply gsep_domain_eq. eassumption. apply GDE_lemma.
   intuition.
   { (*MATCH*) 
     split.
@@ -2292,7 +2188,7 @@ Opaque builtin_strength_reduction.
     eapply rtl_effstep_exec_function_internal; simpl; eauto.
   intuition.
   eapply gsep_domain_eq. eapply intern_incr_globals_separate; eauto.
-                         apply GDE.
+                         apply GDE_lemma.
   (*MATCH*)
     split. simpl. econstructor; eauto.
       apply analyze_correct_3; auto.
@@ -2350,7 +2246,7 @@ Opaque builtin_strength_reduction.
   exists O; eexists; eexists. exists mu'; eexists.
   split. left. eapply effstep_plus_one. eapply rtl_effstep_exec_function_external; eauto.
   split; trivial.
-  split. eapply gsep_domain_eq; eassumption.
+  split. eapply gsep_domain_eq. eassumption. apply GDE_lemma.
   split; trivial.
   split.
   { (*MATCH*)
@@ -2392,448 +2288,21 @@ Opaque builtin_strength_reduction.
   intuition. } 
 Qed.
 
-Lemma mem_match_approx_FORWARD m1 m2 (FWD: FORWARD m1 m2) (M:mem_match_approx m1):
-      mem_match_approx m2.
-Proof. red; intros.
-  destruct (M _ _ _ H H0) as [M1 [M2 M3]].
-  split. eapply Genv.load_store_init_data_invariant. 2: eassumption. 
-         intros. apply FWD; eassumption.
-  split. apply FWD; assumption.
-  intros ofs N. apply (M3 ofs). apply FWD; assumption.
-Qed.
-
-Lemma MATCH_initial: forall v
-  (vals1 : list val) c1 (m1 : mem) (j : meminj)
-  (vals2 : list val) (m2 : mem) (DomS DomT : Values.block -> bool)
-  (Ini :initial_core (rtl_eff_sem hf) ge v vals1 = Some c1)
-  (Inj: Mem.inject j m1 m2)
-  (VInj: Forall2 (val_inject j) vals1 vals2)
-  (PG: meminj_preserves_globals ge j)
-  (*(R : list_norepet (map fst (prog_defs prog)))*)
-  (J: forall b1 b2 d, j b1 = Some (b2, d) -> 
-                      DomS b1 = true /\ DomT b2 = true)
-  (RCH: forall b, REACH m2
-        (fun b' : Values.block => isGlobalBlock tge b' || getBlocks vals2 b') b =
-         true -> DomT b = true)
-  (Ini: forall b gv, Genv.find_var_info ge b = Some gv ->
-                     gvar_readonly gv && negb (gvar_volatile gv) = true ->
-                     Genv.load_store_init_data ge m1 b 0 (gvar_init gv) /\
-                     Mem.valid_block m1 b /\ (forall ofs : Z, ~ Mem.perm m1 b ofs Max Writable))
-
-                       
-                     
-  (*(InitMem : exists m0 : mem, Genv.init_mem prog = Some m0 
-      (*/\ Ple (Mem.nextblock m0) (Mem.nextblock m1) 
-      /\ Ple (Mem.nextblock m0) (Mem.nextblock m2) *)
-      /\ FORWARD m0 m1
-      /\ FORWARD m0 m2)*)
-  (GFI: globalfunction_ptr_inject j)
-  (GDE: genvs_domain_eq ge tge)
-  (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
-  (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
-exists n2 c2,
-  initial_core (rtl_eff_sem hf) tge v vals2 = Some c2 /\
-  MATCH n2
-    (initial_SM DomS DomT
-       (REACH m1
-          (fun b : Values.block => isGlobalBlock ge b || getBlocks vals1 b))
-       (REACH m2
-          (fun b : Values.block => isGlobalBlock tge b || getBlocks vals2 b))
-       j) c1 m1 c2 m2. 
-Proof. intros. unfold ge in *. unfold tge in *.
-  apply RTL_initial_coreD in Ini.
-  destruct Ini as [b [f [V1 [Heqzz [valsHT [valsDEF [valsLEN HC1]]]]]]]. subst.
-  specialize (Forall2_Zlength VInj). intros ZlengthEq.
-(*  simpl in Ini.
-  remember (Int.eq_dec i Int.zero) as z; destruct z; inv H0. clear Heqz.
-  remember (Genv.find_funct_ptr (Genv.globalenv prog) b) as zz; destruct zz; inv H1. 
-    apply eq_sym in Heqzz.
-  destruct f; try discriminate.
-  case_eq (val_casted.val_has_type_list_func vals1
-           (sig_args (funsig (Internal f))) && val_casted.vals_defined vals1). 
-  2: solve[intros Heq; rewrite Heq in H0; inv H0].
-  intros Heq; rewrite Heq in H0; inv H0.*)
-  apply function_ptr_translated in Heqzz. simpl in Heqzz.
-  exists O. exists (RTL_Callstate nil (Internal (transf_function gapp f)) vals2).
-  split. 
-    (*destruct (entry_points_ok _ _ _ EP) as [b0 [f1 [f2 [A [B [C D]]]]]].
-    subst. inv A.*) unfold tge in Heqzz. (*rewrite D in Heqzz. inv Heqzz.*)
-    unfold rtl_eff_sem; simpl. rewrite Heqzz.
-    case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
-(*    rewrite D. *)
-    assert (val_casted.vals_defined vals2=true) as ->.
-    { eapply val_casted.val_list_inject_defined.
-      eapply forall_inject_val_list_inject; eauto.
-      destruct (val_casted.vals_defined vals1); auto.
-      (*rewrite andb_comm in Heq; inv Heq.*) }
-    simpl. (* apply andb_true_iff in Heq. destruct Heq. *)
-       exploit val_casted.val_list_inject_hastype.
-           eapply forall_inject_val_list_inject; eauto. 
-           assumption. eassumption. 
-       simpl; intros VHTL. rewrite VHTL. simpl.
-    rewrite <- ZlengthEq, proj_sumbool_is_true. trivial. apply valsLEN.
-
-    intros CONTRA. solve[elimtype False; auto].
-  destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
-     VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
-    as [AA [BB [CC [DD [EE [FF GG]]]]]].
-  split.
-    econstructor; eauto. 
-    red. intros. 
-    assert (GAC:  global_approx_charact ge gapp).
-      apply make_global_approx_correct. red; intros.
-      rewrite PTree.gempty in H1. discriminate.
-    specialize (GAC _ _ _ H H0). clear AA BB CC DD EE FF GG.
-    apply (Ini0 b0 _ GAC (eq_refl _)). 
-    (*(*admit. NEED forward m0 m1? Or take (parts of)
-      init_mem_characterization and init_mem_characterization_2 to specify the conditions m1 sjould satisfy
-    unfold Genv.load_store_init_data. global_approx_charact .
-       unfold gapp, ge. apply make_global_approx_correct.  *)
-     (*destruct InitMem as [m0 [InitM0 [FWD1 FWD2]]].*)
-     clear AA BB CC (*Heq*). clear GG FF EE DD.
-     (*red; intros.*) clear RCH (*entry_points_ok*) PG VInj Inj J.
-     (*MAYBE take mem_match_approx as invariant, not FORWRD? *)
-     eapply mem_match_approx_FORWARD. apply FWD1.
-     apply mem_match_approx_init; assumption. (* red; intros.
-     exploit mem_match_approx_init; try eassumption.
-     intros [InitMemApproxA [InitMemApproxB InitMemApproxC]].
-     split. eapply Genv.load_store_init_data_invariant; try eassumption.
-              intros. eapply FWD1. assumption. apply InitMemApproxC.
-     split. eapply FWD1; eassumption.
-       intros; intros N. eapply (InitMemApproxC ofs).
-         eapply FWD1; assumption.*)*)
-    constructor.
-    rewrite initial_SM_as_inj.
-      unfold vis, initial_SM; simpl.
-      apply forall_inject_val_list_inject.
-      eapply restrict_forall_vals_inject; try eassumption.
-        intros. apply REACH_nil. rewrite H; intuition.
-    rewrite initial_SM_as_inj.
-      eapply inject_restrict; eassumption.
-  rewrite initial_SM_as_inj.
-  intuition.
-Qed.
-
-Lemma MATCH_afterExternal: forall
-      n1 mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
-      (MemInjMu : Mem.inject (as_inj mu) m1 m2)
-      (MatchMu: MATCH n1 mu st1 m1 st2 m2)
-      (AtExtSrc : at_external (rtl_eff_sem hf) st1 = Some (e, ef_sig, vals1))
-      (AtExtTgt : at_external (rtl_eff_sem hf) st2 = Some (e', ef_sig', vals2))
-      (ValInjMu : Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2)
-      (pubSrc' : block -> bool)
-      (pubSrcHyp : pubSrc' =
-                 (fun b : block => 
-                 locBlocksSrc mu b && REACH m1 (exportedSrc mu vals1) b))
-      (pubTgt' : block -> bool)
-      (pubTgtHyp: pubTgt' =
-                 (fun b : block => 
-                 locBlocksTgt mu b && REACH m2 (exportedTgt mu vals2) b))
-       nu (NuHyp: nu = replace_locals mu pubSrc' pubTgt')
-       nu' ret1 m1' ret2 m2' 
-       (INC: extern_incr nu nu')
-       (SEP: globals_separate tge nu nu')
-(*       (SEP: sm_inject_separated nu nu' m1 m2)*)
-       (WDnu': SM_wd nu')
-       (SMvalNu': sm_valid nu' m1' m2')
-       (MemInjNu': Mem.inject (as_inj nu') m1' m2')
-       (RValInjNu': val_inject (as_inj nu') ret1 ret2)
-       (*(FwdSrc: mem_forward m1 m1')
-       (FwdTgt: mem_forward m2 m2')*)
-       (FwdSrc: FORWARD m1 m1')
-       (FwdTgt: FORWARD m2 m2')
-       (frgnSrc' : block -> bool)
-       (frgnSrcHyp: frgnSrc' =
-             (fun b : block => DomSrc nu' b &&
-            (negb (locBlocksSrc nu' b) && REACH m1' (exportedSrc nu' (ret1 :: nil)) b)))
-       (frgnTgt' : block -> bool)
-       (frgnTgtHyp: frgnTgt' =
-            (fun b : block => DomTgt nu' b &&
-             (negb (locBlocksTgt nu' b) && REACH m2' (exportedTgt nu' (ret2 :: nil)) b)))
-       mu' (Mu'Hyp: mu' = replace_externs nu' frgnSrc' frgnTgt')
-       (UnchPrivSrc: Mem.unchanged_on
-               (fun b z => locBlocksSrc nu b = true /\ pubBlocksSrc nu b = false) m1 m1')
-       (UnchLOOR: Mem.unchanged_on (local_out_of_reach nu m1) m2 m2'),
-  exists n1' st1' st2',
-  after_external (rtl_eff_sem hf) (Some ret1) st1 =Some st1' /\
-  after_external (rtl_eff_sem hf) (Some ret2) st2 = Some st2' /\
-  MATCH n1' mu' st1' m1' st2' m2'.
-Proof. intros.
-destruct MatchMu as [MS PRE].
-destruct PRE as [RC [PG [GFP [Glob [SMV [WDmu INJ]]]]]].
-simpl in *. inv MS; simpl in *; inv AtExtSrc.
-destruct f; inv H0.
-simpl in *. apply eq_sym in AtExtTgt; inv AtExtTgt.
-exists O. eexists; eexists.
-    split. reflexivity.
-    split. reflexivity.
- simpl in *.
-destruct (observableEF_dec hf e0); inv H1. inv H0.
-assert (INCvisNu': inject_incr
-  (restrict (as_inj nu')
-     (vis
-        (replace_externs nu'
-           (fun b : Values.block =>
-            DomSrc nu' b &&
-            (negb (locBlocksSrc nu' b) &&
-             REACH m1' (exportedSrc nu' (ret1 :: nil)) b))
-           (fun b : Values.block =>
-            DomTgt nu' b &&
-            (negb (locBlocksTgt nu' b) &&
-             REACH m2' (exportedTgt nu' (ret2 :: nil)) b))))) (as_inj nu')).
-      unfold vis. rewrite replace_externs_frgnBlocksSrc, replace_externs_locBlocksSrc.
-      apply restrict_incr. 
-assert (RC': REACH_closed m1' (mapped (as_inj nu'))).
-        eapply inject_REACH_closed; eassumption.
-assert (PGnu': meminj_preserves_globals (Genv.globalenv prog) (as_inj nu')).
-    subst. clear - INC SEP PG GFP Glob WDmu WDnu'.
-    eapply meminj_preserves_globals_extern_incr_separate. eassumption.
-    rewrite replace_locals_as_inj. assumption.
-    assumption. 
-    specialize (genvs_domain_eq_isGlobal _ _ GDE_lemma). intros GL.
-    red. unfold ge in GL. rewrite GL. apply SEP.
-
-assert (RR1: REACH_closed m1'
-  (fun b : Values.block =>
-   locBlocksSrc nu' b
-   || DomSrc nu' b &&
-      (negb (locBlocksSrc nu' b) &&
-       REACH m1' (exportedSrc nu' (ret1 :: nil)) b))).
-  intros b Hb. rewrite REACHAX in Hb. destruct Hb as [L HL].
-  generalize dependent b.
-  induction L; simpl; intros; inv HL.
-     assumption.
-  specialize (IHL _ H1); clear H1.
-  apply orb_true_iff in IHL.
-  remember (locBlocksSrc nu' b') as l.
-  destruct l; apply eq_sym in Heql.
-  (*case locBlocksSrc nu' b' = true*)
-    clear IHL.
-    remember (pubBlocksSrc nu' b') as p.
-    destruct p; apply eq_sym in Heqp.
-      assert (Rb': REACH m1' (mapped (as_inj nu')) b' = true).
-        apply REACH_nil. 
-        destruct (pubSrc _ WDnu' _ Heqp) as [bb2 [dd1 [PUB PT]]].
-        eapply mappedI_true.
-         apply (pub_in_all _ WDnu' _ _ _ PUB).
-      assert (Rb:  REACH m1' (mapped (as_inj nu')) b = true).
-        eapply REACH_cons; try eassumption.
-      specialize (RC' _ Rb).
-      destruct (mappedD_true _ _ RC') as [[b2 d1] AI'].
-      remember (locBlocksSrc nu' b) as d.
-      destruct d; simpl; trivial.
-      apply andb_true_iff. 
-      split. eapply as_inj_DomRng; try eassumption.
-      eapply REACH_cons; try eassumption.
-        apply REACH_nil. unfold exportedSrc.
-        rewrite (pubSrc_shared _ WDnu' _ Heqp). intuition.
-      destruct (UnchPrivSrc) as [UP UV]; clear UnchLOOR.
-        specialize (UP b' z Cur Readable). 
-        specialize (UV b' z). 
-        destruct INC as [_ [_ [_ [_ [LCnu' [_ [PBnu' [_ [FRGnu' _]]]]]]]]].
-        rewrite <- LCnu'. rewrite replace_locals_locBlocksSrc.  
-        rewrite <- LCnu' in Heql. rewrite replace_locals_locBlocksSrc in *.
-        rewrite <- PBnu' in Heqp. rewrite replace_locals_pubBlocksSrc in *.
-        clear INCvisNu'. 
-        rewrite Heql in *. simpl in *. intuition.
-        assert (VB: Mem.valid_block m1 b').
-          eapply SMV. unfold DOM, DomSrc. rewrite Heql. intuition.
-        destruct (H VB) as [Perm Perm'].
-        rewrite H0 in H4. 2: eauto.
-        clear H H0.
-        remember (locBlocksSrc mu b) as q.
-        destruct q; simpl; trivial; apply eq_sym in Heqq.
-        assert (Rb : REACH m1 (vis mu) b = true).
-           eapply REACH_cons; try eassumption.
-           apply REACH_nil. unfold vis. rewrite Heql; trivial.
-           eauto.
-        specialize (RC _ Rb). unfold vis in RC.
-           rewrite Heqq in RC; simpl in *.
-        rewrite replace_locals_frgnBlocksSrc in FRGnu'.
-        rewrite FRGnu' in RC.
-        apply andb_true_iff.  
-        split. unfold DomSrc. rewrite (frgnBlocksSrc_extBlocksSrc _ WDnu' _ RC). intuition.
-        apply REACH_nil. unfold exportedSrc.
-          rewrite (frgnSrc_shared _ WDnu' _ RC). intuition.
-  (*case DomSrc nu' b' &&
-    (negb (locBlocksSrc nu' b') &&
-     REACH m1' (exportedSrc nu' (ret1 :: nil)) b') = true*)
-    destruct IHL. congruence.
-    apply andb_true_iff in H. simpl in H. 
-    destruct H as [DomNu' Rb']. 
-    clear INC SEP INCvisNu' UnchLOOR UnchPrivSrc.
-    remember (locBlocksSrc nu' b) as d.
-    destruct d; simpl; trivial. apply eq_sym in Heqd.
-    apply andb_true_iff.
-    split. assert (RET: Forall2 (val_inject (as_inj nu')) (ret1::nil) (ret2::nil)).
-              constructor. assumption. constructor.
-           destruct (REACH_as_inj _ WDnu' _ _ _ _ MemInjNu' RET
-               _ Rb' (fun b => true)) as [b2 [d1 [AI' _]]]; trivial.
-           assert (REACH m1' (mapped (as_inj nu')) b = true).
-             eapply REACH_cons; try eassumption.
-             apply REACH_nil. eapply mappedI_true; eassumption.
-           specialize (RC' _ H). 
-           destruct (mappedD_true _ _ RC') as [[? ?] ?].
-           eapply as_inj_DomRng; eassumption.
-    eapply REACH_cons; try eassumption.
-(*assert (RRR: REACH_closed m1' (exportedSrc nu' (ret1 :: nil))).
-    intros b Hb. apply REACHAX in Hb.
-       destruct Hb as [L HL].
-       generalize dependent b.
-       induction L ; simpl; intros; inv HL; trivial.
-       specialize (IHL _ H1); clear H1.
-       unfold exportedSrc.
-       eapply REACH_cons; eassumption.*)
-    
-assert (RRC: REACH_closed m1' (fun b : Values.block =>
-                         mapped (as_inj nu') b &&
-                           (locBlocksSrc nu' b
-                            || DomSrc nu' b &&
-                               (negb (locBlocksSrc nu' b) &&
-                           REACH m1' (exportedSrc nu' (ret1 :: nil)) b)))).
-  eapply REACH_closed_intersection; eassumption.
-assert (GFnu': forall b, isGlobalBlock (Genv.globalenv prog) b = true ->
-               DomSrc nu' b &&
-               (negb (locBlocksSrc nu' b) && REACH m1' (exportedSrc nu' (ret1 :: nil)) b) = true).
-     intros. specialize (Glob _ H).
-       assert (FSRC:= extern_incr_frgnBlocksSrc _ _ INC).
-          rewrite replace_locals_frgnBlocksSrc in FSRC.
-       rewrite FSRC in Glob.
-       rewrite (frgnBlocksSrc_locBlocksSrc _ WDnu' _ Glob). 
-       apply andb_true_iff; simpl.
-        split.
-          unfold DomSrc. rewrite (frgnBlocksSrc_extBlocksSrc _ WDnu' _ Glob). intuition.
-          apply REACH_nil. unfold exportedSrc.
-          rewrite (frgnSrc_shared _ WDnu' _ Glob). intuition.
-
-
-assert (LL: local_of mu = local_of nu').
-  destruct INC. rewrite replace_locals_local in H0. eapply H0. 
-assert (WDnuRE: SM_wd
-  (replace_externs nu'
-     (fun b : block =>
-      DomSrc nu' b &&
-      (negb (locBlocksSrc nu' b) &&
-       REACH m1' (exportedSrc nu' (ret1 :: nil)) b))
-     (fun b : block =>
-      DomTgt nu' b &&
-      (negb (locBlocksTgt nu' b) &&
-       REACH m2' (exportedTgt nu' (ret2 :: nil)) b)))).
-              eapply replace_externs_wd. assumption.
-  clear - WDnu'  RValInjNu' MemInjNu'. intros.  
-   apply andb_true_iff in H; destruct H.
-             apply andb_true_iff in H0; destruct H0.
-             remember (locBlocksSrc nu' b1) as d.
-             apply eq_sym in Heqd. destruct d; inv H0.
-             exploit (REACH_extern_REACH nu'); try eassumption.
-               econstructor. eassumption. econstructor.
-            intros [b2 [delta [EXT REXT]]].
-              exists b2, delta. split; trivial.
-              destruct (extern_DomRng _ WDnu' _ _ _ EXT). 
-              unfold DomTgt. rewrite H2, REXT.
-              rewrite (extBlocksTgt_locBlocksTgt _ WDnu' _ H2).
-              trivial.
-            intros. apply andb_true_iff in H; destruct H.
-              apply andb_true_iff in H0; destruct H0.
-              unfold DomTgt in H.
-              destruct (locBlocksTgt nu' b). inv H0. simpl in H; trivial.
-assert (II: inject_incr (as_inj (restrict_sm mu (vis mu)))
-  (restrict (as_inj nu')
-     (fun b : block =>
-      locBlocksSrc nu' b
-      || DomSrc nu' b &&
-         (negb (locBlocksSrc nu' b) &&
-          REACH m1' (exportedSrc nu' (ret1 :: nil)) b)))).
-  clear - INC WDnu'.
-    specialize (extern_incr_restrict _ _ INC WDnu').
-    rewrite replace_locals_as_inj, replace_locals_vis.
-    red; intros; clear INC. rewrite restrict_sm_all in H0. 
-    apply H in H0. destruct (restrictD_Some _ _ _ _ _ H0).
-    apply restrictI_Some; trivial.
-    destruct (as_inj_DomRng _ _ _ _ H1 WDnu'). rewrite H3.
-    unfold DomSrc in H3; simpl.
-    unfold vis in H2. destruct (locBlocksSrc nu' b); simpl in *; trivial.
-    apply REACH_nil. unfold exportedSrc.
-         apply frgnSrc_shared in H2; trivial.
-         solve[rewrite H2; intuition].
-  
-split.
-  assert (MSnu': list_forall2 (match_stackframes nu') s s').
-    clear - STACKS INC WDnu'.
-    induction STACKS; econstructor; eauto.
-      inv H; econstructor; eauto.
-      eapply regs_inject_incr; try eassumption.
-        red; intros. destruct (restrictD_Some _ _ _ _ _ H).
-        apply restrictI_Some.
-          apply extern_incr_as_inj in INC; trivial.
-            rewrite replace_locals_as_inj in INC.
-            apply INC. trivial.
-          apply extern_incr_vis in INC; trivial. rewrite <- INC. 
-            rewrite replace_locals_vis. trivial. 
-      destruct INC as [_ [LOC _]]. rewrite replace_locals_local in LOC.
-        rewrite LOC in H2; trivial.
-  econstructor; eauto. 
-  { (*mem_match_approx m1'*)
-    clear - UnchPrivSrc GMATCH FwdSrc.  
-    rewrite replace_locals_locBlocksSrc, replace_locals_pubBlocksSrc in UnchPrivSrc.
-    red; intros. 
-    exploit GMATCH; eauto. intros [A [B C]].
-    split. eapply Genv.load_store_init_data_invariant ; try eassumption. (* apply Genv.load_store_init_data_invariant with m1; auto.*)
-      intros. eapply FwdSrc. assumption. apply C. 
-    split. apply FwdSrc. trivial.
-     intros. intros N. apply FwdSrc in N. apply (C _ N). trivial. }
-  eapply list_match_stackframes_replace_externs; try eassumption.
-    intros.
-      unfold DomSrc. 
-      rewrite (frgnBlocksSrc_extBlocksSrc _ WDnu' _ H),
-        (frgnBlocksSrc_locBlocksSrc _ WDnu' _ H); simpl.
-      apply REACH_nil. unfold exportedSrc.
-         rewrite (frgnSrc_shared _ WDnu' _ H). intuition.
-  rewrite replace_externs_as_inj, replace_externs_vis.
-    clear - RValInjNu' WDnu'.
-    inv RValInjNu'; econstructor; eauto.
-    apply restrictI_Some; trivial.
-    destruct (as_inj_DomRng _ _ _ _ H WDnu'). rewrite H0.
-    destruct (locBlocksSrc nu' b1); simpl in *; trivial.
-    apply REACH_nil. unfold exportedSrc.
-    apply orb_true_iff; left.
-    apply getBlocks_char. eexists; left; reflexivity.
-  rewrite replace_externs_as_inj, replace_externs_vis.
-    eapply inject_restrict; eassumption.
-  eapply list_match_stackframes_replace_externs; try eassumption.
-    intros.
-      unfold DomSrc. 
-      rewrite (frgnBlocksSrc_extBlocksSrc _ WDnu' _ H),
-        (frgnBlocksSrc_locBlocksSrc _ WDnu' _ H); simpl.
-      apply REACH_nil. unfold exportedSrc.
-         rewrite (frgnSrc_shared _ WDnu' _ H). intuition.
-
-unfold vis in *.
-rewrite replace_externs_locBlocksSrc, replace_externs_frgnBlocksSrc,
-        replace_externs_as_inj in *.
-destruct (eff_after_check2 _ _ _ _ _ MemInjNu' RValInjNu' 
-      _ (eq_refl _) _ (eq_refl _) _ (eq_refl _) WDnu' SMvalNu').
-unfold vis in *.
-intuition.
-(*last goal: globalfunction_ptr_inject *)
-  red; intros. destruct (GFP _ _ H1). split; trivial.
-  eapply extern_incr_as_inj; try eassumption.
-  rewrite replace_locals_as_inj. assumption.
-Qed.
-
 Theorem transl_program_correct:
 SM_simulation.SM_simulation_inject (rtl_eff_sem hf)
   (rtl_eff_sem hf) ge tge.
 Proof.
-intros.
-assert (GDE:= GDE_lemma).
 econstructor.
 (*well_founded*)
    apply lt_wf.
 (*SM_wd*)
   eapply MATCH_wd.
 (*genvs_domain_eq*)
-  assumption.
+  apply GDE_lemma.
+(*ginfos_preserved*)
+ split; red; intros.
+   rewrite varinfo_preserved. apply gvar_info_refl.
+   rewrite symbols_preserved. trivial.
 (*match_genv*)
   eapply MATCH_PG. 
 (*match_reach_closed*)
@@ -2843,51 +2312,7 @@ econstructor.
 (*match_valid*)
   apply MATCH_valid.
 { (*match_initial*)
-   intros.
-    eapply MATCH_initial; eauto. (*
-    destruct init_mem as [m0 INIT].
-    exists m0; split; auto.
-    unfold meminj_preserves_globals in H3.    
-    destruct H3 as [A [B C]].
-
-    assert (P: forall p q, {Ple p q} + {Plt q p}).
-      intros p q.
-      case_eq (Pos.leb p q).
-      intros TRUE.
-      apply Pos.leb_le in TRUE.
-      left; auto.
-      intros FALSE.
-      apply Pos.leb_gt in FALSE.
-      right; auto.
-
-    cut (forall b, Plt b (Mem.nextblock m0) -> 
-           exists id, Genv.find_symbol ge id = Some b). intro D.
-    
-    split.
-    destruct (P (Mem.nextblock m0) (Mem.nextblock m1)); auto.
-    exfalso. 
-    destruct (D _ p).
-    apply A in H3.
-    assert (Mem.valid_block m1 (Mem.nextblock m1)).
-      eapply Mem.valid_block_inject_1; eauto.
-    clear - H8; unfold Mem.valid_block in H8.
-    xomega.
-
-    destruct (P (Mem.nextblock m0) (Mem.nextblock m2)); auto.
-    exfalso. 
-    destruct (D _ p).
-    apply A in H3.
-    assert (Mem.valid_block m2 (Mem.nextblock m2)).
-      eapply Mem.valid_block_inject_2; eauto.
-    clear - H8; unfold Mem.valid_block in H8.
-    xomega.
-    
-    intros b LT.    
-    unfold ge. 
-    apply valid_init_is_global with (b0 := b) in INIT.
-    eapply INIT; auto.
-    apply LNR.
-    apply LT.*) admit. (*init_mem assuption*) }
+   intros. eapply MATCH_initial; eauto. }
 { (*effcore_diagram*)
   intros. exploit MATCH_effcore_diagram; try eassumption.
   intros [n2 [st2' [m2' [mu' [U2 [CS2 HH]]]]]].
@@ -2906,9 +2331,7 @@ econstructor.
    apply MATCH_atExternal. }
 { (*afterExternal*) 
   intros.
-   eapply MATCH_afterExternal; try apply MemInjMu; try eassumption.
-   split. assumption. admit. (*new FORWRD-clause*) 
-   split. assumption. admit. (*new FORWRD-clause*) }
+   eapply MATCH_afterExternal; try apply MemInjMu; try eassumption. }
 Qed.
 
 End PRESERVATION.

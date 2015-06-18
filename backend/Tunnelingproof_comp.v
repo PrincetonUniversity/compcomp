@@ -842,7 +842,6 @@ induction l; simpl in *. contradiction.
 Qed.
 
 Lemma MATCH_afterExternal: forall
-      (GDE : genvs_domain_eq ge tge)
       mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
       (MemInjMu : Mem.inject (as_inj mu) m1 m2)
       (MatchMu: MATCH mu st1 m1 st2 m2)
@@ -1109,7 +1108,6 @@ Lemma MATCH_initial: forall v
         (fun b' : Values.block => isGlobalBlock tge b' || getBlocks vals2 b') b =
          true -> DomT b = true)
   (GFI: globalfunction_ptr_inject ge j)
-  (GDE: genvs_domain_eq ge tge)
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
@@ -1182,7 +1180,7 @@ Proof. intros.
     intros CONTRA. solve[elimtype False; auto].
 
   destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
-     VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
+     VInj J RCH PG GDE_lemma HDomS HDomT _ (eq_refl _))
     as [AA [BB [CC [DD [EE [FF GG]]]]]].
   split.
     eapply match_states_call; try eassumption.
@@ -1234,7 +1232,6 @@ exists st2' m2' U2,
          Mem.perm m1 b1 (ofs - delta1) Max Nonempty)).
 Proof. intros.
   destruct MTCH as [MS [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
-  assert (GDE:= GDE_lemma). 
   assert (SymbPres := symbols_preserved).
   induction CS; intros; try (inv MS).
 
@@ -1847,6 +1844,10 @@ eapply lt_state_wf.
 intros. apply H.
 (*genvs_dom_eq*)
 apply GDE_lemma.
+(*ginfos_preserved*)
+ split; red; intros.
+   rewrite varinfo_preserved. apply gvar_info_refl.
+   rewrite symbols_preserved. trivial.
 (*match_visible*)
   intros. destruct MC; subst. eapply MATCH_PG; eassumption.
 (*match_reach_closed*)
@@ -1927,13 +1928,13 @@ intros. apply H.
 (*afterExternal*)
   { intros. destruct MatchMu as [MTCH CD]; subst cd.
     exploit MATCH_afterExternal.
-     apply GDE_lemma. apply MemInjMu. apply MTCH.
+     apply MemInjMu. apply MTCH.
      eassumption. eassumption. eassumption.
      eapply pubSrcHyp. eapply pubTgtHyp. eassumption.
      eassumption. eassumption. eassumption. 
      eassumption. eassumption. eassumption. 
-     eassumption.
-     intros. destruct (H FwdTgt _ frgnSrcHyp _  frgnTgtHyp 
+     eassumption. eassumption.
+     intros. destruct (H _ frgnSrcHyp _  frgnTgtHyp 
               _ Mu'Hyp UnchPrivSrc UnchLOOR)
              as [st1' [st2' [AftExtSrc [AftExtTgt MTCH']]]].
             exists st1', st1', st2'; eauto. }

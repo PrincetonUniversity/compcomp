@@ -2919,6 +2919,33 @@ Ltac auto_sm:=
                end.
 
 
+Lemma load_eq_unchanged_on (P : block -> Z -> Prop) m m' 
+         (U: Mem.unchanged_on P m m') b (B: Mem.valid_block m b)
+         chunk ofs (OFS: forall i : Z, ofs <= i < ofs + size_chunk chunk -> P b i):
+  Mem.load chunk m b ofs = Mem.load chunk m' b ofs.
+Proof. intros. 
+Transparent Mem.load.
+    unfold Mem.load.
+    destruct U.
+    destruct (Mem.valid_access_dec m chunk b ofs Readable).
+    { destruct (Mem.valid_access_dec m' chunk b ofs Readable).
+         erewrite Mem.getN_exten. reflexivity.
+         rewrite <- size_chunk_conv.
+         intros. rewrite unchanged_on_contents. trivial. apply (OFS _ H).
+       apply v. trivial.
+      elim n; clear n unchanged_on_contents.
+        unfold Mem.valid_access, Mem.range_perm in *.
+        destruct v; split; trivial; intros. apply unchanged_on_perm; trivial. apply (OFS _ H1).
+        apply H; trivial.
+    }
+
+   { destruct (Mem.valid_access_dec m' chunk b ofs Readable); trivial.
+      elim n; clear n unchanged_on_contents.
+        unfold Mem.valid_access, Mem.range_perm in *.
+        destruct v; split; trivial; intros. apply unchanged_on_perm; trivial. apply (OFS _ H1).
+        apply H; trivial. }
+Opaque Mem.load.
+Qed.
 
 Lemma EFF_interp_II_strong: 
   forall m1 m2 nu12 
@@ -3191,38 +3218,6 @@ Proof. intros.
         * Proving some properties of my memory m2'     *
         ************************************************)
 
-       (* mem_forward m2 m2' *)
-       assert (Fwd2: mem_forward m2 m2').
-       { unfold mem_forward; split.
-         + unfold Mem.valid_block in *.
-           rewrite property_nb.
-           unfold mem_add_nb.
-           xomega.
-         + intros ofs per. 
-           unfold Mem.perm. rewrite property_acc; unfold mem_add_acc.
-           destruct (valid_dec m2 b); try contradiction.
-           destruct (locBlocksSrc nu23 b) eqn: loc23.
-           destruct (pubBlocksSrc nu23 b) eqn: pub23; trivial.
-           destruct (source (local_of nu12) m1 b ofs) eqn:sour; trivial; destruct p.
-           destruct (pubBlocksSrc nu12 b0) eqn: pub12; trivial.
-           symmetry in sour. apply source_SomeE in sour.
-           destruct sour as [b1 [delta' [ofs1 [invertible [leq [mapj [mperm ofs_add]]]]]]].
-           subst ofs; intros H0. eapply MInj12.
-           apply local_in_all; eauto.
-           eapply Fwd1; auto.
-           inversion invertible; subst z b0; auto.
-           
-           destruct (source (as_inj nu12) m1 b ofs) eqn:sour;
-             try solve[destruct (as_inj nu23 b); intros HH;try destruct p; trivial; inversion HH].
-           destruct p.
-           intros H0.
-           symmetry in sour. apply source_SomeE in sour.
-           destruct sour as [b1 [delta' [ofs1 [invertible [leq [mapj [mperm ofs_add]]]]]]].
-           subst ofs; eapply MInj12; eauto.
-           eapply Fwd1; auto.
-           inversion invertible; subst z b0; auto.
-       }
-
        (* Mem.unchanged_on private m2 *)
        assert (UnchPrivSrc12 : Mem.unchanged_on
                    (fun (b : block) (_ : Z) =>
@@ -3239,7 +3234,6 @@ Proof. intros.
            destruct (valid_dec m2 b); try solve[trivial].
            (*Invalid case*) apply Mem.perm_valid_block in mperm; contradiction.
        }
-       
        (*Mem.unchanged_on local_out_of_reach 12*)
        assert (UnchLOOR12: Mem.unchanged_on (local_out_of_reach nu12 m1) m2 m2').
        { unfold local_out_of_reach.
@@ -3322,6 +3316,56 @@ Proof. intros.
                rewrite maploc12 in maploc12'; inversion maploc12'; subst b1 z.
                apply GlueInv in pubT12. rewrite pubT12 in H2; inversion H2.
        }
+       (* mem_forward m2 m2' *)
+       assert (Fwd2: mem_forward m2 m2').
+       { unfold mem_forward; split.
+         + unfold Mem.valid_block in *.
+           rewrite property_nb.
+           unfold mem_add_nb.
+           xomega.
+         + split. 
+           - intros ofs per. 
+             unfold Mem.perm. rewrite property_acc; unfold mem_add_acc.
+             destruct (valid_dec m2 b); try contradiction.
+             destruct (locBlocksSrc nu23 b) eqn: loc23.
+             destruct (pubBlocksSrc nu23 b) eqn: pub23; trivial.
+             destruct (source (local_of nu12) m1 b ofs) eqn:sour; trivial; destruct p.
+             destruct (pubBlocksSrc nu12 b0) eqn: pub12; trivial.
+             symmetry in sour. apply source_SomeE in sour.
+             destruct sour as [b1 [delta' [ofs1 [invertible [leq [mapj [mperm ofs_add]]]]]]].
+             subst ofs; intros H0. eapply MInj12.
+             apply local_in_all; eauto.
+             eapply Fwd1; auto.
+             inversion invertible; subst z b0; auto.
+           
+             destruct (source (as_inj nu12) m1 b ofs) eqn:sour;
+               try solve[destruct (as_inj nu23 b); intros HH;try destruct p; trivial; inversion HH].
+             destruct p.
+             intros H0.
+             symmetry in sour. apply source_SomeE in sour.
+             destruct sour as [b1 [delta' [ofs1 [invertible [leq [mapj [mperm ofs_add]]]]]]].
+             subst ofs; eapply MInj12; eauto.
+             eapply Fwd1; auto.
+             inversion invertible; subst z b0; auto.
+           - admit. (*Santiago: this is the goal we need to prove, and some initial steps.
+              An alternative to do
+               red; intros.
+             destruct GlueInv as [locTS [extTS [pubTS frgnTS]]]. rewrite <- locTS in *. 
+             specialize (property_cont b ofs); specialize (property_acc b).
+             symmetry.
+             unfold local_out_of_reach in UnchLOOR12. 
+             remember (locBlocksTgt nu12 b && negb (pubBlocksSrc nu23 b)) as q.
+             destruct q.
+                eapply load_eq_unchanged_on. apply UnchPrivSrc12. eapply SMV12. unfold RNG, DomTgt. apply andb_true_eq in Heqq. intuition.
+                intros. simpl. destruct (andb_true_eq _ _ Heqq). symmetry in H3. apply negb_true_iff in H3. intuition. 
+             remember (locBlocksTgt nu12 b) as d; symmetry in Heqd.
+             destruct d; simpl in *. symmetry in Heqq. apply negb_false_iff in Heqq.
+               admit.
+             clear Heqq UnchLOOR12 UnchPrivSrc12. unfold mem_add_cont, mem_add_acc in *. rewrite <- locTS, Heqd in *.
+             destruct (valid_dec m2 b); try contradiction. clear H.
+               admit. (*and so on...*)*)
+       }
+
        
        (*(* pure_comp_ext nu12' nu23' m1' m2 *)
        assert (Pure': pure_comp_ext nu12' nu23' m1' m2').

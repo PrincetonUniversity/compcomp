@@ -4094,70 +4094,28 @@ Qed.
 
 
 (** ** Behold the theorem *)
-Theorem transl_program_correct:
-  forall (R: list_norepet (map fst (prog_defs SrcProg)))
-         (*entrypoints : list (val * val * signature)*)
-         (*entry_ok : entry_points_ok entrypoints*)
-         (*init_mem: exists m0, Genv.init_mem SrcProg = Some m0*),
-    SM_simulation.SM_simulation_inject (rtl_eff_sem hf)
-                                       (rtl_eff_sem hf) ge tge.
-  intros.
-
+Theorem transl_program_correct
+     (R: list_norepet (map fst (prog_defs SrcProg))):
+  SM_simulation.SM_simulation_inject (rtl_eff_sem hf)
+                                     (rtl_eff_sem hf) ge tge.
+Proof.
   eapply simulations_lemmas.inj_simulation_star with (match_states:= MATCH)(measure:= RTL_measure); eauto with trans_correct.
   
+ (*ginfos_preserved*)
+   split; red; intros.
+   rewrite varinfo_preserved. apply gvar_info_refl.
+   rewrite symbols_preserved. trivial.
+
   (*Initial Core*)
   intros; eapply MATCH_initial_core; eauto.
-  (*
-  { (*destruct init_mem as [m0 INIT].
-    exists m0; split; auto.
-    unfold meminj_preserves_globals in H2.    
-    destruct H2 as [A [B C]]. *)
-    
-    assert (P: forall p q, {Ple p q} + {Plt q p}).
-    intros p q.
-    case_eq (Pos.leb p q).
-    intros TRUE.
-    apply Pos.leb_le in TRUE.
-    left; auto.
-    intros FALSE.
-    apply Pos.leb_gt in FALSE.
-    right; auto.
 
-    cut (forall b, Plt b (Mem.nextblock m0) -> 
-                   exists id, Genv.find_symbol ge id = Some b). intro D.
-    
-    split.
-    destruct (P (Mem.nextblock m0) (Mem.nextblock m1)); auto.
-    exfalso. 
-    destruct (D _ p).
-    apply A in H2.
-    assert (Mem.valid_block m1 (Mem.nextblock m1)).
-    eapply Mem.valid_block_inject_1; eauto.
-    clear - H8; unfold Mem.valid_block in H8.
-    xomega.
-
-    destruct (P (Mem.nextblock m0) (Mem.nextblock m2)); auto.
-    exfalso. 
-    destruct (D _ p).
-    apply A in H2.
-    assert (Mem.valid_block m2 (Mem.nextblock m2)).
-    eapply Mem.valid_block_inject_2; eauto.
-    clear - H8; unfold Mem.valid_block in H8.
-    xomega.
-    
-    intros b LT.    
-    unfold ge. 
-    apply valid_init_is_global with (b0 := b) in INIT.
-    eapply INIT; auto.
-    apply R.
-    apply LT. }*)
-
-  {intros. 
-   exploit step_simulation_effect; eauto.
-   intros HH; destruct HH as [st2' [m2' [[U2 ?] [mu' ?]]]].
-   repeat open_Hyp.
-   exists st2', m2', mu'.
-   intuition; exists U2;intuition. }
+  (*Corediagram*)
+  { intros. 
+    exploit step_simulation_effect; eauto.
+    intros HH; destruct HH as [st2' [m2' [[U2 ?] [mu' ?]]]].
+    repeat open_Hyp.
+    exists st2', m2', mu'.
+    intuition; exists U2; intuition. }
 Qed.
 
 End PRESERVATION.

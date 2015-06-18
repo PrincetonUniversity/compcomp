@@ -34,6 +34,8 @@ Section Eff_INJ_SIMU_DIAGRAMS.
    
    Hypothesis genvs_dom_eq: genvs_domain_eq ge1 ge2.
 
+   Hypothesis  ginfo_preserved : gvar_infos_eq ge1 ge2 /\ findsymbols_preserved ge1 ge2.
+
    Hypothesis match_sm_wd: forall d mu c1 m1 c2 m2, 
           match_states d mu c1 m1 c2 m2 ->
           SM_wd mu.
@@ -42,11 +44,13 @@ Section Eff_INJ_SIMU_DIAGRAMS.
           match_states d mu c1 m1 c2 m2 -> 
           REACH_closed m1 (vis mu).
 
+(* Removed in Jan 2015
     Hypothesis match_restrict: forall d mu c1 m1 c2 m2 X, 
           match_states d mu c1 m1 c2 m2 -> 
           (forall b, vis mu b = true -> X b = true) ->
           REACH_closed m1 X ->
           match_states d (restrict_sm mu X) c1 m1 c2 m2.
+*)
 
    Hypothesis match_validblocks: forall d mu c1 m1 c2 m2, 
           match_states d mu c1 m1 c2 m2 ->
@@ -67,6 +71,8 @@ Section Eff_INJ_SIMU_DIAGRAMS.
          (forall b1 b2 d, j b1 = Some (b2, d) -> 
                           DomS b1 = true /\ DomT b2 = true) ->
          (forall b, REACH m2 (fun b' => isGlobalBlock ge2 b' || getBlocks vals2 b') b = true -> DomT b = true) ->
+
+         mem_respects_readonly ge1 m1 -> mem_respects_readonly ge2 m2 ->
 
         (*the next two conditions ensure the initialSM satisfies sm_valid*)
          (forall b, DomS b = true -> Mem.valid_block m1 b) ->
@@ -197,6 +203,7 @@ Proof.
   apply order_wf.
 clear - match_sm_wd. intros. destruct H; subst. eauto.
 assumption.
+clear - ginfo_preserved. assumption.
 clear - match_genv. intros. destruct MC; subst. eauto.
 clear - match_visible. intros. destruct H; subst. eauto.
 (* RESTRIC : clear - match_restrict. intros. destruct H; subst. eauto.*)
@@ -204,17 +211,17 @@ clear - match_validblocks. intros.
     destruct H; subst. eauto.
 clear - inj_initial_cores . intros.
     destruct (inj_initial_cores _ _ _ _ _ _ _ _ _ H
-         H0 H1 H2 H3 H4 H5 H6 H7)
+         H0 H1 H2 H3 H4 H5 H6 H7 H8 H9)
     as [c2 [INI MS]].
   exists c1, c2. intuition. 
-clear - inj_effcore_diagram genvs_dom_eq. 
+clear - inj_effcore_diagram genvs_dom_eq.
   intros. destruct H0; subst.
   destruct (inj_effcore_diagram _ _ _ _ _ H _ _ _ H1) as 
 
     [c2' [m2' [mu' [INC [GSEP [LAC [MC' [U2 [STEP' PROP]]]]]]]]]. 
   exists c2'. exists m2'. exists st1'. exists mu'.
   split; try assumption.
-  split. eapply gsep_domain_eq; eassumption.
+  split. eapply gsep_domain_eq; try eassumption. 
   split; try assumption. 
   split. split; trivial. 
   exists U2. split; assumption. 
@@ -329,13 +336,14 @@ Proof.
   apply order_wf.
 clear - match_sm_wd. intros. destruct H; subst. eauto.
 assumption.
+clear - ginfo_preserved. assumption.
 clear - match_genv. intros. destruct MC; subst. eauto.
 clear - match_visible. intros. destruct H; subst. eauto.
 (* RESTRICT: clear - match_restrict. intros. destruct H; subst. eauto.*)
 clear - match_validblocks. intros.
     destruct H; subst. eauto.
 clear - inj_initial_cores. intros.
-    destruct (inj_initial_cores _ _ _ _ _ _ _ _ _ H H0 H1 H2 H3 H4 H5 H6 H7)
+    destruct (inj_initial_cores _ _ _ _ _ _ _ _ _ H H0 H1 H2 H3 H4 H5 H6 H7 H8 H9)
     as [c2 [INI MS]].
   exists c1, c2. intuition. 
 clear - inj_effcore_diagram genvs_dom_eq. 
@@ -1113,8 +1121,6 @@ destruct (compose_meminjD_None _ _ _ locmap) as [locmap' | [b'' [ofs'' [locmap1 
   destruct (disj_src b1) as [theFalse | theFalse]; rewrite theFalse in *; discriminate.
 Qed.  
 
-
-
 (*
 Lemma compose_sm_intern_separated:
       forall mu12 mu12' mu23 mu23' m1 m2 m3 
@@ -1240,7 +1246,6 @@ split.
 simpl.
   split. apply DomTgt12. apply Sep23.
 Qed.*)
-
 
 Lemma vis_compose_sm: forall mu nu, vis (compose_sm mu nu) = vis mu.
 Proof. intros. unfold vis. destruct mu; simpl. reflexivity. Qed.

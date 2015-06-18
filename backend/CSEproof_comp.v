@@ -2282,7 +2282,6 @@ Lemma MATCH_initial: forall v
         (fun b' : Values.block => isGlobalBlock tge b' || getBlocks vals2 b') b =
          true -> DomT b = true)
   (GFI: globalfunction_ptr_inject ge j)
-  (GDE: genvs_domain_eq ge tge)
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
@@ -2363,7 +2362,7 @@ intros.
 
   clear e e0.
   destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
-     VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
+     VInj J RCH PG GDE_lemma HDomS HDomT _ (eq_refl _))
     as [AA [BB [CC [DD [EE [FF GG]]]]]].
   remember (val_casted.val_has_type_list_func vals1 (sig_args (funsig (Internal f))) &&
          val_casted.vals_defined vals1) as vc.
@@ -2395,13 +2394,15 @@ Theorem transl_program_correct:
 SM_simulation.SM_simulation_inject (rtl_eff_sem hf)
   (rtl_eff_sem hf) ge tge.
 Proof.
-intros.
-assert (GDE:= GDE_lemma).
  eapply inj_simulation_plus_typed with
   (match_states:=fun x mu st m st' m' => MATCH mu st m st' m')
   (measure:=fun x => O).
 (*genvs_dom_eq*)
-  assumption.
+  apply GDE_lemma.
+(*ginfos_preserved*)
+ split; red; intros.
+   rewrite varinfo_preserved. apply gvar_info_refl.
+   rewrite symbols_preserved. trivial.
 (*match_wd*)
   intros; apply H.
 (*match_visible*)

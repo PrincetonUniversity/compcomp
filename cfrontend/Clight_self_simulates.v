@@ -3619,12 +3619,14 @@ Theorem transl_program_correct:
   SM_simulation.SM_simulation_inject (CL_eff_sem1 hf) (CL_eff_sem1 hf) ge tge.
 Proof.
 intros.
-assert (GDE: genvs_domain_eq ge tge).
-  solve[apply GDE_lemma].
  eapply simulations_lemmas.inj_simulation_plus with
   (match_states:=MATCH)(measure:= fun _ => O).
 (*genvs_dom_eq*)
-  assumption.
+  apply GDE_lemma.
+(*ginfos_preserved*)
+ split; red; intros.
+   apply gvar_info_refl.
+   rewrite symbols_preserved. trivial.
 (*MATCH_wd*)
   apply MATCH_wd. 
 (*MATCH_reachclosed*)

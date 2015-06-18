@@ -856,7 +856,6 @@ Lemma Match_init_core: forall v
         (fun b' : Values.block => isGlobalBlock tge b' || getBlocks vals2 b') b =
          true -> DomT b = true)
   (GFI: globalfunction_ptr_inject ge j)
-  (GDE: genvs_domain_eq ge tge)
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
 exists c2 : CMin_core,
@@ -991,7 +990,7 @@ Proof.
   simpl. 
   
   destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
-    VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
+    VInj J RCH PG GDE_lemma HDomS HDomT _ (eq_refl _))
    as [AA [BB [CC [DD [EE [FF GG]]]]]].
   intuition.
   rewrite initial_SM_as_inj. assumption.
@@ -3398,17 +3397,20 @@ induction EFFSTEP; simpl in *.
 Qed. 
 
 (*program structure not yet updated to module*)
-Theorem transl_program_correct:
-  forall (R: list_norepet (map fst (prog_defs prog))),
+Theorem transl_program_correct
+        (R: list_norepet (map fst (prog_defs prog))):
   SM_simulation.SM_simulation_inject (csharpmin_eff_sem hf) 
    (cmin_eff_sem hf) ge tge.
 Proof.
-intros.
-assert (GDE:= GDE_lemma).
  eapply simulations_lemmas.inj_simulation_star with
   (match_states:=MATCH) (measure:=MC_measure).
 (*genvs_dom_eq*)
-  apply GDE.
+  apply GDE_lemma.
+(*ginfos_preserved*)
+  unfold tge, ge. 
+  split; red; intros.
+   rewrite (varinfo_preserved _ _ TRANSL). apply gvar_info_refl.
+   rewrite (symbols_preserved _ _ TRANSL). trivial.
 (*match_wd*)
   apply MATCH_sm_wd.
 (*match_visible*)

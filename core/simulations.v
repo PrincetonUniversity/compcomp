@@ -18,8 +18,70 @@ Require Import reach.
 Require Export globalSep.
 
 
-
 (** * Structured Simulations *)
+
+Definition mem_respects_readonly {F V} (ge : Genv.t F V) m :=
+    forall b gv, Genv.find_var_info ge b = Some gv ->
+                 gvar_readonly gv && negb (gvar_volatile gv) = true ->
+           Genv.load_store_init_data ge m b 0 (gvar_init gv) /\
+           Mem.valid_block m b /\ (forall ofs : Z, ~ Mem.perm m b ofs Max Writable).
+
+Definition gvar_info_eq {V1 V2} (v1: option (globvar V1)) (v2: option (globvar V2)) :=
+  match v1, v2 with
+    None, None => True
+  | Some i1, Some i2 => gvar_init i1 = gvar_init i2 /\
+                        gvar_readonly i1 = gvar_readonly i2 /\ gvar_volatile i1 = gvar_volatile i2
+  | _, _ => False
+  end. 
+
+Definition gvar_infos_eq {F1 V1 F2 V2} 
+  (g1 : Genv.t F1 V1) (g2 : Genv.t F2 V2) :=
+  forall b, gvar_info_eq (Genv.find_var_info g1 b) (Genv.find_var_info g2 b).
+
+Lemma gvar_info_refl V v: @gvar_info_eq V V v v. 
+  destruct v; simpl; intuition. Qed.
+
+(*
+Definition gvar_info_rev {F1 V1 F2 V2} 
+  (g1 : Genv.t F1 V1) (g2 : Genv.t F2 V2) :=
+  forall b gv',
+  Genv.find_var_info g2 b = Some gv' ->
+  exists gv,
+    Genv.find_var_info g1 b = Some gv /\ gvar_init gv = gvar_init gv' /\ 
+    gvar_readonly gv = gvar_readonly gv' /\ gvar_volatile gv = gvar_volatile gv'. 
+
+Definition gvar_info {F1 V1 F2 V2} 
+  (g1 : Genv.t F1 V1) (g2 : Genv.t F2 V2) :=
+  forall b gv,
+  Genv.find_var_info g1 b = Some gv ->
+  exists gv',
+    Genv.find_var_info g2 b = Some gv' /\ gvar_init gv = gvar_init gv' /\ 
+    gvar_readonly gv = gvar_readonly gv' /\ gvar_volatile gv = gvar_volatile gv'. 
+
+Goal forall  {F1 V1 F2 V2} (g1 : Genv.t F1 V1) (g2 : Genv.t F2 V2),
+  gvar_infos g1 g2 = (gvar_info g1 g2 /\ gvar_info_rev g1 g2).
+Proof. unfold gvar_infos, gvar_info, gvar_info_rev. intros.
+  apply prop_ext. split; intros.
+  split; intros. unfold gvar_info_eq in H; specialize (H b); simpl in H.
+      rewrite H0 in H. destruct (Genv.find_var_info g2 b); try contradiction.
+      exists g; intuition. 
+    unfold gvar_info_eq in H; specialize (H b); simpl in H.
+      rewrite H0 in H. destruct (Genv.find_var_info g1 b); try contradiction.
+      exists g; intuition.
+  destruct H; red; intros. specialize (H b); specialize (H0 b).
+    destruct (Genv.find_var_info g1 b); destruct (Genv.find_var_info g2 b); trivial.
+
+     destruct (H _ (eq_refl _)) as [? [? ?]]; clear H. inv H1.
+     destruct (H0 _ (eq_refl _)) as [? [? ?]]; clear H0. inv H. intuition.
+
+     destruct (H _ (eq_refl _)) as [? [? ?]]; clear H. inv H1.
+
+     destruct (H0 _ (eq_refl _)) as [? [? ?]]; clear H0. inv H1.
+Qed. 
+*)
+
+Definition findsymbols_preserved {F1 V1 F2 V2} (g1 : Genv.t F1 V1) (g2 : Genv.t F2 V2) := 
+  forall i b, Genv.find_symbol g1 i = Some b -> Genv.find_symbol g2 i = Some b.
 
 Module SM_simulation. Section SharedMemory_simulation_inject. 
 
@@ -54,6 +116,11 @@ Record SM_simulation_inject := {
 
   (** The global environments have equal domain. *)
 ; genvs_dom_eq : genvs_domain_eq ge1 ge2
+
+  (** The global environments also assocaite same info with global blocks and 
+      preserve find_var. These conditions are used for in the transitivity proof,
+      to establish mem_respects_readonly for the intermediate memory and globalenv. *)
+; ginfo_preserved : gvar_infos_eq ge1 ge2 /\ findsymbols_preserved ge1 ge2
 
   (** The injection [mu] preserves global blocks. *)
 ; match_genv : 
@@ -98,6 +165,8 @@ Record SM_simulation_inject := {
     (forall b, 
       REACH m2 (fun b' => isGlobalBlock ge2 b' || getBlocks vals2 b') b=true -> 
       DomT b = true) ->
+
+    mem_respects_readonly ge1 m1 -> mem_respects_readonly ge2 m2 ->
 
     (*the next two conditions ensure the initialSM satisfies sm_valid*)
     (forall b, DomS b = true -> Mem.valid_block m1 b) ->

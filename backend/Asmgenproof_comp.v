@@ -828,7 +828,6 @@ Lemma MATCH_initial: forall v
         (fun b' : Values.block => isGlobalBlock tge b' || getBlocks vals2 b') b =
          true -> DomT b = true)
   (GFI: globalfunction_ptr_inject ge j)
-  (GDE: genvs_domain_eq ge tge)
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
@@ -917,7 +916,7 @@ Proof. intros.
   intros CONTRA. solve[elimtype False; auto].
 
   destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
-     VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
+     VInj J RCH PG GDE_lemma HDomS HDomT _ (eq_refl _))
     as [AA [BB [CC [DD [EE [FF GG]]]]]].
 
   unfold MATCH.
@@ -1021,7 +1020,6 @@ intuition.
 Qed.
 
 Lemma MATCH_afterExternal: forall
-      (GDE : genvs_domain_eq ge tge)
       mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
       (MemInjMu : Mem.inject (as_inj mu) m1 m2)
       (MatchMu: MATCH st1 mu st1 m1 st2 m2)
@@ -3049,12 +3047,14 @@ Theorem transl_program_correct:
   SM_simulation.SM_simulation_inject 
    (Mach_eff_sem hf return_address_offset) (Asm_eff_sem hf) ge tge.
 Proof.
-intros.
-assert (GDE:= GDE_lemma). 
  eapply simulations_lemmas.inj_simulation_plus with
   (match_states:=MATCH) (measure:=measure).
 (*genvs_dom_eq*)
-  assumption.
+  apply GDE_lemma.
+(*ginfos_preserved*)
+ split; red; intros.
+   rewrite varinfo_preserved. apply gvar_info_refl.
+   rewrite symbols_preserved. trivial.
 (*MATCH_wd*)
   apply MATCH_wd. 
 (*MATCH_reachclosed*)
@@ -3089,7 +3089,7 @@ assert (GDE:= GDE_lemma).
     simpl in ATPC. inv ATPC. simpl.
     exists (rs (preg_of AX)); split; auto. } }
 { (*at_external *) apply MATCH_atExternal. }
-{ (*after_external *) apply MATCH_afterExternal. trivial. }
+{ (*after_external *) apply MATCH_afterExternal. }
 { (*effcore_diagram *)
   intros.
    exploit MATCH_effcore_diagram; try eassumption.

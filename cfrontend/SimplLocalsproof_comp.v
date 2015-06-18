@@ -4213,18 +4213,19 @@ destruct CS; intros;
 Qed.
 
 (** The simulation proof *)
-Theorem transl_program_correct:
-  forall (R: list_norepet (map fst (prog_defs prog))),
+Theorem transl_program_correct
+       (R: list_norepet (map fst (prog_defs prog))):
   SM_simulation.SM_simulation_inject 
-   (CL_eff_sem1 hf) (CL_eff_sem2 hf) ge tge.
+     (CL_eff_sem1 hf) (CL_eff_sem2 hf) ge tge.
 Proof.
-intros.
-assert (GDE: genvs_domain_eq ge tge).
-  solve[apply GDE_lemma].
  eapply simulations_lemmas.inj_simulation_plus with
   (match_states:=MATCH)(measure:= fun _ => O).
 (*genvs_dom_eq*)
-  assumption.
+  apply GDE_lemma.
+(*ginfos_preserved*)
+ split; red; intros.
+   rewrite varinfo_preserved. apply gvar_info_refl.
+   rewrite symbols_preserved. trivial.
 (*MATCH_wd*)
   apply MATCH_wd. 
 (*MATCH_reachclosed*)

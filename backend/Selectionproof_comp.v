@@ -2238,7 +2238,6 @@ Lemma MATCH_init_cores: forall v
         (fun b' : Values.block => isGlobalBlock tge b' || getBlocks vals2 b') b =
          true -> DomT b = true)
   (GFI: globalfunction_ptr_inject ge j)
-  (GDE: genvs_domain_eq ge tge)
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
 exists c2 : CMinSel_core,
@@ -2311,7 +2310,7 @@ Proof. intros.
   intros CONTRA. solve[elimtype False; auto].
 
   destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
-    VInj J RCH PG GDE HDomS HDomT _ (eq_refl _))
+    VInj J RCH PG GDE_lemma HDomS HDomT _ (eq_refl _))
    as [AA [BB [CC [DD [EE [FF GG]]]]]].
   intuition.
   split.
@@ -2613,7 +2612,6 @@ Proof.
   intros. 
   assert (THELPERS:= helpers_correct_preserved); clear HELPERS.
   assert (SymbPres:= symbols_preserved).
-  assert (GDE:= GDE_lemma).
   induction CS; simpl in *.
 { (*skip seq*)
       destruct MC as [SMC PRE].
@@ -2698,7 +2696,7 @@ Proof.
         rewrite <- restrict_sm_all.
         eapply restrict_sm_preserves_globals; try eassumption.
           unfold vis. intuition.  
-      exploit sel_expr_inject; eauto.
+      exploit sel_expr_inject; try eapply GDE_lemma; eauto.
       (*WAS: exploit sel_expr_corect; eauto.*) intros [v' [A B]].
       eexists; eexists. eexists.
       split. left.
@@ -2727,10 +2725,10 @@ Proof.
         eapply restrict_sm_preserves_globals; try eassumption.
           unfold vis. intuition.  
       (*WAS:exploit sel_expr_correct.*)
-      exploit sel_expr_inject. eexact H. eauto. eauto. assumption. assumption.
+      exploit sel_expr_inject; try eapply GDE_lemma. eexact H. eauto. eauto. assumption.
           eassumption. intros [vaddr' [A B]].
       (*WAS: exploit sel_expr_correct.*) 
-      exploit sel_expr_inject. eexact H0. eauto. eauto. assumption. assumption.
+      exploit sel_expr_inject; try eapply GDE_lemma. eexact H0. eauto. eauto. assumption.
           eassumption. intros [v' [C D]].
       (*WAS:exploit Mem.storev_extends; eauto. intros [m2' [P Q]].*)
       exploit Mem.storev_mapped_inject; eauto. intros [m2' [P Q]]. 
@@ -2781,12 +2779,12 @@ Proof.
         rewrite <- restrict_sm_all.
         eapply restrict_sm_preserves_globals; try eassumption.
           unfold vis. intuition.
-     exploit sel_exprlist_inject; eauto.
+     exploit sel_exprlist_inject; try eapply GDE_lemma; eauto.
      (*WAS: exploit sel_exprlist_correct; eauto.*) intros [vargs' [C D]].
      exploit classify_call_correct; eauto. 
      destruct (classify_call hf ge a) as [ | id | ef].  
      (* indirect *)
-       exploit sel_expr_inject; eauto. 
+       exploit sel_expr_inject; try eapply GDE_lemma; eauto. 
        (*exploit sel_expr_correct; eauto.*) intros [vf' [A B]].
        eexists; eexists. eexists.
        split. left. 
@@ -2858,8 +2856,8 @@ Proof.
           unfold vis. intuition.
       assert (GFPR: globalfunction_ptr_inject ge (restrict (as_inj mu) (vis mu))). 
             eapply restrict_GFP_vis; eassumption.
-      exploit sel_expr_inject; eauto. intros [vf' [A B]].
-      exploit sel_exprlist_inject; eauto. intros [vargs' [C D]].
+      exploit sel_expr_inject; try eapply GDE_lemma; eauto. intros [vf' [A B]].
+      exploit sel_exprlist_inject; try eapply GDE_lemma; eauto. intros [vargs' [C D]].
       destruct H16 as [spb [i [spb' [X [Y Hsp]]]]]; subst.
             apply eq_sym in X; inv X.
       destruct (restrictD_Some _ _ _ _ _ Hsp).
@@ -2924,7 +2922,7 @@ Proof.
         rewrite <- restrict_sm_all.
         eapply restrict_sm_preserves_globals; try eassumption.
           unfold vis. intuition.
-      exploit sel_exprlist_inject; eauto. intros [vargs' [P Q]].
+      exploit sel_exprlist_inject; try eapply GDE_lemma; eauto. intros [vargs' [P Q]].
       exploit (inlineable_extern_inject _ _ GDE_lemma);
           try eapply Q; try eassumption.
       intros [mu' [vres' [tm' [EC [VINJ [MINJ' [UNMAPPED [OUTOFREACH 
@@ -3004,7 +3002,7 @@ eapply meminj_preserves_globals_intern_incr_separate; eassumption.
         rewrite <- restrict_sm_all.
         eapply restrict_sm_preserves_globals; try eassumption.
           unfold vis. intuition.
-      exploit sel_expr_inject; eauto. intros [v' [A B]].
+      exploit sel_expr_inject; try eapply GDE_lemma; eauto. intros [v' [A B]].
       destruct H13 as [spb [i [spb' [X [Y Hsp]]]]]; subst.
       assert (Val.bool_of_val v' b). 
         inv H0; inv B; econstructor.
@@ -3114,7 +3112,7 @@ eapply meminj_preserves_globals_intern_incr_separate; eassumption.
         rewrite <- restrict_sm_all.
         eapply restrict_sm_preserves_globals; try eassumption.
           unfold vis. intuition. 
-      exploit sel_expr_inject; eauto. intros [v' [A B]]. inv B.
+      exploit sel_expr_inject; try eapply GDE_lemma; eauto. intros [v' [A B]]. inv B.
       eexists; eexists. exists EmptyEffect.
       split. left. 
         apply effstep_plus_one. 
@@ -3179,7 +3177,7 @@ eapply meminj_preserves_globals_intern_incr_separate; eassumption.
         eapply restrict_sm_preserves_globals; try eassumption.
           unfold vis. intuition. 
       (*WAS:exploit Mem.free_parallel_extends; eauto.*)
-      exploit sel_expr_inject; eauto. intros [v' [A B]].
+      exploit sel_expr_inject; try eapply GDE_lemma; eauto. intros [v' [A B]].
       destruct H13 as [spb [i [spb' [X [Y Hsp]]]]]; subst.
         apply eq_sym in X; inv X.
       exploit free_parallel_inject; try eassumption. intros [m2' [P Q]].
@@ -3361,12 +3359,14 @@ Theorem transl_program_correct:
   SM_simulation.SM_simulation_inject (cmin_eff_sem hf)
    (cminsel_eff_sem hf) ge tge.
 Proof.
-intros.
-assert (GDE: genvs_domain_eq ge tge) by apply GDE_lemma.
 eapply simulations_lemmas.inj_simulation_star with
   (match_states:=MATCH) (measure:=measure).
 (*genvs_dom_eq*)
-  assumption.
+  apply GDE_lemma.
+(*ginfos_preserved*)
+ split; red; intros.
+   rewrite varinfo_preserved. apply gvar_info_refl.
+   rewrite symbols_preserved. trivial.
 (*match_wd*)
   intros; apply H.
 (*match_visible*)
