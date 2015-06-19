@@ -26,6 +26,16 @@ Definition mem_respects_readonly {F V} (ge : Genv.t F V) m :=
            Genv.load_store_init_data ge m b 0 (gvar_init gv) /\
            Mem.valid_block m b /\ (forall ofs : Z, ~ Mem.perm m b ofs Max Writable).
 
+Lemma mem_respects_readonly_forward {F V} (ge : Genv.t F V) m m'
+         (MRR: mem_respects_readonly ge m)
+         (FWD: mem_forward m m'): mem_respects_readonly ge m'.
+Proof. red; intros. destruct (MRR _ _ H H0) as [LSI [VB NP]]; clear MRR.
+destruct (FWD _ VB) as [VB' [Perm RDO]].
+split. specialize (RDO NP). eapply Genv.load_store_init_data_invariant; eassumption.
+split. trivial.
+intros z N. apply (NP z); eauto.
+Qed.
+
 Definition gvar_info_eq {V1 V2} (v1: option (globvar V1)) (v2: option (globvar V2)) :=
   match v1, v2 with
     None, None => True

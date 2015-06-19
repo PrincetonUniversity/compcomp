@@ -181,7 +181,7 @@ Qed.
 
 Definition readonly m1 b m2 :=
     (forall ofs : Z, ~ Mem.perm m1 b ofs Max Writable) ->
-    forall ofs ch, Mem.load ch m2 b ofs = Mem.load ch m1 b ofs.
+    forall ch ofs, Mem.load ch m2 b ofs = Mem.load ch m1 b ofs.
 
 Definition readonly_refl m b: readonly m b m.
   Proof. red; intros. trivial. Qed. 
