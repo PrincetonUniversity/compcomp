@@ -1981,7 +1981,7 @@ Qed.
 
 End initCore_lems.
 
-          End linkingInv.
+End linkingInv.
           
 
 Lemma vis_sub_DomSrc (mu0 : Inj.t) : {subset vis mu0 <= DomSrc mu0}.
