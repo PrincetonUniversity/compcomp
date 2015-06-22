@@ -16,6 +16,7 @@ Require Import semantics_lemmas.
 Require Import structured_injections.
 Require Import reach.
 Require Import mem_welldefined.
+Require Import simulations.
 
 Require Import effect_semantics. (*for specialization below*)
 
@@ -100,7 +101,8 @@ Context {F1 V1 C1 F2 V2 C2 : Type}
 Definition cc_init_inv j (ge1 : Genv.t F1 V1) vals1 m1 (ge2 : Genv.t F2 V2) vals2 m2 :=
   Mem.inject j m1 m2 /\ Forall2 (val_inject j) vals1 vals2 
   /\ meminj_preserves_globals ge1 j /\ globalfunction_ptr_inject ge1 j 
-  /\ mem_wd m2 /\ valid_genv ge2 m2 /\ Forall (fun v2 => val_valid v2 m2) vals2.
+  /\ mem_wd m2 /\ valid_genv ge2 m2 /\ Forall (fun v2 => val_valid v2 m2) vals2
+  /\ mem_respects_readonly ge1 m1 /\ mem_respects_readonly ge2 m2.
   
 Definition cc_halt_inv j (ge1 : Genv.t F1 V1) v1 m1 (ge2 : Genv.t F2 V2) v2 m2 :=
   meminj_preserves_globals ge1 (as_inj j)

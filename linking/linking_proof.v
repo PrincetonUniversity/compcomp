@@ -154,7 +154,7 @@ eapply Build_Wholeprog_sim
 
 {(** Case: [core_initial] *)
   move=> j c1 vals1 m1 vals2 m2 init1.
-  case=>inj []vinj []pres []gfi []wd []vgenv vval.
+  case=>inj []vinj []pres []gfi []wd []vgenv []vval []ro1 ro2.
   move: init1. 
   rewrite /= /LinkerSem.initial_core.
   case e: main=> [//|//|//|//|b ofs].
@@ -231,6 +231,16 @@ eapply Build_Wholeprog_sim
     by apply: valid_dec.
     apply reach; apply: (REACH_mono (fun b' : block =>
       isGlobalBlock (ge (cores_T ix)) b' || getBlocks vals2 b'))=> //. }
+
+  { move=> b' gv Hfind /andP []H2 H3.  
+     move: (ro1 b' (mkglobvar tt (gvar_init gv) (gvar_readonly gv) (gvar_volatile gv))); case.
+     admit. (*find_var_info (ge (cores_S ix)) <= find_var_info my_ge*)
+     by apply/andP; split.
+     simpl=> H4; case=> H5 H6; split=> //.
+     admit. (*Genv.load_store_init_data*)
+    }
+
+  { (*symmetric to previous*) admit. }
 
   { by apply: valid_dec'. }
 
@@ -336,6 +346,10 @@ eapply Build_Wholeprog_sim
   by apply: (Nuke_sem.wmd_initial _ vval vgenv_ix wd init2).
   by move: gfi; rewrite /mu_top /= /mu_top0 initial_SM_as_inj.
   by move=> ix'; move: vgenv; apply: valid_genvs_domain_eq.
+
+  admit. (*ro1*)
+  admit. (*ro2*)
+
   by apply: ord_dec. }(*END [Case: core_initial]*)
     
 {(** Case: diagram*)
@@ -429,6 +443,9 @@ have [n STEPN]:
 split. 
 
 {(** Re-establish invariant. *) 
+ have fwd1: mem_forward m1 m1'.
+ { by apply: (corestep_fwd STEP0). }
+
  apply: Build_R. rewrite ST1'; rewrite /st2'.
 
  have sgeq: Core.sg c1=Core.sg c2.
@@ -458,7 +475,6 @@ split.
  { eapply tail_inv_step with (Esrc := U1) (Etgt := U2) (mu' := mu_top'); eauto.
    by apply: (effstep_unchanged _ _ _ _ _ _ _ ESTEP0).
    by move: STEPN; apply: effect_semantics.effstepN_unchanged.
-   by move: (effax1 ESTEP0)=> []; move/corestep_fwd.
    move=> ? ? X; move: (PERM U1_DEF' _ _ X)=> []Y Z; split=> //.
    by eapply effstepN_valid in STEPN; eauto.
      by apply: (head_valid hdinv).
@@ -476,6 +492,16 @@ split.
  { move=> ix; move: (R_ge INV); move/(_ ix)=> vgenv. 
    by apply: (Nuke_sem.valid_genv_fwd vgenv). }
 
+ (* mem_respects_readonly ... m1' *)
+ { move=> ix; move: (R_ro1 INV); move/(_ ix)=> RO1.
+    by apply: (mem_respects_readonly_forward _ _ _ RO1 fwd1).
+ }
+
+ (* mem_respects_readonly ... m2' *)
+ { move=> ix; move: (R_ro2 INV); move/(_ ix)=> RO2.
+    by apply: (mem_respects_readonly_forward _ _ _ RO2 fwd2).
+ }
+    
  unfold c1 in *; rewrite ST1'; move: (R_tys1 INV). 
  rewrite /s1 => tys; clear -tys; case st1_eq: st1 tys c1'=> // [fntbl stack]. 
  case stack_eq: stack=> [stack0 WF]; rewrite /= => tys _.

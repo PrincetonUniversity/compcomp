@@ -334,6 +334,8 @@ have [cd_new [c2 [pf_new [init2 mtch12]]]]:
          args1 _ m1 j args2 m2 domS domT init1 inj vinj')=> //.
   case: hdinv=> ? ? ? ? ? genvs /=; rewrite /j.
   by apply: (genvs_domain_eq_globalptr_inject (my_ge_S c1_i) genvs). 
+  by case: inv=> ????????? Ro1 Ro2 _ _; apply: Ro1.
+  by case: inv=> ????????? Ro1 Ro2 _ _; apply: Ro2.
   move=> cd' []c2' []init2 mtch_init12.
   exists cd',(Core.mk N cores_T c1_i c2' (ef_sig ef)),erefl.
   move: init2=> /= ->; split=> //=.
@@ -535,13 +537,24 @@ by rewrite st1_eq st2_eq; apply: tlinv'.
 by rewrite st1'_eq /st2'; apply: (R_fntbl inv).
 by apply: (R_ge inv).
 
+{
+apply: (R_ro1 inv).
+}
+
+{
+apply: (R_ro2 inv).
+}
+
+{
 have sigOf1: sig_of (c inv) = Some (Core.sg c1).
 { move: (initCore_sg _ _ _ _ _ _ _ init1)=> X; clear -X atext1' defs1.
   case: c1 X=> /= => ? ? ? ->; rewrite /sig_of /=. 
-  by move: atext1'; rewrite /= => ->. }
+  by move: atext1'; rewrite /= => ->. 
+}
 
 move: (R_tys1 inv); rewrite st1'_eq /=.
 by rewrite /s1 st1_eq /= sigOf1=> ?; split.
+}
 
 have sigOf2: sig_of (d inv) = Some (Core.sg c2).
 { move: (initCore_sg _ _ _ _ _ _ _ init2)=> X; clear -X my_atext2.

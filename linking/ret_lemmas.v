@@ -1072,6 +1072,10 @@ by rewrite mus_eq.
 by rewrite st1'_eq.
 by apply: (R_ge inv).
 
+by apply: (R_ro1 inv).
+
+by apply: (R_ro2 inv).
+
 { rewrite st1'_eq; move: tys1; case: (popCoreE _ pop1); rewrite st1''_eq=> x []_. 
   case=> _; case: st1 x=> y; case=> /=; case=> // a l _ _ /= => <- /=.
   by case sgof: (sig_of hd1)=> //; case=> ?; rewrite esig. }

@@ -1870,6 +1870,8 @@ Record R (data : sig_data N (fun ix : 'I_N => (sims ix).(core_data)))
     (* side conditions *)
   ; R_fntbl : x1.(fn_tbl)=x2.(fn_tbl) 
   ; R_ge    : forall ix : 'I_N, valid_genv (ge (cores_T ix)) m2 
+  ; R_ro1  : forall ix : 'I_N, mem_respects_readonly (ge (cores_S ix)) m1
+  ; R_ro2  : forall ix : 'I_N, mem_respects_readonly (ge (cores_T ix)) m2
 
     (* typing conditions *)
   ; R_tys1  : tys_agree (callStack s1)
