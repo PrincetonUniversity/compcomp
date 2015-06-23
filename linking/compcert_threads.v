@@ -157,15 +157,18 @@ Module Concur. Section Concur.
 
 Import ThreadPool.
 
-Context {sem : Modsem.t} (tp : ThreadPool.t sem).
+Context {sem : Modsem.t}.
 
 Notation thread_pool := (t sem).
-Notation the_ge := (Modsem.ge sem).
 Notation the_sem := (Modsem.sem sem).
 Notation perm_map := PermMap.t.
 
-Variable  aggelos : nat -> perm_map.
+Variable aggelos : nat -> perm_map.
 Variable schedule : nat -> nat.
+
+Section Corestep.
+
+Variable the_ge : Genv.t (Modsem.F sem) (Modsem.V sem).
 
 Inductive step : thread_pool -> mem -> thread_pool -> mem -> Prop :=
   | step_congr : 
@@ -216,4 +219,150 @@ Inductive step : thread_pool -> mem -> thread_pool -> mem -> Prop :=
       updPermMap m'' (aggelos n) = Some m' -> 
       step tp m (updThread tp tid (Krun c')) m'.
 
+End Corestep.
+
+Inductive Handled : external_function -> Prop :=
+  | HandledLock : Handled LOCK
+  | HandledUnlock : Handled UNLOCK
+  (*...*) .
+
+Definition handled (ef : external_function) : bool :=
+  match extfunct_eqdec ef LOCK with
+    | left _ => true
+    | right _ => 
+      match extfunct_eqdec ef UNLOCK with
+        | left _ => true
+        | right _  => false
+      end
+  end.
+
+Lemma extfunct_eqdec_refl ef : exists pf, extfunct_eqdec ef ef = left pf.
+Proof. by case H: (extfunct_eqdec _ _)=> [pf|//]; exists pf. Qed.
+
+Lemma handledP ef : reflect (Handled ef) (handled ef).
+Proof.
+case Hhdl: (handled ef); [apply: ReflectT|apply: ReflectF].
+{ move: Hhdl; rewrite /handled; case: (extfunct_eqdec _ _).
+   by move=> ->; constructor.
+   move=> H; case: (extfunct_eqdec _ _)=> //.
+   by move=> ->; constructor.
+}
+{ inversion 1; subst; rewrite /handled in Hhdl. 
+   by move: Hhdl; case: (extfunct_eqdec_refl LOCK)=> pf ->.
+   by move: Hhdl; case: (extfunct_eqdec_refl UNLOCK)=> pf ->.   
+}
+Qed.   
+
+Lemma step_inv the_ge tp c m tp' m' ef sig args : 
+  let: n := counter tp in
+  let: tid0 := schedule n in
+  forall (tid0_lt_pf :  tid0 < num_threads tp),
+  let: tid := Ordinal tid0_lt_pf in
+  getThread tp tid = Krun c ->
+  semantics.at_external the_sem c = Some (ef, sig, args) -> 
+  handled ef = false -> 
+  ~ step the_ge tp m tp' m'.
+Proof. Admitted.
+
+Lemma my_ltP m n : (m < n)%coq_nat -> (m < n).
+Proof. by move/ltP. Qed.
+
+Definition at_external (tp : thread_pool) 
+  : option (external_function * signature * seq val) := 
+  let: n := counter tp in
+  let: tid0 := schedule n in
+  match lt_dec tid0 (num_threads tp) with
+    | left lt_pf => 
+      let: tid := Ordinal (my_ltP lt_pf) in
+      match getThread tp tid with 
+        | Krun c => 
+          match semantics.at_external the_sem c with
+            | None => None
+            | Some (ef, sg, args) => 
+              if handled ef then None 
+              else Some (ef, sg, args)
+          end
+        | Klock _ _ _ => None
+      end
+    | right _ => None
+  end.
+
+Definition after_external (ov : option val) (tp : thread_pool) :=
+  let: n := counter tp in
+  let: tid0 := schedule n in
+  match lt_dec tid0 (num_threads tp) with
+    | left lt_pf => 
+      let: tid := Ordinal (my_ltP lt_pf) in
+      match getThread tp tid with 
+        | Krun c => 
+          match semantics.after_external the_sem ov c with
+            | None => None
+            | Some c' => Some (updThread tp tid (Krun c'))
+          end
+        | Klock _ _ _ => None
+      end
+    | right _ => None
+  end.
+
+Definition one_pos : pos := mkPos NPeano.Nat.lt_0_1.
+
+Section InitialCore.
+
+Variable ge : Genv.t (Modsem.F sem) (Modsem.V sem).
+
+Definition initial_core (f : val) (args : list val) : option thread_pool :=
+  match initial_core the_sem ge f args with
+    | None => None
+    | Some c => 
+      Some (ThreadPool.mk 
+                   one_pos 
+                   (fun tid => if tid == ord0 then Krun c 
+                                     else Krun c (*bogus value; can't occur*))
+                   0)
+  end.
+
+End InitialCore.
+
+Definition halted (tp : thread_pool) : option val := None.
+
+Program Definition semantics :
+  CoreSemantics (Genv.t (Modsem.F sem) (Modsem.V sem)) thread_pool mem :=
+  Build_CoreSemantics _ _ _
+    initial_core 
+    at_external
+    after_external
+    halted
+    step
+    _ _ _.
+Next Obligation.
+rewrite /at_external.
+case Hlt: (lt_dec _ _)=> //[a].
+case Hget: (getThread _ _)=> //[c].
+case Hat: (semantics.at_external _ _)=>[[[ef sg]  args]|//].
+case Hhdl: (handled _)=> //.
+elimtype False; apply: (step_inv (my_ltP a) Hget Hat Hhdl H).
+Qed.
+  
 End Concur. End Concur.
+
+Section ConcurLemmas.
+
+Import ThreadPool.
+
+Context {sem : Modsem.t}.
+
+Notation thread_pool := (t sem).
+Notation the_sem := (Modsem.sem sem).
+Notation perm_map := PermMap.t.
+
+Variable  aggelos : nat -> perm_map.
+Variable schedule : nat -> nat.
+
+Notation thread_sem := (@Concur.semantics sem aggelos schedule).
+
+Lemma thread_det :
+  semantics_lemmas.corestep_fun the_sem ->
+  semantics_lemmas.corestep_fun thread_sem.
+Proof. Admitted.
+
+End ConcurLemmas.
