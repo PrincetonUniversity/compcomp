@@ -88,8 +88,7 @@ Notation cT := (Modsem.C sem).
 
 Inductive ctl : Type :=
   | Krun : cT -> ctl
-  | Klock : block -> int -> cT -> ctl
-  | Kunlock : block -> int -> cT -> ctl.
+  | Kstage : external_function -> list val -> cT -> ctl.
 
 Record t := mk
   { num_threads : pos
@@ -100,8 +99,7 @@ Record t := mk
 End ThreadPool. End ThreadPool.
 
 Arguments ThreadPool.Krun [sem] _.
-Arguments ThreadPool.Klock [sem] _ _ _.
-Arguments ThreadPool.Kunlock [sem] _ _ _.
+Arguments ThreadPool.Kstage [sem] _ _ _.
 
 Notation pool := ThreadPool.t.
 
@@ -161,84 +159,6 @@ Proof. by rewrite /getThread /addThread /= => <-; rewrite unlift_none. Qed.
 
 End poolLemmas.
 
-Module Concur. Section Concur.
-
-Import ThreadPool.
-
-Context {sem : Modsem.t}.
-
-Notation thread_pool := (t sem).
-Notation the_sem := (Modsem.sem sem).
-Notation perm_map := PermMap.t.
-
-Variable aggelos : nat -> perm_map.
-Variable schedule : nat -> nat.
-
-Section Corestep.
-
-Variable the_ge : Genv.t (Modsem.F sem) (Modsem.V sem).
-
-Inductive step : thread_pool -> mem -> thread_pool -> mem -> Prop :=
-  | step_congr : 
-      forall tp m c m' (c' : Modsem.C sem),
-      let: n := counter tp in
-      let: tid0 := schedule n in
-      forall (tid0_lt_pf :  tid0 < num_threads tp),
-      let: tid := Ordinal tid0_lt_pf in
-      getThread tp tid = Krun c ->
-      semantics.corestep the_sem the_ge c m c' m' ->
-      step tp m (updThread tp tid (Krun c')) m'
-
-  | step_lock_into :
-      forall tp m c b ofs,
-      let: n := counter tp in
-      let: tid0 := schedule n in
-      forall (tid0_lt_pf :  tid0 < num_threads tp),
-      let: tid := Ordinal tid0_lt_pf in
-      getThread tp tid = Krun c ->
-      semantics.at_external the_sem c = Some (LOCK, LOCK_SIG, Vptr b ofs::nil) ->
-      step tp m (schedNext (updThread tp tid (Klock b ofs c))) m
-
-  | step_lock_exec :
-      forall tp m c m'' c' m' b ofs,
-      let: n := counter tp in
-      let: tid0 := schedule n in
-      forall (tid0_lt_pf :  tid0 < num_threads tp),
-      let: tid := Ordinal tid0_lt_pf in
-      getThread tp tid = Klock b ofs c ->
-      semantics.at_external the_sem c = Some (LOCK, LOCK_SIG, Vptr b ofs::nil) ->
-      Mem.load Mint32 m b (Int.intval ofs) = Some (Vint Int.one) ->
-      Mem.store Mint32 m b (Int.intval ofs) (Vint Int.zero) = Some m'' ->
-      semantics.after_external the_sem (Some (Vint Int.zero)) c = Some c' ->
-      updPermMap m'' (aggelos n) = Some m' -> 
-      step tp m (updThread tp tid (Krun c')) m'
-
-  | step_unlock_into :
-      forall tp m c b ofs,
-      let: n := counter tp in
-      let: tid0 := schedule n in
-      forall (tid0_lt_pf :  tid0 < num_threads tp),
-      let: tid := Ordinal tid0_lt_pf in
-      getThread tp tid = Krun c ->
-      semantics.at_external the_sem c = Some (UNLOCK, UNLOCK_SIG, Vptr b ofs::nil) ->
-      step tp m (schedNext (updThread tp tid (Kunlock b ofs c))) m
-
-  | step_unlock_exec :
-      forall tp m c m'' c' m' b ofs,
-      let: n := counter tp in
-      let: tid0 := schedule n in
-      forall (tid0_lt_pf :  tid0 < num_threads tp),
-      let: tid := Ordinal tid0_lt_pf in
-      getThread tp tid = Kunlock b ofs c ->
-      semantics.at_external the_sem c = Some (UNLOCK, UNLOCK_SIG, Vptr b ofs::nil) ->
-      Mem.load Mint32 m b (Int.intval ofs) = Some (Vint Int.zero) ->
-      Mem.store Mint32 m b (Int.intval ofs) (Vint Int.one) = Some m'' ->
-      semantics.after_external the_sem (Some (Vint Int.zero)) c = Some c' ->
-      updPermMap m'' (aggelos n) = Some m' -> 
-      step tp m (updThread tp tid (Krun c')) m'.
-
-End Corestep.
-
 Inductive Handled : external_function -> Prop :=
   | HandledLock : Handled LOCK
   | HandledUnlock : Handled UNLOCK
@@ -271,6 +191,73 @@ case Hhdl: (handled ef); [apply: ReflectT|apply: ReflectF].
 }
 Qed.   
 
+Module Concur. Section Concur.
+
+Import ThreadPool.
+
+Context {sem : Modsem.t}.
+
+Notation thread_pool := (t sem).
+Notation the_sem := (Modsem.sem sem).
+Notation perm_map := PermMap.t.
+
+Variable aggelos : nat -> perm_map.
+Variable schedule : nat -> nat.
+
+Section Corestep.
+
+Variable the_ge : Genv.t (Modsem.F sem) (Modsem.V sem).
+
+Inductive step : thread_pool -> mem -> thread_pool -> mem -> Prop :=
+  | step_congr : 
+      forall tp m c m' (c' : Modsem.C sem),
+      let: n := counter tp in
+      let: tid0 := schedule n in
+      forall (tid0_lt_pf :  tid0 < num_threads tp),
+      let: tid := Ordinal tid0_lt_pf in
+      getThread tp tid = Krun c ->
+      semantics.corestep the_sem the_ge c m c' m' ->
+      step tp m (updThread tp tid (Krun c')) m'
+
+  | step_stage :
+      forall tp m c ef args,
+      let: n := counter tp in
+      let: tid0 := schedule n in
+      forall (tid0_lt_pf :  tid0 < num_threads tp),
+      let: tid := Ordinal tid0_lt_pf in
+      getThread tp tid = Krun c ->
+      semantics.at_external the_sem c = Some (ef, ef_sig ef, args) ->
+      handled ef ->
+      step tp m (schedNext (updThread tp tid (Kstage ef args c))) m
+
+  | step_lock_exec :
+      forall tp m c m'' c' m' b ofs,
+      let: n := counter tp in
+      let: tid0 := schedule n in
+      forall (tid0_lt_pf :  tid0 < num_threads tp),
+      let: tid := Ordinal tid0_lt_pf in
+      getThread tp tid = Kstage LOCK (Vptr b ofs::nil) c ->
+      Mem.load Mint32 m b (Int.intval ofs) = Some (Vint Int.one) ->
+      Mem.store Mint32 m b (Int.intval ofs) (Vint Int.zero) = Some m'' ->
+      semantics.after_external the_sem (Some (Vint Int.zero)) c = Some c' ->
+      updPermMap m'' (aggelos n) = Some m' -> 
+      step tp m (updThread tp tid (Krun c')) m'
+
+  | step_unlock_exec :
+      forall tp m c m'' c' m' b ofs,
+      let: n := counter tp in
+      let: tid0 := schedule n in
+      forall (tid0_lt_pf :  tid0 < num_threads tp),
+      let: tid := Ordinal tid0_lt_pf in
+      getThread tp tid = Kstage UNLOCK (Vptr b ofs::nil) c ->
+      Mem.load Mint32 m b (Int.intval ofs) = Some (Vint Int.zero) ->
+      Mem.store Mint32 m b (Int.intval ofs) (Vint Int.one) = Some m'' ->
+      semantics.after_external the_sem (Some (Vint Int.zero)) c = Some c' ->
+      updPermMap m'' (aggelos n) = Some m' -> 
+      step tp m (updThread tp tid (Krun c')) m'.
+
+End Corestep.
+
 Lemma step_inv the_ge tp c m tp' m' ef sig args : 
   let: n := counter tp in
   let: tid0 := schedule n in
@@ -286,16 +273,13 @@ case: step pf get Hat Hhdl; move {tp m tp' m'}.
 { move=> ????? pf get step pf'; have ->: pf' = pf by apply: proof_irr.
    by rewrite get; case=> <-; erewrite corestep_not_at_external; eauto.
 }
-{ move=> ????? pf get Hat pf'; have ->: pf' = pf by apply: proof_irr.
-   by rewrite get; case=> <-; rewrite Hat; case=> <- /= _ _; apply; constructor.
+{ move=> ????? pf get Hat Hhdl pf'; have ->: pf' = pf by apply: proof_irr.
+   by rewrite get; case=> <-; rewrite Hat; case=> <- /= _ _; apply; apply/handledP.
 }
-{ move=> ???????? pf get Hat ???? pf'; have ->: pf' = pf by apply: proof_irr.
+{ move=> ???????? pf get Hat ??? pf'; have ->: pf' = pf by apply: proof_irr.
    by rewrite get.
 }
-{ move=> ????? pf get Hat pf'; have ->: pf' = pf by apply: proof_irr.
-   rewrite get; case=> <-; rewrite Hat; case=> <- _ _; apply; constructor.
-}
-{ move=> ???????? pf get Hat ???? pf'; have ->: pf' = pf by apply: proof_irr.
+{ move=> ???????? pf get Hat ??? pf'; have ->: pf' = pf by apply: proof_irr.
    by rewrite get.
 }
 Qed.
@@ -318,8 +302,7 @@ Definition at_external (tp : thread_pool)
               if handled ef then None 
               else Some (ef, sg, args)
           end
-        | Klock _ _ _ => None
-        | Kunlock _ _ _ => None
+        | Kstage _ _ _ => None
       end
     | right _ => None
   end.
@@ -336,8 +319,7 @@ Definition after_external (ov : option val) (tp : thread_pool) :=
             | None => None
             | Some c' => Some (schedNext (updThread tp tid (Krun c')))
           end
-        | Klock _ _ _ => None
-        | Kunlock _ _ _ => None
+        | Kstage _ _ _ => None
       end
     | right _ => None
   end.
@@ -409,77 +391,52 @@ move=> Hfun m m' m'' ge tp tp' tp''; case; move {tp tp' m m'}.
       have ->: pf' = pf by apply: proof_irr.
       move=> -> step; case=> <- step'.
       by case: (Hfun _ _ _ _ _ _ _ step step')=> <- <-; split.
-   + move {m}=> tp m c'' b ofs pf get Hat pf'.
+   + move {m}=> tp m c'' b ofs pf get Hat Hhdl pf'.
       have ->: pf' = pf by apply: proof_irr.
       rewrite get; case=> <- step.
       by move: (corestep_not_at_external _ _ _ _ _ _ step); rewrite Hat.
-   + move {m}=> tp m c'' m'' c''' m''' b ofs pf get Hat load store aft upd pf'.
+   + move {m}=> tp m c'' m'' c''' m''' b ofs pf get load store aft upd pf'.
       have ->: pf' = pf by apply: proof_irr.
       by rewrite get.
-   + move {m}=> tp m c'' b ofs pf get Hat pf'.
-      have ->: pf' = pf by apply: proof_irr.
-      rewrite get; case=> <- step.
-      by move: (corestep_not_at_external _ _ _ _ _ _ step); rewrite Hat.
-   + move {m}=> tp m c'' m'' c''' m''' b ofs pf get Hat load store aft upd pf'.
+   + move {m}=> tp m c'' m'' c''' m''' b ofs pf get load store aft upd pf'.
       have ->: pf' = pf by apply: proof_irr.
       by rewrite get.
 }
-{ move=> tp m c b ofs pf get Hat step; case: step pf get Hat; move {tp m tp'' m''}.
+{ move=> tp m c b ofs pf get Hat Hhdl step; case: step pf get Hat Hhdl; move {tp m tp'' m''}.
    + move=> ????? pf' get step pf; have <-: pf' = pf by apply: proof_irr.
       by rewrite get; case=> <-; erewrite corestep_not_at_external; eauto.
-   + move=> ????? pf' get Hat pf; have <-: pf' = pf by apply: proof_irr.
-      by rewrite get; case=> <-; rewrite Hat; case=> -> ->; split.
-   + move=> ???????? pf get Hat ???? pf'; have ->: pf' = pf by apply: proof_irr.
+   + move=> ????? pf' get Hat Hhdl pf; have <-: pf' = pf by apply: proof_irr.
+      by rewrite get; case=> <-; rewrite Hat; case=> -> _ -> _; split.
+   + move=> ???????? pf get ???? pf'; have ->: pf' = pf by apply: proof_irr.
       by rewrite get.
-   + move=> ????? pf' get Hat pf; have <-: pf' = pf by apply: proof_irr.
-      by rewrite get; case=> <-; rewrite Hat.
-   + move=> ???????? pf get Hat ???? pf'; have ->: pf' = pf by apply: proof_irr.
+   + move=> ???????? pf get ???? pf'; have ->: pf' = pf by apply: proof_irr.
       by rewrite get.
 }
-{ move=> tp m c m''' c' m' b ofs pf get Hat load store aft upd step.
-   case: step pf get Hat upd load store; move {tp m tp'' m''}.
+{ move=> tp m c m''' c' m' b ofs pf get load store aft upd step.
+   case: step pf get upd load store; move {tp m tp'' m''}.
    + move=> ????? pf get step0 pf'; have ->: pf' = pf by apply: proof_irr.
       by rewrite get.
-   + move=> ????? pf get step0 pf'; have ->: pf' = pf by apply: proof_irr.
+   + move=> ????? pf get Hat Hhdl pf'; have ->: pf' = pf by apply: proof_irr.
       by rewrite get.
-   + move=> ???????? pf get Hat load store aft' upd pf'; have ->: pf' = pf by apply: proof_irr.
-      rewrite get; case=> <- <- cs_eq _ upd' load'; rewrite store; case=> mem_eq; subst.
+   + move=> ???????? pf get load store aft' upd pf'; have ->: pf' = pf by apply: proof_irr.
+      rewrite get; case=> <- <- cs_eq upd' load'; rewrite store; case=> mem_eq; subst.
       by move: aft'; rewrite aft; case=> ->; move: upd'; rewrite upd; case=> ->; split.
-   + move=> ????? pf get step0 pf'; have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
-   + move=> tp m c'' m'' c'''' m'''' b' ofs' pf get Hat ? store aft' upd' pf'.
+   + move=> tp m c'' m'' c'''' m'''' b' ofs' pf get ? store aft' upd' pf'.
       have ->: pf' = pf by apply: proof_irr.
       by rewrite get.
 }
-{ move=> tp m c b ofs pf get Hat step.
-   case: step pf get Hat; move {tp m tp'' m''}.
-   + move=> ????? pf get step pf'; have ->: pf' = pf by apply: proof_irr.
-       by rewrite get; case=> <-; erewrite corestep_not_at_external; eauto.
-   + move=> ????? pf get Hat pf'; have ->: pf' = pf by apply: proof_irr.
-      by rewrite get; case=> <-; rewrite Hat.
-   + move=> ???????? pf get Hat load store aft upd pf'.
-      have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
-   + move=> ????? pf get Hat pf'; have ->: pf' = pf by apply: proof_irr.
-      by rewrite get; case=> <-; rewrite Hat; case=> <- <-.
-   + move=> ???????? pf get Hat ? store aft upd pf'.
-      have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
-}
-{ move=> tp m c m''' c' m' b ofs pf get Hat load store aft upd step. 
-   case: step pf get Hat load store aft upd; move {tp m tp'' m''}.
+{ move=> tp m c m''' c' m' b ofs pf get load store aft upd step. 
+   case: step pf get load store aft upd; move {tp m tp'' m''}.
    + move=> ????? pf get step pf'; have ->: pf' = pf by apply: proof_irr.
       by rewrite get.
-   + move=> ????? pf get Hat pf'; have ->: pf' = pf by apply: proof_irr.
+   + move=> ????? pf get Hat Hhdl pf'; have ->: pf' = pf by apply: proof_irr.
       by rewrite get.
-   + move=> ???????? pf get Hat load store aft upd pf'. 
+   + move=> ???????? pf get load store aft upd pf'. 
       have ->: pf' = pf by apply: proof_irr.
       by rewrite get.
-   + move=> ????? pf get Hat pf'; have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
-   + move=> ???????? pf get Hat ? store aft upd pf'.
+   + move=> ???????? pf get ? store aft upd pf'.
       have ->: pf' = pf by apply: proof_irr.
-      rewrite get; case=> <- <- <- _; rewrite store=> _; case=> <-.
+      rewrite get; case=> <- <- <- _; rewrite store; case=> <-.
       by rewrite aft; case=> <-; rewrite upd; case=> <-; split.      
 }
 Qed.
