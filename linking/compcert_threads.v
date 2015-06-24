@@ -21,19 +21,22 @@ Require Import ZArith.
 
 Notation EXIT := 
   (EF_external 1%positive (mksignature (AST.Tint::nil) None)). 
-Notation FORK := 
-  (EF_external 2%positive 
-  (mksignature (AST.Tint::AST.Tint::nil) (Some AST.Tint))).
+
+Notation CREATE_SIG := (mksignature (AST.Tint::AST.Tint::nil) (Some AST.Tint)).
+Notation CREATE := (EF_external 2%positive CREATE_SIG).
+
 Notation READ := 
   (EF_external 3%positive 
   (mksignature (AST.Tint::AST.Tint::AST.Tint::nil) (Some AST.Tint))).
 Notation WRITE := 
   (EF_external 4%positive 
   (mksignature (AST.Tint::AST.Tint::AST.Tint::nil) (Some AST.Tint))).
+
 Notation MKLOCK := 
   (EF_external 5%positive (mksignature (AST.Tint::nil) (Some AST.Tint))).
 Notation FREE_LOCK := 
   (EF_external 6%positive (mksignature (AST.Tint::nil) (Some AST.Tint))).
+
 Notation LOCK_SIG := (mksignature (AST.Tint::nil) (Some AST.Tint)).
 Notation LOCK := (EF_external 7%positive LOCK_SIG).
 Notation UNLOCK_SIG := (mksignature (AST.Tint::nil) (Some AST.Tint)).
@@ -85,7 +88,8 @@ Notation cT := (Modsem.C sem).
 
 Inductive ctl : Type :=
   | Krun : cT -> ctl
-  | Klock : block -> int -> cT -> ctl.
+  | Klock : block -> int -> cT -> ctl
+  | Kunlock : block -> int -> cT -> ctl.
 
 Record t := mk
   { num_threads : pos
@@ -97,6 +101,7 @@ End ThreadPool. End ThreadPool.
 
 Arguments ThreadPool.Krun [sem] _.
 Arguments ThreadPool.Klock [sem] _ _ _.
+Arguments ThreadPool.Kunlock [sem] _ _ _.
 
 Notation pool := ThreadPool.t.
 
@@ -126,7 +131,10 @@ Definition addThread (c : ctl) : thread_pool :=
 Definition updThread (tid : 'I_num_threads) (c' : ctl) : thread_pool :=
   @mk sem num_threads (fun (n : 'I_num_threads) => 
       if n == tid then c' else tp n) 
-  (counter tp).+1.
+  (counter tp).
+
+Definition schedNext : thread_pool :=
+  @mk sem num_threads (pool tp) (counter tp).+1.
 
 Definition getThread (tid : 'I_num_threads) : ctl := tp tid.
   
@@ -189,7 +197,7 @@ Inductive step : thread_pool -> mem -> thread_pool -> mem -> Prop :=
       let: tid := Ordinal tid0_lt_pf in
       getThread tp tid = Krun c ->
       semantics.at_external the_sem c = Some (LOCK, LOCK_SIG, Vptr b ofs::nil) ->
-      step tp m (updThread tp tid (Klock b ofs c)) m
+      step tp m (schedNext (updThread tp tid (Klock b ofs c))) m
 
   | step_lock_exec :
       forall tp m c m'' c' m' b ofs,
@@ -205,13 +213,23 @@ Inductive step : thread_pool -> mem -> thread_pool -> mem -> Prop :=
       updPermMap m'' (aggelos n) = Some m' -> 
       step tp m (updThread tp tid (Krun c')) m'
 
-  | step_unlock :
-      forall tp m c m'' c' m' b ofs,
+  | step_unlock_into :
+      forall tp m c b ofs,
       let: n := counter tp in
       let: tid0 := schedule n in
       forall (tid0_lt_pf :  tid0 < num_threads tp),
       let: tid := Ordinal tid0_lt_pf in
       getThread tp tid = Krun c ->
+      semantics.at_external the_sem c = Some (UNLOCK, UNLOCK_SIG, Vptr b ofs::nil) ->
+      step tp m (schedNext (updThread tp tid (Kunlock b ofs c))) m
+
+  | step_unlock_exec :
+      forall tp m c m'' c' m' b ofs,
+      let: n := counter tp in
+      let: tid0 := schedule n in
+      forall (tid0_lt_pf :  tid0 < num_threads tp),
+      let: tid := Ordinal tid0_lt_pf in
+      getThread tp tid = Kunlock b ofs c ->
       semantics.at_external the_sem c = Some (UNLOCK, UNLOCK_SIG, Vptr b ofs::nil) ->
       Mem.load Mint32 m b (Int.intval ofs) = Some (Vint Int.zero) ->
       Mem.store Mint32 m b (Int.intval ofs) (Vint Int.one) = Some m'' ->
@@ -274,8 +292,11 @@ case: step pf get Hat Hhdl; move {tp m tp' m'}.
 { move=> ???????? pf get Hat ???? pf'; have ->: pf' = pf by apply: proof_irr.
    by rewrite get.
 }
-{ move=> ???????? pf get Hat ???? pf'; have ->: pf' = pf by apply: proof_irr.
+{ move=> ????? pf get Hat pf'; have ->: pf' = pf by apply: proof_irr.
    rewrite get; case=> <-; rewrite Hat; case=> <- _ _; apply; constructor.
+}
+{ move=> ???????? pf get Hat ???? pf'; have ->: pf' = pf by apply: proof_irr.
+   by rewrite get.
 }
 Qed.
 
@@ -298,6 +319,7 @@ Definition at_external (tp : thread_pool)
               else Some (ef, sg, args)
           end
         | Klock _ _ _ => None
+        | Kunlock _ _ _ => None
       end
     | right _ => None
   end.
@@ -312,9 +334,10 @@ Definition after_external (ov : option val) (tp : thread_pool) :=
         | Krun c => 
           match semantics.after_external the_sem ov c with
             | None => None
-            | Some c' => Some (updThread tp tid (Krun c'))
+            | Some c' => Some (schedNext (updThread tp tid (Krun c')))
           end
         | Klock _ _ _ => None
+        | Kunlock _ _ _ => None
       end
     | right _ => None
   end.
@@ -393,10 +416,13 @@ move=> Hfun m m' m'' ge tp tp' tp''; case; move {tp tp' m m'}.
    + move {m}=> tp m c'' m'' c''' m''' b ofs pf get Hat load store aft upd pf'.
       have ->: pf' = pf by apply: proof_irr.
       by rewrite get.
-   + move {m}=> tp m c'' m'' c''' m''' b ofs pf get Hat load store aft upd pf'.
+   + move {m}=> tp m c'' b ofs pf get Hat pf'.
       have ->: pf' = pf by apply: proof_irr.
       rewrite get; case=> <- step.
       by move: (corestep_not_at_external _ _ _ _ _ _ step); rewrite Hat.
+   + move {m}=> tp m c'' m'' c''' m''' b ofs pf get Hat load store aft upd pf'.
+      have ->: pf' = pf by apply: proof_irr.
+      by rewrite get.
 }
 { move=> tp m c b ofs pf get Hat step; case: step pf get Hat; move {tp m tp'' m''}.
    + move=> ????? pf' get step pf; have <-: pf' = pf by apply: proof_irr.
@@ -405,8 +431,10 @@ move=> Hfun m m' m'' ge tp tp' tp''; case; move {tp tp' m m'}.
       by rewrite get; case=> <-; rewrite Hat; case=> -> ->; split.
    + move=> ???????? pf get Hat ???? pf'; have ->: pf' = pf by apply: proof_irr.
       by rewrite get.
-   + move=> ???????? pf get Hat ???? pf'; have ->: pf' = pf by apply: proof_irr.
+   + move=> ????? pf' get Hat pf; have <-: pf' = pf by apply: proof_irr.
       by rewrite get; case=> <-; rewrite Hat.
+   + move=> ???????? pf get Hat ???? pf'; have ->: pf' = pf by apply: proof_irr.
+      by rewrite get.
 }
 { move=> tp m c m''' c' m' b ofs pf get Hat load store aft upd step.
    case: step pf get Hat upd load store; move {tp m tp'' m''}.
@@ -417,22 +445,41 @@ move=> Hfun m m' m'' ge tp tp' tp''; case; move {tp tp' m m'}.
    + move=> ???????? pf get Hat load store aft' upd pf'; have ->: pf' = pf by apply: proof_irr.
       rewrite get; case=> <- <- cs_eq _ upd' load'; rewrite store; case=> mem_eq; subst.
       by move: aft'; rewrite aft; case=> ->; move: upd'; rewrite upd; case=> ->; split.
+   + move=> ????? pf get step0 pf'; have ->: pf' = pf by apply: proof_irr.
+      by rewrite get.
    + move=> tp m c'' m'' c'''' m'''' b' ofs' pf get Hat ? store aft' upd' pf'.
+      have ->: pf' = pf by apply: proof_irr.
+      by rewrite get.
+}
+{ move=> tp m c b ofs pf get Hat step.
+   case: step pf get Hat; move {tp m tp'' m''}.
+   + move=> ????? pf get step pf'; have ->: pf' = pf by apply: proof_irr.
+       by rewrite get; case=> <-; erewrite corestep_not_at_external; eauto.
+   + move=> ????? pf get Hat pf'; have ->: pf' = pf by apply: proof_irr.
+      by rewrite get; case=> <-; rewrite Hat.
+   + move=> ???????? pf get Hat load store aft upd pf'.
+      have ->: pf' = pf by apply: proof_irr.
+      by rewrite get.
+   + move=> ????? pf get Hat pf'; have ->: pf' = pf by apply: proof_irr.
+      by rewrite get; case=> <-; rewrite Hat; case=> <- <-.
+   + move=> ???????? pf get Hat ? store aft upd pf'.
       have ->: pf' = pf by apply: proof_irr.
       by rewrite get.
 }
 { move=> tp m c m''' c' m' b ofs pf get Hat load store aft upd step. 
    case: step pf get Hat load store aft upd; move {tp m tp'' m''}.
    + move=> ????? pf get step pf'; have ->: pf' = pf by apply: proof_irr.
-      by rewrite get; case=> <-; erewrite corestep_not_at_external; eauto.
+      by rewrite get.
    + move=> ????? pf get Hat pf'; have ->: pf' = pf by apply: proof_irr.
-      rewrite get; case=> <-; rewrite Hat; discriminate.
+      by rewrite get.
    + move=> ???????? pf get Hat load store aft upd pf'. 
       have ->: pf' = pf by apply: proof_irr.
       by rewrite get.
+   + move=> ????? pf get Hat pf'; have ->: pf' = pf by apply: proof_irr.
+      by rewrite get.
    + move=> ???????? pf get Hat ? store aft upd pf'.
       have ->: pf' = pf by apply: proof_irr.
-      rewrite get; case=> <-; rewrite Hat; case=> <- <- _; rewrite store; case=> <-.
+      rewrite get; case=> <- <- <- _; rewrite store=> _; case=> <-.
       by rewrite aft; case=> <-; rewrite upd; case=> <-; split.      
 }
 Qed.
