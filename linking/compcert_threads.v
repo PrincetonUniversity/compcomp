@@ -262,7 +262,22 @@ Lemma step_inv the_ge tp c m tp' m' ef sig args :
   semantics.at_external the_sem c = Some (ef, sig, args) -> 
   handled ef = false -> 
   ~ step the_ge tp m tp' m'.
-Proof. Admitted.
+Proof. 
+move=> pf get Hat; move/handledP=> Hhdl step. 
+case: step pf get Hat Hhdl; move {tp m tp' m'}.
+{ move=> ????? pf get step pf'; have ->: pf' = pf by apply: proof_irr.
+   by rewrite get; case=> <-; erewrite corestep_not_at_external; eauto.
+}
+{ move=> ????? pf get Hat pf'; have ->: pf' = pf by apply: proof_irr.
+   by rewrite get; case=> <-; rewrite Hat; case=> <- /= _ _; apply; constructor.
+}
+{ move=> ???????? pf get Hat ???? pf'; have ->: pf' = pf by apply: proof_irr.
+   by rewrite get.
+}
+{ move=> ???????? pf get Hat ???? pf'; have ->: pf' = pf by apply: proof_irr.
+   rewrite get; case=> <-; rewrite Hat; case=> <- _ _; apply; constructor.
+}
+Qed.
 
 Lemma my_ltP m n : (m < n)%coq_nat -> (m < n).
 Proof. by move/ltP. Qed.
