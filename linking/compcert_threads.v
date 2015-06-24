@@ -273,7 +273,7 @@ Inductive step : thread_pool -> mem -> thread_pool -> mem -> Prop :=
       getThread tp tid = Kstage CREATE (vf::arg::nil) c ->
       semantics.initial_core the_sem the_ge vf (arg::nil) = Some c_new ->
       semantics.after_external the_sem (Some (Vint Int.zero)) c = Some c' ->
-      step tp m (addThread (updThread tp tid (Krun c')) (Krun c_new)) m.
+      step tp m (schedNext (addThread (updThread tp tid (Krun c')) (Krun c_new))) m.
 
 End Corestep.
 
@@ -449,6 +449,8 @@ move=> Hfun m m' m'' ge tp tp' tp''; case; move {tp tp' m m'}.
       by move: aft'; rewrite aft; case=> ->; move: upd'; rewrite upd; case=> ->; split.
    + move=> tp m c'' m'' c'''' m'''' b' ofs' pf get ? store aft' upd' pf'.
       have ->: pf' = pf by apply: proof_irr.
+      by rewrite get.
+   + move=> ??????? pf get init aft' pf'; have ->: pf' = pf by apply: proof_irr.
       by rewrite get.
 }
 { move=> tp m c m''' c' m' b ofs pf get load store aft upd step. 
