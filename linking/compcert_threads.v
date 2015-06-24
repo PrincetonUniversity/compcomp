@@ -85,7 +85,7 @@ Notation cT := (Modsem.C sem).
 
 Inductive ctl : Type :=
   | Krun : cT -> ctl
-  | Klock : block -> Z -> cT -> ctl.
+  | Klock : block -> int -> cT -> ctl.
 
 Record t := mk
   { num_threads : pos
@@ -188,7 +188,7 @@ Inductive step : thread_pool -> mem -> thread_pool -> mem -> Prop :=
       forall (tid0_lt_pf :  tid0 < num_threads tp),
       let: tid := Ordinal tid0_lt_pf in
       getThread tp tid = Krun c ->
-      semantics.at_external the_sem c = Some (LOCK, LOCK_SIG, Vptr b (Int.repr ofs)::nil) ->
+      semantics.at_external the_sem c = Some (LOCK, LOCK_SIG, Vptr b ofs::nil) ->
       step tp m (updThread tp tid (Klock b ofs c)) m
 
   | step_lock_exec :
@@ -198,9 +198,9 @@ Inductive step : thread_pool -> mem -> thread_pool -> mem -> Prop :=
       forall (tid0_lt_pf :  tid0 < num_threads tp),
       let: tid := Ordinal tid0_lt_pf in
       getThread tp tid = Klock b ofs c ->
-      semantics.at_external the_sem c = Some (LOCK, LOCK_SIG, Vptr b (Int.repr ofs)::nil) ->
-      Mem.load Mint32 m b ofs = Some (Vint Int.one) ->
-      Mem.store Mint32 m b ofs (Vint Int.zero) = Some m'' ->
+      semantics.at_external the_sem c = Some (LOCK, LOCK_SIG, Vptr b ofs::nil) ->
+      Mem.load Mint32 m b (Int.intval ofs) = Some (Vint Int.one) ->
+      Mem.store Mint32 m b (Int.intval ofs) (Vint Int.zero) = Some m'' ->
       semantics.after_external the_sem (Some (Vint Int.zero)) c = Some c' ->
       updPermMap m'' (aggelos n) = Some m' -> 
       step tp m (updThread tp tid (Krun c')) m'
@@ -212,9 +212,9 @@ Inductive step : thread_pool -> mem -> thread_pool -> mem -> Prop :=
       forall (tid0_lt_pf :  tid0 < num_threads tp),
       let: tid := Ordinal tid0_lt_pf in
       getThread tp tid = Krun c ->
-      semantics.at_external the_sem c = Some (UNLOCK, UNLOCK_SIG, Vptr b (Int.repr ofs)::nil) ->
-      Mem.load Mint32 m b ofs = Some (Vint Int.zero) ->
-      Mem.store Mint32 m b ofs (Vint Int.one) = Some m'' ->
+      semantics.at_external the_sem c = Some (UNLOCK, UNLOCK_SIG, Vptr b ofs::nil) ->
+      Mem.load Mint32 m b (Int.intval ofs) = Some (Vint Int.zero) ->
+      Mem.store Mint32 m b (Int.intval ofs) (Vint Int.one) = Some m'' ->
       semantics.after_external the_sem (Some (Vint Int.zero)) c = Some c' ->
       updPermMap m'' (aggelos n) = Some m' -> 
       step tp m (updThread tp tid (Krun c')) m'.
@@ -363,6 +363,63 @@ Notation thread_sem := (@Concur.semantics sem aggelos schedule).
 Lemma thread_det :
   semantics_lemmas.corestep_fun the_sem ->
   semantics_lemmas.corestep_fun thread_sem.
-Proof. Admitted.
+Proof. 
+move=> Hfun m m' m'' ge tp tp' tp''; case; move {tp tp' m m'}.
+{ move=> tp m c m' c' pf get step0 step.
+   case: step pf get step0; move {tp tp'' m''}.
+   + move=> tp m'' c'' m''' c''' pf get step pf'; move: get step.
+      have ->: pf' = pf by apply: proof_irr.
+      move=> -> step; case=> <- step'.
+      by case: (Hfun _ _ _ _ _ _ _ step step')=> <- <-; split.
+   + move {m}=> tp m c'' b ofs pf get Hat pf'.
+      have ->: pf' = pf by apply: proof_irr.
+      rewrite get; case=> <- step.
+      by move: (corestep_not_at_external _ _ _ _ _ _ step); rewrite Hat.
+   + move {m}=> tp m c'' m'' c''' m''' b ofs pf get Hat load store aft upd pf'.
+      have ->: pf' = pf by apply: proof_irr.
+      by rewrite get.
+   + move {m}=> tp m c'' m'' c''' m''' b ofs pf get Hat load store aft upd pf'.
+      have ->: pf' = pf by apply: proof_irr.
+      rewrite get; case=> <- step.
+      by move: (corestep_not_at_external _ _ _ _ _ _ step); rewrite Hat.
+}
+{ move=> tp m c b ofs pf get Hat step; case: step pf get Hat; move {tp m tp'' m''}.
+   + move=> ????? pf' get step pf; have <-: pf' = pf by apply: proof_irr.
+      by rewrite get; case=> <-; erewrite corestep_not_at_external; eauto.
+   + move=> ????? pf' get Hat pf; have <-: pf' = pf by apply: proof_irr.
+      by rewrite get; case=> <-; rewrite Hat; case=> -> ->; split.
+   + move=> ???????? pf get Hat ???? pf'; have ->: pf' = pf by apply: proof_irr.
+      by rewrite get.
+   + move=> ???????? pf get Hat ???? pf'; have ->: pf' = pf by apply: proof_irr.
+      by rewrite get; case=> <-; rewrite Hat.
+}
+{ move=> tp m c m''' c' m' b ofs pf get Hat load store aft upd step.
+   case: step pf get Hat upd load store; move {tp m tp'' m''}.
+   + move=> ????? pf get step0 pf'; have ->: pf' = pf by apply: proof_irr.
+      by rewrite get.
+   + move=> ????? pf get step0 pf'; have ->: pf' = pf by apply: proof_irr.
+      by rewrite get.
+   + move=> ???????? pf get Hat load store aft' upd pf'; have ->: pf' = pf by apply: proof_irr.
+      rewrite get; case=> <- <- cs_eq _ upd' load'; rewrite store; case=> mem_eq; subst.
+      by move: aft'; rewrite aft; case=> ->; move: upd'; rewrite upd; case=> ->; split.
+   + move=> tp m c'' m'' c'''' m'''' b' ofs' pf get Hat ? store aft' upd' pf'.
+      have ->: pf' = pf by apply: proof_irr.
+      by rewrite get.
+}
+{ move=> tp m c m''' c' m' b ofs pf get Hat load store aft upd step. 
+   case: step pf get Hat load store aft upd; move {tp m tp'' m''}.
+   + move=> ????? pf get step pf'; have ->: pf' = pf by apply: proof_irr.
+      by rewrite get; case=> <-; erewrite corestep_not_at_external; eauto.
+   + move=> ????? pf get Hat pf'; have ->: pf' = pf by apply: proof_irr.
+      rewrite get; case=> <-; rewrite Hat; discriminate.
+   + move=> ???????? pf get Hat load store aft upd pf'. 
+      have ->: pf' = pf by apply: proof_irr.
+      by rewrite get.
+   + move=> ???????? pf get Hat ? store aft upd pf'.
+      have ->: pf' = pf by apply: proof_irr.
+      rewrite get; case=> <-; rewrite Hat; case=> <- <- _; rewrite store; case=> <-.
+      by rewrite aft; case=> <-; rewrite upd; case=> <-; split.      
+}
+Qed.
 
 End ConcurLemmas.
