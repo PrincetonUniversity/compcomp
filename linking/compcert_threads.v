@@ -1,6 +1,7 @@
 Require Import Axioms.
 
 Require Import sepcomp. Import SepComp.
+Require Import semantics_lemmas.
 
 Require Import pos.
 Require Import stack. 
@@ -199,6 +200,24 @@ case Hhdl: (handled ef); [apply: ReflectT|apply: ReflectF].
 }
 Qed.   
 
+Definition cant_step {G C M} (sem : CoreSemantics G C M) c := 
+  (exists pkg, semantics.at_external sem c = Some pkg)
+  \/ exists v, semantics.halted sem c = Some v.
+
+Lemma cant_step_step {G C M} (sem : CoreSemantics G C M) ge c m c' m' :
+  cant_step sem c -> 
+  ~ semantics.corestep sem ge c m c' m'.
+Proof.
+case.
+{ case=> ? H H2.
+  erewrite corestep_not_at_external in H; eauto.
+  congruence.
+}
+case=> ? H H2.
+erewrite corestep_not_halted in H; eauto.
+congruence.
+Qed.
+
 Module Concur. Section Concur.
 
 Import ThreadPool.
@@ -218,13 +237,14 @@ Variable the_ge : Genv.t (Modsem.F sem) (Modsem.V sem).
 
 Inductive step : thread_pool -> mem -> thread_pool -> mem -> Prop :=
   | step_congr : 
-      forall tp m c m' (c' : Modsem.C sem),
+      forall tp m c m' (c' : Modsem.C sem) n0,
       let: n := counter tp in
       let: tid0 := schedule n in
       forall (tid0_lt_pf :  tid0 < num_threads tp),
       let: tid := Ordinal tid0_lt_pf in
       getThread tp tid = Krun c ->
-      semantics.corestep the_sem the_ge c m c' m' ->
+      corestepN the_sem the_ge (S n0) c m c' m' ->
+      cant_step the_sem c' -> 
       step tp m (updThread tp tid (Krun c')) m'
 
   | step_stage :
@@ -288,21 +308,23 @@ Lemma step_inv the_ge tp c m tp' m' ef sig args :
   ~ step the_ge tp m tp' m'.
 Proof. 
 move=> pf get Hat; move/handledP=> Hhdl step. 
-case: step pf get Hat Hhdl; move {tp m tp' m'}.
-{ move=> ????? pf get step pf'; have ->: pf' = pf by apply: proof_irr.
-   by rewrite get; case=> <-; erewrite corestep_not_at_external; eauto.
+case: step pf get Hat Hhdl n; move {tp m tp' m'}.
+{ move=> ?????? pf get step cant pf'; have ->: pf' = pf by apply: proof_irr.
+  move: step=> /=; case=> x []y []? ?.
+  by rewrite get; case=> <-; erewrite corestep_not_at_external; eauto.
 }
 { move=> ????? pf get Hat Hhdl pf'; have ->: pf' = pf by apply: proof_irr.
-   by rewrite get; case=> <-; rewrite Hat; case=> <- /= _ _; apply; apply/handledP.
+  rewrite get; case=> <-; rewrite Hat; case=> <- /= _ _ Contra _. 
+  by apply: Contra; apply/handledP.
 }
 { move=> ???????? pf get Hat ??? pf'; have ->: pf' = pf by apply: proof_irr.
-   by rewrite get.
+  by rewrite get.
 }
 { move=> ???????? pf get Hat ??? pf'; have ->: pf' = pf by apply: proof_irr.
-   by rewrite get.
+  by rewrite get.
 }
 { move=> ??????? pf get init aft pf'; have ->: pf' = pf by apply: proof_irr.
-   by rewrite get.
+  by rewrite get.
 }
 Qed.
 
@@ -357,10 +379,10 @@ Definition initial_core (f : val) (args : list val) : option thread_pool :=
     | None => None
     | Some c => 
       Some (ThreadPool.mk 
-                   one_pos 
-                   (fun tid => if tid == ord0 then Krun c 
-                                     else Krun c (*bogus value; can't occur*))
-                   0)
+              one_pos 
+              (fun tid => if tid == ord0 then Krun c 
+                          else Krun c (*bogus value; can't occur*))
+              0)
   end.
 
 End InitialCore.
@@ -387,6 +409,56 @@ Qed.
   
 End Concur. End Concur.
 
+(*MOVE to core/semantics_lemmas.v*)
+Lemma corestepN_fun {G C M} {sem : CoreSemantics G C M} {c m c' m' c'' m'' n ge}
+  (Hfun : corestep_fun sem) :
+  corestepN sem ge n c m c' m' ->
+  corestepN sem ge n c m c'' m'' -> 
+  c'=c'' /\ m'=m''.
+Proof.
+move: c m; elim: n=> /=.
+{ by move=> c m; case=> <- <-; case=> <- <-. }
+{ move=> n IH c m; case=> x []y []H H2 []z []w []H3 H4.
+  case: (Hfun _ _ _ _ _ _ _ H H3)=> ??; subst.
+  by case: (IH _ _ H2 H4)=> <- <-.
+}
+Qed.
+
+Lemma corestepN_fun_cant {G C M} {sem : CoreSemantics G C M} 
+      {c m c' m' c'' m'' ge}
+      {n n' : nat}
+      (Hfun : corestep_fun sem) :
+  corestepN sem ge n c m c' m' ->
+  corestepN sem ge n' c m c'' m'' -> 
+  cant_step sem c' -> 
+  cant_step sem c'' -> 
+  c'=c'' /\ m'=m''.
+Proof. 
+move=> H H2 H3 H4. 
+suff: n = n'.
+by move=> ?; subst; apply: (corestepN_fun Hfun H H2).
+elim: n n' c m H H2 H3 H4=> /=. 
+{ move=> n' c m H H2 c1 c2.
+case: n' H2=> n'; elim: n'=> //. 
+case: H=> -> -> /=; case=> ? []? []H2 _.
+by eapply cant_step_step in H2.
+{ 
+  case: H=> -> -> /= n H []c3 []m3 []H2 []c4 []m4 []H3 H4.
+  clear - c1 H2; elimtype False.
+  by eapply cant_step_step; eauto.
+}
+}
+move=> n IH n' c m []c2 []m2 []H H2 H3 H4 H5.
+case: n' H3.
+{ 
+  simpl; case=> ??; subst.
+  by elimtype False; eapply cant_step_step; eauto.
+}
+move=> n' /= []c3 []m3 []H6 H7.
+case: (Hfun _ _ _ _ _ _ _ H H6)=> ??; subst.
+by move: (IH _ _ _ H2 H7 H4 H5)=> <-.
+Qed.
+
 Section ConcurLemmas.
 
 Import ThreadPool.
@@ -397,7 +469,7 @@ Notation thread_pool := (t sem).
 Notation the_sem := (Modsem.sem sem).
 Notation perm_map := PermMap.t.
 
-Variable  aggelos : nat -> perm_map.
+Variable aggelos : nat -> perm_map.
 Variable schedule : nat -> nat.
 
 Notation thread_sem := (@Concur.semantics sem aggelos schedule).
@@ -407,80 +479,85 @@ Lemma thread_det :
   semantics_lemmas.corestep_fun thread_sem.
 Proof. 
 move=> Hfun m m' m'' ge tp tp' tp''; case; move {tp tp' m m'}.
-{ move=> tp m c m' c' pf get step0 step.
-   case: step pf get step0; move {tp tp'' m''}.
-   + move=> tp m'' c'' m''' c''' pf get step pf'; move: get step.
-      have ->: pf' = pf by apply: proof_irr.
-      move=> -> step; case=> <- step'.
-      by case: (Hfun _ _ _ _ _ _ _ step step')=> <- <-; split.
-   + move {m}=> tp m c'' b ofs pf get Hat Hhdl pf'.
-      have ->: pf' = pf by apply: proof_irr.
-      rewrite get; case=> <- step.
-      by move: (corestep_not_at_external _ _ _ _ _ _ step); rewrite Hat.
-   + move {m}=> tp m c'' m'' c''' m''' b ofs pf get load store aft upd pf'.
-      have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
-   + move {m}=> tp m c'' m'' c''' m''' b ofs pf get load store aft upd pf'.
-      have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
-   + move=> ??????? pf get init aft pf'; have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
+{ move=> tp m c m' c' n pf get cant step0 step.
+  case: step pf get step0 cant; move {tp tp'' m''}.
+  + move=> tp m'' c'' m''' c''' n' pf get step cant' pf'; move: get step.
+    have ->: pf' = pf by apply: proof_irr.
+    move=> -> step; case=> <- cant'' step'.
+    by case: (corestepN_fun_cant Hfun step step')=> // <- <-; split.
+  + move {m}=> tp m c'' b ofs pf get Hat Hhdl pf'.
+    have ->: pf' = pf by apply: proof_irr.
+    rewrite get; case=> <- cant step.
+    simpl in step; case: step=> ? []? []step ?.
+    by move: (corestep_not_at_external _ _ _ _ _ _ step); rewrite Hat.
+  + move {m}=> tp m c'' m'' c''' m''' b ofs pf get load store aft upd pf'.
+    have ->: pf' = pf by apply: proof_irr.
+    by rewrite get.
+  + move {m}=> tp m c'' m'' c''' m''' b ofs pf get load store aft upd pf'.
+    have ->: pf' = pf by apply: proof_irr.
+    by rewrite get.
+  + move=> ??????? pf get init aft pf'; have ->: pf' = pf by apply: proof_irr.
+    by rewrite get.
 }
-{ move=> tp m c b ofs pf get Hat Hhdl step; case: step pf get Hat Hhdl; move {tp m tp'' m''}.
-   + move=> ????? pf' get step pf; have <-: pf' = pf by apply: proof_irr.
-      by rewrite get; case=> <-; erewrite corestep_not_at_external; eauto.
-   + move=> ????? pf' get Hat Hhdl pf; have <-: pf' = pf by apply: proof_irr.
-      by rewrite get; case=> <-; rewrite Hat; case=> -> _ -> _; split.
-   + move=> ???????? pf get ???? pf'; have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
-   + move=> ???????? pf get ???? pf'; have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
-   + move=> ??????? pf get init aft pf'; have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
+{ move=> tp m c b ofs pf get Hat Hhdl step; 
+  case: step pf get Hat Hhdl; move {tp m tp'' m''}.
+  + move=> ?????? pf' get step cant pf; have <-: pf' = pf by apply: proof_irr.
+    rewrite get; case=> <- H. 
+    simpl in step; case: step=> ? []? []step.
+    by erewrite corestep_not_at_external in H; eauto.
+  + move=> ????? pf' get Hat Hhdl pf; have <-: pf' = pf by apply: proof_irr.
+    by rewrite get; case=> <-; rewrite Hat; case=> -> _ -> _; split.
+  + move=> ???????? pf get ???? pf'; have ->: pf' = pf by apply: proof_irr.
+    by rewrite get.
+  + move=> ???????? pf get ???? pf'; have ->: pf' = pf by apply: proof_irr.
+    by rewrite get.
+  + move=> ??????? pf get init aft pf'; have ->: pf' = pf by apply: proof_irr.
+    by rewrite get.
 }
 { move=> tp m c m''' c' m' b ofs pf get load store aft upd step.
-   case: step pf get upd load store; move {tp m tp'' m''}.
-   + move=> ????? pf get step0 pf'; have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
-   + move=> ????? pf get Hat Hhdl pf'; have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
-   + move=> ???????? pf get load store aft' upd pf'; have ->: pf' = pf by apply: proof_irr.
-      rewrite get; case=> <- <- cs_eq upd' load'; rewrite store; case=> mem_eq; subst.
-      by move: aft'; rewrite aft; case=> ->; move: upd'; rewrite upd; case=> ->; split.
-   + move=> tp m c'' m'' c'''' m'''' b' ofs' pf get ? store aft' upd' pf'.
-      have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
-   + move=> ??????? pf get init aft' pf'; have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
+  case: step pf get upd load store; move {tp m tp'' m''}.
+  + move=> ?????? pf get step0 cant pf'; have ->: pf' = pf by apply: proof_irr.
+    by rewrite get.
+  + move=> ????? pf get Hat Hhdl pf'; have ->: pf' = pf by apply: proof_irr.
+    by rewrite get.
+  + move=> ???????? pf get load store aft' upd pf'. 
+    have ->: pf' = pf by apply: proof_irr.
+    rewrite get; case=> <- <- cs_eq upd' load'; rewrite store; case=> mem_eq; subst.
+    by move: aft'; rewrite aft; case=> ->; move: upd'; rewrite upd; case=> ->; split.
+  + move=> tp m c'' m'' c'''' m'''' b' ofs' pf get ? store aft' upd' pf'.
+    have ->: pf' = pf by apply: proof_irr.
+    by rewrite get.
+  + move=> ??????? pf get init aft' pf'; have ->: pf' = pf by apply: proof_irr.
+    by rewrite get.
 }
 { move=> tp m c m''' c' m' b ofs pf get load store aft upd step. 
-   case: step pf get load store aft upd; move {tp m tp'' m''}.
-   + move=> ????? pf get step pf'; have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
-   + move=> ????? pf get Hat Hhdl pf'; have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
-   + move=> ???????? pf get load store aft upd pf'. 
-      have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
-   + move=> ???????? pf get ? store aft upd pf'.
-      have ->: pf' = pf by apply: proof_irr.
-      rewrite get; case=> <- <- <- _; rewrite store; case=> <-.
-      by rewrite aft; case=> <-; rewrite upd; split.
-   + move=> ??????? pf get init aft pf'; have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
+  case: step pf get load store aft upd; move {tp m tp'' m''}.
+  + move=> ?????? pf get step cant pf'; have ->: pf' = pf by apply: proof_irr.
+    by rewrite get.
+  + move=> ????? pf get Hat Hhdl pf'; have ->: pf' = pf by apply: proof_irr.
+    by rewrite get.
+  + move=> ???????? pf get load store aft upd pf'. 
+    have ->: pf' = pf by apply: proof_irr.
+    by rewrite get.
+  + move=> ???????? pf get ? store aft upd pf'.
+    have ->: pf' = pf by apply: proof_irr.
+    rewrite get; case=> <- <- <- _; rewrite store; case=> <-.
+    by rewrite aft; case=> <-; rewrite upd; split.
+  + move=> ??????? pf get init aft pf'; have ->: pf' = pf by apply: proof_irr.
+    by rewrite get.
 }
 { move=> tp m c c' c_new vf arg pf get init aft step.
-   case: step pf get init aft; move {tp m tp'' m''}.
-   + move=> ????? pf get ? pf'; have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
-   + move=> ????? pf get Hat Hhdl pf'; have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
-   + move=> ???????? pf get ? store aft upd pf'; have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
-   + move=> ???????? pf get ? store aft upd pf'; have ->: pf' = pf by apply: proof_irr.
-      by rewrite get.
-   + move=> ??????? pf get init aft pf'; have ->: pf' = pf by apply: proof_irr.
-      by rewrite get; case=> <- <- <-; rewrite init; case=> <-; rewrite aft; case=> <-.
+  case: step pf get init aft; move {tp m tp'' m''}.
+  + move=> ?????? pf get ? cant pf'; have ->: pf' = pf by apply: proof_irr.
+    by rewrite get.
+  + move=> ????? pf get Hat Hhdl pf'; have ->: pf' = pf by apply: proof_irr.
+    by rewrite get.
+  + move=> ???????? pf get ? store aft upd pf'; have ->: pf' = pf by apply: proof_irr.
+    by rewrite get.
+  + move=> ???????? pf get ? store aft upd pf'; have ->: pf' = pf by apply: proof_irr.
+    by rewrite get.
+  + move=> ??????? pf get init aft pf'; have ->: pf' = pf by apply: proof_irr.
+    by rewrite get; case=> <- <- <-; rewrite init; case=> <-; rewrite aft; case=> <-.
 }      
 Qed.
 
