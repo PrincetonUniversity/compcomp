@@ -333,7 +333,7 @@ move=> b ofs val []F G; split=> // b' d' H; case: (G _ _ H)=> I.
 left=> J; apply: I; case: (fwd b')=> //. 
 apply: (valid b'); apply/orP; left. 
 by case: (local_DomRng mu0 (Inj_wd mu0) _ _ _ H).
-by move=> _; apply.
+by move=> _ [] HH _; apply: HH.
 by right.
 apply: (RGTgt_multicorePerm mu Etgt Esrc m2 m2' (Inj_wd mu) m1' A B). 
 move: D; rewrite DisjointInE=> D.

@@ -154,7 +154,7 @@ eapply Build_Wholeprog_sim
 
 {(** Case: [core_initial] *)
   move=> j c1 vals1 m1 vals2 m2 init1.
-  case=>inj []vinj []pres []gfi []wd []vgenv vval.
+  case=>inj []vinj []pres []gfi []wd []vgenv []vval []ro1 ro2.
   move: init1. 
   rewrite /= /LinkerSem.initial_core.
   case e: main=> [//|//|//|//|b ofs].
@@ -231,6 +231,16 @@ eapply Build_Wholeprog_sim
     by apply: valid_dec.
     apply reach; apply: (REACH_mono (fun b' : block =>
       isGlobalBlock (ge (cores_T ix)) b' || getBlocks vals2 b'))=> //. }
+
+  { move=> b' gv Hfind /andP []H2 H3.  
+     move: (ro1 b' (mkglobvar tt (gvar_init gv) (gvar_readonly gv) (gvar_volatile gv))); case.
+     admit. (*find_var_info (ge (cores_S ix)) <= find_var_info my_ge*)
+     by apply/andP; split.
+     simpl=> H4; case=> H5 H6; split=> //.
+     admit. (*Genv.load_store_init_data*)
+    }
+
+  { (*symmetric to previous*) admit. }
 
   { by apply: valid_dec'. }
 
@@ -325,7 +335,8 @@ eapply Build_Wholeprog_sim
   suff [H2|H2]: isGlobalBlock my_ge b1 \/ getBlocks vals1 b1.
   by apply: REACH_nil; apply/orP; left; rewrite -(isGlob_iffS my_ge_S).
   by apply: REACH_nil; apply/orP; right.
-  by move: (orP H).
+  apply/orP; case: (orP H); [|by move=> ->; rewrite orbC].
+  by move/isGlob_iffS;  move/(_ _ my_ge_S)=> ->.
 
   by apply RCSem.init_ax with (v := Vptr b Int.zero).
 
@@ -335,6 +346,10 @@ eapply Build_Wholeprog_sim
   by apply: (Nuke_sem.wmd_initial _ vval vgenv_ix wd init2).
   by move: gfi; rewrite /mu_top /= /mu_top0 initial_SM_as_inj.
   by move=> ix'; move: vgenv; apply: valid_genvs_domain_eq.
+
+  admit. (*ro1*)
+  admit. (*ro2*)
+
   by apply: ord_dec. }(*END [Case: core_initial]*)
     
 {(** Case: diagram*)
@@ -347,7 +362,7 @@ set c1 := peekCore st1.
 set c2 := peekCore st2.
 
 have [c1_B [c1_vis c1_I]]: 
-  exists B, [/\ vis_inv my_ge c1 B mu 
+  exists B, [/\ vis_inv c1 B mu 
               & RCSem.I (rclosed_S c1.(Core.i)) c1.(Core.c) m1 B].
 { case: INV; rewrite /c1 /c2 /=; case=> ? []? []? []? []Hmueq []?.
   by case=> _ _ []B []c1_vis c1_I; exists B; split=> //; subst. }
@@ -385,10 +400,7 @@ have U1_DEF': forall b ofs, U1 b ofs -> vis mupkg b.
   apply match_visible in MATCH; apply: MATCH.
   apply (REACH_mono (fun b => 
     b \in RC.roots (ge (cores_S (Core.i c1))) (RC.mk (Core.c c1) c1_B)))=> //.
-  move=> b0 roots; case: c1_vis; subst; apply. 
-  move: roots; apply: (RC.roots_domains_eq 
-    (ge1 := ge (cores_S (Core.i c1))) (ge2 := my_ge))=> //.
-  by apply: genvs_domain_eq_sym; apply: my_ge_S. }
+  by move=> b0 roots; case: c1_vis; subst; apply. }
 
 move/(_ _ _ _ _ MATCH).
 move=> []c2' []m2' []cd' []mu_top0.
@@ -431,6 +443,9 @@ have [n STEPN]:
 split. 
 
 {(** Re-establish invariant. *) 
+ have fwd1: mem_forward m1 m1'.
+ { by apply: (corestep_fwd STEP0). }
+
  apply: Build_R. rewrite ST1'; rewrite /st2'.
 
  have sgeq: Core.sg c1=Core.sg c2.
@@ -448,7 +463,7 @@ split.
      eapply gsep_domain_eq; eauto.
      apply genvs_domain_eq_sym; eauto.
    }
-   apply (@head_inv_step _ _ _ _ _ sims my_ge my_ge_S 
+   apply (@head_inv_step _ _ _ _ _ sims my_ge 
      mupkg m1 m2 mu_top' m1' m2' fwd2 (head_valid hdinv) INCR GSEP' LOCALLOC rcvis
      (c INV) (d INV) pf c1' c2'' _ _ mus
      (STACK.pop (CallStack.callStack (s1 INV))) 
@@ -460,7 +475,6 @@ split.
  { eapply tail_inv_step with (Esrc := U1) (Etgt := U2) (mu' := mu_top'); eauto.
    by apply: (effstep_unchanged _ _ _ _ _ _ _ ESTEP0).
    by move: STEPN; apply: effect_semantics.effstepN_unchanged.
-   by move: (effax1 ESTEP0)=> []; move/corestep_fwd.
    move=> ? ? X; move: (PERM U1_DEF' _ _ X)=> []Y Z; split=> //.
    by eapply effstepN_valid in STEPN; eauto.
      by apply: (head_valid hdinv).
@@ -478,6 +492,16 @@ split.
  { move=> ix; move: (R_ge INV); move/(_ ix)=> vgenv. 
    by apply: (Nuke_sem.valid_genv_fwd vgenv). }
 
+ (* mem_respects_readonly ... m1' *)
+ { move=> ix; move: (R_ro1 INV); move/(_ ix)=> RO1.
+    by apply: (mem_respects_readonly_forward _ _ _ RO1 fwd1).
+ }
+
+ (* mem_respects_readonly ... m2' *)
+ { move=> ix; move: (R_ro2 INV); move/(_ ix)=> RO2.
+    by apply: (mem_respects_readonly_forward _ _ _ RO2 fwd2).
+ }
+    
  unfold c1 in *; rewrite ST1'; move: (R_tys1 INV). 
  rewrite /s1 => tys; clear -tys; case st1_eq: st1 tys c1'=> // [fntbl stack]. 
  case stack_eq: stack=> [stack0 WF]; rewrite /= => tys _.
@@ -571,7 +595,7 @@ have mu_wd: SM_wd mu.
 have INV': R data (Inj.mk mu_wd) st1 m1 st2 m2.
 { by apply: INV. }
 
-case: (aft2 my_ge_S my_ge_T HLT1 POP1 INV' AFT1)=> 
+case: (aft2 my_ge_T HLT1 POP1 INV' AFT1)=> 
   rv2 []st2'' []st2' []cd' []mu' []HLT2 CTX2 POP2 AFT2 INV''.
 exists st2',m2,cd',mu'.
 split=> //; first by rewrite eq1.
