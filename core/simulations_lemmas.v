@@ -34,13 +34,13 @@ Section Eff_INJ_SIMU_DIAGRAMS.
    
    Hypothesis genvs_dom_eq: genvs_domain_eq ge1 ge2.
 
-   Hypothesis  ginfo_preserved : gvar_infos_eq ge1 ge2 /\ findsymbols_preserved ge1 ge2.
+   Hypothesis ginfo_preserved : gvar_infos_eq ge1 ge2 /\ findsymbols_preserved ge1 ge2.
 
    Hypothesis match_sm_wd: forall d mu c1 m1 c2 m2, 
           match_states d mu c1 m1 c2 m2 ->
           SM_wd mu.
 
-    Hypothesis match_visible: forall d mu c1 m1 c2 m2, 
+   Hypothesis match_visible: forall d mu c1 m1 c2 m2, 
           match_states d mu c1 m1 c2 m2 -> 
           REACH_closed m1 (vis mu).
 
@@ -56,7 +56,7 @@ Section Eff_INJ_SIMU_DIAGRAMS.
           match_states d mu c1 m1 c2 m2 ->
           sm_valid mu m1 m2.
 
-    Hypothesis match_genv: forall d mu c1 m1 c2 m2 (MC:match_states d mu c1 m1 c2 m2),
+   Hypothesis match_genv: forall d mu c1 m1 c2 m2 (MC:match_states d mu c1 m1 c2 m2),
           meminj_preserves_globals ge1 (extern_of mu) /\
           (forall b, isGlobalBlock ge1 b = true -> frgnBlocksSrc mu b = true).
 
@@ -92,6 +92,7 @@ Section Eff_INJ_SIMU_DIAGRAMS.
 
       exists v2, 
              Mem.inject (as_inj mu) m1 m2 /\
+             mem_respects_readonly ge1 m1 /\ mem_respects_readonly ge2 m2 /\
              val_inject (restrict (as_inj mu) (vis mu)) v1 v2 /\
              halted Sem2 c2 = Some v2.
 
@@ -99,8 +100,9 @@ Section Eff_INJ_SIMU_DIAGRAMS.
       forall mu c1 m1 c2 m2 e vals1 ef_sig,
         match_states c1 mu c1 m1 c2 m2 ->
         at_external Sem1 c1 = Some (e,ef_sig,vals1) ->
-        Mem.inject (as_inj mu) m1 m2 /\ 
-          exists vals2, 
+        Mem.inject (as_inj mu) m1 m2 
+        /\ mem_respects_readonly ge1 m1 /\ mem_respects_readonly ge2 m2
+        /\ exists vals2, 
             Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\ 
             at_external Sem2 c2 = Some (e,ef_sig,vals2)
     /\ forall
@@ -147,6 +149,8 @@ Hypothesis order_wf: well_founded order.
         (RValInjNu': val_inject (as_inj nu') ret1 ret2)
 
         (FwdSrc: mem_forward m1 m1') (FwdTgt: mem_forward m2 m2')
+        (RDO1: RDOnly_fwd m1 m1' (ReadOnlyBlocks ge1))
+        (RDO1: RDOnly_fwd m2 m2' (ReadOnlyBlocks ge2))
 
         frgnSrc' (frgnSrcHyp: frgnSrc' = fun b => andb (DomSrc nu' b)
                                                  (andb (negb (locBlocksSrc nu' b)) 
@@ -230,18 +234,18 @@ clear - inj_halted. intros. destruct H; subst.
   exists v2; intuition.
 clear - inj_at_external. intros. destruct H; subst.
   destruct (inj_at_external _ _ _ _ _ _ _ _ H1 H0)
-    as [INJ [vals2 [VALS [AtExt2 SH]]]].
-  split. trivial. exists vals2. split; trivial. split; trivial. 
+    as [INJ [MRR1 [MRR2 [vals2 [VALS [AtExt2 SH]]]]]].
+  intuition. exists vals2. split; trivial. split; trivial. 
     intros. split. split. trivial. eapply SH; eassumption. eapply SH; eassumption.
 clear - inj_after_external. intros. 
   destruct MatchMu as [ZZ matchMu]. subst cd.
   destruct (inj_after_external _ _ _ _ _ _ _ _ _ _ _
       MemInjMu matchMu AtExtSrc AtExtTgt ValInjMu _
       pubSrcHyp _ pubTgtHyp _ NuHyp _ _ _ _ _ INC GSep
-      WDnu' SMvalNu' MemInjNu' RValInjNu' FwdSrc FwdTgt 
+      WDnu' SMvalNu' MemInjNu' RValInjNu' FwdSrc FwdTgt RDO1 RDO2
       _ frgnSrcHyp _ frgnTgtHyp _ Mu'Hyp 
       UnchPrivSrc UnchLOOR)
-    as [st1' [st2' [AftExt1 [AftExt2 MS']]]].
+    as [st1' [st2' [AftExt1 [AftExt2 MS']]]]; try eassumption.
   exists st1', st1', st2'. intuition.
 Qed.
 
@@ -280,6 +284,8 @@ Hypothesis order_wf: well_founded order.
         (RValInjNu': val_inject (as_inj nu') ret1 ret2)
 
         (FwdSrc: mem_forward m1 m1') (FwdTgt: mem_forward m2 m2')
+        (RDO1: RDOnly_fwd m1 m1' (ReadOnlyBlocks ge1))
+        (RDO1: RDOnly_fwd m2 m2' (ReadOnlyBlocks ge2))
 
         frgnSrc' (frgnSrcHyp: frgnSrc' = fun b => andb (DomSrc nu' b)
                                                  (andb (negb (locBlocksSrc nu' b)) 
@@ -361,18 +367,18 @@ clear - inj_halted. intros. destruct H; subst.
   exists v2; intuition.
 clear - inj_at_external. intros. destruct H; subst.
   destruct (inj_at_external _ _ _ _ _ _ _ _ H1 H0)
-    as [INJ [vals2 [VALS [AtExt2 SH]]]].
-  split. trivial. exists vals2. split; trivial. split; trivial. 
+    as [INJ [MRR1 [MRR2 [vals2 [VALS [AtExt2 SH]]]]]].
+  intuition. exists vals2. split; trivial. split; trivial. 
     intros. split. split. trivial. eapply SH; eassumption. eapply SH; eassumption.
 clear - inj_after_external. intros. 
   destruct MatchMu as [ZZ matchMu]. subst cd.
   destruct (inj_after_external _ _ _ _ _ _ _ _ _ _ _
       MemInjMu matchMu AtExtSrc AtExtTgt ValInjMu _
       pubSrcHyp _ pubTgtHyp _ NuHyp _ _ _ _ _ HasTy1 HasTy2 INC GSep
-      WDnu' SMvalNu' MemInjNu' RValInjNu' FwdSrc FwdTgt 
+      WDnu' SMvalNu' MemInjNu' RValInjNu' FwdSrc FwdTgt RDO1 RDO2
       _ frgnSrcHyp _ frgnTgtHyp _ Mu'Hyp 
       UnchPrivSrc UnchLOOR)
-    as [st1' [st2' [AftExt1 [AftExt2 MS']]]].
+    as [st1' [st2' [AftExt1 [AftExt2 MS']]]]; try assumption.
   exists st1', st1', st2'. intuition.
 Qed.
 
@@ -409,6 +415,8 @@ Section EFF_INJ_SIMULATION_STAR.
         (RValInjNu': val_inject (as_inj nu') ret1 ret2)
 
         (FwdSrc: mem_forward m1 m1') (FwdTgt: mem_forward m2 m2')
+        (RDO1: RDOnly_fwd m1 m1' (ReadOnlyBlocks ge1))
+        (RDO1: RDOnly_fwd m2 m2' (ReadOnlyBlocks ge2))
 
         frgnSrc' (frgnSrcHyp: frgnSrc' = fun b => andb (DomSrc nu' b)
                                                  (andb (negb (locBlocksSrc nu' b)) 
@@ -507,6 +515,8 @@ Section EFF_INJ_SIMULATION_STAR_TYPED.
         (RValInjNu': val_inject (as_inj nu') ret1 ret2)
 
         (FwdSrc: mem_forward m1 m1') (FwdTgt: mem_forward m2 m2')
+        (RDO1: RDOnly_fwd m1 m1' (ReadOnlyBlocks ge1))
+        (RDO1: RDOnly_fwd m2 m2' (ReadOnlyBlocks ge2))
 
         frgnSrc' (frgnSrcHyp: frgnSrc' = fun b => andb (DomSrc nu' b)
                                                  (andb (negb (locBlocksSrc nu' b)) 
@@ -602,6 +612,8 @@ Section EFF_INJ_SIMULATION_PLUS.
         (RValInjNu': val_inject (as_inj nu') ret1 ret2)
 
         (FwdSrc: mem_forward m1 m1') (FwdTgt: mem_forward m2 m2')
+        (RDO1: RDOnly_fwd m1 m1' (ReadOnlyBlocks ge1))
+        (RDO1: RDOnly_fwd m2 m2' (ReadOnlyBlocks ge2))
 
         frgnSrc' (frgnSrcHyp: frgnSrc' = fun b => andb (DomSrc nu' b)
                                                  (andb (negb (locBlocksSrc nu' b)) 
@@ -687,6 +699,8 @@ Section EFF_INJ_SIMULATION_PLUS_TYPED.
         (RValInjNu': val_inject (as_inj nu') ret1 ret2)
 
         (FwdSrc: mem_forward m1 m1') (FwdTgt: mem_forward m2 m2')
+        (RDO1: RDOnly_fwd m1 m1' (ReadOnlyBlocks ge1))
+        (RDO1: RDOnly_fwd m2 m2' (ReadOnlyBlocks ge2))
 
         frgnSrc' (frgnSrcHyp: frgnSrc' = fun b => andb (DomSrc nu' b)
                                                  (andb (negb (locBlocksSrc nu' b)) 

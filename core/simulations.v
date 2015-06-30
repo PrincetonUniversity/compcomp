@@ -20,6 +20,15 @@ Require Export globalSep.
 
 (** * Structured Simulations *)
 
+Definition RDOnly_inj (m1 m2:mem) mu B :=
+  forall b (Hb: B b = true),
+            extern_of mu b = Some(b,0) /\ (forall b' d, as_inj mu b' = Some(b,d) -> b'=b) /\ 
+            forall ofs, ~ Mem.perm m1 b ofs Max Writable /\
+                        ~ Mem.perm m2 b ofs Max Writable.
+
+Definition RDOnly_fwd (m1 m1':mem) B :=
+  forall b (Hb: B b = true), readonly m1 b m1'.
+
 Definition mem_respects_readonly {F V} (ge : Genv.t F V) m :=
     forall b gv, Genv.find_var_info ge b = Some gv ->
                  gvar_readonly gv && negb (gvar_volatile gv) = true ->
@@ -28,10 +37,14 @@ Definition mem_respects_readonly {F V} (ge : Genv.t F V) m :=
 
 Lemma mem_respects_readonly_forward {F V} (ge : Genv.t F V) m m'
          (MRR: mem_respects_readonly ge m)
-         (FWD: mem_forward m m'): mem_respects_readonly ge m'.
+         (FWD: mem_forward m m')
+         (RDO: forall b gv, Genv.find_var_info ge b = Some gv ->
+                 gvar_readonly gv && negb (gvar_volatile gv) = true -> readonly m b m'):
+         mem_respects_readonly ge m'.
 Proof. red; intros. destruct (MRR _ _ H H0) as [LSI [VB NP]]; clear MRR.
-destruct (FWD _ VB) as [VB' [Perm RDO]].
-split. specialize (RDO NP). eapply Genv.load_store_init_data_invariant; eassumption.
+destruct (FWD _ VB) as [VB' Perm].
+split. eapply Genv.load_store_init_data_invariant; try eassumption.
+       intros. eapply readonly_readonlyLD. eapply RDO; try eassumption. intros. apply NP.
 split. trivial.
 intros z N. apply (NP z); eauto.
 Qed.
@@ -50,6 +63,45 @@ Definition gvar_infos_eq {F1 V1 F2 V2}
 
 Lemma gvar_info_refl V v: @gvar_info_eq V V v v. 
   destruct v; simpl; intuition. Qed.
+
+Lemma gvar_infos_eqD {F1 V1 F2 V2} (ge1 : Genv.t F1 V1) (ge2 : Genv.t F2 V2)
+         (G: gvar_infos_eq ge1 ge2) b v1 (Hb: Genv.find_var_info ge1 b = Some v1): 
+      exists v2, Genv.find_var_info ge2 b = Some v2 /\ gvar_init v1 = gvar_init v2 /\
+                 gvar_readonly v1 = gvar_readonly v2 /\ gvar_volatile v1 = gvar_volatile v2.
+Proof. specialize (G b); rewrite Hb in G. red in G.
+  destruct (Genv.find_var_info ge2 b); try contradiction.
+  exists g. intuition.
+Qed.
+
+Lemma gvar_infos_eqD2 {F1 V1 F2 V2} (ge1 : Genv.t F1 V1) (ge2 : Genv.t F2 V2)
+         (G: gvar_infos_eq ge1 ge2) b v2 (Hb: Genv.find_var_info ge2 b = Some v2): 
+      exists v1, Genv.find_var_info ge1 b = Some v1 /\ gvar_init v1 = gvar_init v2 /\
+                 gvar_readonly v1 = gvar_readonly v2 /\ gvar_volatile v1 = gvar_volatile v2.
+Proof. specialize (G b); rewrite Hb in G. red in G.
+  destruct (Genv.find_var_info ge1 b); try contradiction.
+  exists g. intuition.
+Qed.
+
+Definition ReadOnlyBlocks {F V} (ge: Genv.t F V) (b:block): bool :=
+  match Genv.find_var_info ge b with 
+          None => false
+        | Some gv => gvar_readonly gv && negb (gvar_volatile gv)
+  end.
+
+Lemma gvar_infos_eq_ReadOnlyBlocks {F1 V1 F2 V2} (g1: Genv.t F1 V1) (g2:Genv.t F2 V2):
+      gvar_infos_eq g1 g2 -> ReadOnlyBlocks g1 = ReadOnlyBlocks g2.
+Proof. intros.
+  unfold ReadOnlyBlocks. extensionality b.
+  remember (Genv.find_var_info g1 b) as d1.
+  destruct d1; symmetry in Heqd1. 
+    apply (gvar_infos_eqD _ _ H) in Heqd1. destruct Heqd1 as [gv2 [? [? [? ?]]]].
+       rewrite H0, H2, H3. trivial.
+  remember (Genv.find_var_info g2 b) as q.
+  destruct q; symmetry in Heqq. 
+    apply (gvar_infos_eqD2 _ _ H) in Heqq. destruct Heqq as [gv1 [? [? [? ?]]]].
+    rewrite H0 in Heqd1. discriminate.
+  trivial.
+Qed.
 
 (*
 Definition gvar_info_rev {F1 V1 F2 V2} 
@@ -222,6 +274,7 @@ Record SM_simulation_inject := {
     halted Sem1 c1 = Some v1 ->
     exists v2, 
     Mem.inject (as_inj mu) m1 m2 
+    /\ mem_respects_readonly ge1 m1 /\ mem_respects_readonly ge2 m2
     /\ val_inject (restrict (as_inj mu) (vis mu)) v1 v2 
     /\ halted Sem2 c2 = Some v2 
 
@@ -231,6 +284,7 @@ Record SM_simulation_inject := {
     match_state cd mu c1 m1 c2 m2 ->
     at_external Sem1 c1 = Some (e,ef_sig,vals1) ->
     Mem.inject (as_inj mu) m1 m2 
+    /\ mem_respects_readonly ge1 m1 /\ mem_respects_readonly ge2 m2
     /\ exists vals2, 
        Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 
        /\ at_external Sem2 c2 = Some (e,ef_sig,vals2)
@@ -289,6 +343,8 @@ Record SM_simulation_inject := {
         (RValInjNu': val_inject (as_inj nu') ret1 ret2)
 
         (FwdSrc: mem_forward m1 m1') (FwdTgt: mem_forward m2 m2')
+        (RDO1: RDOnly_fwd m1 m1' (ReadOnlyBlocks ge1))
+        (RDO2: RDOnly_fwd m2 m2' (ReadOnlyBlocks ge2))
 
         frgnSrc' 
         (frgnSrcHyp: 

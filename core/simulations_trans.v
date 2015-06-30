@@ -25,9 +25,10 @@ Require Import internal_diagram_trans.
 Require Import interpolants.
 Require Import interpolation_proofs.
 
+Require Import full_composition.
+
 (*Require Import mem_interpolation_defs. I think this is required/name hasn't changed (?)*)
 
-Require Import full_composition.
 
 (** * Transitivity of Structured Simulations *)
 
@@ -328,6 +329,7 @@ Proof.
       exists b2; eauto.
     eapply find_symbol_isGlobal; eassumption. } 
 Qed.
+
 
 Theorem eff_sim_trans: forall 
         (SIM12: @SM_simulation_inject _ _ _ _ _ _ Sem1 Sem2 g1 g2)
@@ -653,15 +655,17 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
   destruct cd as [[d12 cc2] d23].
   destruct H as [c2 [m2 [mu12 [mu23 [X [J [INV [MC12 [MC23 full]]]]]]]]]; subst.
   destruct (core_halted12 _ _ _ _ _ _ _ MC12 H0) as
-     [v2 [MInj12 [RValsInject12 HaltedMid]]]. 
+     [v2 [MInj12 [MRR1 [MRR2 [RValsInject12 HaltedMid]]]]]. 
   destruct (core_halted23 _ _ _ _ _ _ _ MC23 HaltedMid) as
-     [v3 [MInj23 [RValsInject23 HaltedTgt]]].
+     [v3 [MInj23 [_ [MRR3 [RValsInject23 HaltedTgt]]]]].
   exists v3.
   assert (WDmu12:= match_sm_wd12 _ _ _ _ _ _ MC12).
   assert (WDmu23:= match_sm_wd23 _ _ _ _ _ _ MC23).
   destruct INV as [INVa [INVb [INVc INVd]]].
   split. rewrite compose_sm_as_inj; trivial.
-           eapply Mem.inject_compose; eassumption.   
+           eapply Mem.inject_compose; eassumption.
+  split; trivial.
+  split. trivial.   
   split. rewrite compose_sm_as_inj; trivial.
          rewrite restrict_compose, vis_compose_sm; simpl.
          eapply val_inject_compose; try eassumption.
@@ -676,13 +680,15 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
   destruct H as [st2 [m2 [mu12 [mu23 [Hst2 [HMu [GLUEINV [MC12 [MC23 full]]]]]]]]]. 
   subst.
   destruct (core_at_external12 _ _ _ _ _ _ _ _ _ MC12 AtExtSrc)
-    as [MInj12 [vals2 [ArgsInj12 [AtExt2 SH12]]]]; 
+    as [MInj12 [MRR1 [MRR2 [vals2 [ArgsInj12 [AtExt2 SH12]]]]]]; 
      clear core_at_external12.
   destruct (core_at_external23 _ _ _ _ _ _ _ _ _ MC23 AtExt2)
-    as [MInj23 [vals3 [ArgsInj23 [AtExtTgt SH23]]]]; 
+    as [MInj23 [_ [MRR3 [vals3 [ArgsInj23 [AtExtTgt SH23]]]]]]; 
      clear core_at_external23.
   rewrite compose_sm_as_inj; try eauto.   
     split. eapply Mem.inject_compose; eassumption.
+    split; trivial.
+    split; trivial.
     exists vals3.
     rewrite restrict_compose, vis_compose_sm; simpl.
     split. eapply forall_val_inject_compose; try eassumption.
@@ -729,7 +735,6 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
           exact full.
         }
 
-
         rewrite HNU. rewrite compose_sm_shared.
               eapply Mem.inject_compose; eassumption.
             rewrite replace_locals_pubBlocksTgt, replace_locals_pubBlocksSrc. 
@@ -760,17 +765,18 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
                 exists b2, d. rewrite LOC, RCH2. 
                 destruct (local_DomRng _ MC23 _ _ _ LOC). rewrite H2; split; trivial.
               intros. apply andb_true_iff in H; destruct H.
-                rewrite H; trivial.
+                rewrite H; trivial. 
   eapply GLUEINV. 
   eapply GLUEINV. }
 { (*after_external*)
   clear - match_sm_wd12 match_sm_valid12 core_at_external12 
           eff_after_external12  match_visible12 (*match_restrict12*)
           match_sm_wd23 match_sm_valid23 core_at_external23 
-          eff_after_external23 genvs_dom_eq23 match_genv12 match_genv23.
+          eff_after_external23 genvs_dom_eq23 match_genv12 match_genv23
+          ginfos_pres23 ginfos_pres12 genvs_dom_eq12.
   intros. rename st2 into st3. rename m2 into m3. 
           rename vals2 into vals3'. rename m2' into m3'.
-          rename UnchLOOR into UnchLOOR13.
+          rename UnchLOOR into UnchLOOR13. rename RDO2 into RDO3.
   destruct cd as [[d12 cc2] d23].
   destruct MatchMu as [st2 [m2 [mu12 [mu23 [Hst2 [HMu [GLUEINV [MC12 [MC23 full]]]]]]]]].
   assert (WDmu12:= match_sm_wd12 _ _ _ _ _ _ MC12).
@@ -811,8 +817,8 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
   assert (HmuNorm: mu = compose_sm nmu12 mu23).
      clear UnchLOOR13 UnchPrivSrc Mu'Hyp mu' frgnTgtHyp frgnTgt'
               frgnSrcHyp frgnSrc' FwdTgt FwdSrc RValInjNu' MemInjNu' 
-              SMvalNu' WDnu' (*SEP*) INC m3' ret2 m1' ret1 (*nu'*) NuHyp (*nu*)
-              (* GlobalsSeparate: SMvalNu' WDnu' INC m3' ret2 m1' ret1 NuHyp*)
+              SMvalNu' WDnu' (*SEP*) INC ret2 ret1 (*nu'*) NuHyp (*nu*)
+              (* GlobalsSeparate: SMvalNu' WDnu' INC ret2 m1' ret1 NuHyp*)
               pubTgtHyp pubTgt' pubSrcHyp pubSrc' ValInjMu AtExtTgt 
               AtExtSrc eff_after_external23 core_at_external23 
               eff_after_external12 core_at_external12 HasTy1 HasTy2. 
@@ -858,9 +864,9 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
   assert (mu23_valid:= match_sm_valid23 _ _ _ _ _ _ MC23).
   rename ret2 into ret3.  
   destruct (core_at_external12 _ _ _ _ _ _ _ _ _ NormMC12 AtExtSrc)
-   as [MInj12 [vals2 [ArgsInj12 (*[ArgsHT2*) [AtExt2 _](*]*)]]]; clear core_at_external12.
+   as [MInj12 [MRR1 [MRR2 [vals2 [ArgsInj12 (*[ArgsHT2*) [AtExt2 _](*]*)]]]]]; clear core_at_external12.
   destruct (core_at_external23 _ _ _ _ _ _ _ _ _ MC23 AtExt2)
-   as [MInj23 [vals3 [ArgsInj23 (*[ArgsHT3*) [AtExt3 _](*]*)]]]; clear core_at_external23.
+   as [MInj23 [_ [MRR3 [vals3 [ArgsInj23 (*[ArgsHT3*) [AtExt3 _](*]*)]]]]]; clear core_at_external23.
   
   (** Prove uniqueness of e, ef_sig, vals3. We do this by hand, instead of 
      rewrite AtExtTgt in AtExt3; inv Atext3 in order to avoid the subst
@@ -999,13 +1005,22 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
   assert (nu23_valid: sm_valid (replace_locals mu23 pubSrcMid' pubTgt') m2 m3).
      split. rewrite replace_locals_DOM. eapply mu23_valid.
      rewrite replace_locals_RNG. eapply mu23_valid.
-  rewrite NU in INC(*, SEP*).
-  destruct (EFFAX.effect_interp_II _ _ _ MinjNu12 _ FwdSrc
+  rewrite NU in INC(*, SEP*). red in MRR3. red in FwdSrc. unfold readonly in FwdSrc.
+(*  destruct (EFFAX.effect_interp_II _ _ _ MinjNu12 _ FwdSrc
       _ _ MinjNu23 _ FwdTgt nu' WDnu' SMvalNu' MemInjNu'
       INC (*Pure*) nu12_valid nu23_valid)
      as [m2' [nu12' [nu23' [X [Incr12 [Incr23 (*[Pure'*) [MInj12'
         [Fwd2 [MInj23' [nu12'valid
-        [nu23'valid [GLUEINV' [full' [UnchMidA [UnchMidB [Pure12 Pure23]]]]]]]]]]]]]]]]; simpl in *.
+        [nu23'valid [GLUEINV' [full' [UnchMidA [UnchMidB [Pure12 Pure23]]]]]]]]]]]]]]]]; simpl in *.*)
+  (*remember (fun b => match Genv.find_var_info g1 b with 
+                        None => false
+                      | Some gv => gvar_readonly gv && negb (gvar_volatile gv) end) as B.*)
+  destruct (EFFAX.effect_interp_II _ _ _ MinjNu12 _ FwdSrc
+      _ _ MinjNu23 _ FwdTgt nu' WDnu' SMvalNu' MemInjNu'
+      INC (*Pure*) nu12_valid nu23_valid) with (B:=ReadOnlyBlocks g1)
+     as [m2' [nu12' [nu23' [X [Incr12 [Incr23 (*[Pure'*) [MInj12'
+        [Fwd2 [RDO2 [MInj23' [nu12'valid
+        [nu23'valid [GLUEINV' [full' [UnchMidA [UnchMidB [Pure12 Pure23]]]]]]]]]]]]]]]]]; simpl in *.
     (*discharge the unchOn application conditions*)
        subst; apply UnchPrivSrc.
        subst. apply UnchLOOR13. 
@@ -1025,7 +1040,58 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
         destruct mu12; destruct mu23; simpl.
         exact full.
         }
-       { (*full_ext *)  
+      { (*RDOnly_inj12*)
+         unfold ReadOnlyBlocks. subst nmu12. clear - NormMC12 match_genv12 ginfos_pres12 WDmu12 MRR1 MRR2.
+         red; intros. remember (Genv.find_var_info g1 b) as d.
+         destruct d; inversion Hb; clear Hb. symmetry in Heqd.
+         specialize (find_var_info_isGlobal _ _ _ Heqd). intros GB1.
+         rewrite replace_locals_extern, replace_locals_as_inj.
+         destruct (match_genv12 _ _ _ _ _ _ NormMC12).
+         destruct ginfos_pres12 as [GP12a GP12b].
+         destruct (gvar_infos_eqD _ _ GP12a _ _ Heqd) as [gv2 [FV2 [gvInit12 [gvRDO12 gvVol12]]]].
+          split. apply (meminj_preserves_globals_isGlobalBlock _ _ H _ GB1).
+          split. intros; symmetry.
+                 apply effect_properties.match_genv_meminj_preserves_extern_iff_all in H; trivial.
+                 eapply H; eassumption.
+          intros. split. eapply MRR1; eassumption.  
+                  rewrite gvRDO12, gvVol12 in *. eapply MRR2; eassumption. }
+       { (*RDOnly_inj23*)
+         unfold ReadOnlyBlocks.
+         clear - NormMC12 match_genv12 ginfos_pres12 genvs_dom_eq12 WDmu12 MRR1
+                         MC23 match_genv23 ginfos_pres23 WDmu23 MRR2 MRR3.
+         red; intros. remember (Genv.find_var_info g1 b) as d.
+         destruct d; inversion Hb; clear Hb. symmetry in Heqd.
+         specialize (find_var_info_isGlobal _ _ _ Heqd). intros GB1.
+         rewrite replace_locals_extern, replace_locals_as_inj.
+         destruct (match_genv23 _ _ _ _ _ _ MC23).
+         assert (GB2: isGlobalBlock g2 b = true).
+           rewrite <- (genvs_domain_eq_isGlobal _ _ genvs_dom_eq12); trivial.
+         destruct ginfos_pres12 as [GP12a GP12b].
+         destruct (gvar_infos_eqD _ _ GP12a _ _ Heqd) as [gv2 [FV2 [gvInit12 [gvRDO12 gvVol12]]]].
+         destruct ginfos_pres23 as [GP23a GP23b].
+         destruct (gvar_infos_eqD _ _ GP23a _ _ FV2) as [gv3 [FV3 [gvInit23 [gvRDO23 gvVol23]]]].
+          split. apply (meminj_preserves_globals_isGlobalBlock _ _ H _ GB2).
+          split. intros; symmetry.
+                 apply effect_properties.match_genv_meminj_preserves_extern_iff_all in H; trivial.
+                 eapply H; eassumption.
+          intros. rewrite gvRDO12, gvVol12 in *. 
+                  split. eapply MRR2; eassumption.  
+                  rewrite gvRDO23, gvVol23 in *. eapply MRR3; eassumption. }
+       { (*RDOnly_fwd1*) assumption. }
+       { (*RDOnly_fwd3*)
+         rewrite (gvar_infos_eq_ReadOnlyBlocks g1 g2); try eapply ginfos_pres12.
+         rewrite (gvar_infos_eq_ReadOnlyBlocks g2 g3); try eapply ginfos_pres23.
+         assumption. }
+       { (*BSep*) 
+         unfold ReadOnlyBlocks; subst nmu12; simpl; intros.
+         remember (Genv.find_var_info g1 b2) as q. 
+         destruct q; trivial. symmetry in Heqq.
+         rewrite <- NU in H.
+         specialize (find_var_info_isGlobal _ _ _ Heqq);
+         rewrite (genvs_domain_eq_isGlobal _ _ genvs_dom_eq12),
+                 (genvs_domain_eq_isGlobal _ _ genvs_dom_eq23),
+                 (GSep _ _ _ H H0). discriminate. }
+     { (*full_ext *)  
         unfold full_ext, full_comp, replace_locals.
         destruct nmu12, mu23; simpl. exact full. }    
  
@@ -1232,8 +1298,8 @@ Proof. (*follows structure of forward_simulations_trans.injinj*)
   specialize (eff_after_external12 nu12' ret1 
      m1' ret2 m2' HasTy1 HasTy12 Incr12 GSep2 WDnu12' nu12'valid MInj12' RValInjNu12'
      FwdSrc Fwd2 (*RetType2*)).
-
-  destruct (eff_after_external12 _ (eq_refl _) 
+  rewrite (gvar_infos_eq_ReadOnlyBlocks g1 g2) in RDO2; try eapply ginfos_pres12.
+  destruct (eff_after_external12 RDO1 RDO2 _ (eq_refl _) 
       _ (eq_refl _) _ (eq_refl _))
     as [d12' [c1' [c2' [AftExt1 [AftExt2 MC12']]]]]; clear eff_after_external12.
    (*discharge unchangedOn-application conditions*)
@@ -1539,7 +1605,7 @@ destruct p.
   } *)
   destruct (eff_after_external23 ret2 m2' 
        ret3 m3' HasTy12 HasTy2 Incr23 GSep3 WDnu23' nu23'valid
-       MInj23' RValInjNu23' Fwd2 FwdTgt (*RetTypeTgt*)
+       MInj23' RValInjNu23' Fwd2 FwdTgt (*RetTypeTgt*) RDO2 RDO3
      _ (eq_refl _) _ (eq_refl _) _ (eq_refl _)) as
      [d23' [c22' [c3' [AftExt22 [AftExt3 MC23']]]]];
     subst; clear eff_after_external23.

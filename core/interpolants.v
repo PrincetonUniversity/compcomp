@@ -16,8 +16,64 @@ Require Import simulations_lemmas.
 
 Require Import full_composition.
 Module Type EffectInterpolationAxioms.
-
 Parameter effect_interp_II: forall m1 m2 nu12 
+                             (MInj12 : Mem.inject (as_inj nu12) m1 m2) m1'
+                             (Fwd1: mem_forward m1 m1') nu23 m3
+                             (MInj23 : Mem.inject (as_inj nu23) m2 m3) m3'
+                             (Fwd3: mem_forward m3 m3')
+                              nu' (WDnu' : SM_wd nu')
+                             (SMvalNu' : sm_valid nu' m1' m3')
+                             (MemInjNu' : Mem.inject (as_inj nu') m1' m3')
+                             
+                             (ExtIncr: extern_incr (compose_sm nu12 nu23) nu')
+                             (*Pure: pure_comp_ext nu12 nu23 m1 m2*)
+                             (SMV12: sm_valid nu12 m1 m2)
+                             (SMV23: sm_valid nu23 m2 m3)
+                             (UnchPrivSrc: Mem.unchanged_on (fun b ofs => locBlocksSrc (compose_sm nu12 nu23) b = true /\ 
+                                                      pubBlocksSrc (compose_sm nu12 nu23) b = false) m1 m1') 
+                             (UnchLOOR13: Mem.unchanged_on (local_out_of_reach (compose_sm nu12 nu23) m1) m3 m3')
+
+                             (GlueInvNu: SM_wd nu12 /\ SM_wd nu23 /\
+                                         locBlocksTgt nu12 = locBlocksSrc nu23 /\
+                                         extBlocksTgt nu12 = extBlocksSrc nu23 /\
+                                         (forall b, pubBlocksTgt nu12 b = true -> 
+                                                    pubBlocksSrc nu23 b = true) /\
+                                         (forall b, frgnBlocksTgt nu12 b = true -> 
+                                                    frgnBlocksSrc nu23 b = true))
+                             (Norm12: forall b1 b2 d1, extern_of nu12 b1 = Some(b2,d1) ->
+                                             exists b3 d2, extern_of nu23 b2 = Some(b3, d2))
+         B (RDOnly12: RDOnly_inj m1 m2 nu12 B) (RDOnly23: RDOnly_inj m2 m3 nu23 B)
+           (RDOnly_fwd1: RDOnly_fwd m1 m1' B) (RDOnly_fwd3: RDOnly_fwd m3 m3' B)
+           (BSep : forall (b1 b2 : block) (d : Z),
+                 as_inj (compose_sm nu12 nu23) b1 = None ->
+                 as_inj nu' b1 = Some (b2, d) -> B b2 = false)
+           (full: full_ext nu12 nu23),
+     exists m2', exists nu12', exists nu23', nu'=compose_sm nu12' nu23' /\
+                             extern_incr nu12 nu12' /\ extern_incr nu23 nu23' /\
+                             Mem.inject (as_inj nu12') m1' m2' /\ mem_forward m2 m2' /\ RDOnly_fwd m2 m2' B /\
+                             Mem.inject (as_inj nu23') m2' m3' /\
+                             sm_valid nu12' m1' m2' /\ sm_valid nu23' m2' m3' /\
+                             (SM_wd nu12' /\ SM_wd nu23' /\
+                              locBlocksTgt nu12' = locBlocksSrc nu23' /\
+                              extBlocksTgt nu12' = extBlocksSrc nu23' /\
+                              (forall b, pubBlocksTgt nu12' b = true -> 
+                                         pubBlocksSrc nu23' b = true) /\
+                              (forall b, frgnBlocksTgt nu12' b = true -> 
+                                         frgnBlocksSrc nu23' b = true)) /\
+                             (forall b1 b2 d1, extern_of nu12' b1 = Some(b2,d1) ->
+                                     exists b3 d2, extern_of nu23' b2 = Some(b3, d2)) /\ 
+                              Mem.unchanged_on (fun b ofs => locBlocksSrc nu23 b = true /\ 
+                                                             pubBlocksSrc nu23 b = false) m2 m2' /\
+                              Mem.unchanged_on (local_out_of_reach nu12 m1) m2 m2' /\
+                              (forall b1 b2 d, extern_of nu12' b1 = Some (b2, d) ->
+                                               extern_of nu12 b1 = Some (b2, d) \/
+                                               extern_of nu12 b1 = None /\
+                                               exists b3 d2, extern_of nu' b1 = Some (b3, d2)) /\
+                              (forall b2 b3 d2, extern_of nu23' b2 = Some (b3, d2) ->
+                                               extern_of nu23 b2 = Some (b3, d2) \/
+                                               extern_of nu23 b2 = None /\
+                                               exists b1 d, extern_of nu12' b1 = Some (b2, d)).
+(*Parameter effect_interp_II: forall m1 m2 nu12 
                              (MInj12 : Mem.inject (as_inj nu12) m1 m2) m1'
                              (Fwd1: mem_forward m1 m1') nu23 m3
                              (MInj23 : Mem.inject (as_inj nu23) m2 m3) m3'
@@ -78,7 +134,7 @@ Parameter effect_interp_II: forall m1 m2 nu12
                               (forall b2 b3 d2, extern_of nu23' b2 = Some (b3, d2) ->
                                                extern_of nu23 b2 = Some (b3, d2) \/
                                                extern_of nu23 b2 = None /\
-                                               exists b1 d, extern_of nu12' b1 = Some (b2, d)).
+                                               exists b1 d, extern_of nu12' b1 = Some (b2, d)).*)
 
 (*(*The following lemma from mem_interpolation (pre- structured-injection! is used in the proof of
   Lemma initial_inject_split in effect_simulations_trans. Prior to reintegrating global environments,

@@ -47,6 +47,19 @@ Require Import RTL_coop.
 Require Import BuiltinEffects.
 Require Import RTL_eff.
 
+Lemma mem_respects_readonly_forward' {F V} (ge : Genv.t F V) m m'
+         (MRR: mem_respects_readonly ge m)
+         (FWD: mem_forward m m')
+         (RDO: RDOnly_fwd m m' (ReadOnlyBlocks ge)):
+         mem_respects_readonly ge m'.
+Proof. red; intros. destruct (MRR _ _ H H0) as [LSI [VB NP]]; clear MRR.
+destruct (FWD _ VB) as [VB' Perm].
+split. eapply Genv.load_store_init_data_invariant; try eassumption.
+       intros. eapply readonly_readonlyLD. eapply RDO; try eassumption. unfold ReadOnlyBlocks. rewrite H; trivial. intros. apply NP.
+split. trivial.
+intros z N. apply (NP z); eauto.
+Qed.
+
 Section PRESERVATION.
 
 Variable prog: program.
@@ -169,7 +182,12 @@ Definition mem_match_approx (m: mem) : Prop :=
   gapp!id = Some il -> Genv.find_symbol ge id = Some b ->
   Genv.load_store_init_data ge m b 0 il /\
   Mem.valid_block m b /\
-  (forall ofs, ~Mem.perm m b ofs Max Writable).
+  (forall ofs, ~Mem.perm m b ofs Max Writable) /\
+  (*Lenb: This is new: carry around the invariant that it's a readonly*)
+  match Genv.find_var_info ge b with
+  | Some gv => gvar_readonly gv && negb (gvar_volatile gv) = true /\ il=gvar_init gv
+  | None => False
+  end.
 
 Lemma eval_load_init_sound:
   forall chunk m b il base ofs pos v,
@@ -249,7 +267,7 @@ Lemma mem_match_approx_store:
   Mem.storev chunk m addr v = Some m' ->
   mem_match_approx m'.
 Proof.
-  intros; red; intros. exploit H; eauto. intros [A [B C]].
+  intros; red; intros. exploit H; eauto. intros [A [B [C D]]].
   destruct addr; simpl in H0; try discriminate.
   exploit Mem.store_valid_access_3; eauto. intros [P Q].
   split. apply Genv.load_store_init_data_invariant with m; auto. 
@@ -257,7 +275,7 @@ Proof.
   eapply C. apply Mem.perm_cur_max. eapply P. instantiate (1 := Int.unsigned i).
   generalize (size_chunk_pos chunk). omega.
   split. eauto with mem.
-  intros; red; intros. eapply C. eapply Mem.perm_store_2; eauto.
+  split; trivial. intros; red; intros. eapply C. eapply Mem.perm_store_2; eauto.
 Qed.
 
 Lemma mem_match_approx_alloc:
@@ -266,11 +284,11 @@ Lemma mem_match_approx_alloc:
   Mem.alloc m lo hi = (m', b) ->
   mem_match_approx m'.
 Proof.
-  intros; red; intros. exploit H; eauto. intros [A [B C]].
+  intros; red; intros. exploit H; eauto. intros [A [B [C D]]].
   split. apply Genv.load_store_init_data_invariant with m; auto.
   intros. eapply Mem.load_alloc_unchanged; eauto. 
   split. eauto with mem.
-  intros; red; intros. exploit Mem.perm_alloc_inv; eauto. 
+  split; trivial. intros; red; intros. exploit Mem.perm_alloc_inv; eauto. 
   rewrite dec_eq_false. apply C. eapply Mem.valid_not_valid_diff; eauto with mem.
 Qed.
 
@@ -280,7 +298,7 @@ Lemma mem_match_approx_free:
   Mem.free m b lo hi = Some m' ->
   mem_match_approx m'.
 Proof.
-  intros; red; intros. exploit H; eauto. intros [A [B C]].
+  intros; red; intros. exploit H; eauto. intros [A [B [C D]]].
   split. apply Genv.load_store_init_data_invariant with m; auto.
   intros. eapply Mem.load_free; eauto.
   destruct (eq_block b0 b); auto. subst b0.
@@ -289,7 +307,7 @@ Proof.
   exploit Mem.free_range_perm; eauto. instantiate (1 := lo); omega. 
   intros; eapply Mem.perm_implies; eauto with mem.
   split. eauto with mem.
-  intros; red; intros. eapply C. eauto with mem. 
+  split; trivial. intros; red; intros. eapply C. eauto with mem. 
 Qed.
 
 Lemma mem_match_approx_extcall:
@@ -298,11 +316,11 @@ Lemma mem_match_approx_extcall:
   external_call ef ge vargs m t vres m' ->
   mem_match_approx m'.
 Proof.
-  intros; red; intros. exploit H; eauto. intros [A [B C]].
+  intros; red; intros. exploit H; eauto. intros [A [B [C D]]].
   split. apply Genv.load_store_init_data_invariant with m; auto.
-  intros. eapply external_call_readonly; eauto. 
+  intros. eapply external_call_readonlyLD; eauto. 
   split. eapply external_call_valid_block; eauto.
-  intros; red; intros. elim (C ofs). eapply external_call_max_perm; eauto. 
+  split; trivial. intros; red; intros. elim (C ofs). eapply external_call_max_perm; eauto. 
 Qed.
 
 (* Show that mem_match_approx holds initially *)
@@ -345,6 +363,7 @@ Proof.
   red; intros; subst b. eelim Plt_strict; eapply Genv.genv_symb_range; eauto.
 Qed.
 
+(*
 Theorem mem_match_approx_init:
   forall m, Genv.init_mem prog = Some m -> mem_match_approx m.
 Proof.
@@ -361,7 +380,7 @@ Proof.
   split. auto. split. eapply Genv.find_symbol_not_fresh; eauto. 
   intros; red; intros. exploit B; eauto. intros [P Q]. inv Q.
 Qed.
-
+*)
 End ANALYSIS.
 
 (** * Correctness of the code transformation *)
@@ -821,6 +840,7 @@ Ltac TransfInstr :=
 
 Definition MATCH n mu c1 m1 c2 m2:Prop :=
   match_states mu n c1 m1 c2 m2 /\
+  (mem_respects_readonly ge m1 /\ mem_respects_readonly tge m2) /\
   REACH_closed m1 (vis mu) /\
   meminj_preserves_globals ge (as_inj mu) /\
   globalfunction_ptr_inject (as_inj mu) /\
@@ -841,11 +861,12 @@ Lemma MATCH_restrict: forall d mu c1 m1 c2 m2 X
   (RX: REACH_closed m1 X), 
   MATCH d (restrict_sm mu X) c1 m1 c2 m2.
 Proof. intros.
-  destruct MC as [MS [RC [PG [GFP [Glob [SMV [WD INJ (* RCT]*)]]]]]]].
+  destruct MC as [MS [MRR [RC [PG [GFP [Glob [SMV [WD INJ (* RCT]*)]]]]]]]].
 assert (WDR: SM_wd (restrict_sm mu X)).
    apply restrict_sm_WD; assumption.
 split.
   eapply match_states_restrict; eassumption.
+split. assumption.
 split. unfold vis.
   rewrite restrict_sm_locBlocksSrc, restrict_sm_frgnBlocksSrc.
   apply RC.
@@ -917,7 +938,8 @@ Qed.
 Lemma MATCH_atExternal: forall n1 mu c1 m1 c2 m2 e vals1 ef_sig
       (MTCH: MATCH n1 mu c1 m1 c2 m2)
       (AtExtSrc: at_external (rtl_eff_sem hf) c1 = Some (e, ef_sig, vals1)),
-      Mem.inject (as_inj mu) m1 m2  /\
+      Mem.inject (as_inj mu) m1 m2  /\ 
+      mem_respects_readonly ge m1 /\ mem_respects_readonly tge m2 /\
 (exists vals2 : list val,
    Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\
    at_external (rtl_eff_sem hf) c2 = Some (e, ef_sig, vals2) /\
@@ -931,10 +953,12 @@ Lemma MATCH_atExternal: forall n1 mu c1 m1 c2 m2 e vals1 ef_sig
     MATCH n1 nu c1 m1 c2 m2 /\ Mem.inject (shared_of nu) m1 m2)).
 Proof. intros.
 destruct MTCH as [MS PRE].
-destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
+destruct PRE as [MRR [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
 inv MS; simpl in AtExtSrc; inv AtExtSrc.
 destruct f; inv H0.
 split; trivial. 
+split. apply MRR. 
+split. apply MRR. 
 exists args'. simpl.
 destruct (observableEF_dec hf e0); inv H1.
 split. apply val_list_inject_forall_inject; auto.
@@ -984,153 +1008,6 @@ Proof. intros.
 induction MS; econstructor; eauto.
   eapply match_stackframes_replace_externs; eassumption.
 Qed.
-(*
-Definition FORWARD m m' :=
-  mem_forward m m' /\
-  (forall b, Mem.valid_block m b ->
-        (forall ofs : Z, ~ Mem.perm m b ofs Max Writable) ->
-        forall ofs ch, Mem.load ch m' b ofs = Mem.load ch m b ofs).
-
-Lemma FORWARD_refl m: FORWARD m m.
-Proof. intros; split.
-  apply mem_forward_refl.
-  intuition.
-Qed.
-
-Lemma FORWARD_trans m1 m2 m3:
-       FORWARD m1 m2 -> FORWARD m2 m3 -> FORWARD m1 m3.
-Proof. intros.
-  destruct H as [FWD1a FWD1b].
-  destruct H0 as [FWD2a FWD2b].
-  split; intros. eapply mem_forward_trans; eassumption.
-  rewrite FWD2b; try eassumption.
-   apply FWD1b; eassumption.
-   apply FWD1a; assumption.
-   intros ofs1 N. apply (H0 ofs1). apply FWD1a; assumption.
-Qed.
-
-(*The following definition is closer to ec_readonly, but proving store_FORWARDis more difficult*)
-Definition FORWARD_ecr m m' :=
-  mem_forward m m' /\
-  (forall b ofs chunk,
-    Mem.valid_block m b ->
-    (forall ofs', ofs <= ofs' < ofs + size_chunk chunk ->
-                          ~(Mem.perm m b ofs' Max Writable)) ->
-    Mem.load chunk m' b ofs = Mem.load chunk m b ofs).
-
-Lemma FORWARD_ecr_refl m: FORWARD_ecr m m.
-Proof. intros; split.
-  apply mem_forward_refl.
-  intuition.
-Qed.
-
-Lemma FORWARD_ecr_trans m1 m2 m3:
-       FORWARD_ecr m1 m2 -> FORWARD_ecr m2 m3 -> FORWARD_ecr m1 m3.
-Proof. intros.
-  destruct H as [FWD1a FWD1b].
-  destruct H0 as [FWD2a FWD2b].
-  split; intros. eapply mem_forward_trans; eassumption.
-  rewrite FWD2b; try eassumption.
-   apply FWD1b; eassumption.
-   apply FWD1a; assumption.
-   intros ofs1 X N. apply (H0 ofs1 X). apply FWD1a; assumption.
-Qed.
-(*
-Lemma FORWARD_trans m1 m2 m3:
-       FORWARD m1 m2 -> FORWARD m2 m3 -> FORWARD m1 m3.
-Proof. intros.
-  destruct H as [FWD1a FWD1b].
-  destruct H0 as [FWD2a FWD2b].
-  split; intros. eapply mem_forward_trans; eassumption.
-  rewrite FWD2b; try eassumption.
-   apply FWD1b; eassumption.
-   apply FWD1a; assumption.
-   intros ofs1 R N. apply (H0 ofs1 R). apply FWD1a; assumption.
-Qed.*)
-
-Lemma store_FORWARD ch m b ofs v m': 
-      Mem.store ch m b ofs v = Some m' -> FORWARD m m'.
-Proof. intros.
-split. eapply store_forward; eassumption.
-intros. eapply Mem.load_store_other; try eassumption.
-destruct (eq_block b0 b); subst. 2: left; trivial.
-  elim (H1 ofs).
-  eapply Mem.perm_max. 
-    eapply Mem.store_valid_access_3; try eassumption.
-    specialize (size_chunk_pos ch); intros; omega.
-Qed.
-(*
-Lemma store_FORWARD_ecr ch m b ofs v m': 
-      Mem.store ch m b ofs v = Some m' -> FORWARD_ecr m m'.
-Proof. intros.
-split. eapply store_forward; eassumption.
-intros. eapply Mem.load_store_other; try eassumption.
-destruct (eq_block b0 b); subst. 2: left; trivial.
-(*  right.
-  destruct (zle (ofs0 + size_chunk chunk) ofs). left; trivial.
-  destruct (zle (ofs + size_chunk ch) ofs0). right; trivial.
-  elim (H1 ofs).
-  split. Focus 2. omega.
-    destruct (zle ofs0 ofs). trivial.
-    assert (ofs0 + size_chunk chunk + size_chunk ch > ofs + size_chunk ch).
-    specialize (size_chunk_pos ch); intros. 
-    specialize (size_chunk_pos chunk); intros. omega.
-  Focus 2.
-  eapply Mem.perm_max. 
-    eapply Mem.store_valid_access_3; try eassumption.
-    specialize (size_chunk_pos ch); intros; omega.
-left; intros N; subst.*)
-  elim (H1 ofs).
-  eapply Mem.perm_max. 
-    eapply Mem.store_valid_access_3; try eassumption.
-    specialize (size_chunk_pos ch); intros; omega.
-Qed.
-*)
-Lemma free_FORWARD m b lo hi m': 
-      Mem.free m b lo hi = Some m' -> FORWARD m m'.
-Proof. intros.
-split. eapply free_forward; eassumption.
-intros. eapply Mem.load_free; try eassumption.
-destruct (zlt lo hi).
-  left; intros N; subst.
-  eapply (H1 lo).
-  eapply Mem.perm_max.
-    eapply Mem.perm_implies. 
-      eapply Mem.free_range_perm; try eassumption.
-      omega.
-    constructor.
-right; left; trivial.
-Qed.
-
-Lemma alloc_FORWARD m lo hi m' b: 
-       Mem.alloc m lo hi = (m', b) -> FORWARD m m'.
-Proof.
-intros.
-split. eapply alloc_forward; eassumption.
-intros. eapply Mem.load_alloc_unchanged; try eassumption.
-Qed.
-
-Lemma external_call_FORWARD:
-  forall (ef : external_function) (F V : Type) (ge : Genv.t F V)
-    (vargs : list val) (m1 : mem) (t : trace) (vres : val) (m2 : mem),
-    external_call ef ge vargs m1 t vres m2 -> FORWARD m1 m2.
-Proof.
-intros.
-split. eapply external_call_mem_forward; eassumption.
-intros.
-eapply ec_readonly. apply (external_call_spec ef). eassumption. eassumption.
-intros. apply H1.
-Qed.*)
-
-Lemma mem_match_approx_forward m1 m2 (FWD: mem_forward m1 m2) (M:mem_match_approx m1):
-      mem_match_approx m2.
-Proof. red; intros.
-  destruct (M _ _ _ H H0) as [M1 [M2 M3]].
-  split. eapply Genv.load_store_init_data_invariant. 2: eassumption. 
-         intros. apply FWD; eassumption.
-  split. apply FWD; assumption.
-  intros ofs N. apply (M3 ofs). apply FWD; assumption.
-Qed.
 
 Lemma MATCH_initial: forall v
   (vals1 : list val) c1 (m1 : mem) (j : meminj)
@@ -1145,7 +1022,8 @@ Lemma MATCH_initial: forall v
   (RCH: forall b, REACH m2
         (fun b' : Values.block => isGlobalBlock tge b' || getBlocks vals2 b') b =
          true -> DomT b = true)
-  (RdOnly: mem_respects_readonly ge m1)
+  (RdOnly1: mem_respects_readonly ge m1)
+  (RdOnly2: mem_respects_readonly tge m2)
   (GFI: globalfunction_ptr_inject j)
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
@@ -1197,12 +1075,12 @@ Proof. intros. unfold ge in *. unfold tge in *.
     as [AA [BB [CC [DD [EE [FF GG]]]]]].
   split.
     econstructor; eauto. 
-    red. intros. 
-    assert (GAC:  global_approx_charact ge gapp).
-      apply make_global_approx_correct. red; intros.
-      rewrite PTree.gempty in H1. discriminate.
-    specialize (GAC _ _ _ H H0). clear AA BB CC DD EE FF GG.
-    apply (RdOnly b0 _ GAC (eq_refl _)). 
+    { red. intros.  
+      assert (GAC:  global_approx_charact ge gapp).
+        apply make_global_approx_correct. red; intros.
+        rewrite PTree.gempty in H1. discriminate.
+      specialize (GAC _ _ _ H H0). clear AA BB CC DD EE FF GG.
+      destruct (RdOnly1 b0 _ GAC (eq_refl _))as [XX [YY ZZ]]. rewrite GAC. simpl. intuition. }       
     constructor.
     rewrite initial_SM_as_inj.
       unfold vis, initial_SM; simpl.
@@ -1241,6 +1119,11 @@ Lemma MATCH_afterExternal: forall
        (RValInjNu': val_inject (as_inj nu') ret1 ret2)
        (FwdSrc: mem_forward m1 m1')
        (FwdTgt: mem_forward m2 m2')
+
+(*       (MRR': mem_respects_readonly ge m1' /\ mem_respects_readonly tge m2')*)
+       (RDO1: RDOnly_fwd m1 m1' (ReadOnlyBlocks ge))
+       (RDO2: RDOnly_fwd m2 m2' (ReadOnlyBlocks tge))
+
        (frgnSrc' : block -> bool)
        (frgnSrcHyp: frgnSrc' =
              (fun b : block => DomSrc nu' b &&
@@ -1259,7 +1142,7 @@ Lemma MATCH_afterExternal: forall
   MATCH n1' mu' st1' m1' st2' m2'.
 Proof. intros.
 destruct MatchMu as [MS PRE].
-destruct PRE as [RC [PG [GFP [Glob [SMV [WDmu INJ]]]]]].
+destruct PRE as [MRR [RC [PG [GFP [Glob [SMV [WDmu INJ]]]]]]].
 simpl in *. inv MS; simpl in *; inv AtExtSrc.
 destruct f; inv H0.
 simpl in *. apply eq_sym in AtExtTgt; inv AtExtTgt.
@@ -1298,7 +1181,7 @@ assert (RR1: REACH_closed m1'
    || DomSrc nu' b &&
       (negb (locBlocksSrc nu' b) &&
        REACH m1' (exportedSrc nu' (ret1 :: nil)) b))).
-  intros b Hb. rewrite REACHAX in Hb. destruct Hb as [L HL].
+  clear MRR (*MRR'*). intros b Hb. rewrite REACHAX in Hb. destruct Hb as [L HL].
   generalize dependent b.
   induction L; simpl; intros; inv HL.
      assumption.
@@ -1306,7 +1189,7 @@ assert (RR1: REACH_closed m1'
   apply orb_true_iff in IHL.
   remember (locBlocksSrc nu' b') as l.
   destruct l; apply eq_sym in Heql.
-  (*case locBlocksSrc nu' b' = true*)
+  { (*case locBlocksSrc nu' b' = true*)
     clear IHL.
     remember (pubBlocksSrc nu' b') as p.
     destruct p; apply eq_sym in Heqp.
@@ -1353,10 +1236,8 @@ assert (RR1: REACH_closed m1'
         apply andb_true_iff.  
         split. unfold DomSrc. rewrite (frgnBlocksSrc_extBlocksSrc _ WDnu' _ RC). intuition.
         apply REACH_nil. unfold exportedSrc.
-          rewrite (frgnSrc_shared _ WDnu' _ RC). intuition.
-  (*case DomSrc nu' b' &&
-    (negb (locBlocksSrc nu' b') &&
-     REACH m1' (exportedSrc nu' (ret1 :: nil)) b') = true*)
+          rewrite (frgnSrc_shared _ WDnu' _ RC). intuition. }
+  { (*case locBlocksSrc nu' b' = false*)
     destruct IHL. congruence.
     apply andb_true_iff in H. simpl in H. 
     destruct H as [DomNu' Rb']. 
@@ -1374,7 +1255,7 @@ assert (RR1: REACH_closed m1'
            specialize (RC' _ H). 
            destruct (mappedD_true _ _ RC') as [[? ?] ?].
            eapply as_inj_DomRng; eassumption.
-    eapply REACH_cons; try eassumption.
+    eapply REACH_cons; try eassumption. }
 (*assert (RRR: REACH_closed m1' (exportedSrc nu' (ret1 :: nil))).
     intros b Hb. apply REACHAX in Hb.
        destruct Hb as [L HL].
@@ -1473,14 +1354,21 @@ split.
         rewrite LOC in H2; trivial.
   econstructor; eauto. 
   { (*mem_match_approx m1'*)
-    clear - UnchPrivSrc GMATCH FwdSrc.  
+    clear - UnchPrivSrc GMATCH FwdSrc (*MRR' *) RDO1 RDO2.  
     rewrite replace_locals_locBlocksSrc, replace_locals_pubBlocksSrc in UnchPrivSrc.
     red; intros. 
-    exploit GMATCH; eauto. intros [A [B C]].
-    split. eapply Genv.load_store_init_data_invariant ; try eassumption. (* apply Genv.load_store_init_data_invariant with m1; auto.*)
-      intros. eapply FwdSrc. assumption. apply C. 
-    split. apply FwdSrc. trivial.
-     intros. intros N. apply FwdSrc in N. apply (C _ N). trivial. }
+    exploit GMATCH; eauto. intros [A [B [C D]]].
+    remember (Genv.find_var_info ge b) as v; destruct v; try contradiction; symmetry in Heqv.
+    destruct D as [D E]. 
+(*    destruct MRR' as [MRR1' _]. specialize (MRR1' _ _ Heqv D). subst il; intuition.*)
+    split.
+      eapply Genv.load_store_init_data_invariant ; try eassumption. (* apply Genv.load_store_init_data_invariant with m1; auto.*)
+      intros. eapply readonly_readonlyLD. apply RDO1.
+              unfold ReadOnlyBlocks. rewrite Heqv; eapply D.
+      intros. eapply C.
+    split. apply FwdSrc; trivial.
+    split. intros. intros N. apply FwdSrc in N. apply (C _ N). trivial.
+    split; assumption. }
   eapply list_match_stackframes_replace_externs; try eassumption.
     intros.
       unfold DomSrc. 
@@ -1506,7 +1394,9 @@ split.
         (frgnBlocksSrc_locBlocksSrc _ WDnu' _ H); simpl.
       apply REACH_nil. unfold exportedSrc.
          rewrite (frgnSrc_shared _ WDnu' _ H). intuition.
-
+split. clear - RDO1 RDO2 MRR FwdSrc FwdTgt. destruct MRR.
+  split; eapply mem_respects_readonly_forward'; try eassumption. 
+clear MRR (*MRR'*).
 unfold vis in *.
 rewrite replace_externs_locBlocksSrc, replace_externs_frgnBlocksSrc,
         replace_externs_as_inj in *.
@@ -1635,7 +1525,7 @@ destruct MTCH as [MSTATE PRE]; inv MSTATE; try (inv PC; try congruence).
   intuition. }
 
 { (* Iop *)
-  destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
+  destruct PRE as [MRR [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
   assert (PGR: meminj_preserves_globals ge (as_inj (restrict_sm mu (vis mu)))).
     eapply restrict_sm_preserves_globals; try eassumption.
       unfold vis. intuition.
@@ -1714,7 +1604,7 @@ destruct MTCH as [MSTATE PRE]; inv MSTATE; try (inv PC; try congruence).
   intuition. }
 
 { (* Iload *)
-  destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
+  destruct PRE as [MRR [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
   assert (PGR: meminj_preserves_globals ge (as_inj (restrict_sm mu (vis mu)))).
     eapply restrict_sm_preserves_globals; try eassumption.
       unfold vis. intuition.
@@ -1804,7 +1694,7 @@ destruct MTCH as [MSTATE PRE]; inv MSTATE; try (inv PC; try congruence).
   intuition. }
 
 { (* Istore *)
-  destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
+  destruct PRE as [MRR [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
   assert (PGR: meminj_preserves_globals ge (as_inj (restrict_sm mu (vis mu)))).
     eapply restrict_sm_preserves_globals; try eassumption.
       unfold vis. intuition.
@@ -1858,6 +1748,7 @@ destruct MTCH as [MSTATE PRE]; inv MSTATE; try (inv PC; try congruence).
      apply restrict_incr.
   intros [m2'' [ST'' Minj2'']].
   rewrite ST' in ST''. apply eq_sym in ST''; inv ST''.
+  destruct MRR as [MRR1 MRR2].
   intuition. 
       apply intern_incr_refl. 
       apply gsep_refl.
@@ -1871,6 +1762,14 @@ destruct MTCH as [MSTATE PRE]; inv MSTATE; try (inv PC; try congruence).
     unfold transfer; rewrite H. auto. 
     eapply mem_match_approx_store; eauto.
     exists spb, spb'; intuition.
+  split. destruct a; inv H1. destruct a'; inv ST'.
+    split; eapply mem_respects_readonly_forward; try eassumption.
+      eapply store_forward; eassumption.
+      intros; eapply store_readonly; try eassumption. eapply MRR1; eassumption.
+
+      eapply store_forward; eassumption.
+      intros; eapply store_readonly; try eassumption. eapply MRR2; eassumption.
+      
   intuition.
   destruct a; inv H1.
         eapply REACH_Store; try eassumption. 
@@ -1884,7 +1783,7 @@ destruct MTCH as [MSTATE PRE]; inv MSTATE; try (inv PC; try congruence).
    eapply StoreEffect_PropagateLeft; eassumption. }
 
 { (* Icall *)
-  destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
+  destruct PRE as [MRR [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
   rename pc'0 into pc.
   exploit transf_ros_correct; eauto. 
     apply restrict_GFP_vis; trivial.
@@ -1894,6 +1793,7 @@ destruct MTCH as [MSTATE PRE]; inv MSTATE; try (inv PC; try congruence).
   left. eapply effstep_plus_one.
     eapply rtl_effstep_exec_Icall; eauto.
       apply sig_function_translated; auto.
+  destruct MRR as [MRR1 MRR2].
   intuition. 
       apply intern_incr_refl. 
       apply gsep_refl.
@@ -1911,7 +1811,7 @@ destruct MTCH as [MSTATE PRE]; inv MSTATE; try (inv PC; try congruence).
   intuition. } 
 
 { (* Itailcall *)
-  destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
+  destruct PRE as [MRR [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
   destruct SP as [spb [spb' [SP [SP' locSP]]]]. inv SP.
   exploit free_parallel_inject; try eapply MEM. 
      eassumption.
@@ -1936,6 +1836,7 @@ destruct MTCH as [MSTATE PRE]; inv MSTATE; try (inv PC; try congruence).
          split; intros;
            eapply Mem.valid_block_free_1; try eassumption;
            eapply SMV; assumption.
+  destruct MRR as [MRR1 MRR2].
   intuition.
     apply intern_incr_refl. 
     apply gsep_refl.
@@ -1948,6 +1849,13 @@ destruct MTCH as [MSTATE PRE]; inv MSTATE; try (inv PC; try congruence).
     constructor; auto.  
     eapply mem_match_approx_free; eauto.
     apply regs_inject_regs; auto.
+  split.
+    split; eapply mem_respects_readonly_forward; try eassumption.
+      eapply free_forward; eassumption.
+      intros; eapply free_readonly; try eassumption. eapply MRR1; eassumption.
+
+      eapply free_forward; eassumption.
+      intros; eapply free_readonly; try eassumption. eapply MRR2; eassumption.
   intuition.
     eapply REACH_closed_free; eassumption.
     apply FreeEffectD in H3. destruct H3 as [? [VB Arith2]]; subst.
@@ -1959,7 +1867,7 @@ destruct MTCH as [MSTATE PRE]; inv MSTATE; try (inv PC; try congruence).
         eapply local_of_vis; eassumption. } 
 
 { (* Ibuiltin *)
-  destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
+  destruct PRE as [MRR [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
   rename pc'0 into pc.
 Opaque builtin_strength_reduction.
   exploit builtin_strength_reduction_correct; eauto. 
@@ -1988,6 +1896,7 @@ Opaque builtin_strength_reduction.
     (* exact symbols_preserved. exact varinfo_preserved.*)
   split; trivial.
   split. eapply gsep_domain_eq. eassumption. apply GDE_lemma.
+  destruct MRR as [MRR1 MRR2].
   intuition.
   { (*MATCH*) 
     split.
@@ -2002,6 +1911,13 @@ Opaque builtin_strength_reduction.
       eapply inject_restrict; eassumption.
       destruct SP as [spb [spb' [SP [SP' locSP]]]].
         exists spb, spb'; intuition. eapply INCR; eassumption.
+    split.
+      split; eapply mem_respects_readonly_forward; try eassumption.
+        eapply external_call_mem_forward; eassumption.
+        intros; eapply external_call_readonly; try eassumption. eapply MRR1; eassumption.
+
+        eapply external_call_mem_forward; eassumption.
+        intros; eapply external_call_readonly; try eassumption. eapply MRR2; eassumption.
     intuition.
     apply intern_incr_as_inj in INCR; trivial.
       apply sm_inject_separated_mem in SEPARATED; trivial.
@@ -2036,7 +1952,7 @@ Opaque builtin_strength_reduction.
   exact symbols_preserved. exact varinfo_preserved.*) }
 
 { (* Icond, preserved *)
-  destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
+  destruct PRE as [MRR [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
   rename pc'0 into pc. TransfInstr.
   generalize (cond_strength_reduction_correct ge sp (analyze gapp f)#pc rs m
                     MATCH2 cond args (approx_regs (analyze gapp f) # pc args) (refl_equal _)).
@@ -2058,6 +1974,7 @@ Opaque builtin_strength_reduction.
       intros.       
       eapply rtl_effstep_exec_Icond; eauto.
       (*WAS: eapply eval_condition_lessdef with (vl1 := rs##args'); eauto. eapply regs_lessdef_regs; eauto. congruence.*)
+  destruct MRR as [MRR1 MRR2].
   intuition. 
       apply intern_incr_refl. 
       apply gsep_refl.
@@ -2072,7 +1989,7 @@ Opaque builtin_strength_reduction.
   intuition. }
 
 { (* Icond, skipped over *)
-  destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
+  destruct PRE as [MRR [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
   rewrite H1 in H; inv H. 
   assert (EV: eval_condition cond rs ## args m = Some b0).
     eapply eval_static_condition_correct; eauto. eapply approx_regs_val_list; eauto.
@@ -2083,6 +2000,7 @@ Opaque builtin_strength_reduction.
   intros EV'.       
   eexists n; eexists; eexists; exists mu; eexists; split.
   right; split. eapply effstep_star_zero. omega.
+  destruct MRR as [MRR1 MRR2].
   intuition. 
     apply intern_incr_refl. 
     apply gsep_refl.
@@ -2098,7 +2016,7 @@ Opaque builtin_strength_reduction.
   intuition. } 
 
 { (* Ijumptable *)
-  destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
+  destruct PRE as [MRR [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
   rename pc'0 into pc.
   assert (A: (fn_code (transf_function gapp f))!pc = Some(Ijumptable arg tbl)
              \/ (fn_code (transf_function gapp f))!pc = Some(Inop pc')).
@@ -2113,6 +2031,7 @@ Opaque builtin_strength_reduction.
           eapply rtl_effstep_exec_Ijumptable; eauto.
           eapply rtl_effstep_exec_Inop; eauto.
   clear A.
+  destruct MRR as [MRR1 MRR2].
   intuition. 
     apply intern_incr_refl. 
     apply gsep_refl.
@@ -2127,7 +2046,7 @@ Opaque builtin_strength_reduction.
   intuition. }
 
 { (* Ireturn *)
-  destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
+  destruct PRE as [MRR [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
 
   (*WAS:exploit Mem.free_parallel_extends; eauto. intros [m2' [A B]].*)
   assert (MInjR : Mem.inject (restrict (as_inj mu) (vis mu)) m m2).
@@ -2146,6 +2065,7 @@ Opaque builtin_strength_reduction.
   exists O, (RTL_Returnstate s' (regmap_optget or Vundef rs')), m'', mu; eexists; split.
   left. eapply effstep_plus_one. 
      eapply rtl_effstep_exec_Ireturn; eauto. TransfInstr; auto.
+  destruct MRR as [MRR1 MRR2].
   intuition. 
     apply intern_incr_refl. 
     apply gsep_refl.
@@ -2158,6 +2078,13 @@ Opaque builtin_strength_reduction.
     constructor; auto.
     eapply mem_match_approx_free; eauto.
     destruct or; simpl; auto.
+  split.
+      split; eapply mem_respects_readonly_forward; try eassumption.
+        eapply free_forward; eassumption.
+        intros; eapply free_readonly; try eassumption. eapply MRR1; eassumption.
+
+        eapply free_forward; eassumption.
+        intros; eapply free_readonly; try eassumption. eapply MRR2; eassumption.
   intuition.
     eapply REACH_closed_free; eassumption.
     eapply free_free_inject; try eassumption.
@@ -2174,7 +2101,7 @@ Opaque builtin_strength_reduction.
 { (* internal function *)
   (*WAS: exploit Mem.alloc_extends. eauto. eauto. apply Zle_refl. apply Zle_refl.
   intros [m2' [A B]].*)
-  destruct PRE as [RC [PG [GFP [Glob [SMV [WD INJ]]]]]].
+  destruct PRE as [MRR [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]].
   assert (PGR: meminj_preserves_globals ge (restrict (as_inj mu) (vis mu))).
         rewrite <- restrict_sm_all.
         eapply restrict_sm_preserves_globals; try eassumption.
@@ -2186,6 +2113,7 @@ Opaque builtin_strength_reduction.
   exists O; eexists; eexists; exists mu'; eexists; split.
   left. eapply effstep_plus_one. 
     eapply rtl_effstep_exec_function_internal; simpl; eauto.
+  destruct MRR as [MRR1 MRR2].
   intuition.
   eapply gsep_domain_eq. eapply intern_incr_globals_separate; eauto.
                          apply GDE_lemma.
@@ -2208,6 +2136,13 @@ Opaque builtin_strength_reduction.
         destruct (as_inj_DomRng _ _ _ _ EXT WD) as [DS DT].
         exfalso. eapply (Mem.fresh_block_alloc _ _ _ _ _ H).
         apply SMV. apply DS.
+    split.
+      split; eapply mem_respects_readonly_forward; try eassumption.
+        eapply alloc_forward; eassumption.
+        intros; eapply alloc_readonly; try eassumption. eapply MRR1; eassumption.
+
+        eapply alloc_forward; eassumption.
+        intros; eapply alloc_readonly; try eassumption. eapply MRR2; eassumption.
     intuition.
     eapply meminj_preserves_incr_sep_vb with (m0:=m)(tm:=m2). eapply PG.
       intros. apply as_inj_DomRng in H1.
@@ -2232,7 +2167,7 @@ Opaque builtin_strength_reduction.
   eapply mem_match_approx_extcall; eauto.*)
 
 { (*external function - helpers*)
-  destruct PRE as [RC [PG [GFP [Glob [SMV [WD MINJ]]]]]].
+  destruct PRE as [MRR [RC [PG [GFP [Glob [SMV [WD MINJ]]]]]]].
   assert (PGR: meminj_preserves_globals ge (restrict (as_inj mu) (vis mu))).
         rewrite <- restrict_sm_all.
         eapply restrict_sm_preserves_globals; try eassumption.
@@ -2250,12 +2185,19 @@ Opaque builtin_strength_reduction.
   split; trivial.
   split.
   { (*MATCH*)
+     destruct MRR as [MRR1 MRR2].
      split; intuition.
        constructor; auto.
          eapply mem_match_approx_extcall; eauto.
          eapply list_match_stackframes_intern_incr; eassumption.
          eapply inject_restrict; eassumption.
          eapply list_match_stackframes_intern_incr; eassumption.
+       eapply mem_respects_readonly_forward; try eassumption.
+         eapply external_call_mem_forward; eassumption.
+         intros; eapply external_call_readonly; try eassumption. eapply MRR1; eassumption.
+       eapply mem_respects_readonly_forward; try eassumption.
+         eapply external_call_mem_forward; eassumption.
+         intros; eapply external_call_readonly; try eassumption. eapply MRR2; eassumption.
        eapply meminj_preserves_incr_sep_vb with (m0:=m)(tm:=m2). eapply PG.
          intros. apply as_inj_DomRng in H1.
               split; eapply SMV; eapply H1.
@@ -2321,15 +2263,12 @@ econstructor.
   exists U2. 
   split. assumption. intros. apply HH. eassumption. }
 { (*halted*) 
-  intros. destruct H as [MC [RC [PG [GFP [GF [VAL [WD INJ]]]]]]]. 
+  intros. destruct H as [MC [MRR [RC [PG [GFP [GF [VAL [WD INJ]]]]]]]]. 
     destruct c1; inv H0. destruct stack; inv H1.
-    inv MC. inv H5. exists v'.
-    split. assumption.
-    split. assumption.
-    simpl. trivial. }
+    inv MC. inv H5. exists v'. intuition. }
 { (*atExternal*)
    apply MATCH_atExternal. }
-{ (*afterExternal*) 
+{ (*afterExternal*)
   intros.
    eapply MATCH_afterExternal; try apply MemInjMu; try eassumption. }
 Qed.

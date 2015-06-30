@@ -726,9 +726,11 @@ Definition mem_add_acc_old (j k:meminj) (m1' m2:mem):=
        end)
     else (m1'.(Mem.mem_access) !! (b2 - m2.(Mem.nextblock))%positive) ofs2 kind.
 
-Definition mem_add_acc nu12 nu23 (j12' :meminj) (m1 m1' m2 : mem) :=
+Definition mem_add_acc nu12 nu23 (j12' :meminj) (m1 m1' m2 : mem) (B:block -> bool) :=
   fun b2 ofs2 k =>
-         if valid_dec m2 b2 then 
+       if valid_dec m2 b2 then 
+(*         if Mem.perm_dec m2 b2 ofs2 Max Writable then*)
+         if B b2 then PMap.get b2 m2.(Mem.mem_access) ofs2 k else
            if (locBlocksSrc nu23 b2) then
              if (pubBlocksSrc nu23 b2) then
                match source (local_of nu12) m1 b2 ofs2 with
@@ -745,14 +747,17 @@ Definition mem_add_acc nu12 nu23 (j12' :meminj) (m1 m1' m2 : mem) :=
                               | Some (b3,d3) =>  None (* This shouldn't happen by full_comp *)
                             end
                 end
-         else match source j12' m1' b2 ofs2 with 
+(*         else PMap.get b2 m2.(Mem.mem_access) ofs2 k*)
+       else match source j12' m1' b2 ofs2 with 
                   Some(b1,ofs1) => PMap.get b1 m1'.(Mem.mem_access) ofs1 k
                 | None =>  None
               end.
 
-Definition mem_add_acc' nu12 nu23 (j12' :meminj) (m1 m1' m2 : mem) :=
+Definition mem_add_acc' nu12 nu23 (j12' :meminj) (m1 m1' m2 : mem) (B:block -> bool) :=
   fun b2 ofs2 =>
-         if valid_dec m2 b2 then 
+       if valid_dec m2 b2 then 
+(*         if Mem.perm_dec m2 b2 ofs2 Max Writable then*)
+         if B b2 then PMap.get b2 m2.(Mem.mem_access) ofs2 else
            if (locBlocksSrc nu23 b2) then
              if (pubBlocksSrc nu23 b2) then
                match source (local_of nu12) m1 b2 ofs2 with
@@ -769,7 +774,8 @@ Definition mem_add_acc' nu12 nu23 (j12' :meminj) (m1 m1' m2 : mem) :=
                               | Some (b3,d3) =>  fun k =>None 
                             end
                 end
-         else match source j12' m1' b2 ofs2 with 
+(*         else PMap.get b2 m2.(Mem.mem_access) ofs2*)
+       else match source j12' m1' b2 ofs2 with 
                   Some(b1,ofs1) => fun k =>PMap.get b1 m1'.(Mem.mem_access) ofs1 k
                 | None =>  fun k => None
               end.
@@ -781,11 +787,14 @@ Lemma mem_add_acc_equiv: mem_add_acc = mem_add_acc'.
   extensionality m1;
   extensionality m1';
   extensionality m2;
+  extensionality B;
   extensionality b2;
   extensionality of2;
   extensionality k.
   unfold mem_add_acc', mem_add_acc.
   destruct (valid_dec m2 b2).
+(*  destruct (Mem.perm_dec m2 b2 of2 Max Writable); trivial. rename p into PWR.*)
+  destruct (B b2); trivial. 
   destruct (locBlocksSrc nu23 b2).
   destruct (pubBlocksSrc nu23 b2); trivial.
   destruct (source (local_of nu12) m1 b2 of2); trivial.
@@ -799,18 +808,20 @@ Lemma mem_add_acc_equiv: mem_add_acc = mem_add_acc'.
 Qed.
 
 Lemma mem_add_acc_cases: 
-  forall nu12 nu23 (j12' :meminj) (m1 m1' m2 : mem),
+  forall nu12 nu23 (j12' :meminj) (m1 m1' m2 : mem) B,
     forall b ofs,
-      (mem_add_acc nu12 nu23 j12' m1 m1' m2 b ofs = PMap.get b m2.(Mem.mem_access) ofs) \/
-      (mem_add_acc nu12 nu23 j12' m1 m1' m2 b ofs = fun _ => None) \/
+      (mem_add_acc nu12 nu23 j12' m1 m1' m2 B b ofs = PMap.get b m2.(Mem.mem_access) ofs) \/
+      (mem_add_acc nu12 nu23 j12' m1 m1' m2 B b ofs = fun _ => None) \/
       (exists b1 ofs1,
-         mem_add_acc nu12 nu23 j12' m1 m1' m2 b ofs = PMap.get b1 m1'.(Mem.mem_access) ofs1).
+         mem_add_acc nu12 nu23 j12' m1 m1' m2 B b ofs = PMap.get b1 m1'.(Mem.mem_access) ofs1).
       
       intros.
       rewrite mem_add_acc_equiv.
-      remember (mem_add_acc' nu12 nu23 j12' m1 m1' m2 b ofs) as f.
+      remember (mem_add_acc' nu12 nu23 j12' m1 m1' m2 B b ofs) as f.
       unfold mem_add_acc' in Heqf.
   destruct (valid_dec m2 b).
+(*  destruct (Mem.perm_dec m2 b ofs Max Writable). rename p into PWR.*)
+  destruct (B b). left; trivial.
   destruct (locBlocksSrc nu23 b).
   destruct (pubBlocksSrc nu23 b).
   destruct (source (local_of nu12) m1 b ofs).
@@ -826,6 +837,7 @@ Lemma mem_add_acc_cases:
   destruct p.
   { right; left; trivial. }
   { left; subst; extensionality k; auto. }
+(*  left; trivial.*)
   destruct (source j12' m1' b ofs).
   destruct p as [b1 ofs1].
   { right; right; subst; exists b1, ofs1; extensionality k; auto. }
@@ -892,10 +904,12 @@ Definition mem_add_cont' (j k:meminj)(f:meminj) (m1' m2:mem):=
        end)
     else inject_memval j (ZMap.get ofs2 (m1'.(Mem.mem_contents) !! (b2 - m2.(Mem.nextblock)))).
 
-Definition mem_add_cont nu12 nu23 (j12' :meminj) (m1 m1' m2 : mem) :=
-  let j12 := as_inj nu12 in
-  fun b2 ofs2 =>
-    if valid_dec m2 b2 then 
+Definition mem_add_cont nu12 nu23 (j12' :meminj) (m1 m1' m2 : mem) (B:block -> bool) :=
+let j12 := as_inj nu12 in
+fun b2 ofs2 =>
+  if valid_dec m2 b2 then 
+    (*if Mem.perm_dec m2 b2 ofs2 Max Writable then*)
+    if B b2 then ZMap.get ofs2 (m2.(Mem.mem_contents) !! b2) else
       if (locBlocksSrc nu23 b2) then
         if (pubBlocksSrc nu23 b2) then
           match source (local_of nu12) m1 b2 ofs2 with
@@ -915,7 +929,8 @@ Definition mem_add_cont nu12 nu23 (j12' :meminj) (m1 m1' m2 : mem) :=
               | Some (b3,d3) =>  Undef (* This shouldn't happen by full_comp *)
             end
         end
-    else 
+    (*else ZMap.get ofs2 ( m2.(Mem.mem_contents) !! b2)*)
+  else
       match source j12' m1' b2 ofs2 with 
         | Some(b1,ofs1) => inject_memval j12' (ZMap.get ofs1 (PMap.get b1 m1'.(Mem.mem_contents)))
         | None =>  (*Undef*) ZMap.get ofs2 (fst (Mem.mem_contents m2))
@@ -927,13 +942,13 @@ Definition mi_mappedblocks f m2 := forall (b b' : block) (delta : Z),
 Definition mi_mappedblocks' f N2 := forall (b b' : block) (delta : Z),
                                f b = Some (b', delta) -> Plt b' N2.
 
-Lemma finite_acc: forall nu12 nu23 j12' m1 m1' m2
+Lemma finite_acc: forall nu12 nu23 j12' m1 m1' m2 B
                     (finite12: mi_mappedblocks (as_inj nu12) m2)
                     (finite12': mi_mappedblocks' j12' (mem_add_nb m1' m2))
                   (SMWD12: SM_wd nu12),
                   forall n : positive,
                     (n >= mem_add_nb m1' m2)%positive ->
-                    mem_add_acc nu12 nu23 j12' m1 m1' m2 n = (fun _ _ => None).
+                    mem_add_acc nu12 nu23 j12' m1 m1' m2 B n = (fun _ _ => None).
   intros.
   extensionality x; extensionality k; unfold mem_add_acc.
   assert (sour: source (as_inj nu12) m1 n x = None).
@@ -978,32 +993,32 @@ Lemma finite_acc: forall nu12 nu23 j12' m1 m1' m2
   rewrite HH.
   (*Do the cases*)
   destruct (valid_dec m2 n); trivial. 
-  destruct (locBlocksSrc nu23 n), (pubBlocksSrc nu23), (as_inj nu23 n); 
+  destruct (B n),(*(Mem.perm_dec m2 n x Max Writable),*) (locBlocksSrc nu23 n), (pubBlocksSrc nu23), (as_inj nu23 n); 
     try destruct p; trivial.
 Qed.
 
 Lemma acc_construct :
-  forall nu12 nu23 j12' m1 m1' m2
+  forall nu12 nu23 j12' m1 m1' m2 B
          (finite12: mi_mappedblocks (as_inj nu12) m2)
          (finite12': mi_mappedblocks' j12' (mem_add_nb m1' m2))
          (SMWD12: SM_wd nu12),
   exists mem_access:PMap.t (Z -> perm_kind -> option permission),
-    (forall b, mem_access !! b = mem_add_acc nu12 nu23 j12' m1 m1' m2 b) /\
+    (forall b, mem_access !! b = mem_add_acc nu12 nu23 j12' m1 m1' m2 B b) /\
     (forall (b : positive) (ofs : Z),  Mem.perm_order'' (mem_access !! b ofs Max)
                                                         (mem_access !! b ofs Cur)) /\
     (forall (b : positive) (ofs : Z) (k : perm_kind),
                          ~ Plt b (mem_add_nb m1' m2) -> mem_access !! b ofs k = None).
   intros. 
-  remember (finite_acc _ nu23 _ m1 _ _ finite12 finite12' SMWD12) as finite_proof.
+  remember (finite_acc _ nu23 _ m1 _ _ B finite12 finite12' SMWD12) as finite_proof.
   destruct (pmap_construct _                                       (*A*)
-                           (mem_add_acc nu12 nu23 j12' m1 m1' m2)  (*f*)
+                           (mem_add_acc nu12 nu23 j12' m1 m1' m2 B)  (*f*)
                            (mem_add_nb m1' m2)                     (*hi*)
                            (fun _ _ => None)                       (*dfl*)
                            (finite_proof))                         (*proof*)
   as [mem_access property].
   exists mem_access; intuition.
   + rewrite property;
-    destruct (mem_add_acc_cases nu12 nu23 j12' m1 m1' m2 b ofs) as 
+    destruct (mem_add_acc_cases nu12 nu23 j12' m1 m1' m2 B b ofs) as 
         [caseM2 | [caseNone | [b1 [ofs1 caseM1']]]].
     - rewrite caseM2. apply m2.
     - rewrite caseNone; unfold Mem.perm_order''; trivial.
@@ -1119,14 +1134,14 @@ Lemma delta_superbound: forall (j:meminj) N,
         xomega.
  Qed.
            
-Lemma finite_cont_perblock: forall nu12 nu23 j12' m1 m1' m2 
+Lemma finite_cont_perblock: forall nu12 nu23 j12' m1 m1' m2 B
                                    (SMWD12: SM_wd nu12)
                               (INCR: inject_incr (as_inj nu12) j12'),
                           forall b,
                    sigT ( fun lo => 
                             sigT (fun hi =>
                      forall z : Z, z < lo \/ z > hi -> 
-                                   mem_add_cont nu12 nu23 j12' m1 m1' m2 b z = Undef)).
+                                   mem_add_cont nu12 nu23 j12' m1 m1' m2 B b z = Undef)).
   intros.
   destruct (block_content_superbound m1') as [lo1 [hi1 bound1]].
   destruct (delta_superbound  j12' (Pos.max (Mem.nextblock m1) (Mem.nextblock m1'))) 
@@ -1142,7 +1157,10 @@ Lemma finite_cont_perblock: forall nu12 nu23 j12' m1 m1' m2
   rewrite HH.
   (*Now do the cases *)
   destruct (valid_dec m2 b).
-  + destruct (locBlocksSrc nu23 b). 
+  + (*destruct (Mem.perm_dec m2 b z Max Writable); trivial.
+    rename p into PWR.*)
+    destruct (B b); trivial. 
+    destruct (locBlocksSrc nu23 b). 
     - destruct (pubBlocksSrc nu23 b); trivial.
       destruct (source (local_of nu12) m1 b z) eqn:sour12; trivial.
       destruct p; destruct (pubBlocksSrc nu12 b0); trivial.
@@ -1170,7 +1188,7 @@ Lemma finite_cont_perblock: forall nu12 nu23 j12' m1 m1' m2
         apply boundd in jmap'; auto; destruct jmap'.
         apply bound1. destruct H; [left | right]; xomega.
         apply Pos.max_lt_iff; auto. }
-      rewrite H0; auto.
+      rewrite H0; auto. 
   + destruct (source j12' m1' b z) eqn:sour; trivial.
     - destruct p.
       assert (ZMap.get z0 (Mem.mem_contents m1') !! b0 = Undef).
@@ -1190,16 +1208,16 @@ Lemma finite_cont_perblock: forall nu12 nu23 j12' m1 m1' m2
 Qed.
 
 Lemma cont_construct_perblock: 
-  forall nu12 nu23 j12' m1 m1' m2 (SMWD12: SM_wd nu12) (INCR: inject_incr (as_inj nu12) j12'),
+  forall nu12 nu23 j12' m1 m1' m2 B (SMWD12: SM_wd nu12) (INCR: inject_incr (as_inj nu12) j12'),
   forall b,
   sigT (fun mem_contents_block: ZMap.t memval =>
-    (forall ofs, ZMap.get ofs mem_contents_block = mem_add_cont nu12 nu23 j12' m1 m1' m2 b ofs) /\
+    (forall ofs, ZMap.get ofs mem_contents_block = mem_add_cont nu12 nu23 j12' m1 m1' m2 B b ofs) /\
     (fst mem_contents_block = Undef)) .
   intros.
-  destruct (finite_cont_perblock _ nu23 j12' m1 m1' m2 SMWD12 INCR b) as [lo [hi finite_proof]].
+  destruct (finite_cont_perblock _ nu23 j12' m1 m1' m2 B SMWD12 INCR b) as [lo [hi finite_proof]].
   destruct (zmap_construct_type 
                            _                                         (*A*)
-                           (mem_add_cont nu12 nu23 j12' m1 m1' m2 b) (*f*)
+                           (mem_add_cont nu12 nu23 j12' m1 m1' m2 B b) (*f*)
                            (lo)                                      (*lo*)
                            (hi)                                      (*hi*)
                            (Undef)                                   (*dfl*)
@@ -1211,14 +1229,14 @@ Lemma cont_construct_perblock:
   rewrite property; apply finite_proof; xomega.
 Qed.
 
-Lemma finite_cont: forall nu12 nu23 j12' m1 m1' m2
+Lemma finite_cont: forall nu12 nu23 j12' m1 m1' m2 B
                     (finite12: mi_mappedblocks (as_inj nu12) m2)
                     (finite12': mi_mappedblocks' j12' (mem_add_nb m1' m2))
                   (SMWD12: SM_wd nu12),
                    exists N,
                   forall n : positive,
                     (n >= Pmax (mem_add_nb m1' m2) N )%positive ->
-                    mem_add_cont nu12 nu23 j12' m1 m1' m2 n = 
+                    mem_add_cont nu12 nu23 j12' m1 m1' m2 B n = 
                     (fun z => ZMap.get z (fst (Mem.mem_contents m2))) .
   intros.
   destruct (pmap_finite _ (Mem.mem_contents m2)) as [N bound]; exists N.
@@ -1262,6 +1280,9 @@ Lemma finite_cont: forall nu12 nu23 j12' m1 m1' m2
   
   rewrite sour, sour12', sour_loc, bound.
   { destruct (valid_dec m2 n); trivial.
+    (*destruct (Mem.perm_dec m2 n x Max Writable); trivial.
+    rename p into PWR.*)
+    destruct (B n); trivial.
     destruct (locBlocksSrc nu23 n).
     + destruct (pubBlocksSrc nu23 n); trivial.
     + destruct (as_inj nu23 n) eqn:map23; trivial.
@@ -1285,7 +1306,7 @@ Lemma try: forall A B (P: A -> B -> Prop),
 Qed.
 
 Lemma cont_construct_step1: 
-  forall nu12 nu23 j12' m1 m1' m2 
+  forall nu12 nu23 j12' m1 m1' m2 B
          (finite12: mi_mappedblocks (as_inj nu12) m2)
          (finite12': mi_mappedblocks' j12' (mem_add_nb m1' m2))
          (SMWD12: SM_wd nu12)
@@ -1293,18 +1314,18 @@ Lemma cont_construct_step1:
   exists mem_contents: block -> (ZMap.t memval),
   (forall b ofs,
     (ZMap.get ofs (mem_contents b) = 
-                 mem_add_cont nu12 nu23 j12' m1 m1' m2 b ofs) /\
+                 mem_add_cont nu12 nu23 j12' m1 m1' m2 B b ofs) /\
     (fst (mem_contents b) = Undef))  .
   intros.
   remember (fun b M => forall  (ofs : ZIndexed.t),
      ZMap.get ofs M =
-     mem_add_cont nu12 nu23 j12' m1 m1' m2 b ofs /\
+     mem_add_cont nu12 nu23 j12' m1 m1' m2 B b ofs /\
      fst M = Undef) as P.
   cut (exists f, forall b, (P b (f b))).
   { subst P; intros. destruct H. exists x. exact H. }
   { apply try. intros. 
-  destruct (finite_cont_perblock _ nu23 j12' m1 m1' m2 SMWD12 INCR b) as [hi [lo finite_block']].
-  destruct (cont_construct_perblock nu12 nu23 j12' m1 m1' m2 SMWD12 INCR b) as 
+  destruct (finite_cont_perblock _ nu23 j12' m1 m1' m2 B SMWD12 INCR b) as [hi [lo finite_block']].
+  destruct (cont_construct_perblock nu12 nu23 j12' m1 m1' m2 B SMWD12 INCR b) as 
       [block_content [cont_property dfl_property]].
   exists block_content.
   subst P. intros; split.
@@ -1313,7 +1334,7 @@ Lemma cont_construct_step1:
 Qed.
 
 Lemma cont_construct: 
-  forall nu12 nu23 j12' m1 m1' m2 
+  forall nu12 nu23 j12' m1 m1' m2 B
          (finite12: mi_mappedblocks (as_inj nu12) m2)
          (finite12': mi_mappedblocks' j12' (mem_add_nb m1' m2))
          (SMWD12: SM_wd nu12)
@@ -1321,12 +1342,12 @@ Lemma cont_construct:
     
   exists mem_contents: PMap.t (ZMap.t memval),
     (forall b ofs, ZMap.get ofs (mem_contents !! b) = 
-                 mem_add_cont nu12 nu23 j12' m1 m1' m2 b ofs) /\
+                 mem_add_cont nu12 nu23 j12' m1 m1' m2 B b ofs) /\
     (forall b, fst (mem_contents !! b) = Undef).
-  intros. destruct (cont_construct_step1 _ nu23 _ m1 _ _ finite12 finite12' SMWD12 INCR) 
+  intros. destruct (cont_construct_step1 _ nu23 _ m1 _ _ B finite12 finite12' SMWD12 INCR) 
           as [mem_contents_f' prop].
   remember ( fst (Mem.mem_contents m2)) as dfl.
-  destruct (finite_cont _ nu23 _ m1 _ _ finite12 finite12' SMWD12) as [N finite_proof].
+  destruct (finite_cont _ nu23 _ m1 _ _ B finite12 finite12' SMWD12) as [N finite_proof].
   remember (Pos.max (mem_add_nb m1' m2) N)%positive as hi.
   remember (fun n => match (n ?= hi)%positive with
                          | Eq | Gt => dfl
@@ -1358,25 +1379,25 @@ Lemma cont_construct:
 Qed.
 
 Lemma mem_interpolation:
-  forall (nu12 nu23:SM_Injection)(j12':meminj) (m1 m1' m2 m3: mem)
+  forall (nu12 nu23:SM_Injection)(j12':meminj) (m1 m1' m2 m3: mem) B
     (finite12: mi_mappedblocks (as_inj nu12) m2)
       (finite12': mi_mappedblocks' j12' (mem_add_nb m1' m2))
       (SMWD12: SM_wd nu12)
       (INCR: inject_incr (as_inj nu12) j12'),
     exists m3, (forall b ofs, ZMap.get ofs (Mem.mem_contents m3) !! b = 
-                                   mem_add_cont nu12 nu23 j12' m1 m1' m2 b ofs) /\
+                                   mem_add_cont nu12 nu23 j12' m1 m1' m2 B b ofs) /\
                     (forall b, (Mem.mem_access m3) !! b = 
-                               mem_add_acc nu12 nu23 j12' m1 m1' m2 b) /\  
+                               mem_add_acc nu12 nu23 j12' m1 m1' m2 B b) /\  
                     (Mem.nextblock m3 = mem_add_nb m1' m2).
 Proof.
   intros.
 
   (*Access*)
-  destruct (acc_construct nu12 nu23 j12' m1 m1' m2 finite12 finite12' SMWD12) as
+  destruct (acc_construct nu12 nu23 j12' m1 m1' m2 B finite12 finite12' SMWD12) as
       [mem_access [property_acc [access_max nextblock_noaccess]]].
    
   (*Content*)
-  destruct (cont_construct nu12 nu23 j12' m1 m1' m2 finite12 finite12' SMWD12 INCR) as
+  destruct (cont_construct nu12 nu23 j12' m1 m1' m2 B finite12 finite12' SMWD12 INCR) as
       [mem_contents [property_cont contents_default]].
 
   exists (Mem.mkmem mem_contents 
