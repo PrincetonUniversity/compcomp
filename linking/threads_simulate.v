@@ -75,13 +75,12 @@ move=> INV SAFE n; move: mu c m d tm z INV SAFE; elim: n.
       { admit. }
       case: (ThreadInv.krun_inv INV (Ordinal tid0_lt_pf) getS).
       move=> d0 []getT []cd MATCH.
-      have [d'0 [tm' [n1 [T [mu' [tstep0 [tcant [MATCH' incr]]]]]]]]:
+      have [d'0 [tm' [n1 [T [mu' [tstep0 [tcant MATCH']]]]]]]:
         exists d'0 tm' n1 T mu',
           effstepN (Modsem.sem semT) (Modsem.ge semT) n1.+1 T
                    d0 tm d'0 tm'
           /\ cant_step (Modsem.sem semT) d'0
-          /\ match_state sim cd mu' c'0 m' d'0 tm'
-          /\ intern_incr mu mu'. 
+          /\ match_state sim cd mu' c'0 m' d'0 tm'.
       { admit. }
       set (c' := updThread c
                  (Ordinal (n:=num_threads c) (m:=schedule (counter c)) tid0_lt_pf) 
@@ -102,7 +101,37 @@ move=> INV SAFE n; move: mu c m d tm z INV SAFE; elim: n.
       { admit. (*dependent types*) }
       { by apply: effstepN_corestepN. }
     }
-    admit.
+    { 
+      set (c' := schedNext (updThread c
+                  (Ordinal (n:=num_threads c) (m:=schedule (counter c))
+                     tid0_lt_pf) (Kstage ef args c0))) in *.
+      case: (ThreadInv.krun_inv INV _ H)=> d0 []H' []cd MATCH.
+      case: (core_at_external sim cd mu _ _ _ _ MATCH H0)=> inj []args2.
+      case=> hfor []at2 H2. 
+      have tid1_lt_pf: schedule (counter d) < num_threads d.
+      { admit. }
+      set (d' := schedNext (updThread d
+                  (Ordinal (n:=num_threads d) (m:=schedule (counter d))
+                     tid1_lt_pf) (Kstage ef args2 d0))) in *.
+      set (pubSrc' :=
+             (fun b : block =>
+                locBlocksSrc mu b && REACH m' (exportedSrc mu args) b)) in *.
+      set (pubTgt' :=
+             (fun b : block =>
+                   locBlocksTgt mu b && REACH tm (exportedTgt mu args2) b)) in *.
+      set (nu := replace_locals mu pubSrc' pubTgt').
+      case: (H2 pubSrc' pubTgt' erefl erefl nu erefl)=> MATCH' INJ'.
+      have INV': ThreadInv.t c' d' sim nu m' tm.
+      { admit. }
+      have SAFE'': (forall n0 : nat,
+                      safeN (Concur.semantics aggelosS schedule) Espec 
+                            (Modsem.ge semS) n0 z c' m').
+      { admit. }
+      case: (IH _ _ _ _ _ _ INV' SAFE'')=> aggelosT TSAFE.
+      exists aggelosT, d', tm; split=> //.
+      apply: Concur.step_stage=> //.
+      move: H'. admit. (*dependent type stuff*)                                     
+    }
     admit.
     admit.
     admit.
