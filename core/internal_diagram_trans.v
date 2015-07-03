@@ -52,7 +52,6 @@ Inductive sem_compose_ord_eq_eq {D12 D23:Type}
   forall (d12 d12':D12) (c2 c2':C2) (d23 d23':D23),
     ord23 d23 d23' -> sem_compose_ord_eq_eq ord12 ord23 C2 (d12,Some c2,d23) (d12',Some c2',d23').
 
-
 Lemma effcore_diagram_trans: forall
 (core_data12 : Type)
 (match_core12 : core_data12 -> SM_Injection -> C1 -> mem -> C2 -> mem -> Prop)
@@ -81,7 +80,7 @@ Lemma effcore_diagram_trans: forall
                        (locBlocksTgt mu b = false ->
                            exists b1 delta1, foreign_of mu b1 = Some(b,delta1) /\
                            U1 b1 (ofs-delta1) = true /\
-                           Mem.perm m1 b1 (ofs-delta1) Max Nonempty))))          
+                           Mem.perm m1 b1 (ofs-delta1) Max Nonempty))))
 (core_data23 : Type)
 (match_core23 : core_data23 -> SM_Injection -> C2 -> mem -> C3 -> mem -> Prop)
 (core_ord23 : core_data23 -> core_data23 -> Prop)
@@ -223,13 +222,13 @@ Proof.
         (sem_compose_ord_eq_eq core_ord12 core_ord23 C2) 
                (d12', Some st2', d23')
         (d12, Some st2,d23)))
-    /\ forall (UHyp: forall b ofs, U2 b ofs = true -> vis mu23 b = true)
+    /\ (forall (UHyp: forall b ofs, U2 b ofs = true -> vis mu23 b = true)
               b ofs (Ub: U3 b ofs = true),
         (visTgt mu23 b = true /\
            (locBlocksTgt mu23 b = false ->
            exists b2 delta2, foreign_of mu23 b2 = Some(b,delta2) /\
                U2 b2 (ofs-delta2) = true /\
-               Mem.perm m2 b2 (ofs-delta2) Max Nonempty)))).
+               Mem.perm m2 b2 (ofs-delta2) Max Nonempty))))).
   intros XX; destruct XX as [st3' [m3' [d23' [mu23' [INV' [InjIncr23 
           [GSEP [LocAlloc23 [MC23' [U3 [ZZ MOD32]]]]]]]]]]].
   exists st3'. exists m3'. 
@@ -339,7 +338,8 @@ split. unfold compose_sm; simpl.
          simpl in *. 
          destruct INV' as [INVa' [INVb' [INVc' INVd']]].
          subst. simpl in *. apply ZZ.
-    (*proof of MOD31*) intros HypU1 b3 ofs HypU3. clear ZZ eff_diagram23.
+    { (*proof of MOD31*) 
+         intros HypU1 b3 ofs HypU3. clear ZZ eff_diagram23.
          destruct INV' as [INVa' [INVb' [INVc' INVd']]].
          subst. simpl in *. rewrite vis_compose_sm in HypU1. 
          specialize (MOD21 HypU1). 
@@ -365,7 +365,8 @@ split. unfold compose_sm; simpl.
            rewrite (foreign_in_extern _ _ _ _ Frg1). 
            rewrite (foreign_in_extern _ _ _ _ Frg2).
            assert (Arith: ofs - (d1 + d2) = ofs - d2 - d1) by omega.
-           rewrite Arith. eauto.           
+           rewrite Arith. eauto.
+    }
   (*proof of the cut*)
   assert (locLocAlloc12': locBlocksTgt mu12' =
                          fun b => orb (locBlocksTgt mu12 b) (freshloc m2 m2' b)).
@@ -382,7 +383,7 @@ split. unfold compose_sm; simpl.
   destruct INV as [lBlocks2 [eBlocks2 [pBlocks2 fBlocks2]]]. 
   rewrite lBlocks2, eBlocks2 in *. 
   subst.
-  clear MC12 InjIncr12  MC12' match_sm_wd12 match_validblock12. 
+  clear MC12 InjIncr12 MC12' match_sm_wd12 match_validblock12. 
   clear LocAlloc12 full.
   clear st1 m1 st1' m1' (*UHyp*) MOD21.
   rewrite pubAlloc12' in *; clear pubAlloc12'.
@@ -448,7 +449,7 @@ split. unfold compose_sm; simpl.
     assert (FWD3: mem_forward m3 m3').
         destruct Steps3 as [[n K] | [[n K] _]];
              eapply effstepN_fwd; eassumption.
-    destruct (IHx _ mu23' d23' _ _ c3' m3' StepN2 MC23' XX1 XX2)
+   destruct (IHx _ mu23' d23' _ _ c3' m3' StepN2 MC23' XX1 XX2)
         as [c3'' [m3'' [d23'' [mu23'' [ZZ [InjIncr' 
              [GSEP' [LocAlloc23' [MC23'' [U3' [StepN3 MOD32']]]]]]]]]]]; clear IHx.
     assert (FWD3': mem_forward m3' m3'').

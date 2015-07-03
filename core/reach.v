@@ -1014,17 +1014,6 @@ Definition local_out_of_reach mu (m : mem) (b : block) (ofs : Z): Prop :=
                   (~ Mem.perm m b0 (ofs - delta) Max Nonempty \/
                    pubBlocksSrc mu b0 = false).
 
-Definition genv2blocksBool {F V : Type} (ge : Genv.t F V):= 
-  (fun b =>
-      match Genv.invert_symbol ge b with
-        Some id => true
-      | None => false
-      end,
-   fun b => match Genv.find_var_info ge b with
-                  Some gv => true
-                | None => false
-            end).
-
 Lemma genvs_domain_eq_match_genvsB: forall {F1 V1 F2 V2:Type} 
   (ge1: Genv.t F1 V1) (ge2: Genv.t F2 V2),
   genvs_domain_eq ge1 ge2 -> genv2blocksBool ge1 = genv2blocksBool ge2.
@@ -1110,30 +1099,6 @@ Proof. intros.
   remember (snd (genv2blocksBool ge) b) as d.
   destruct d; trivial. apply eq_sym in Heqd.
     apply genv2blocksBool_char2 in Heqd. congruence.
-Qed.
-
-Definition isGlobalBlock {F V : Type} (ge : Genv.t F V) :=
-  fun b => (fst (genv2blocksBool ge)) b || (snd (genv2blocksBool ge)) b.
-
-Lemma invert_symbol_isGlobal: forall {V F} (ge : Genv.t F V) b x,
-      Genv.invert_symbol ge b = Some x -> isGlobalBlock ge b = true.
-Proof. intros.
-  unfold isGlobalBlock, genv2blocksBool. simpl.
-  rewrite H; simpl; trivial. 
-Qed.
-
-Lemma find_symbol_isGlobal: forall {V F} (ge : Genv.t F V) x b
-       (Find: Genv.find_symbol ge x = Some b), isGlobalBlock ge b = true.
-Proof. intros.
-  eapply invert_symbol_isGlobal.
-  rewrite (Genv.find_invert_symbol _ _ Find). reflexivity.
-Qed.
-
-Lemma find_var_info_isGlobal: forall {V F} (ge : Genv.t F V) b x,
-      Genv.find_var_info ge b = Some x -> isGlobalBlock ge b = true.
-Proof. intros.
-  unfold isGlobalBlock, genv2blocksBool. simpl.
-  rewrite H, orb_true_r; trivial. 
 Qed.
 
 Lemma restrict_preserves_globals: forall {F V} (ge:Genv.t F V) j X

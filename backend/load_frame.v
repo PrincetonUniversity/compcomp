@@ -19,6 +19,7 @@ Require Import BuiltinEffects.
 Require Import structured_injections.
 Require Import effect_properties.
 Require Import reach.
+Require Import Axioms.
 
 Definition load_stack (m: mem) (sp: val) (ty: typ) (ofs: int) :=
   Mem.loadv (chunk_of_type ty) m (Val.add sp (Vint ofs)).
@@ -913,4 +914,73 @@ intros. eapply H2. rewrite getBlocksD in H0|-*.
 destruct v; auto; try solve[rewrite getBlocksD_nil in H0; congruence].
 rewrite getBlocksD_nil, orb_comm in H0; simpl in H0.
 rewrite H0; auto.
+Qed.
+
+Lemma store_stack_readonly m sp ty ofs v m'
+        (ST: store_stack m sp ty ofs v = Some m') b: 
+      Mem.valid_block m b-> readonly m b m'.
+Proof. intros. unfold store_stack in ST. destruct sp; simpl in ST; inv ST.
+   eapply store_readonly; eassumption.
+Qed.
+
+Lemma store_args_readonly sp ofs args tys m m' :
+  store_args_rec m sp ofs args tys = Some m' -> 
+  forall b, Mem.valid_block m b -> readonly m b m'.
+Proof.
+revert args ofs m; induction tys.
+simpl. destruct args. intros ofs. inversion 1; subst. 
+solve[intros; apply readonly_refl].
+intros ofs m. simpl. inversion 1. 
+destruct args; try solve[inversion 1]. 
+destruct a; simpl; intros ofs m. 
+- case_eq (store_stack m (Vptr sp Int.zero) Tint
+           (Int.repr match ofs with | 0 => 0 | Z.pos y' => Z.pos y'~0~0
+                                    | Z.neg y' => Z.neg y'~0~0 end) v).
+intros m0 EQ. specialize (store_stack_readonly _ _ _ _ _ _ EQ); intros RD.
+  apply store_stack_fwd in EQ.
+  intros H b VB.
+  eapply readonly_trans; eauto.
+  eapply IHtys. eassumption. apply EQ. eassumption. 
+  intros; congruence.
+- case_eq (store_stack m (Vptr sp Int.zero) Tfloat
+           (Int.repr match ofs with | 0 => 0 | Z.pos y' => Z.pos y'~0~0
+                                    | Z.neg y' => Z.neg y'~0~0 end) v).
+intros m0 EQ. specialize (store_stack_readonly _ _ _ _ _ _ EQ); intros RD.
+  apply store_stack_fwd in EQ.
+  intros H b VB.
+  eapply readonly_trans; eauto.
+  eapply IHtys. eassumption. apply EQ. eassumption. 
+  intros; congruence.
+- destruct v; try solve[congruence].
+case_eq (store_stack m (Vptr sp Int.zero) Tint
+           (Int.repr match ofs+1 with | 0 => 0 | Z.pos y' => Z.pos y'~0~0
+                                      | Z.neg y' => Z.neg y'~0~0 end)
+        (Vint (Int64.hiword i))).
+intros m0 EQ. specialize (store_stack_readonly _ _ _ _ _ _ EQ); intros RD.
+  apply store_stack_fwd in EQ.
+  intros H b VB.
+  remember (store_stack m0 (Vptr sp Int.zero) Tint
+        (Int.repr
+           match ofs with
+           | 0 => 0
+           | Z.pos y' => Z.pos y'~0~0
+           | Z.neg y' => Z.neg y'~0~0
+           end) (Vint (Int64.loword i))).
+  symmetry in Heqo; destruct o; inv H. 
+  eapply readonly_trans. eapply RD. assumption.
+  eapply readonly_trans. 
+    apply (store_stack_readonly _ _ _ _ _ _ Heqo).
+    apply EQ. assumption.
+  apply store_stack_fwd in Heqo.
+  eapply IHtys. eassumption. apply Heqo. apply EQ. eassumption. 
+  intros; congruence.
+- case_eq (store_stack m (Vptr sp Int.zero) Tsingle
+           (Int.repr match ofs with | 0 => 0 | Z.pos y' => Z.pos y'~0~0
+                                    | Z.neg y' => Z.neg y'~0~0 end) v).
+intros m0 EQ. specialize (store_stack_readonly _ _ _ _ _ _ EQ); intros RD.
+  apply store_stack_fwd in EQ.
+  intros H b VB.
+  eapply readonly_trans; eauto.
+  eapply IHtys. eassumption. apply EQ. eassumption. 
+  intros; congruence.
 Qed.

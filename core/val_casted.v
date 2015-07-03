@@ -12,23 +12,12 @@ Require Import Values.
 Require Import Memory.
 Require Import Globalenvs.
 Require Import Events.
-Require Import Smallstep.
+
 Require Import Ctypes.
-Require Import Cop.
-Require Import Clight.
-Require Import SimplLocals.
+Require Import Cop. 
 
 Require Import mem_lemmas.
-Require Import semantics.
-Require Import semantics_lemmas.
 Require Import reach.
-Require Import effect_semantics.
-Require Import structured_injections.
-Require Import simulations.
-Require Import effect_properties.
-Require Import simulations_lemmas.
-
-Require Export Axioms.
 
 (** Properties of values obtained by casting to a given type. *)
 

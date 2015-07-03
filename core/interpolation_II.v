@@ -3066,7 +3066,7 @@ Lemma EFF_interp_II_strong:
                      (b2 = Mem.nextblock m2 /\ as_inj nu' (Mem.nextblock m1) = Some(b3,ofs3)) \/
                      (exists m, (b2 = Mem.nextblock m2 + m)%positive /\ 
                             as_inj nu' ((Mem.nextblock m1+m)%positive) = Some(b3,ofs3))). *)
-Proof. intros.
+Proof. intros. 
        (****************************
         * Preparing the hypothesis *
         ****************************)
@@ -3463,9 +3463,9 @@ Proof. intros.
            destruct (RDOnly12 _ Hb) as [Map12 [J12b Perm12]].
            destruct (RDOnly23 _ Hb) as [Map23 [J23b Perm23]].
            destruct (RDOnly_fwd1 _ Hb n ofs) as [LD1 Perm1]. 
-              intros. apply Perm12. (* rewrite Perm12. apply (NWR _ H).*)
+              intros. apply Perm12. (*
            destruct (RDOnly_fwd3 _ Hb n ofs) as [LD3 Perm3].
-              intros. apply Perm23. (* rewrite <- Perm23. apply (NWR _ H).*)
+              intros. apply Perm23.*)
            assert (VB2: Mem.valid_block m2 b).
              eapply (Mem.valid_block_inject_1 (as_inj nu23)). eapply extern_in_all; eassumption. eassumption.
            split.

@@ -26,7 +26,13 @@ Section Eff_INJ_SIMU_DIAGRAMS.
           {Sem2 : @EffectSem (Genv.t F2 V2) C2}
 
           {ge1: Genv.t F1 V1} 
-          {ge2: Genv.t F2 V2}.
+          {ge2: Genv.t F2 V2}
+  (CS1_RDO: forall c m c' m', corestep Sem1 ge1 c m c' m' ->
+                  (forall b, isGlobalBlock ge1 b = true -> Mem.valid_block m b) ->
+                  RDOnly_fwd m m' (ReadOnlyBlocks ge1))
+  (CS2_RDO: forall c m c' m', corestep Sem2 ge2 c m c' m' ->
+                  (forall b, isGlobalBlock ge2 b = true -> Mem.valid_block m b) ->
+                  RDOnly_fwd m m' (ReadOnlyBlocks ge2)).
 
   Let core_data := C1.
 
@@ -189,14 +195,14 @@ Hypothesis order_wf: well_founded order.
               (effstep_star Sem2 ge2 U2 st2 m2 st2' m2' /\
                order st1' st1)) /\
 
-             forall 
+             (forall 
                (UHyp: forall b z, U1 b z = true -> vis mu b = true)
-               b ofs (Ub: U2 b ofs = true), 
-             visTgt mu b = true /\ 
+                b ofs (Ub: U2 b ofs = true), 
+               visTgt mu b = true /\ 
                 (locBlocksTgt mu b = false ->
                  exists b1 delta1, foreign_of mu b1 = Some(b,delta1) /\
                  U1 b1 (ofs-delta1) = true /\
-                 Mem.perm m1 b1 (ofs-delta1) Max Nonempty)).
+                 Mem.perm m1 b1 (ofs-delta1) Max Nonempty))).
 
 Lemma  inj_simulation_star_wf: 
   SM_simulation.SM_simulation_inject Sem1 Sem2 ge1 ge2.
@@ -210,7 +216,7 @@ assumption.
 clear - ginfo_preserved. assumption.
 clear - match_genv. intros. destruct MC; subst. eauto.
 clear - match_visible. intros. destruct H; subst. eauto.
-(* RESTRIC : clear - match_restrict. intros. destruct H; subst. eauto.*)
+(* RESTRICT : clear - match_restrict. intros. destruct H; subst. eauto.*)
 clear - match_validblocks. intros.
     destruct H; subst. eauto.
 clear - inj_initial_cores . intros.
@@ -324,14 +330,14 @@ Hypothesis order_wf: well_founded order.
               (effstep_star Sem2 ge2 U2 st2 m2 st2' m2' /\
                order st1' st1)) /\
 
-           forall
+            (forall
              (UHyp: forall b z, U1 b z = true -> vis mu b = true)
              b ofs(Ub: U2 b ofs = true),
              visTgt mu b = true /\
              (locBlocksTgt mu b = false ->
                 exists b1 delta1, foreign_of mu b1 = Some(b,delta1) /\
                 U1 b1 (ofs-delta1) = true /\
-                Mem.perm m1 b1 (ofs-delta1) Max Nonempty)).
+                Mem.perm m1 b1 (ofs-delta1) Max Nonempty))).
 
 Lemma  inj_simulation_star_wf_typed: 
   SM_simulation.SM_simulation_inject Sem1 Sem2 ge1 ge2.
@@ -454,14 +460,14 @@ Section EFF_INJ_SIMULATION_STAR.
             (effstep_plus Sem2 ge2 U2 st2 m2 st2' m2' \/
              ((measure st1' < measure st1)%nat /\ effstep_star Sem2 ge2 U2 st2 m2 st2' m2'))
             /\
-             forall 
+             (forall 
                (UHyp: forall b ofs, U1 b ofs = true -> vis mu b = true)
                b ofs(Ub: U2 b ofs = true), 
              visTgt mu b = true /\
              (locBlocksTgt mu b = false ->
                  exists b1 delta1, foreign_of mu b1 = Some(b,delta1) /\
                  U1 b1 (ofs-delta1) = true /\
-                 Mem.perm m1 b1 (ofs-delta1) Max Nonempty).
+                 Mem.perm m1 b1 (ofs-delta1) Max Nonempty)).
 
 Lemma inj_simulation_star: 
   SM_simulation.SM_simulation_inject Sem1 Sem2 ge1 ge2.
@@ -554,14 +560,14 @@ Section EFF_INJ_SIMULATION_STAR_TYPED.
             (effstep_plus Sem2 ge2 U2 st2 m2 st2' m2' \/
              ((measure st1' < measure st1)%nat /\ effstep_star Sem2 ge2 U2 st2 m2 st2' m2'))
             /\
-             forall 
+             (forall 
                (UHyp: forall b ofs, U1 b ofs = true -> vis mu b = true)
                b ofs(Ub: U2 b ofs = true),
               visTgt mu b = true /\ 
                 (locBlocksTgt mu b = false ->
                  exists b1 delta1, foreign_of mu b1 = Some(b,delta1) /\
                      U1 b1 (ofs-delta1) = true /\
-                     Mem.perm m1 b1 (ofs-delta1) Max Nonempty).
+                     Mem.perm m1 b1 (ofs-delta1) Max Nonempty)).
 
 Lemma inj_simulation_star_typed: 
   SM_simulation.SM_simulation_inject Sem1 Sem2 ge1 ge2.
@@ -650,14 +656,15 @@ Section EFF_INJ_SIMULATION_PLUS.
           exists U2,              
             (effstep_plus Sem2 ge2 U2 st2 m2 st2' m2' \/
              ((measure st1' < measure st1)%nat /\ effstep_star Sem2 ge2 U2 st2 m2 st2' m2'))
-            /\ forall 
+            /\ 
+            ( forall 
                  (UHyp: forall b ofs, U1 b ofs = true -> vis mu b = true)
                  b ofs (Ub: U2 b ofs = true),
                  visTgt mu b = true /\ 
                  (locBlocksTgt mu b = false ->
                      exists b1 delta1, foreign_of mu b1 = Some(b,delta1) /\
                      U1 b1 (ofs-delta1) = true /\
-                     Mem.perm m1 b1 (ofs-delta1) Max Nonempty).
+                     Mem.perm m1 b1 (ofs-delta1) Max Nonempty)).
   
 Lemma inj_simulation_plus: 
   SM_simulation.SM_simulation_inject Sem1 Sem2 ge1 ge2.
@@ -737,14 +744,14 @@ Section EFF_INJ_SIMULATION_PLUS_TYPED.
           exists U2,              
             (effstep_plus Sem2 ge2 U2 st2 m2 st2' m2' \/
              ((measure st1' < measure st1)%nat /\ effstep_star Sem2 ge2 U2 st2 m2 st2' m2'))
-            /\ forall 
+            /\ (forall 
                  (UHyp: forall b ofs, U1 b ofs = true -> vis mu b = true)
                   b ofs (Ub: U2 b ofs = true),
                 visTgt mu b = true /\ 
                 (locBlocksTgt mu b = false ->
                     exists b1 delta1, foreign_of mu b1 = Some(b,delta1) /\
                     U1 b1 (ofs-delta1) = true /\
-                    Mem.perm m1 b1 (ofs-delta1) Max Nonempty).
+                    Mem.perm m1 b1 (ofs-delta1) Max Nonempty)).
   
 Lemma inj_simulation_plus_typed: 
   SM_simulation.SM_simulation_inject Sem1 Sem2 ge1 ge2.

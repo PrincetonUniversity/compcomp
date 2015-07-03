@@ -1314,7 +1314,7 @@ Inductive match_states:  SM_Injection -> RTL_core -> mem -> RTL_core -> mem -> P
       match_states mu (RTL_Returnstate stk v) m
                    (RTL_State stk' f' (Vptr sp' Int.zero) pc' rs') m'.
 
-Definition MATCH (d:RTL_core) mu c1 m1 c2 m2:Prop :=
+Definition MATCH' (d:RTL_core) mu c1 m1 c2 m2:Prop :=
   match_states (restrict_sm mu (vis mu)) c1 m1 c2 m2 /\
   REACH_closed m1 (vis mu) /\
   meminj_preserves_globals ge (as_inj mu) /\
@@ -1323,6 +1323,10 @@ Definition MATCH (d:RTL_core) mu c1 m1 c2 m2:Prop :=
   sm_valid mu m1 m2 /\
   SM_wd mu /\
   Mem.inject (as_inj mu) m1 m2.
+
+Definition MATCH d mu c1 m1 c2 m2:Prop :=
+  MATCH' d mu c1 m1 c2 m2 /\
+  (mem_respects_readonly ge m1 /\ mem_respects_readonly tge m2).
 
 (** ** Forward simulation *)
 Definition RTL_measure (S: RTL_core) : nat :=
@@ -1383,9 +1387,11 @@ Hint Resolve MATCH_RC: trans_correct.
 Lemma MATCH_restrict: forall (d : RTL_core) (mu : SM_Injection) (c1 : RTL_core) 
                              (m1 : mem) (c2 : RTL_core) (m2 : mem) (X : block -> bool) (MC: MATCH d mu c1 m1 c2 m2)(HX: forall b : block, vis mu b = true -> X b = true)(RC0:REACH_closed m1 X), MATCH d (restrict_sm mu X) c1 m1 c2 m2.
   intros.
-  destruct MC as [MS [RC [PG [GF [Glob [SMV [WD INJ]]]]]]].
+  destruct MC as [[MS [RC [PG [GF [Glob [SMV [WD INJ]]]]]]] MRR].
   assert (WDR: SM_wd (restrict_sm mu X)).
   apply restrict_sm_WD; assumption.
+  split; trivial.
+  clear MRR.
   split; try rewrite vis_restrict_sm; try rewrite restrict_sm_all; try rewrite restrict_sm_frgnBlocksSrc.
   rewrite restrict_sm_nest; assumption.
   intuition.
@@ -1443,22 +1449,16 @@ Lemma MATCH_initial_core:
     (m1 : mem) (j : meminj) (vals2 : list val) (m2 : mem)
     (DomS DomT : block -> bool)
     (R : list_norepet (map fst (prog_defs SrcProg)))
-    (*entrypoints : list (val * val * signature)*)
-    (*entry_ok : entry_points_ok entrypoints*)
-    (*init_mem : exists m0 : mem, Genv.init_mem SrcProg = Some m0*)
     (Ini: initial_core (rtl_eff_sem hf) ge v vals1 = Some c1)
     (MINJ: Mem.inject j m1 m2)
     (VInj: Forall2 (val_inject j) vals1 vals2)
     (PG: meminj_preserves_globals ge j)
+    (GFI: globalfunction_ptr_inject ge j)
     (J: forall (b1 b2 : block) (d : Z),
           j b1 = Some (b2, d) -> DomS b1 = true /\ DomT b2 = true)
     (RCH:forall b : block,
            REACH m2 (fun b' : block => isGlobalBlock tge b' || getBlocks vals2 b') b = true -> DomT b = true)
-    (*InitMem : exists m0 : mem, Genv.init_mem SrcProg = Some m0 
-                                /\ Ple (Mem.nextblock m0) (Mem.nextblock m1)  (*Not needed/ Can remove just this one ineq*)
-                                /\ Ple (Mem.nextblock m0) (Mem.nextblock m2)*)
-    (GFI: globalfunction_ptr_inject ge j)
-    (*GDE: genvs_domain_eq ge tge*)
+    (RDO1: mem_respects_readonly ge m1) (RDO2: mem_respects_readonly tge m2)
     (HDomS: forall b : block, DomS b = true -> Mem.valid_block m1 b)
     (HDomT: forall b : block, DomT b = true -> Mem.valid_block m2 b),
   exists c2 : RTL_core,
@@ -1537,6 +1537,7 @@ Proof.
   remember (val_casted.val_has_type_list_func vals1 (sig_args (funsig (Internal f))) &&
                                               val_casted.vals_defined vals1) as vc.
   destruct vc; inv H2.
+  split. 2: split; trivial.
   split. 
   { specialize (Genv.find_funct_ptr_not_fresh SrcProg). intros FFP.
     (*destruct init_mem as [m0 INIT_MEM].
@@ -1660,32 +1661,6 @@ apply genv_next_symbol_exists; auto.
 xomega.
 Qed.
 
-
-(*
-(*Ple (Genv.genv_next ge) (Mem.nextblock m1)*)
-{ destruct PG as [XX [Y Z]].
-    unfold Ple. rewrite <-Pos.leb_le.
-    destruct (Pos.leb (Genv.genv_next ge) (Mem.nextblock m1)) eqn:?; auto.
-    rewrite Pos.leb_nle in Heqb0.
-    assert (Heqb': (Genv.genv_next ge > Mem.nextblock m1)%positive) by xomega.
-    assert (exists b0, Psucc b0 = Genv.genv_next ge).
-    { destruct (Genv.genv_next ge). 
-      exists ((b0~1)-1)%positive. simpl. auto.
-      exists (Pos.pred (b0~0))%positive. rewrite Pos.succ_pred. auto. xomega.
-      xomega. }
-    destruct H0 as [b0 H0].
-    generalize H0 as H'; intro.
-    
-    apply genv_next_symbol_exists2 in H0.
-    destruct H0 as [id H0].
-    apply XX in H0.
-    apply J in H0.
-    destruct H0 as [H0 H3].
-    specialize (HDomS _ H0).
-    unfold Mem.valid_block in HDomS. clear - Heqb' HDomS H'. xomega.
-    auto. }*)
-
-
 (*Ple (Genv.genv_next ge) (Mem.nextblock m2)*)
       { destruct PG as [XX [Y Z]].
     unfold Ple. rewrite <-Pos.leb_le.
@@ -1707,40 +1682,7 @@ Qed.
     specialize (HDomT _ H3).
     unfold Mem.valid_block in HDomT. clear - Heqb' HDomT H'. xomega.
     auto. }
-
-
-    
-(**Ye Old Proof  
-      rewrite initial_SM_as_inj. assumption.
-      unfold as_inj; simpl.
-      constructor. 
-      { (*DOMAIN*)
-        simpl. unfold as_inj; simpl.
-        intros b0 DD. 
-        cut (exists id, Genv.find_symbol (Genv.globalenv SrcProg) id = Some b0).
-        intros [symb ID].
-         (*split. apply REACH_nil. rewrite (find_symbol_isGlobal _ _ _ ID). 
-        trivial.*)
-        apply joinI. left.
-        eapply restrictI_Some. destruct PG. eapply H0; eassumption.
-        eapply REACH_nil.
-        erewrite find_symbol_isGlobal. trivial.
-        eassumption.
-        
-        eapply valid_init_is_global; eauto. }
-      { (*IMAGE*)
-        unfold as_inj; simpl.
-        intros.  symmetry. 
-        destruct (joinD_Some _ _ _ _ _ H0).  
-        solve [eapply (CC _ _ _ _ GV); eauto].
-        destruct H3. destruct (restrictD_Some _ _ _ _ _ H4).
-        discriminate. }
-      { intros. eapply Genv.find_symbol_not_fresh; eauto. }
-      { intros. eapply Genv.find_funct_ptr_not_fresh ; eauto. }
-      { intros. eapply Genv.find_var_info_not_fresh; eauto. }
-      destruct InitMem as [m0' [INIT_MEM' [Ple1 Ple2]]].
-      rewrite INIT_MEM' in INIT_MEM. inversion INIT_MEM.
-      subst; auto.*)  }
+   }
 
     unfold initial_SM, vis; simpl. 
     clear - VInj.
@@ -1759,14 +1701,17 @@ Lemma MATCH_halted: forall (cd : RTL_core) (mu : SM_Injection) (c1 : RTL_core)
                            (MC: MATCH cd mu c1 m1 c2 m2)(HALT: halted (rtl_eff_sem hf) c1 = Some v1),
                     exists v2 : val,
                       Mem.inject (as_inj mu) m1 m2 /\
+                      mem_respects_readonly ge m1 /\ mem_respects_readonly tge m2 /\
                       val_inject (restrict (as_inj mu) (vis mu)) v1 v2 /\
                       halted (rtl_eff_sem hf) c2 = Some v2.
 Proof.
   intros.
-  unfold MATCH in MC; destruct MC as [H0 H1].
+  unfold MATCH in MC; destruct MC as [[H0 H1] MRR].
   inv H0; simpl in *; inv HALT. 
   inv MS. 
   exists v'; split; try assumption. eapply H1.
+  split. apply MRR.
+  split. apply MRR.
 
   inv H0.
   split; trivial.
@@ -1790,6 +1735,7 @@ Lemma MATCH_atExternal:
          (MC: MATCH c1 mu c1 m1 c2 m2) 
          (ATE: at_external (rtl_eff_sem hf) c1 = Some (e, ef_sig, vals1)),
     Mem.inject (as_inj mu) m1 m2 /\ 
+     mem_respects_readonly ge m1 /\ mem_respects_readonly tge m2 /\
     (exists vals2 : list val, Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\ at_external (rtl_eff_sem hf) c2 = Some (e, ef_sig, vals2) /\
                               (forall pubSrc' pubTgt' : block -> bool,
                                  pubSrc' =
@@ -1801,12 +1747,14 @@ Lemma MATCH_atExternal:
                                  forall nu : SM_Injection,
                                    nu = replace_locals mu pubSrc' pubTgt' ->
                                    MATCH c1 nu c1 m1 c2 m2 /\ Mem.inject (shared_of nu) m1 m2)).
-  intros.
-  split. inv MC; apply H0.
-  inv MC; simpl in *. inv H; inv ATE.
-  destruct H0 as [RC [ MPG [GFP [GLOB_FRGN [ SMV [ SMWD MINJ']]]]]].
-  destruct fd; inv H1. inv FD; simpl in *. 
-  destruct (BuiltinEffects.observableEF_dec hf e0); inv H0.
+Proof. intros.
+  destruct MC as [[MC [RC [PG [GFP [Glob [SMV [WD INJ]]]]]]] [MRR1 MRR2]].
+  split; trivial.
+  split; trivial.
+  split; trivial. 
+  inv MC; inv ATE.
+  destruct fd; inv H0. inv FD; simpl in *. 
+  destruct (BuiltinEffects.observableEF_dec hf e0); inv H1.
   exists args'.
   split. apply val_list_inject_forall_inject.
   autorewrite with restrict in VINJ; assumption.
@@ -1818,29 +1766,31 @@ Lemma MATCH_atExternal:
   exploit replace_locals_wd_AtExternal; try eassumption.
   intros SMWD_replace_locals.
   subst.
-  split; auto. split; auto. 
-  rewrite replace_locals_vis.
-  constructor; eauto.
-  apply match_stacks_replace_locals_restrict; auto.
+  split.
+  { split; auto. split; auto. 
+    rewrite replace_locals_vis.
+    constructor; eauto.
+    apply match_stacks_replace_locals_restrict; auto.
 
-  rewrite restrict_sm_all, replace_locals_as_inj in *; auto.
-  rewrite restrict_sm_all, replace_locals_as_inj in *; auto.
+    rewrite restrict_sm_all, replace_locals_as_inj in *; auto.
+    rewrite restrict_sm_all, replace_locals_as_inj in *; auto.
   
-  repeat open_Hyp.
-  split; auto.  solve[rewrite replace_locals_vis; auto ].
-  split; auto. solve[rewrite replace_locals_as_inj; auto].
-  Lemma globalfunction_ptr_inject_replace_locals: forall mu ls lt
-  (PG : globalfunction_ptr_inject ge (as_inj mu)),
-  globalfunction_ptr_inject ge (as_inj (replace_locals mu ls lt)).
-    unfold globalfunction_ptr_inject; intros.
-    rewrite replace_locals_as_inj.
-    eapply PG; eauto.
-  Qed.
-  split. apply globalfunction_ptr_inject_replace_locals; assumption.
-  split; auto. solve[rewrite replace_locals_frgnBlocksSrc; auto].
-  split. unfold sm_valid. rewrite replace_locals_DOM, replace_locals_RNG. assumption.
-  split; auto.
-  solve[rewrite replace_locals_as_inj; auto].
+    repeat open_Hyp.
+    split; auto.  solve[rewrite replace_locals_vis; auto ].
+    split; auto. solve[rewrite replace_locals_as_inj; auto].
+    Lemma globalfunction_ptr_inject_replace_locals: forall mu ls lt
+          (PG : globalfunction_ptr_inject ge (as_inj mu)),
+          globalfunction_ptr_inject ge (as_inj (replace_locals mu ls lt)).
+      unfold globalfunction_ptr_inject; intros.
+      rewrite replace_locals_as_inj.
+      eapply PG; eauto.
+    Qed.
+    split. apply globalfunction_ptr_inject_replace_locals; assumption.
+    split; auto. solve[rewrite replace_locals_frgnBlocksSrc; auto].
+    split. unfold sm_valid. rewrite replace_locals_DOM, replace_locals_RNG. assumption.
+    split; auto.
+    solve[rewrite replace_locals_as_inj; auto].
+  }
   eapply inject_shared_replace_locals; eauto.
   extensionality b; eauto.
   extensionality b; eauto.
@@ -2397,6 +2347,8 @@ Lemma Match_AfterExternal:
          (RValInjNu' : val_inject (as_inj nu') ret1 ret2)
          (FwdSrc : mem_forward m1 m1')
          (FwdTgt : mem_forward m2 m2')
+       (RDO1: RDOnly_fwd m1 m1' (ReadOnlyBlocks ge))
+       (RDO2: RDOnly_fwd m2 m2' (ReadOnlyBlocks tge))
          (frgnSrc' : block -> bool)
          (frgnSrcHyp : frgnSrc' =
                        (fun b : block =>
@@ -2420,7 +2372,7 @@ Lemma Match_AfterExternal:
     after_external (rtl_eff_sem hf) (Some ret2) st2 = Some st2' /\
     MATCH st1' mu' st1' m1' st2' m2'.
 Proof. intros. 
-       destruct MatchMu as [MC [RC [PG [GFP [GF [VAL [WDmu INJ]]]]]]].
+       destruct MatchMu as [[MC [RC [PG [GFP [GF [VAL [WDmu INJ]]]]]]] MRR].
        inv MC; simpl in *; inv AtExtSrc.
        destruct fd; inv H0.
        destruct fd'; inv AtExtTgt.
@@ -2463,7 +2415,7 @@ Proof. intros.
                                                  || DomSrc nu' b &&
                                                  (negb (locBlocksSrc nu' b) &&
                                                        REACH m1' (exportedSrc nu' (ret1 :: nil)) b))).
-       intros b Hb. rewrite REACHAX in Hb. destruct Hb as [L HL].
+       clear MRR; intros b Hb. rewrite REACHAX in Hb. destruct Hb as [L HL].
        generalize dependent b.
        induction L; simpl; intros; inv HL.
        assumption.
@@ -2590,24 +2542,24 @@ Proof. intros.
        apply REACH_nil. unfold exportedSrc.
        rewrite sharedSrc_iff_frgnpub, H1. intuition. trivial. 
 
+     split.
+     { (*MATCH'*) clear MRR.
        split.
        Focus 2. unfold vis in *.
-       rewrite replace_externs_locBlocksSrc, replace_externs_frgnBlocksSrc,
-       replace_externs_as_inj in *. intuition.
+          rewrite replace_externs_locBlocksSrc, replace_externs_frgnBlocksSrc,
+          replace_externs_as_inj in *. intuition.
 
-       (* globalfunction_ptr_inject *)
-       unfold globalfunction_ptr_inject; intros.
-       apply GFP in H1; destruct H1.
-       split; auto.
+         (* globalfunction_ptr_inject *)
+         unfold globalfunction_ptr_inject; intros.
+         apply GFP in H1; destruct H1.
+         split; auto.
 
-       move INC at bottom.
-       apply extern_incr_as_inj in INC; auto.
-       rewrite replace_locals_as_inj in INC.
-       apply INC; assumption.
+         move INC at bottom.
+         apply extern_incr_as_inj in INC; auto.
+         rewrite replace_locals_as_inj in INC.
+         apply INC; assumption.
        
-       
-       econstructor; try rewrite restrict_sm_all; try eassumption.
-
+       econstructor; try rewrite restrict_sm_all; try eassumption. 
        {(*Match_stacks*)
          clear UnchPrivSrc OBS INCvisNu'. 
          eapply match_stacks_bound. instantiate (1:=Mem.nextblock m2).
@@ -2697,6 +2649,9 @@ Proof. intros.
        apply getBlocks_char. exists ofs1; left; eauto.
        rewrite replace_externs_as_inj, replace_externs_vis.
        eapply inject_restrict; try eassumption.
+    }
+    destruct MRR as [MRR1 MRR2].
+    split; eapply mem_respects_readonly_forward'; eassumption. 
 Qed.
 Hint Resolve Match_AfterExternal: trans_correct.
 
@@ -2919,7 +2874,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
                                      (ES: effstep (rtl_eff_sem hf) ge U1 st1 m1 st1' m1'),
                               forall (st2 : RTL_core) (mu : SM_Injection) (m2 : mem)
 (*   (U2vis: forall (b : block) (ofs : Z), U1 b ofs = true -> vis mu b = true)*)
-(MC: MATCH st1 mu st1 m1 st2 m2),
+                                     (MC: MATCH' st1 mu st1 m1 st2 m2),
                               exists (st2' : RTL_core) (m2' : mem),
                                 (exists U2 : block -> Z -> bool,
                                    (effstep_plus (rtl_eff_sem hf) tge U2 st2 m2 st2' m2' \/
@@ -2938,7 +2893,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
                                   (*sm_inject_separated mu mu' m1 m2 /\*)
                                   globals_separate ge mu mu' /\
                                   sm_locally_allocated mu mu' m1 m2 m1' m2' /\
-                                  MATCH st1' mu' st1' m1' st2' m2'.
+                                  MATCH' st1' mu' st1' m1' st2' m2'.
   intros.
   simpl in *.
   destruct MC as [MS PRE].
@@ -2960,7 +2915,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
 
   apply gsep_refl.
   loc_alloc_solve.
-  unfold MATCH.
+  unfold MATCH'.
   intuition.
   eapply match_regular_states; first [eassumption| split; eassumption]. }
 
@@ -2994,7 +2949,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
   intuition.
   apply gsep_refl.
   loc_alloc_solve.
-  unfold MATCH.
+  unfold MATCH'.
   intuition.
   eapply match_regular_states; eauto.
   apply match_stacks_inside_set_reg; auto.
@@ -3027,7 +2982,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
   intuition.
   apply gsep_refl.
   loc_alloc_solve.
-  unfold MATCH;
+  unfold MATCH';
     intuition.
   eapply match_regular_states; eauto.
   apply match_stacks_inside_set_reg; auto.
@@ -3105,7 +3060,7 @@ Lemma step_simulation_effect: forall (st1 : RTL_core) (m1 : mem) (st1' : RTL_cor
   simpl in H5.
   contradiction.
 
-  unfold MATCH;
+  unfold MATCH';
     intuition.
   (*match_states*)
   econstructor; eauto.
@@ -3267,7 +3222,7 @@ Qed.
   apply gsep_refl.
   loc_alloc_solve.
 
-  unfold MATCH.
+  unfold MATCH'.
   split.
   econstructor; eauto.
   eapply match_stacks_cons; eauto.
@@ -3295,7 +3250,7 @@ Qed.
   apply gsep_refl.
   loc_alloc_solve.
 
-  unfold MATCH;
+  unfold MATCH';
     intuition.
   Focus 1.
   eapply match_call_regular_states; eauto. (* match_call_regular_states*)
@@ -3374,7 +3329,7 @@ Qed.
   replace (ofs + delta - delta) with ofs by omega.
   apply Mem.perm_max with k. apply Mem.perm_implies with p; auto with mem.
 
-  unfold MATCH.
+  unfold MATCH'.
   intuition.
   econstructor; eauto.
   eapply match_stacks_bound with (bound := sp'). 
@@ -3413,7 +3368,7 @@ Qed.
   apply gsep_refl.
   loc_alloc_solve.
 
-  unfold MATCH.
+  unfold MATCH'.
   intuition.
   econstructor; eauto.
   eapply match_stacks_untailcall; eauto.
@@ -3451,7 +3406,7 @@ Qed.
   apply gsep_refl.
   loc_alloc_solve.
 
-  unfold MATCH;
+  unfold MATCH';
     intuition.
   econstructor; eauto.
   eapply match_stacks_inside_inlined_tailcall; eauto.
@@ -3568,7 +3523,7 @@ Qed.
   apply gsep_refl.
   loc_alloc_solve.
 
-  unfold MATCH.
+  unfold MATCH'.
   intuition.
   destruct b;
     econstructor; eauto. }
@@ -3591,7 +3546,7 @@ Qed.
   apply gsep_refl.
   loc_alloc_solve.
 
-  unfold MATCH.
+  unfold MATCH'.
   intuition.
   econstructor; eauto. }
 
@@ -3636,7 +3591,7 @@ Qed.
   apply gsep_refl.
   loc_alloc_solve.
 
-  unfold MATCH;
+  unfold MATCH';
     intuition.
   econstructor; eauto.
   eapply match_stacks_bound with (bound := sp'). 
@@ -3696,7 +3651,7 @@ Qed.
   apply gsep_refl.
   loc_alloc_solve. 
   
-  unfold MATCH;
+  unfold MATCH';
     intuition.
   econstructor; eauto.
   
@@ -3743,7 +3698,7 @@ Qed.
   intuition.
   eapply intern_incr_globals_separate; eauto.
   
-  unfold MATCH; intuition.
+  unfold MATCH'; intuition.
   unfold globals_separate.
   rewrite H5.
   rewrite <- H4.
@@ -3883,7 +3838,7 @@ Qed.
 
   (*First SEP*)
 
-  unfold MATCH; intuition.
+  unfold MATCH'; intuition.
   
   constructor; eauto.
   assert (SM_wd (restrict_sm mu (vis mu))).
@@ -4008,7 +3963,7 @@ Qed.
   apply gsep_refl.
   loc_alloc_solve.
 
-  unfold MATCH; intuition.
+  unfold MATCH'; intuition.
   econstructor; eauto. 
   apply match_stacks_inside_set_reg; auto. 
   apply restrict_sm_WD; auto.
@@ -4029,7 +3984,7 @@ Qed.
   loc_alloc_solve.
 
 
-  unfold MATCH. intuition.
+  unfold MATCH'. intuition.
   eapply match_regular_states; eauto. 
   eapply match_stacks_inside_set_reg; eauto.
   apply restrict_sm_WD; auto.
@@ -4063,7 +4018,7 @@ Qed.
   apply gsep_refl.
   loc_alloc_solve.
 
-  unfold MATCH; intuition.
+  unfold MATCH'; intuition.
   econstructor; eauto. apply match_stacks_inside_set_reg; auto. 
   apply restrict_sm_WD; auto.
   apply agree_set_reg; auto.
@@ -4085,7 +4040,7 @@ Qed.
   repeat split; extensionality b0;
   rewrite freshloc_irrefl;
   intuition.
-  unfold MATCH; intuition.
+  unfold MATCH'; intuition.
   econstructor; eauto. subst vres. apply agree_set_reg_undef'; auto.
   apply local_of_restrict_vis; auto.
 
@@ -4110,12 +4065,39 @@ Proof.
   intros; eapply MATCH_initial_core; eauto.
 
   (*Corediagram*)
-  { intros. 
+  { intros. destruct H0 as [MTCH [MRR1 MRR2]].
     exploit step_simulation_effect; eauto.
     intros HH; destruct HH as [st2' [m2' [[U2 ?] [mu' ?]]]].
     repeat open_Hyp.
     exists st2', m2', mu'.
-    intuition; exists U2; intuition. }
+    split; trivial.
+    split; trivial.
+    split; trivial.
+    split. 
+      split; trivial. 
+      destruct MTCH as [_ [_ [PG [_ [GF [SMV [WD _]]]]]]].
+      split. apply effstep_corestep in H.
+             eapply mem_respects_readonly_forward'. eassumption.
+             eapply corestep_fwd; eassumption.
+             eapply rtl_coop_readonly; try eassumption. apply H.
+         intros b GB. apply GF in GB. eapply SMV.
+         destruct (frgnSrc _ WD _ GB) as [bb [d [Frgn FTgt]]]. eapply foreign_DomRng; eassumption.
+      assert(G2: forall b, isGlobalBlock tge b = true -> Mem.valid_block m2 b).
+         rewrite <- (genvs_domain_eq_isGlobal _ _ GDE_lemma).
+         intros b GB. eapply SMV.
+         apply (meminj_preserves_globals_isGlobalBlock _ _ PG) in GB. 
+         eapply as_inj_DomRng; eassumption.
+      destruct H0 as [CS2 | [_ CS2]]. 
+        apply effstep_plus_corestep_plus in CS2.
+             eapply mem_respects_readonly_forward'. eassumption.
+             eapply  semantics_lemmas.corestep_plus_fwd; eassumption.
+             eapply SM_simulation.CS2_RDO_plus; try eassumption. apply rtl_coop_readonly.
+        apply effstep_star_corestep_star in CS2.
+             eapply mem_respects_readonly_forward'. eassumption.
+             eapply  semantics_lemmas.corestep_star_fwd; eassumption.
+             eapply SM_simulation.CS2_RDO_star; try eassumption. apply rtl_coop_readonly.
+
+    exists U2; intuition. }
 Qed.
 
 End PRESERVATION.

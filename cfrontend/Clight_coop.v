@@ -347,3 +347,180 @@ Defined.
 
 End CLIGHT_COOP.
 
+Lemma clight_coop_readonly hf g
+            (FE: function -> list val -> mem -> env -> temp_env -> mem -> Prop)
+            (HFE: forall f vargs m e le m', FE f vargs m e le m' -> 
+                   (forall b, isGlobalBlock g b = true -> Mem.valid_block m b) ->
+                   (*mem_respects_readonly g m ->*)
+                   RDOnly_fwd m m' (ReadOnlyBlocks g))
+             c m c' m'
+            (CS: clight_corestep hf FE g c m c' m')
+            (GV: forall b, isGlobalBlock g b = true -> Mem.valid_block m b):  
+            (*(MRR: mem_respects_readonly g m):*)
+         RDOnly_fwd m m' (ReadOnlyBlocks g).
+  Proof. intros. red; intros.
+     unfold ReadOnlyBlocks in Hb.
+     remember (Genv.find_var_info g b) as d; symmetry in Heqd.
+     destruct d; try discriminate.
+     specialize (find_var_info_isGlobal _ _ _ Heqd). intros GB. apply GV in GB.
+     (*destruct (MRR _ _ Heqd Hb) as [_ [VB _]].     *)
+     inv CS; simpl in *; try apply readonly_refl.
+          remember (typeof a1) as t; clear Heqt.
+            inv H2. eapply store_readonly; eassumption.
+                    eapply storebytes_readonly; eassumption.
+          eapply ec_readonly_strong; eassumption. 
+          eapply freelist_readonly; eassumption.
+          eapply freelist_readonly; eassumption.
+          eapply freelist_readonly; eassumption.
+          eapply HFE. eassumption. eassumption. unfold ReadOnlyBlocks. rewrite Heqd; trivial.
+  Qed.
+
+Lemma alloc_variables_readonly: forall vars m e e2 m'
+      (M: alloc_variables e m vars e2 m') b (VB: Mem.valid_block m b),
+      readonly m b m'.
+Proof. intros.
+  induction M.
+  apply readonly_refl.
+  eapply readonly_trans. 
+     eapply alloc_readonly; try eassumption.
+     apply IHM. eapply alloc_forward; eassumption.
+Qed.
+
+Lemma bind_parameter_readonly: forall e m pars vargs m'
+      (M: bind_parameters e m pars vargs m') b (VB: Mem.valid_block m b),
+      readonly m b m'.
+Proof. intros.
+  induction M.
+  apply readonly_refl.
+  eapply readonly_trans; try eassumption.
+  inv H0.
+  eapply store_readonly; eassumption.
+  eapply storebytes_readonly; eassumption. 
+     apply IHM. inv H0. eapply store_forward; eassumption.
+                        eapply storebytes_forward; eassumption.
+Qed.
+
+Lemma function_entry1_readonly: forall (g:genv) f vargs m e le m'
+            (GV: forall b, isGlobalBlock g b = true -> Mem.valid_block m b)
+            (*(MRR: mem_respects_readonly g m)*), 
+      function_entry1 f vargs m e le m'-> RDOnly_fwd m m' (ReadOnlyBlocks g). 
+Proof. intros. inv H.
+  red; intros. eapply readonly_trans.
+    eapply alloc_variables_readonly; try eassumption.
+      unfold ReadOnlyBlocks in Hb. 
+      remember (Genv.find_var_info g b) as d; symmetry in Heqd.
+      destruct d; try discriminate.
+      (*eapply MRR; eassumption.*)
+      apply find_var_info_isGlobal in Heqd. eauto.
+    eapply bind_parameter_readonly; try eassumption.
+      unfold ReadOnlyBlocks in Hb. 
+      remember (Genv.find_var_info g b) as d; symmetry in Heqd.
+      destruct d; try discriminate.
+      eapply alloc_variables_forward; try eassumption. 
+      (*eapply MRR; eassumption.*)
+      apply find_var_info_isGlobal in Heqd. eauto.
+Qed.
+
+Lemma clight1_coop_readonly hf g c m c' m'
+            (CS: clight_corestep hf function_entry1 g c m c' m')
+            (GV: forall b, isGlobalBlock g b = true -> Mem.valid_block m b)
+            (*(MRR: mem_respects_readonly g m)*):
+         RDOnly_fwd m m' (ReadOnlyBlocks g).
+  Proof. eapply clight_coop_readonly; eauto.
+         intros. eapply function_entry1_readonly; eassumption.
+  Qed.
+
+Lemma function_entry2_readonly: forall (g:genv) f vargs m e le m'
+            (GV: forall b, isGlobalBlock g b = true -> Mem.valid_block m b)
+            (*(MRR: mem_respects_readonly g m)*), 
+      function_entry2 f vargs m e le m'-> RDOnly_fwd m m' (ReadOnlyBlocks g). 
+Proof. intros. inv H.
+  red; intros. eapply alloc_variables_readonly; try eassumption.
+      unfold ReadOnlyBlocks in Hb. 
+      remember (Genv.find_var_info g b) as d; symmetry in Heqd.
+      destruct d; try discriminate.
+(*      eapply MRR; eassumption.*)
+      apply find_var_info_isGlobal in Heqd. eauto.
+Qed.
+
+Lemma clight2_coop_readonly hf g c m c' m'
+            (CS: clight_corestep hf function_entry2 g c m c' m')
+            (GV: forall b, isGlobalBlock g b = true -> Mem.valid_block m b)
+            (*(MRR: mem_respects_readonly g m)*):
+         RDOnly_fwd m m' (ReadOnlyBlocks g).
+  Proof. eapply clight_coop_readonly; eauto.
+         intros. eapply function_entry2_readonly; eassumption.
+  Qed.
+
+(*
+Require Import semantics_lemmas.
+Lemma clight_coopN_readonly hf g (FE:function -> list val -> mem -> env -> temp_env -> mem -> Prop)
+         (HFE1: forall f vargs m e le m', FE f vargs m e le m' -> mem_respects_readonly g m -> RDOnly_fwd m m' (ReadOnlyBlocks g))
+         (HFE2: forall f vargs m e le m', FE f vargs m e le m' -> mem_forward m m'):
+         forall n c m c' m'
+            (CS: corestepN (CL_core_sem hf FE) g n c m c' m')
+            (MRR: mem_respects_readonly g m),
+         RDOnly_fwd m m' (ReadOnlyBlocks g).
+Proof.
+  induction n; simpl; intros; red; intros.
+  inv CS. apply readonly_refl.
+  destruct CS as [cc [mm [CS CSN]]].
+  specialize (CL_forward hf _ HFE2 _ _ _ _ _ CS). intros.
+  apply clight_coop_readonly in CS; trivial.
+  eapply readonly_trans. eapply CS. eassumption.
+  eapply IHn; try eassumption.
+  eapply mem_respects_readonly_forward'; eassumption.
+Qed.
+
+Lemma clight1_coopN_readonly hf g n c m c' m'
+            (CS: corestepN (CL_core_sem hf function_entry1) g n c m c' m')
+            (MRR: mem_respects_readonly g m):
+         RDOnly_fwd m m' (ReadOnlyBlocks g).
+Proof.
+  eapply clight_coopN_readonly; try eassumption.
+  intros. eapply function_entry1_readonly; eauto. 
+  intros. eapply function_entry1_forward; eauto.
+Qed.
+
+Lemma clight2_coopN_readonly hf g n c m c' m'
+            (CS: corestepN (CL_core_sem hf function_entry2) g n c m c' m')
+            (MRR: mem_respects_readonly g m):
+         RDOnly_fwd m m' (ReadOnlyBlocks g).
+Proof.
+  eapply clight_coopN_readonly; try eassumption.
+  intros. eapply function_entry2_readonly; eauto. 
+  intros. eapply function_entry2_forward; eauto.
+Qed.
+
+Lemma clight1_coop_plus_readonly hf g: forall c m c' m'
+            (CS: corestep_plus (CL_core_sem hf function_entry1) g c m c' m')
+            (MRR: mem_respects_readonly g m),
+         RDOnly_fwd m m' (ReadOnlyBlocks g).
+Proof. intros.
+  destruct CS. eapply clight1_coopN_readonly; eassumption.
+Qed.
+ 
+Lemma clight2_coop_plus_readonly hf g: forall c m c' m'
+            (CS: corestep_plus (CL_core_sem hf function_entry2) g c m c' m')
+            (MRR: mem_respects_readonly g m),
+         RDOnly_fwd m m' (ReadOnlyBlocks g).
+Proof. intros.
+  destruct CS. eapply clight2_coopN_readonly; eassumption.
+Qed.
+ 
+Lemma clight1_coop_star_readonly hf g: forall c m c' m'
+            (CS: corestep_star (CL_core_sem hf function_entry1) g c m c' m')
+            (MRR: mem_respects_readonly g m),
+         RDOnly_fwd m m' (ReadOnlyBlocks g).
+Proof. intros.
+  destruct CS. eapply clight1_coopN_readonly; eassumption.
+Qed.
+
+Lemma clight2_coop_star_readonly hf g: forall c m c' m'
+            (CS: corestep_star (CL_core_sem hf function_entry2) g c m c' m')
+            (MRR: mem_respects_readonly g m),
+         RDOnly_fwd m m' (ReadOnlyBlocks g).
+Proof. intros.
+  destruct CS. eapply clight2_coopN_readonly; eassumption.
+Qed.
+ *)

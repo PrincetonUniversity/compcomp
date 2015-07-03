@@ -1512,7 +1512,7 @@ destruct U1 as [P1 V1]; destruct U2 as [P2 V2].
     apply V1; trivial.
   apply P1; trivial. eapply Mem.perm_valid_block; eassumption.
 Qed.
-
+(*
 Axiom ec_readonly_perm:
   forall (ef : external_function) (F V : Type) (ge : Genv.t F V)
     (vargs : list val) (m1 : mem) (t : trace) (vres : val) (m2 : mem)
@@ -1523,6 +1523,13 @@ Axiom ec_readonly_perm:
    ofs <= ofs' < ofs + size_chunk chunk -> ~ Mem.perm m1 b ofs' Max Writable) ->
   forall ofs', ofs <= ofs' < ofs + size_chunk chunk ->
     forall k p, Mem.perm m1 b ofs' k p <-> Mem.perm m2 b ofs' k p.
+*)
+
+Axiom ec_readonly_strong: forall
+  (ef : external_function) (F V : Type) (ge : Genv.t F V)
+    (vargs : list val) (m1 : mem) (t : trace) (vres : val) (m2 : mem)
+    (EC: external_call ef ge vargs m1 t vres m2)
+    b (VB: Mem.valid_block m1 b), readonly m1 b m2.
 
 Lemma external_call_mem_forward:
   forall (ef : external_function) (F V : Type) (ge : Genv.t F V)
@@ -1534,21 +1541,14 @@ split; intros. eapply external_call_valid_block; eauto.
 eapply external_call_max_perm; eauto.
 Qed.
 
-Axiom external_call_readonly:
-  forall (ef : external_function) (F V : Type) (ge : Genv.t F V)
-    (vargs : list val) (m1 : mem) (t : trace) (vres : val) (m2 : mem),
-    external_call ef ge vargs m1 t vres m2 -> 
-  forall b, Mem.valid_block m1 b -> readonly m1 b m2. 
-
 Lemma external_call_readonlyLD:
   forall (ef : external_function) (F V : Type) (ge : Genv.t F V)
     (vargs : list val) (m1 : mem) (t : trace) (vres : val) (m2 : mem),
     external_call ef ge vargs m1 t vres m2 -> 
   forall b, Mem.valid_block m1 b -> readonlyLD m1 b m2. 
-Proof. red; intros.
-  split. eapply ec_readonly; trivial.
-         apply (external_call_spec ef). eassumption.
-  eapply ec_readonly_perm; eassumption.
+Proof. intros.
+  eapply readonly_readonlyLD.
+  eapply ec_readonly_strong; eassumption.
 Qed.
 
 Definition val_has_type_opt' (v: option val) (ty: typ) :=
@@ -1568,3 +1568,86 @@ Definition is_vundef (v : val) : bool :=
 
 Definition vals_def (vs : list val) := 
   List.forallb (fun v => negb (is_vundef v)) vs.
+
+Definition genv2blocksBool {F V : Type} (ge : Genv.t F V):= 
+  (fun b =>
+      match Genv.invert_symbol ge b with
+        Some id => true
+      | None => false
+      end,
+   fun b => match Genv.find_var_info ge b with
+                  Some gv => true
+                | None => false
+            end).
+
+Definition isGlobalBlock {F V : Type} (ge : Genv.t F V) :=
+  fun b => (fst (genv2blocksBool ge)) b || (snd (genv2blocksBool ge)) b.
+
+Lemma invert_symbol_isGlobal: forall {V F} (ge : Genv.t F V) b x,
+      Genv.invert_symbol ge b = Some x -> isGlobalBlock ge b = true.
+Proof. intros.
+  unfold isGlobalBlock, genv2blocksBool. simpl.
+  rewrite H; simpl; trivial. 
+Qed.
+
+Lemma find_symbol_isGlobal: forall {V F} (ge : Genv.t F V) x b
+       (Find: Genv.find_symbol ge x = Some b), isGlobalBlock ge b = true.
+Proof. intros.
+  eapply invert_symbol_isGlobal.
+  rewrite (Genv.find_invert_symbol _ _ Find). reflexivity.
+Qed.
+
+Lemma find_var_info_isGlobal: forall {V F} (ge : Genv.t F V) b x,
+      Genv.find_var_info ge b = Some x -> isGlobalBlock ge b = true.
+Proof. intros.
+  unfold isGlobalBlock, genv2blocksBool. simpl.
+  rewrite H, orb_true_r; trivial. 
+Qed.
+
+Definition ReadOnlyBlocks {F V} (ge: Genv.t F V) (b:block): bool :=
+  match Genv.find_var_info ge b with 
+          None => false
+        | Some gv => gvar_readonly gv && negb (gvar_volatile gv)
+  end.
+
+Definition RDOnly_fwd (m1 m1':mem) B :=
+  forall b (Hb: B b = true), readonly m1 b m1'.
+
+Lemma RDOnly_fwd_trans m1 m2 m3 B:
+  RDOnly_fwd m1 m2 B -> RDOnly_fwd m2 m3 B -> RDOnly_fwd m1 m3 B.
+Proof. intros; red; intros.
+  eapply readonly_trans. apply H; eauto. apply H0; eauto.
+Qed.
+
+Definition mem_respects_readonly {F V} (ge : Genv.t F V) m :=
+    forall b gv, Genv.find_var_info ge b = Some gv ->
+                 gvar_readonly gv && negb (gvar_volatile gv) = true ->
+           Genv.load_store_init_data ge m b 0 (gvar_init gv) /\
+           Mem.valid_block m b /\ (forall ofs : Z, ~ Mem.perm m b ofs Max Writable).
+
+Lemma mem_respects_readonly_forward {F V} (ge : Genv.t F V) m m'
+         (MRR: mem_respects_readonly ge m)
+         (FWD: mem_forward m m')
+         (RDO: forall b gv, Genv.find_var_info ge b = Some gv ->
+                 gvar_readonly gv && negb (gvar_volatile gv) = true -> readonly m b m'):
+         mem_respects_readonly ge m'.
+Proof. red; intros. destruct (MRR _ _ H H0) as [LSI [VB NP]]; clear MRR.
+destruct (FWD _ VB) as [VB' Perm].
+split. eapply Genv.load_store_init_data_invariant; try eassumption.
+       intros. eapply readonly_readonlyLD. eapply RDO; try eassumption. intros. apply NP.
+split. trivial.
+intros z N. apply (NP z); eauto.
+Qed.
+
+Lemma mem_respects_readonly_forward' {F V} (ge : Genv.t F V) m m'
+         (MRR: mem_respects_readonly ge m)
+         (FWD: mem_forward m m')
+         (RDO: RDOnly_fwd m m' (ReadOnlyBlocks ge)):
+         mem_respects_readonly ge m'.
+Proof. red; intros. destruct (MRR _ _ H H0) as [LSI [VB NP]]; clear MRR.
+destruct (FWD _ VB) as [VB' Perm].
+split. eapply Genv.load_store_init_data_invariant; try eassumption.
+       intros. eapply readonly_readonlyLD. eapply RDO; try eassumption. unfold ReadOnlyBlocks. rewrite H; trivial. intros. apply NP.
+split. trivial.
+intros z N. apply (NP z); eauto.
+Qed.

@@ -9,7 +9,7 @@ Require Import Events.
 Require Import Globalenvs.
 Require Import Smallstep.
 Require Import Locations.
-Require Import Stacklayout.
+(*Require Import Stacklayout.*)
 Require Import Conventions.
 
 (*LENB: We don't import CompCert's original Asm.v, but the modified one*)
@@ -373,3 +373,116 @@ Defined.
 End ASM_COOPSEM.
 
 End ASM_COOP.
+
+Lemma exec_load_readonly g ch m a rs rd rs' m': forall 
+      (EI: exec_load g ch m a rs rd = Next rs' m') b
+      (VB: Mem.valid_block m b),
+      readonly m b m'.
+Proof. intros.
+  unfold exec_load in EI.
+  remember (Mem.loadv ch m (eval_addrmode g a rs) ).
+  symmetry in Heqo; destruct o; inv EI. apply readonly_refl.
+Qed.
+
+Lemma exec_store_readonly g ch m a rs rs0 vals rs' m': forall
+      (ES: exec_store g ch m a rs rs0 vals = Next rs' m') b
+      (VB: Mem.valid_block m b),
+      readonly m b m'.
+Proof. intros.
+  unfold exec_store in ES.
+  remember (Mem.storev ch m (eval_addrmode g a rs) (rs rs0)).
+  symmetry in Heqo; destruct o; inv ES.
+  remember (eval_addrmode g a rs). destruct v; inv Heqo. 
+  eapply store_readonly; eassumption.
+Qed.
+
+Lemma goto_label_readonly c0 l rs m rs' m': forall
+      (G: goto_label c0 l rs m = Next rs' m') b
+      (VB: Mem.valid_block m b), readonly m b m'.
+Proof. intros.
+   unfold goto_label in G. 
+   destruct (label_pos l 0 c0); inv G.
+   destruct (rs PC); inv H0. 
+   apply readonly_refl.
+Qed.
+
+Lemma exec_instr_readonly g c i rs m rs' m': forall 
+      (EI: exec_instr g c i rs m = Next rs' m') b
+      (VB: Mem.valid_block m b),
+      readonly m b m'.
+Proof. intros.
+   destruct i; simpl in *; inv EI; try apply readonly_refl;
+   try (eapply exec_load_readonly; eassumption);
+   try (eapply exec_store_readonly; eassumption).
+
+   destruct (Val.divu (rs EAX) (rs # EDX <- Vundef r1)); inv H0.
+   destruct (Val.modu (rs EAX) (rs # EDX <- Vundef r1)); inv H1.
+   apply readonly_refl.
+
+   destruct (Val.divs (rs EAX) (rs # EDX <- Vundef r1)); inv H0.
+   destruct (Val.mods (rs EAX) (rs # EDX <- Vundef r1)); inv H1.
+   apply readonly_refl.
+
+   destruct (eval_testcond c0 rs); inv H0.
+   destruct b0; inv H1; apply readonly_refl.
+   apply readonly_refl.
+
+   eapply goto_label_readonly; eassumption. 
+
+   destruct (eval_testcond c0 rs); inv H0.
+   destruct b0; inv H1.
+   eapply goto_label_readonly; eassumption. 
+   apply readonly_refl.
+
+   destruct (eval_testcond c1 rs); inv H0.
+   destruct b0. 
+     destruct (eval_testcond c2 rs); inv H1.
+     destruct b0; inv H0. 
+     eapply goto_label_readonly; eassumption.
+   apply readonly_refl.
+
+     destruct (eval_testcond c2 rs); inv H1.
+     apply readonly_refl.
+     destruct (rs r); inv H0.
+     destruct (list_nth_z tbl (Int.unsigned i)); inv H1. 
+     eapply goto_label_readonly; eassumption.
+  remember (Mem.alloc m 0 sz) as d; apply eq_sym in Heqd.
+    destruct d; inv H0.
+    remember (Mem.store Mint32 m0 b0 (Int.unsigned (Int.add Int.zero ofs_link))
+         (rs ESP)) as q.
+    apply eq_sym in Heqq; destruct q; inv H1.
+    remember (Mem.store Mint32 m1 b0 (Int.unsigned (Int.add Int.zero ofs_ra))
+         (rs RA)) as w.
+    destruct w; apply eq_sym in Heqw; inv H0.
+    eapply readonly_trans.
+      eapply alloc_readonly; eassumption.
+    apply alloc_forward in Heqd. 
+    eapply readonly_trans.
+      eapply store_readonly; try eassumption. eapply Heqd; eassumption. 
+      eapply store_readonly; try eassumption. eapply store_forward; try eassumption. eapply Heqd; eassumption. 
+  destruct (Mem.loadv Mint32 m (Val.add (rs ESP) (Vint ofs_ra))); inv H0.  
+    destruct (Mem.loadv Mint32 m (Val.add (rs ESP) (Vint ofs_link))); inv H1.  
+    destruct (rs ESP); inv H0.
+    remember (Mem.free m b0 0 sz) as t.
+    destruct t; inv H1; apply eq_sym in Heqt. 
+    eapply free_readonly; eassumption. 
+Qed.
+
+Lemma asm_coop_readonly hf g c m c' m'
+            (CS: asm_step hf g c m c' m')
+            (GV: forall b, isGlobalBlock g b = true -> Mem.valid_block m b):  
+         RDOnly_fwd m m' (ReadOnlyBlocks g).
+  Proof. intros. red; intros.
+     unfold ReadOnlyBlocks in Hb.
+     remember (Genv.find_var_info g b) as d; symmetry in Heqd.
+     destruct d; try discriminate.
+     apply find_var_info_isGlobal in Heqd. apply GV in Heqd.  
+     inv CS; simpl in *; try apply readonly_refl.
+          eapply exec_instr_readonly; eassumption. 
+          inv H2. eapply ec_readonly_strong; eassumption.
+          inv H1. eapply ec_readonly_strong; eassumption.
+          eapply readonly_trans. 
+            eapply alloc_readonly; eassumption.
+            apply alloc_forward in H0.
+            eapply store_args_readonly; try eassumption. apply H0; trivial.
+Qed.

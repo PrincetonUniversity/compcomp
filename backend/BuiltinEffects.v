@@ -14,7 +14,8 @@ Require Import structured_injections.
 Require Import reach. 
 Require Import effect_semantics. 
 Require Import effect_properties.
-Require Import simulations. 
+Require Import globalSep.
+(*Require Import simulations. *)
 
 Require Import I64Helpers.
 

@@ -72,6 +72,7 @@ Section effsemlemmas.
         U = (fun b z => U1 b z || (U2 b z && valid_block_dec m1 b))
     end.
 
+
 Lemma effstepN_valid: forall n U c1 m1 c2 m2, effstepN n U c1 m1 c2 m2 ->
        forall b z, U b z = true -> Mem.valid_block m1 b.
 Proof. intros n.
@@ -194,6 +195,14 @@ Proof. intros; subst. eapply effstepN_trans; eassumption. Qed.
 
   Definition effstep_star U c m c' m' :=
     exists n, effstepN n U c m c' m'.
+
+  Lemma effstep_plus_corestep_plus U c m c' m' (EFF: effstep_plus U c m c' m'):
+        corestep_plus Sem g c m c' m'.
+  Proof. destruct EFF. apply effstepN_corestepN in H. exists x; trivial. Qed.
+  
+  Lemma effstep_star_corestep_star U c m c' m' (EFF: effstep_star U c m c' m'):
+        corestep_star Sem g c m c' m'.
+  Proof. destruct EFF. apply effstepN_corestepN in H. exists x; trivial. Qed.
 
   Lemma effstep_plus_star : forall U c1 c2 m1 m2,
     effstep_plus U c1 m1 c2 m2 -> effstep_star U c1 m1 c2 m2.

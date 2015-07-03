@@ -377,3 +377,21 @@ apply Build_CoopCoreSem with (coopsem := Linear_core_sem).
 Defined.
 
 End LINEAR_COOP.
+
+Lemma linear_coop_readonly hf g c m c' m'
+            (CS: Linear_step hf g c m c' m')
+            (GV: forall b, isGlobalBlock g b = true -> Mem.valid_block m b):  
+         RDOnly_fwd m m' (ReadOnlyBlocks g).
+  Proof. intros. red; intros.
+     unfold ReadOnlyBlocks in Hb.
+     remember (Genv.find_var_info g b) as d; symmetry in Heqd.
+     destruct d; try discriminate.  
+     apply find_var_info_isGlobal in Heqd. apply GV in Heqd.   
+     inv CS; simpl in *; try apply readonly_refl.
+          destruct a; inv H0. eapply store_readonly; eassumption.
+          eapply free_readonly; eassumption.
+          inv H. eapply ec_readonly_strong; eassumption.
+          eapply free_readonly; eassumption.
+          eapply alloc_readonly; eassumption.
+          inv H0; eapply ec_readonly_strong; eassumption.
+Qed.

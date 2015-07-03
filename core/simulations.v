@@ -20,34 +20,12 @@ Require Export globalSep.
 
 (** * Structured Simulations *)
 
+
 Definition RDOnly_inj (m1 m2:mem) mu B :=
   forall b (Hb: B b = true),
             extern_of mu b = Some(b,0) /\ (forall b' d, as_inj mu b' = Some(b,d) -> b'=b) /\ 
             forall ofs, ~ Mem.perm m1 b ofs Max Writable /\
                         ~ Mem.perm m2 b ofs Max Writable.
-
-Definition RDOnly_fwd (m1 m1':mem) B :=
-  forall b (Hb: B b = true), readonly m1 b m1'.
-
-Definition mem_respects_readonly {F V} (ge : Genv.t F V) m :=
-    forall b gv, Genv.find_var_info ge b = Some gv ->
-                 gvar_readonly gv && negb (gvar_volatile gv) = true ->
-           Genv.load_store_init_data ge m b 0 (gvar_init gv) /\
-           Mem.valid_block m b /\ (forall ofs : Z, ~ Mem.perm m b ofs Max Writable).
-
-Lemma mem_respects_readonly_forward {F V} (ge : Genv.t F V) m m'
-         (MRR: mem_respects_readonly ge m)
-         (FWD: mem_forward m m')
-         (RDO: forall b gv, Genv.find_var_info ge b = Some gv ->
-                 gvar_readonly gv && negb (gvar_volatile gv) = true -> readonly m b m'):
-         mem_respects_readonly ge m'.
-Proof. red; intros. destruct (MRR _ _ H H0) as [LSI [VB NP]]; clear MRR.
-destruct (FWD _ VB) as [VB' Perm].
-split. eapply Genv.load_store_init_data_invariant; try eassumption.
-       intros. eapply readonly_readonlyLD. eapply RDO; try eassumption. intros. apply NP.
-split. trivial.
-intros z N. apply (NP z); eauto.
-Qed.
 
 Definition gvar_info_eq {V1 V2} (v1: option (globvar V1)) (v2: option (globvar V2)) :=
   match v1, v2 with
@@ -81,12 +59,6 @@ Proof. specialize (G b); rewrite Hb in G. red in G.
   destruct (Genv.find_var_info ge1 b); try contradiction.
   exists g. intuition.
 Qed.
-
-Definition ReadOnlyBlocks {F V} (ge: Genv.t F V) (b:block): bool :=
-  match Genv.find_var_info ge b with 
-          None => false
-        | Some gv => gvar_readonly gv && negb (gvar_volatile gv)
-  end.
 
 Lemma gvar_infos_eq_ReadOnlyBlocks {F1 V1 F2 V2} (g1: Genv.t F1 V1) (g2:Genv.t F2 V2):
       gvar_infos_eq g1 g2 -> ReadOnlyBlocks g1 = ReadOnlyBlocks g2.
@@ -158,7 +130,67 @@ Context
   (Sem1 : @EffectSem (Genv.t F1 V1) C1)
   (Sem2 : @EffectSem (Genv.t F2 V2) C2)
   (ge1 : Genv.t F1 V1)
-  (ge2 : Genv.t F2 V2).
+  (ge2 : Genv.t F2 V2)
+  (CS1_RDO: forall c m c' m', corestep Sem1 ge1 c m c' m' ->
+                  (*mem_respects_readonly ge1 m ->*)
+                  (forall b, isGlobalBlock ge1 b = true -> Mem.valid_block m b) ->
+                  RDOnly_fwd m m' (ReadOnlyBlocks ge1))
+  (CS2_RDO: forall c m c' m', corestep Sem2 ge2 c m c' m' ->
+                  (*mem_respects_readonly ge2 m ->*)
+                  (forall b, isGlobalBlock ge2 b = true -> Mem.valid_block m b) ->
+                  RDOnly_fwd m m' (ReadOnlyBlocks ge2)).
+
+Require Import semantics_lemmas.
+Lemma CS1_RDO_N: forall n c m c' m', corestepN Sem1 ge1 n c m c' m' ->
+                  (*mem_respects_readonly ge1 m ->*)
+                  (forall b, isGlobalBlock ge1 b = true -> Mem.valid_block m b) ->
+                  RDOnly_fwd m m' (ReadOnlyBlocks ge1).
+Proof.
+  induction n; simpl; intros; red; intros.
+  inv H. apply readonly_refl.
+  destruct H as [cc [mm [CS CSN]]].
+  specialize (corestep_fwd _ _ _ _ _ _ CS). intros.
+  apply CS1_RDO in CS; trivial.
+  eapply readonly_trans. eapply CS. eassumption.
+  eapply IHn; try eassumption.
+  intros. apply H. eauto.
+  (*eapply mem_respects_readonly_forward'; eassumption.*)
+Qed.
+
+Lemma CS1_RDO_plus: forall c m c' m', corestep_plus Sem1 ge1 c m c' m' ->
+                  (forall b, isGlobalBlock ge1 b = true -> Mem.valid_block m b) ->
+                  RDOnly_fwd m m' (ReadOnlyBlocks ge1).
+Proof. intros. destruct H. eapply CS1_RDO_N; eassumption. Qed.
+
+Lemma CS1_RDO_star: forall c m c' m', corestep_star Sem1 ge1 c m c' m' -> 
+                  (forall b, isGlobalBlock ge1 b = true -> Mem.valid_block m b) ->  
+                  RDOnly_fwd m m' (ReadOnlyBlocks ge1).
+Proof. intros. destruct H. eapply CS1_RDO_N; eassumption. Qed.
+
+Lemma CS2_RDO_N: forall n c m c' m', corestepN Sem2 ge2 n c m c' m' ->
+                  (forall b, isGlobalBlock ge2 b = true -> Mem.valid_block m b) ->
+                  RDOnly_fwd m m' (ReadOnlyBlocks ge2).
+Proof.
+  induction n; simpl; intros; red; intros.
+  inv H. apply readonly_refl.
+  destruct H as [cc [mm [CS CSN]]].
+  specialize (corestep_fwd _ _ _ _ _ _ CS). intros.
+  apply CS2_RDO in CS; trivial.
+  eapply readonly_trans. eapply CS. eassumption.
+  eapply IHn; try eassumption.
+  intros. apply H. eauto.
+  (*eapply mem_respects_readonly_forward'; eassumption.*)
+Qed.
+
+Lemma CS2_RDO_plus: forall c m c' m', corestep_plus Sem2 ge2 c m c' m' ->
+                  (forall b, isGlobalBlock ge2 b = true -> Mem.valid_block m b) ->
+                  RDOnly_fwd m m' (ReadOnlyBlocks ge2).
+Proof. intros. destruct H. eapply CS2_RDO_N; eassumption. Qed.
+
+Lemma CS2_RDO_star: forall c m c' m', corestep_star Sem2 ge2 c m c' m' ->
+                  (forall b, isGlobalBlock ge2 b = true -> Mem.valid_block m b) ->
+                  RDOnly_fwd m m' (ReadOnlyBlocks ge2).
+Proof. intros. destruct H. eapply CS2_RDO_N; eassumption. Qed.
 
 Record SM_simulation_inject := { 
   (** The type of auxiliary data used to model stuttering. *)
@@ -179,7 +211,7 @@ Record SM_simulation_inject := {
   (** The global environments have equal domain. *)
 ; genvs_dom_eq : genvs_domain_eq ge1 ge2
 
-  (** The global environments also assocaite same info with global blocks and 
+  (** The global environments also associate same info with global blocks and 
       preserve find_var. These conditions are used for in the transitivity proof,
       to establish mem_respects_readonly for the intermediate memory and globalenv. *)
 ; ginfo_preserved : gvar_infos_eq ge1 ge2 /\ findsymbols_preserved ge1 ge2
@@ -257,15 +289,15 @@ Record SM_simulation_inject := {
           ((effstep_plus Sem2 ge2 U2 st2 m2 st2' m2' \/
             (effstep_star Sem2 ge2 U2 st2 m2 st2' m2' /\
              core_ord cd' cd)) /\
-         forall 
-           (UHyp: forall b1 z, U1 b1 z = true -> vis mu b1 = true)
-           b ofs (Ub: U2 b ofs = true),
-           visTgt mu b = true 
-           /\ (locBlocksTgt mu b = false ->
+          ( forall 
+            (UHyp: forall b1 z, U1 b1 z = true -> vis mu b1 = true)
+            b ofs (Ub: U2 b ofs = true),
+            visTgt mu b = true 
+            /\ (locBlocksTgt mu b = false ->
                exists b1 delta1, 
                  foreign_of mu b1 = Some(b,delta1) 
                  /\ U1 b1 (ofs-delta1) = true 
-                 /\ Mem.perm m1 b1 (ofs-delta1) Max Nonempty))
+                 /\ Mem.perm m1 b1 (ofs-delta1) Max Nonempty)))
 
   (** The clause that relates halted states. *)      
 ; core_halted : 
@@ -407,6 +439,64 @@ destruct STEP as [[n STEP] | [[n STEP] CO]];
 left. exists n. assumption.
 right; split; trivial. exists n. assumption.
 Qed.
+
+(** Derive an internal step diagram with RDO_fwd property. *)
+Lemma effcore_diagram_RDO_fwd (SMI: SM_simulation_inject): 
+    forall st1 m1 st1' m1' U1, 
+    effstep Sem1 ge1 U1 st1 m1 st1' m1' ->
+    forall cd st2 mu m2,
+    match_state SMI cd mu st1 m1 st2 m2 ->
+    exists st2', exists m2', exists cd', exists mu',
+      intern_incr mu mu'
+      /\ globals_separate ge2 mu mu' 
+      /\ sm_locally_allocated mu mu' m1 m2 m1' m2' 
+      /\ match_state SMI cd' mu' st1' m1' st2' m2'
+      /\ exists U2,              
+          ((effstep_plus Sem2 ge2 U2 st2 m2 st2' m2' \/
+            (effstep_star Sem2 ge2 U2 st2 m2 st2' m2' /\
+             core_ord SMI cd' cd)) /\
+          ( forall 
+            (UHyp: forall b1 z, U1 b1 z = true -> vis mu b1 = true)
+            b ofs (Ub: U2 b ofs = true),
+            visTgt mu b = true 
+            /\ (locBlocksTgt mu b = false ->
+               exists b1 delta1, 
+                 foreign_of mu b1 = Some(b,delta1) 
+                 /\ U1 b1 (ofs-delta1) = true 
+                 /\ Mem.perm m1 b1 (ofs-delta1) Max Nonempty))
+         /\ RDOnly_fwd m1 m1' (ReadOnlyBlocks ge1)
+         /\ RDOnly_fwd m2 m2' (ReadOnlyBlocks ge2)).
+Proof. intros.
+  exploit effcore_diagram; eauto. 
+  intros [st2' [m2' [cd' [mu' [INC [LOCALLOC [GSEP [MTCH' [U2 [Steps2 VIS]]]]]]]]]].
+  exists st2', m2', cd', mu'.
+  split; trivial.
+  split; trivial.
+  split; trivial.
+  split; trivial.
+  exists U2.
+  split; trivial.
+  split; trivial.
+  destruct (match_genv SMI _ _ _ _ _ _ H0).
+  specialize (match_sm_wd SMI _ _ _ _ _ _ H0). intros WD.
+  apply match_validblocks in H0.
+  split. eapply CS1_RDO. eapply effstep_corestep. eassumption.
+         intros. apply H2 in H3. eapply H0.
+         destruct (frgnSrc _ WD _ H3) as [? [? [? ?]]]. eapply foreign_DomRng; eassumption.
+  destruct Steps2 as [Steps2 | [Steps2 _]].
+  apply effstep_plus_corestep_plus in Steps2.
+    eapply CS2_RDO_plus; try eassumption. 
+         rewrite <- (genvs_domain_eq_isGlobal _ _ (genvs_dom_eq SMI)).
+         intros. eapply H0.
+         apply (meminj_preserves_globals_isGlobalBlock _ _ H1) in H3. 
+         eapply extern_DomRng'; eassumption.
+  apply effstep_star_corestep_star in Steps2.
+    eapply CS2_RDO_star; try eassumption. 
+         rewrite <- (genvs_domain_eq_isGlobal _ _ (genvs_dom_eq SMI)).
+         intros. eapply H0.
+         apply (meminj_preserves_globals_isGlobalBlock _ _ H1) in H3. 
+         eapply extern_DomRng'; eassumption.
+Qed.  
 
 End SharedMemory_simulation_inject. 
 

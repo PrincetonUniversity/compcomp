@@ -646,13 +646,17 @@ Proof. intros. inv MS.
        rewrite vis_restrict_sm, restrict_sm_local, restrict_nest; auto. }
 Qed.
 
-Definition MATCH (d:Mach_core) mu c1 m1 c2 m2:Prop :=
+Definition MATCH' (d:Mach_core) mu c1 m1 c2 m2:Prop :=
   match_states mu c1 m1 c2 m2 /\ 
   REACH_closed m1 (vis mu) /\
   meminj_preserves_globals ge (as_inj mu) /\
   globalfunction_ptr_inject ge (as_inj mu) /\
   (forall b, isGlobalBlock ge b = true -> frgnBlocksSrc mu b = true) /\
   sm_valid mu m1 m2 /\ SM_wd mu.
+
+Definition MATCH d mu c1 m1 c2 m2:Prop :=
+  MATCH' d mu c1 m1 c2 m2 /\
+  (mem_respects_readonly ge m1 /\ mem_respects_readonly tge m2).
 
 Lemma MATCH_wd: forall d mu c1 m1 c2 m2 
   (MC: MATCH d mu c1 m1 c2 m2), SM_wd mu.
@@ -668,9 +672,10 @@ Lemma MATCH_restrict: forall d mu c1 m1 c2 m2 X
   (RX: REACH_closed m1 X), 
   MATCH d (restrict_sm mu X) c1 m1 c2 m2.
 Proof. intros.
-  destruct MC as [MS [RC [PG [GF [Glob [SMV WD]]]]]].
+  destruct MC as [[MS [RC [PG [GF [Glob [SMV WD]]]]]] MRR].
 assert (WDR: SM_wd (restrict_sm mu X)).
    apply restrict_sm_WD; assumption.
+split; trivial.
 split.
   eapply match_states_restrict; eassumption.
 split. unfold vis.
@@ -822,12 +827,14 @@ Lemma MATCH_initial: forall v
   (Inj: Mem.inject j m1 m2)
   (VInj: Forall2 (val_inject j) vals1 vals2)
   (PG: meminj_preserves_globals ge j)
+  (GFI: globalfunction_ptr_inject ge j)
   (J: forall b1 b2 d, j b1 = Some (b2, d) -> 
                       DomS b1 = true /\ DomT b2 = true)
   (RCH: forall b, REACH m2
         (fun b' : Values.block => isGlobalBlock tge b' || getBlocks vals2 b') b =
          true -> DomT b = true)
-  (GFI: globalfunction_ptr_inject ge j)
+  (RdOnly1: mem_respects_readonly ge m1)
+  (RdOnly2: mem_respects_readonly tge m2) 
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
 exists c2,
@@ -919,7 +926,8 @@ Proof. intros.
      VInj J RCH PG GDE_lemma HDomS HDomT _ (eq_refl _))
     as [AA [BB [CC [DD [EE [FF GG]]]]]].
 
-  unfold MATCH.
+  split. 2: split; assumption.
+  unfold MATCH'.
   intuition.
 
   rewrite Hsig. 
@@ -944,6 +952,8 @@ Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
       (AtExtSrc: at_external (Mach_eff_sem hf return_address_offset) c1 = 
                  Some (e, ef_sig, vals1)),
       Mem.inject (as_inj mu) m1 m2  /\
+     mem_respects_readonly ge m1 /\
+     mem_respects_readonly tge m2 /\
 (exists vals2 : list val,
    Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\
    at_external (Asm_eff_sem hf)c2 = Some (e, ef_sig, vals2) /\
@@ -957,9 +967,11 @@ Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
     MATCH c1 nu c1 m1 c2 m2 /\ Mem.inject (shared_of nu) m1 m2)).
 Proof. 
 intros. 
-destruct MTCH as [MS PRE].
+destruct MTCH as [[MS PRE] [MRR1 MRR2]].
 destruct PRE as [RC [PG [GFP [Glob [SMV WD]]]]].
 inv MS; simpl in AtExtSrc; inv AtExtSrc.
+split; trivial. 
+split; trivial. 
 split; trivial. 
 exists (decode_longs (sig_args (AST.ef_sig e)) args').
 assert (H: 
@@ -977,10 +989,12 @@ exploit replace_locals_wd_AtExternal; try eassumption.
         apply forall_vals_inject_restrictD in H. eassumption.
 intros WDnu.
 simpl. revert H0. destruct (observableEF_dec hf ef). 2: solve[inversion 1]. inversion 1; auto. 
-intuition. subst. split. 
-econstructor; try rewrite replace_locals_as_inj; try rewrite replace_locals_vis; eauto.
-clear - STACKS WD MEXT WDnu. 
-induction STACKS; econstructor; try eassumption.
+intuition.
+{ (*MATCH*) split. 2: split; assumption.
+  subst. split. 
+  econstructor; try rewrite replace_locals_as_inj; try rewrite replace_locals_vis; eauto.
+  clear - STACKS WD MEXT WDnu. 
+  induction STACKS; econstructor; try eassumption.
             clear IHSTACKS. 
                destruct H1 as [b [ofs [tb [X Y]]]].
                exists b, ofs, tb. split; auto.
@@ -1010,10 +1024,11 @@ induction STACKS; econstructor; try eassumption.
          { (*match_load_frames*)
            clear - MLF. inversion MLF. subst lf. subst. constructor; auto.
            rewrite replace_locals_local, replace_locals_vis; auto. }
-rewrite replace_locals_as_inj, replace_locals_vis, replace_locals_frgnBlocksSrc.
-intuition.
-(*sm_valid*)
-  red. rewrite replace_locals_DOM, replace_locals_RNG. apply SMV.
+  rewrite replace_locals_as_inj, replace_locals_vis, replace_locals_frgnBlocksSrc.
+  intuition.
+  (*sm_valid*)
+    red. rewrite replace_locals_DOM, replace_locals_RNG. apply SMV.
+}
 (*inject_shared*)
   eapply inject_shared_replace_locals; try eassumption.
   subst; trivial.
@@ -1044,6 +1059,8 @@ Lemma MATCH_afterExternal: forall
        (RValInjNu': val_inject (as_inj nu') ret1 ret2)
        (FwdSrc: mem_forward m1 m1')
        (FwdTgt: mem_forward m2 m2')
+       (RDO1: RDOnly_fwd m1 m1' (ReadOnlyBlocks ge))
+       (RDO2: RDOnly_fwd m2 m2' (ReadOnlyBlocks tge))
        (frgnSrc' : block -> bool)
        (frgnSrcHyp: frgnSrc' =
              (fun b : block => DomSrc nu' b &&
@@ -1061,7 +1078,7 @@ Lemma MATCH_afterExternal: forall
   after_external (Asm_eff_sem hf)(Some ret2) st2 = Some st2' /\
   MATCH st1' mu' st1' m1' st2' m2'.
 Proof. intros.
-destruct MatchMu as [MS PRE].
+destruct MatchMu as [[MS PRE] MRR].
 destruct PRE as [RC [PG [GFP [Glob [SMV WDmu]]]]].
 simpl in *. inv MS; simpl in *; inv AtExtSrc.
  inv AtExtTgt.
@@ -1098,7 +1115,7 @@ assert (RR1: REACH_closed m1'
    || DomSrc nu' b &&
       (negb (locBlocksSrc nu' b) &&
        REACH m1' (exportedSrc nu' (ret1 :: nil)) b))).
-  intros b Hb. rewrite REACHAX in Hb. destruct Hb as [L HL].
+  clear MRR; intros b Hb. rewrite REACHAX in Hb. destruct Hb as [L HL].
   generalize dependent b.
   induction L; simpl; intros; inv HL.
      assumption.
@@ -1275,10 +1292,11 @@ assert (II': inject_incr (local_of (restrict_sm mu (vis mu)))
   rewrite EQ2 in H1.
   apply frgnSrc_shared in H1; trivial.
   solve[rewrite H1; intuition]. }
-  
-split.
-{ econstructor. 
-       rewrite replace_externs_vis. 
+split. 
+{ (* MATCH'*) 
+  clear MRR; split.
+  { econstructor. 
+    + rewrite replace_externs_vis. 
        clear - LL II WDnuRE STACKS WDmu WDnu' RValInjNu' MemInjNu'.
        induction STACKS; econstructor; eauto.
        clear IHSTACKS STACKS H2 H H0. 
@@ -1297,11 +1315,11 @@ split.
                 rewrite replace_externs_local; trivial.
                 rewrite <- LL. trivial. 
             rewrite replace_externs_vis. trivial.
-rewrite replace_externs_as_inj. trivial.
-rewrite replace_externs_vis. unfold loc_external_result.
-  apply agree_set_other; trivial. 
-  eapply agree_set_mregs.
-  Focus 2. rewrite restrict_sm_all, replace_externs_as_inj.
+    + rewrite replace_externs_as_inj. trivial.
+    + rewrite replace_externs_vis. unfold loc_external_result.
+      apply agree_set_other; trivial. 
+      eapply agree_set_mregs.
+      Focus 2. rewrite restrict_sm_all, replace_externs_as_inj.
            clear - WDnu' RValInjNu'. apply encode_long_inject.
            inv RValInjNu'; try econstructor; eauto.
            eapply restrictI_Some; trivial.
@@ -1310,43 +1328,46 @@ rewrite replace_externs_vis. unfold loc_external_result.
            apply REACH_nil. unfold exportedSrc.
              apply orb_true_iff; left.
              rewrite getBlocks_char. eexists; left. reflexivity.
-  clear - LL II AG INC WDmu WDnu' WDnuRE. destruct AG.
-  constructor; intros.
-    rewrite restrict_sm_local'; trivial.
-    rewrite restrict_sm_local' in agree_sp_local; trivial.
-    rewrite replace_externs_local. rewrite <- LL; trivial.
-    rewrite replace_externs_vis. trivial.
-  rewrite restrict_sm_all. rewrite replace_externs_as_inj. 
-    eapply val_inject_incr.
-    Focus 2. eapply agree_mregs. assumption.
-  rewrite restrict_sm_all, replace_externs_as_inj, replace_externs_vis.
-    rewrite Pregmap.gss. eapply val_inject_incr; try eassumption. 
-(*match_load_frames*)
-inversion MLF. subst lf. subst. constructor; auto. 
-rewrite replace_externs_local.
-rewrite replace_externs_vis.
-apply II'.
-inv SP.
-rewrite restrict_sm_local; auto.
-}
-
-unfold vis in *.
-rewrite replace_externs_locBlocksSrc, replace_externs_frgnBlocksSrc,
+      clear - LL II AG INC WDmu WDnu' WDnuRE. destruct AG.
+      constructor; intros.
+      rewrite restrict_sm_local'; trivial.
+      rewrite restrict_sm_local' in agree_sp_local; trivial.
+      rewrite replace_externs_local. rewrite <- LL; trivial.
+      rewrite replace_externs_vis. trivial.
+      rewrite restrict_sm_all. rewrite replace_externs_as_inj. 
+      eapply val_inject_incr.
+      Focus 2. eapply agree_mregs. assumption.
+    + rewrite restrict_sm_all, replace_externs_as_inj, replace_externs_vis.
+      rewrite Pregmap.gss. eapply val_inject_incr; try eassumption. 
+    + (*match_load_frames*)
+      inversion MLF. subst lf. subst. constructor; auto. 
+      rewrite replace_externs_local.
+      rewrite replace_externs_vis.
+      apply II'.
+      inv SP.
+      rewrite restrict_sm_local; auto.
+  }
+  { unfold vis in *.
+    rewrite replace_externs_locBlocksSrc, replace_externs_frgnBlocksSrc,
         replace_externs_as_inj in *.
-destruct (eff_after_check2 _ _ _ _ _ MemInjNu' RValInjNu' 
-      _ (eq_refl _) _ (eq_refl _) _ (eq_refl _) WDnu' SMvalNu').
-unfold vis in *.
-intuition.
-(*last goal: globalfunction_ptr_inject *)
-  red; intros. destruct (GFP _ _ H3). split; trivial.
-  eapply extern_incr_as_inj; try eassumption.
-  rewrite replace_locals_as_inj. assumption.
+    destruct (eff_after_check2 _ _ _ _ _ MemInjNu' RValInjNu' 
+        _ (eq_refl _) _ (eq_refl _) _ (eq_refl _) WDnu' SMvalNu').
+    unfold vis in *.
+    intuition.
+    (*last goal: globalfunction_ptr_inject *)
+    red; intros. destruct (GFP _ _ H3). split; trivial.
+    eapply extern_incr_as_inj; try eassumption.
+    rewrite replace_locals_as_inj. assumption.
+  }
+}
+destruct MRR as [MRR1 MRR2].
+split; eapply mem_respects_readonly_forward'; eassumption. 
 Qed.
 
 Lemma MATCH_effcore_diagram: forall st1 m1 st1' m1' (U1 : block -> Z -> bool)
       (CS: effstep (Mach_eff_sem hf return_address_offset) ge U1 st1 m1 st1' m1')
       st2 mu m2
-      (MTCH: MATCH st1 mu st1 m1 st2 m2),
+      (MTCH: MATCH' st1 mu st1 m1 st2 m2),
 exists st2' m2' (U2 : block -> Z -> bool),
      (effstep_plus (Asm_eff_sem hf)tge U2 st2 m2 st2' m2' \/
       (measure st1' < measure st1)%nat /\
@@ -1356,7 +1377,7 @@ exists st2' m2' (U2 : block -> Z -> bool),
       globals_separate ge mu mu' /\
     sm_inject_separated mu mu' m1 m2 /\
     sm_locally_allocated mu mu' m1 m2 m1' m2' /\
-    MATCH st1' mu' st1' m1' st2' m2' /\
+    MATCH' st1' mu' st1' m1' st2' m2' /\
    (forall 
       (U1Vis: forall b ofs, U1 b ofs = true -> vis mu b = true)
       b ofs, U2 b ofs = true ->
@@ -1808,7 +1829,7 @@ Opaque loadind.
   eapply sm_locally_allocated_only_stores; eauto.
   solve[apply alloc_forward in H0; auto].
   solve[apply alloc_forward in ALLOC'; auto].
-  unfold MATCH.
+  unfold MATCH'.
   intuition.
   rewrite SIG.
   apply match_states_call_internal with (f:=f); auto.
@@ -3065,40 +3086,64 @@ Proof.
   apply MATCH_valid.
 (*MATCH_preserves_globals*)
   apply MATCH_PG.
-(* init*) { intros.
-    eapply (MATCH_initial _ _ _); eauto. }
+(* init*) { apply MATCH_initial. }
 { (* halted *)
-    intros. destruct H as [MC [RC [PG [Glob [VAL [WD INJ]]]]]].
+    intros. destruct H as [[MC [RC [PG [Glob [VAL [WD INJ]]]]]] [MRR1 MRR2]].
     inv MC; try solve[inv H0]. simpl in H0.
     destruct s; simpl; try solve[congruence]. 
     destruct retty0; inv H0.
     { inv AG. rewrite restrict_sm_all in agree_mregs.
     simpl in ATPC. inv ATPC. simpl.
     destruct t. 
-    + simpl in H1. inv H1. exists (rs (preg_of AX)); split; auto.
-    + simpl in H1. inv H1. exists (rs (preg_of FP0)); split; auto.
+    + simpl in H1. inv H1. exists (rs (preg_of AX)); split; auto; split; auto; split; auto.
+    + simpl in H1. inv H1. exists (rs (preg_of FP0)); split; auto; split; auto; split; auto.
     + simpl in H1. inv H1. 
       case_eq (decode_longs (Tlong::nil) ((rs(preg_of DX))::(rs(preg_of AX))::nil)).
       simpl. inversion 1. simpl. inversion 1. subst.
       exists (Val.longofwords (rs EDX) (rs EAX)). 
       split; auto.
       split; auto.
+      split; auto.
+      split; auto.
       apply val_longofwords_inject; apply agree_mregs.
-    + simpl in H1. inv H1. exists (rs (preg_of FP0)); split; auto. }
+    + simpl in H1. inv H1. exists (rs (preg_of FP0)); split; auto; split; auto; split; auto. }
     { inv AG. rewrite restrict_sm_all in agree_mregs.
     simpl in ATPC. inv ATPC. simpl.
-    exists (rs (preg_of AX)); split; auto. } }
+    exists (rs (preg_of AX)); split; auto; split; auto; split; auto. } }
 { (*at_external *) apply MATCH_atExternal. }
 { (*after_external *) apply MATCH_afterExternal. }
 { (*effcore_diagram *)
-  intros.
+  intros. destruct H0 as [MTCH [MRR1 MRR2]].
    exploit MATCH_effcore_diagram; try eassumption.
     intros [st2' [m2' [U2 [CSTgt [mu' MU]]]]].
     exists st2', m2', mu'.
     split. eapply MU.
     split. eapply MU.
     split. eapply MU.
-    split. eapply MU.
+    split. split. eapply MU. clear MU.
+      destruct MTCH as [_ [_ [PG [_ [GF [SMV WD]]]]]].
+      split. apply effstep_corestep in H.
+             eapply mem_respects_readonly_forward'. eassumption.
+             eapply corestep_fwd; eassumption.
+             eapply mach_coop_readonly. apply H.
+         intros b GB. apply GF in GB. eapply SMV.
+         destruct (frgnSrc _ WD _ GB) as [bb [d [Frgn FTgt]]]. eapply foreign_DomRng; eassumption.
+      assert(G2: forall b, isGlobalBlock tge b = true -> Mem.valid_block m2 b).
+         rewrite <- (genvs_domain_eq_isGlobal _ _ GDE_lemma).
+         intros b GB. eapply SMV.
+         apply (meminj_preserves_globals_isGlobalBlock _ _ PG) in GB. 
+         eapply as_inj_DomRng; eassumption.
+      destruct CSTgt as [CS2 | [_ CS2]].
+      apply effstep_plus_corestep_plus in CS2.
+             eapply mem_respects_readonly_forward'. eassumption.
+             eapply corestep_plus_fwd; eassumption.
+             eapply SM_simulation.CS2_RDO_plus; try eassumption.
+             apply asm_coop_readonly. 
+      apply effstep_star_corestep_star in CS2.
+             eapply mem_respects_readonly_forward'. eassumption.
+             eapply corestep_star_fwd; eassumption.
+             eapply SM_simulation.CS2_RDO_star; try eassumption.
+             apply asm_coop_readonly. 
     (*split. eapply MU. *)
     exists U2. split. trivial. eapply MU. }
 Qed.

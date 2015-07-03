@@ -292,25 +292,25 @@ Proof. intros f1 m1 tm1 f2 m2 tm2 cs bound tbound WD1 WD2 IntInc.
   assert (INC:= intern_incr_restrict _ _ WD2 IntInc). 
   induction 1; intros.
   (* base case *)
-  econstructor; eauto.
-  inv H. constructor; intros; eauto.
-  eapply IMAGE; eauto. 
-    destruct (restrictD_Some _ _ _ _ _ H6); clear H6.
-    assert (AI:  as_inj f1 b1 = Some (b2, delta)).
-      eapply (H5 _ _ _ H8). xomega.
-    eapply restrictI_Some; try eassumption.
-    eapply intern_incr_vis_inv; eassumption.
+  { econstructor; eauto.
+    inv H. constructor; intros; eauto.
+    eapply IMAGE; eauto. 
+      destruct (restrictD_Some _ _ _ _ _ H6); clear H6.
+      assert (AI:  as_inj f1 b1 = Some (b2, delta)).
+        eapply (H5 _ _ _ H8). xomega.
+      eapply restrictI_Some; try eassumption.
+      eapply intern_incr_vis_inv; eassumption. }
   (* inductive case *)
-  assert (Ple lo hi) by (eapply me_low_high; eauto).
-  econstructor; eauto.
-  eapply match_temps_invariant; eauto.
-  eapply match_env_restrict_invariant with (f1:=f1); try eassumption.
-    intros. apply H3. assumption. assumption.
-    intros. apply H2. xomega.
-  eapply match_bounds_invariant; eauto.
-    intros. eapply H0; eauto. 
-    exploit me_bounded; eauto. xomega. 
-  eapply padding_freeable_invariant; eauto. 
+  { assert (Ple lo hi) by (eapply me_low_high; eauto).
+    econstructor; eauto.
+    eapply match_temps_invariant; eauto.
+    eapply match_env_restrict_invariant with (f1:=f1); try eassumption.
+      intros. apply H3. assumption. assumption.
+      intros. apply H2. xomega.
+    eapply match_bounds_invariant; eauto.
+      intros. eapply H0; eauto. 
+      exploit me_bounded; eauto. xomega. 
+    eapply padding_freeable_invariant; eauto. 
     intros. 
       remember (restrict (as_inj f1) (vis f1) b) as d.
       destruct d; apply eq_sym in Heqd.
@@ -325,17 +325,19 @@ Proof. intros f1 m1 tm1 f2 m2 tm2 cs bound tbound WD1 WD2 IntInc.
           rewrite (intern_incr_vis_inv _ _ WD1 WD2 IntInc _ _ _ H6 H7) in Heqd.
             congruence. 
           xomega.
-  eapply IntInc. assumption.
-  intros. exploit (H2 b). xomega. unfold as_inj, join. rewrite H5.
+    eapply IntInc. assumption.
+    intros. exploit (H2 b). xomega. unfold as_inj, join. rewrite H5.
             destruct (disjoint_extern_local _ WD2 b).
               assert (extern_of f1 = extern_of f2) by eapply IntInc. 
               rewrite H8, H7. 
               intros. apply eq_sym in H9. 
               apply (ME_INCR _ _ _ H9 H6). 
            rewrite H7 in H5; discriminate. 
-  eapply IHstructured_match_callstack; eauto. 
-    intros. eapply H0; eauto. xomega. 
-    intros. eapply H2; eauto. xomega. 
+    eapply IHstructured_match_callstack; eauto; clear IHstructured_match_callstack. 
+      intros. eapply H0; eauto. xomega. 
+      intros. eapply H1; eauto. xomega. 
+      intros. eapply H2; eauto. xomega. 
+      intros. eapply H3; eauto. xomega. } 
 Qed.
 
 Lemma structured_match_callstack_builtin_invariant:
@@ -393,6 +395,7 @@ Proof. intros f1 m1 tm1 f2 m2 tm2 cs bound tbound WD1 WD2 IntInc.
   eapply IHstructured_match_callstack; eauto. 
     intros. eapply H0; eauto. xomega. 
     intros. eapply H2; eauto. xomega.
+    intros. eapply H3; eauto. xomega.
 Qed.
 
 Lemma structured_match_callstack_match_globalenvs: 
@@ -646,7 +649,7 @@ Inductive structured_match_cores: core_data -> SM_Injection -> CSharpMin_core ->
       structured_match_cores d mu (CSharpMin_Returnstate v k) m
                    (CMin_Returnstate tv tk) tm.
 
-Definition MATCH d mu c1 m1 c2 m2:Prop :=
+Definition MATCH' d mu c1 m1 c2 m2:Prop :=
   structured_match_cores d mu c1 m1 c2 m2 (*(restrict_sm mu (vis mu)) doesn't work here, since 
                               some of the conditions of match_env are "global"*) /\
   REACH_closed m1 (vis mu) /\
@@ -654,6 +657,10 @@ Definition MATCH d mu c1 m1 c2 m2:Prop :=
   (forall b, isGlobalBlock ge b = true -> frgnBlocksSrc mu b = true) /\
   sm_valid mu m1 m2 /\ SM_wd mu /\
   Mem.inject (as_inj mu) m1 m2(* /\ protected m1 mu*).
+
+Definition MATCH d mu c1 m1 c2 m2:Prop :=
+  MATCH' d mu c1 m1 c2 m2 /\
+  (mem_respects_readonly ge m1 /\ mem_respects_readonly tge m2).
 
 Lemma MATCH_sm_wd: forall d mu c1 m1 c2 m2, 
           MATCH d mu c1 m1 c2 m2 -> 
@@ -740,9 +747,10 @@ Lemma MATCH_restrict: forall d mu c1 m1 c2 m2 X
           (RC: REACH_closed m1 X),
           MATCH d (restrict_sm mu X) c1 m1 c2 m2.
 Proof. intros.
-  destruct MC as [MC [RCLocs [PG [Glob [SMV [WD INJ]]]]]].
+  destruct MC as [[MC [RCLocs [PG [Glob [SMV [WD INJ]]]]]] MRR].
 assert (WDR: SM_wd (restrict_sm mu X)).
    apply restrict_sm_WD; assumption.
+split; trivial.
 split.
   eapply structured_match_cores_restrict; eassumption.
 split. unfold vis.
@@ -842,20 +850,22 @@ Proof.
   * intros. eapply Genv.genv_vars_range; eauto.
 Qed.
 
-Lemma Match_init_core: forall v 
+Lemma MATCH_initial_core: forall v 
   (vals1 : list val) (c1 : CSharpMin_core) (m1 : mem) (j : meminj)
   (vals2 : list val) (m2 : mem) (DomS DomT : Values.block -> bool)
   (CSM_Ini :initial_core (csharpmin_eff_sem hf) ge v vals1 = Some c1)
   (Inj: Mem.inject j m1 m2)
   (VInj: Forall2 (val_inject j) vals1 vals2)
   (PG: meminj_preserves_globals ge j)
+  (GFI: globalfunction_ptr_inject ge j)
   (R : list_norepet (map fst (prog_defs prog)))
   (J: forall b1 b2 d, j b1 = Some (b2, d) -> 
                       DomS b1 = true /\ DomT b2 = true)
   (RCH: forall b, REACH m2
         (fun b' : Values.block => isGlobalBlock tge b' || getBlocks vals2 b') b =
          true -> DomT b = true)
-  (GFI: globalfunction_ptr_inject ge j)
+  (RdOnly1: mem_respects_readonly ge m1)
+  (RdOnly2: mem_respects_readonly tge m2) 
   (HDomS: forall b : Values.block, DomS b = true -> Mem.valid_block m1 b)
   (HDomT: forall b : Values.block, DomT b = true -> Mem.valid_block m2 b),
 exists c2 : CMin_core,
@@ -931,8 +941,9 @@ Proof.
 
   intros CONTRA.
   solve[elimtype False; auto].
+  split. 2: split; trivial.
   split.
-    inv H1.
+  { inv H1.
     eapply SMC_callstate with (cenv:=PTree.empty _)(cs := @nil frame); eauto.
     apply st_mcs_nil with (Genv.genv_next ge).
     eapply match_globalenvs_init2; auto.
@@ -940,55 +951,56 @@ Proof.
     unfold vis, initial_SM; simpl.
     intros b0 isGlob. apply REACH_nil. intuition.
 
-  { destruct PG as [XX [Y Z]].
-    unfold Ple. rewrite <-Pos.leb_le.
-    destruct (Pos.leb (Genv.genv_next ge) (Mem.nextblock m1)) eqn:?; auto.
-    rewrite Pos.leb_nle in Heqb0.
-    assert (Heqb': (Genv.genv_next ge > Mem.nextblock m1)%positive) by xomega.
-    assert (exists b0, Psucc b0 = Genv.genv_next ge).
-    { destruct (Genv.genv_next ge). 
-      exists ((b0~1)-1)%positive. simpl. auto.
-      exists (Pos.pred (b0~0))%positive. rewrite Pos.succ_pred. auto. xomega.
-      xomega. }
-    destruct H as [b0 H].
-    generalize H as H'; intro.
-    apply genv_next_symbol_exists2 in H.
-    destruct H as [id H].
-    apply XX in H.
-    apply J in H.
-    destruct H as [H H3].
-    specialize (HDomS _ H).
-    unfold Mem.valid_block in HDomS. clear - Heqb' HDomS H'. xomega.
-    auto. }
+    { destruct PG as [XX [Y Z]].
+      unfold Ple. rewrite <-Pos.leb_le.
+      destruct (Pos.leb (Genv.genv_next ge) (Mem.nextblock m1)) eqn:?; auto.
+      rewrite Pos.leb_nle in Heqb0.
+      assert (Heqb': (Genv.genv_next ge > Mem.nextblock m1)%positive) by xomega.
+      assert (exists b0, Psucc b0 = Genv.genv_next ge).
+      { destruct (Genv.genv_next ge). 
+        exists ((b0~1)-1)%positive. simpl. auto.
+        exists (Pos.pred (b0~0))%positive. rewrite Pos.succ_pred. auto. xomega.
+        xomega. }
+      destruct H as [b0 H].
+      generalize H as H'; intro.
+      apply genv_next_symbol_exists2 in H.
+      destruct H as [id H].
+      apply XX in H.
+      apply J in H.
+      destruct H as [H H3].
+      specialize (HDomS _ H).
+      unfold Mem.valid_block in HDomS. clear - Heqb' HDomS H'. xomega.
+      auto. }
 
-  { destruct PG as [XX [Y Z]].
-    unfold Ple. rewrite <-Pos.leb_le.
-    destruct (Pos.leb (Genv.genv_next ge) (Mem.nextblock m2)) eqn:?; auto.
-    rewrite Pos.leb_nle in Heqb0.
-    assert (Heqb': (Genv.genv_next ge > Mem.nextblock m2)%positive) by xomega.
-    assert (exists b0, Psucc b0 = Genv.genv_next ge).
-    { destruct (Genv.genv_next ge). 
-      exists ((b0~1)-1)%positive. simpl. auto.
-      exists (Pos.pred (b0~0))%positive. rewrite Pos.succ_pred. auto. xomega.
-      xomega. }
-    destruct H as [b0 H].
-    generalize H as H'; intro.
-    apply genv_next_symbol_exists2 in H.
-    destruct H as [id H].
-    apply XX in H.
-    apply J in H.
-    destruct H as [H H3].
-    specialize (HDomT _ H3).
-    unfold Mem.valid_block in HDomT. clear - Heqb' HDomT H'. xomega.
-    auto. }
+    { destruct PG as [XX [Y Z]].
+      unfold Ple. rewrite <-Pos.leb_le.
+      destruct (Pos.leb (Genv.genv_next ge) (Mem.nextblock m2)) eqn:?; auto.
+      rewrite Pos.leb_nle in Heqb0.
+      assert (Heqb': (Genv.genv_next ge > Mem.nextblock m2)%positive) by xomega.
+      assert (exists b0, Psucc b0 = Genv.genv_next ge).
+      { destruct (Genv.genv_next ge). 
+        exists ((b0~1)-1)%positive. simpl. auto.
+        exists (Pos.pred (b0~0))%positive. rewrite Pos.succ_pred. auto. xomega.
+        xomega. }
+      destruct H as [b0 H].
+      generalize H as H'; intro.
+      apply genv_next_symbol_exists2 in H.
+      destruct H as [id H].
+      apply XX in H.
+      apply J in H.
+      destruct H as [H H3].
+      specialize (HDomT _ H3).
+      unfold Mem.valid_block in HDomT. clear - Heqb' HDomT H'. xomega.
+      auto. }
 
-  constructor; auto. simpl; auto.
-  apply forall_inject_val_list_inject.
-  eapply restrict_forall_vals_inject; try eassumption.
-  intuition. rewrite initial_SM_as_inj. assumption.
-  intros b0 Hget. unfold vis. simpl. apply REACH_nil. intuition.
-  simpl. 
-  
+    { constructor; auto. }
+    { simpl; auto. }
+    { apply forall_inject_val_list_inject.
+      eapply restrict_forall_vals_inject; try eassumption.
+      intuition. rewrite initial_SM_as_inj. assumption.
+      intros b0 Hget. unfold vis. simpl. apply REACH_nil. intuition. }
+  }
+  simpl.   
   destruct (core_initial_wd ge tge _ _ _ _ _ _ _  Inj
     VInj J RCH PG GDE_lemma HDomS HDomT _ (eq_refl _))
    as [AA [BB [CC [DD [EE [FF GG]]]]]].
@@ -997,7 +1009,7 @@ Proof.
   rewrite initial_SM_as_inj. assumption.
 Qed.
 
-Lemma MATCH_AfterExternal: 
+Lemma MATCH_afterExternal: 
 forall mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
   (MemInjMu : Mem.inject (as_inj mu) m1 m2)
   (MatchMu : MATCH st1 mu st1 m1 st2 m2)
@@ -1023,6 +1035,8 @@ forall mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
   (RValInjNu' : val_inject (as_inj nu') ret1 ret2)
   (FwdSrc : mem_forward m1 m1')
   (FwdTgt : mem_forward m2 m2')
+  (RDO1: RDOnly_fwd m1 m1' (ReadOnlyBlocks ge))
+  (RDO2: RDOnly_fwd m2 m2' (ReadOnlyBlocks tge))
   (frgnSrc' : Values.block -> bool)
   (frgnSrcHyp : frgnSrc' =
                (fun b : Values.block =>
@@ -1047,7 +1061,7 @@ exists (st1' : CSharpMin_core) (st2' : CMin_core),
   after_external (cmin_eff_sem hf) (Some ret2) st2 = Some st2' /\
   MATCH st1' mu' st1' m1' st2' m2'.
 Proof. intros. 
- destruct MatchMu as [MC [RC [PG [GF [VAL [WDmu INJ]]]]]].
+ destruct MatchMu as [[MC [RC [PG [GF [VAL [WDmu INJ]]]]]] MRR].
  (*assert (PGR: meminj_preserves_globals (Genv.globalenv prog)
                   (restrict (as_inj mu) (vis mu))).
       eapply restrict_preserves_globals; try eassumption.
@@ -1089,7 +1103,7 @@ assert (RR1: REACH_closed m1'
    || DomSrc nu' b &&
       (negb (locBlocksSrc nu' b) &&
        REACH m1' (exportedSrc nu' (ret1 :: nil)) b))).
-  intros b Hb. rewrite REACHAX in Hb. destruct Hb as [L HL].
+  clear MRR; intros b Hb. rewrite REACHAX in Hb. destruct Hb as [L HL].
   generalize dependent b.
   induction L; simpl; intros; inv HL.
      assumption.
@@ -1186,9 +1200,11 @@ assert (GFnu': forall b, isGlobalBlock (Genv.globalenv prog) b = true ->
           apply REACH_nil. unfold exportedSrc.
           rewrite (frgnSrc_shared _ WDnu' _ GF). intuition.
 split.
-  unfold vis in *.
-  rewrite replace_externs_frgnBlocksSrc, replace_externs_locBlocksSrc in *.
-  econstructor; try eassumption.
+{ (*MATCH'*)
+  clear MRR; split.
+  { unfold vis in *.
+    rewrite replace_externs_frgnBlocksSrc, replace_externs_locBlocksSrc in *.
+    econstructor; try eassumption.
     eapply structured_match_callstack_incr_bound.
       eapply structured_match_callstack_ext with
        (mu:=mu)(nu':=nu'); try reflexivity; try eassumption.
@@ -1207,16 +1223,19 @@ split.
         destruct d; simpl; trivial. apply andb_true_iff.
         split. eapply as_inj_DomRng; eassumption.
         apply REACH_nil. unfold exportedSrc.
-           rewrite H. trivial.
-unfold vis.
-rewrite replace_externs_locBlocksSrc, replace_externs_frgnBlocksSrc,
+           rewrite H. trivial. }
+  { unfold vis.
+    rewrite replace_externs_locBlocksSrc, replace_externs_frgnBlocksSrc,
         replace_externs_as_inj.
-destruct (eff_after_check2 _ _ _ _ _ MemInjNu' RValInjNu' 
+    destruct (eff_after_check2 _ _ _ _ _ MemInjNu' RValInjNu' 
       _ (eq_refl _) _ (eq_refl _) _ (eq_refl _) WDnu' SMvalNu').
-intuition.
+    intuition. }
+}
+destruct MRR as [MRR1 MRR2].
+split; eapply mem_respects_readonly_forward'; eassumption. 
 Qed.
 
-Lemma MATCH_safely_halted: forall cd mu c1 m1 c2 m2 v1
+Lemma MatchCores_safely_halted: forall cd mu c1 m1 c2 m2 v1
      (SMC: structured_match_cores cd mu c1 m1 c2 m2)
      (HALT: halted (CSharpMin_core_sem hf) c1 = Some v1),
 exists v2, halted (CMin_core_sem hf) c2 = Some v2 /\ 
@@ -1228,7 +1247,7 @@ Proof.
   inv MK. split; trivial.
 Qed.
 
-Lemma MATCH_at_external: forall mu st1 m1 st2 m2 e vals1 sig
+Lemma MatchCores_atExternal: forall mu st1 m1 st2 m2 e vals1 sig
      (MC: structured_match_cores st1 mu st1 m1 st2 m2) 
      (AtExt: at_external (CSharpMin_core_sem hf) st1 = Some (e, sig, vals1)),
   exists vals2, Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\
@@ -1261,6 +1280,8 @@ Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
        (MTCH: MATCH c1 mu c1 m1 c2 m2)
        (AtExtSrc: at_external (csharpmin_eff_sem hf) c1 = Some (e, ef_sig, vals1)),
      Mem.inject (as_inj mu) m1 m2 /\
+     mem_respects_readonly ge m1 /\
+     mem_respects_readonly tge m2 /\
      exists vals2,
        Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2 /\
        at_external (cmin_eff_sem hf) c2 = Some (e, ef_sig, vals2) /\
@@ -1269,8 +1290,10 @@ Lemma MATCH_atExternal: forall mu c1 m1 c2 m2 e vals1 ef_sig
        pubTgt' = (fun b => locBlocksTgt mu b && REACH m2 (exportedTgt mu vals2) b) ->
        forall nu : SM_Injection, nu = replace_locals mu pubSrc' pubTgt' ->
        MATCH c1 nu c1 m1 c2 m2 /\ Mem.inject (shared_of nu) m1 m2).
-Proof. intros. destruct MTCH as [MC [RC [PG [GF [SMV [WD INJ]]]]]].
-destruct (MATCH_at_external _ _ _ _ _ _ _ _ MC AtExtSrc) as [vals2 [ValsInj AtExtTgt]]. 
+Proof. intros. destruct MTCH as [[MC [RC [PG [GF [SMV [WD INJ]]]]]] [MRR1 MRR2]].
+destruct (MatchCores_atExternal _ _ _ _ _ _ _ _ MC AtExtSrc) as [vals2 [ValsInj AtExtTgt]]. 
+split; trivial.
+split; trivial.
 split; trivial.
 exists vals2. split; trivial. split; trivial.
 exploit replace_locals_wd_AtExternal; try eassumption.
@@ -1279,16 +1302,18 @@ intros WDnu.
 intros.
 assert (SMVnu: sm_valid nu m1 m2).
   red. subst nu. rewrite replace_locals_DOM, replace_locals_RNG. apply SMV.
-  split. (*MATCH*)
-    split. inv MC; inv AtExtSrc.
+split.
+{ (*MATCH*)
+  split. 2: split; assumption.
+  split. inv MC; inv AtExtSrc.
       econstructor; try eassumption. 
         eapply structured_match_callstack_replace_locals; eauto.
         rewrite replace_locals_as_inj, replace_locals_vis. trivial.    
     subst nu.
       rewrite replace_locals_vis, replace_locals_as_inj, replace_locals_frgnBlocksSrc.
       intuition. subst; assumption.
-    eapply inject_shared_replace_locals; try eassumption.
-      subst; trivial.
+}
+eapply inject_shared_replace_locals; try eassumption. subst; trivial.
 Qed.
 
 Lemma match_callstack_freelist:
@@ -1321,7 +1346,7 @@ Proof.
   apply structured_match_callstack_intern_invariant with mu m tm; auto.
      apply intern_incr_refl.
   intros. eapply perm_freelist; eauto.
-  intros. eapply Mem.perm_free_1; eauto. xomega. xomega.
+  intros. eapply Mem.perm_free_1; eauto. left. intros N; subst; xomega. xomega. xomega.
   eapply Mem.free_inject; eauto.
   intros. exploit me_inv0; eauto.
     apply restrictI_Some; try eassumption.
@@ -2126,7 +2151,7 @@ exists st2' : CMin_core,
    globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m m2' /\
-  MATCH (CSharpMin_State f s k e lenv) mu'
+  MATCH' (CSharpMin_State f s k e lenv) mu'
     (CSharpMin_State f s k e lenv) m st2' m2' /\
   SM_wd mu' /\ sm_valid mu' m m2'.
 Proof. intros.
@@ -2189,7 +2214,7 @@ exists st2' : CMin_core,
    globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m m2' /\
-  MATCH (CSharpMin_State f Csharpminor.Sskip k e lenv) mu' (CSharpMin_State f Csharpminor.Sskip k e lenv) m st2' m2' /\
+  MATCH' (CSharpMin_State f Csharpminor.Sskip k e lenv) mu' (CSharpMin_State f Csharpminor.Sskip k e lenv) m st2' m2' /\
   SM_wd mu' /\
   sm_valid mu' m m2'.
 Proof. intros.
@@ -2268,7 +2293,7 @@ exists st2' : CMin_core,
    globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m' m2' /\
-  MATCH (CSharpMin_Returnstate Vundef k) mu' (CSharpMin_Returnstate Vundef k) m' st2' m2' /\
+  MATCH' (CSharpMin_Returnstate Vundef k) mu' (CSharpMin_Returnstate Vundef k) m' st2' m2' /\
   SM_wd mu' /\
   sm_valid mu' m' m2'.
 Proof. intros.
@@ -2325,7 +2350,7 @@ exists st2' : CMin_core,
    globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m m2' /\
-  MATCH (CSharpMin_State f Csharpminor.Sskip k e (PTree.set id v lenv))
+  MATCH' (CSharpMin_State f Csharpminor.Sskip k e (PTree.set id v lenv))
               mu' (CSharpMin_State f Csharpminor.Sskip k e (PTree.set id v lenv)) m st2' m2' /\
   SM_wd mu' /\
   sm_valid mu' m m2'.
@@ -2388,7 +2413,7 @@ exists vv,
    globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m' m2' /\
-  MATCH (CSharpMin_State f Csharpminor.Sskip k e lenv)
+  MATCH' (CSharpMin_State f Csharpminor.Sskip k e lenv)
               mu' (CSharpMin_State f Csharpminor.Sskip k e lenv) m' st2' m2' /\
   SM_wd mu' /\
   sm_valid mu' m' m2'.
@@ -2471,7 +2496,7 @@ exists c2' : CMin_core,
    globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m m2' /\
-  MATCH (CSharpMin_Callstate fd vargs (Csharpminor.Kcall optid f e lenv k)) mu'
+  MATCH' (CSharpMin_Callstate fd vargs (Csharpminor.Kcall optid f e lenv k)) mu'
               (CSharpMin_Callstate fd vargs (Csharpminor.Kcall optid f e lenv k)) m c2' m2' /\
   SM_wd mu' /\
   sm_valid mu' m m2'.
@@ -2525,7 +2550,7 @@ exists c2' : CMin_core,
    globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m m2' /\
-  MATCH  (CSharpMin_State f (if b then s1 else s2) k e lenv) mu'
+  MATCH' (CSharpMin_State f (if b then s1 else s2) k e lenv) mu'
              (CSharpMin_State f (if b then s1 else s2) k e lenv) m c2' m2' /\
   SM_wd mu' /\
   sm_valid mu' m m2'.
@@ -2563,7 +2588,7 @@ exists c2' : CMin_core,
    globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m m2' /\
-  MATCH (CSharpMin_State f s (Csharpminor.Kseq (Csharpminor.Sloop s) k) e lenv) mu'
+  MATCH' (CSharpMin_State f s (Csharpminor.Kseq (Csharpminor.Sloop s) k) e lenv) mu'
              (CSharpMin_State f s (Csharpminor.Kseq (Csharpminor.Sloop s) k) e lenv) m c2' m2' /\
   SM_wd mu' /\
   sm_valid mu' m m2'.
@@ -2600,7 +2625,7 @@ exists c2' : CMin_core,
    globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m m2' /\
-        MATCH (CSharpMin_State f s (Csharpminor.Kblock k) e lenv) mu' 
+        MATCH' (CSharpMin_State f s (Csharpminor.Kblock k) e lenv) mu' 
                     (CSharpMin_State f s (Csharpminor.Kblock k) e lenv) m c2' m2'
   /\ SM_wd mu' /\
   sm_valid mu' m m2'.
@@ -2631,7 +2656,7 @@ exists c2' : CMin_core,
   exists m2' mu',
        effstep_plus (cmin_eff_sem hf) tge EmptyEffect 
                (CMin_State tfn (Sexit (shift_exit xenv n)) tk (Vptr sp Int.zero) te) tm c2' m2'  /\
-        MATCH (CSharpMin_State f (Csharpminor.Sexit n) k e lenv) mu'
+        MATCH' (CSharpMin_State f (Csharpminor.Sexit n) k e lenv) mu'
     (CSharpMin_State f (Csharpminor.Sexit n) k e lenv) m c2' m2'
 /\ intern_incr mu mu' /\
    globals_separate ge mu mu' /\
@@ -2685,7 +2710,7 @@ exists c2' : CMin_core,
   exists m2' mu',
    effstep_plus (cmin_eff_sem hf) tge EmptyEffect 
      (CMin_State tfn (Sexit (shift_exit xenv 0)) tk (Vptr sp Int.zero) te) tm c2' m2'
-  /\ MATCH (CSharpMin_State f Csharpminor.Sskip k e lenv) mu'
+  /\ MATCH' (CSharpMin_State f Csharpminor.Sskip k e lenv) mu'
     (CSharpMin_State f Csharpminor.Sskip k e lenv) m c2' m2'
 /\ intern_incr mu mu' /\
    globals_separate ge mu mu' /\
@@ -2730,7 +2755,7 @@ exists c2' : CMin_core,
   exists m2' mu',
        effstep_plus (cmin_eff_sem hf) tge EmptyEffect 
      (CMin_State tfn (Sexit (shift_exit xenv (S n))) tk (Vptr sp Int.zero) te) tm c2' m2' /\ 
-       MATCH (CSharpMin_State f (Csharpminor.Sexit n) k e lenv) mu'
+       MATCH' (CSharpMin_State f (Csharpminor.Sexit n) k e lenv) mu'
     (CSharpMin_State f (Csharpminor.Sexit n) k e lenv) m c2' m2'
 /\ intern_incr mu mu' /\
    globals_separate ge mu mu' /\
@@ -2777,7 +2802,7 @@ Lemma EFF_switch_MSI: forall
   exists S, exists m2' mu',
   effstep_plus (cmin_eff_sem hf) tge EmptyEffect 
       (CMin_State tfn (Sexit O) tk' (Vptr sp Int.zero) te) tm S m2'
-  /\ MATCH (CSharpMin_State f (seq_of_lbl_stmt ls) k e lenv) mu'
+  /\ MATCH' (CSharpMin_State f (seq_of_lbl_stmt ls) k e lenv) mu'
                  (CSharpMin_State f (seq_of_lbl_stmt ls) k e lenv) m
                  S m2'
   /\ intern_incr mu mu' /\
@@ -2841,7 +2866,7 @@ exists c2' : CMin_core,
   exists m2' mu',
        effstep_plus (cmin_eff_sem hf) tge EmptyEffect 
              (CMin_State tfn ts tk (Vptr sp Int.zero) te) tm c2' m2' /\
-         MATCH (CSharpMin_State f (seq_of_lbl_stmt (select_switch n cases)) k e lenv) mu'
+         MATCH' (CSharpMin_State f (seq_of_lbl_stmt (select_switch n cases)) k e lenv) mu'
     (CSharpMin_State f (seq_of_lbl_stmt (select_switch n cases)) k e lenv) m c2' m2'
 /\ intern_incr mu mu' /\
    globals_separate ge mu mu' /\
@@ -2890,7 +2915,7 @@ exists c2' : CMin_core,
    globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m' m2' /\
-  MATCH
+  MATCH'
     (CSharpMin_State f Csharpminor.Sskip k e (set_optvar optid vres lenv)) mu'
     (CSharpMin_State f Csharpminor.Sskip k e (set_optvar optid vres lenv)) m'
     c2' m2' /\
@@ -2988,7 +3013,7 @@ exists (c2' : CMin_core) m2' mu',
   sm_inject_separated mu mu' m tm /\
   sm_locally_allocated mu mu' m tm m1 m2' /\ SM_wd mu' /\
   sm_valid mu' m1 m2' /\
-  MATCH (CSharpMin_State f (Csharpminor.fn_body f) k e lenv) mu'
+  MATCH' (CSharpMin_State f (Csharpminor.fn_body f) k e lenv) mu'
     (CSharpMin_State f (Csharpminor.fn_body f) k e lenv) m1 c2' m2'.
 Proof. intros. 
   generalize EQ; clear EQ; unfold transl_function.
@@ -3030,13 +3055,13 @@ Lemma MATCH_effcore_diagram:
 forall st1 m1 st1' m1' (U1 : Values.block -> Z -> bool)
        (EFFSTEP: effstep (csharpmin_eff_sem hf) ge U1 st1 m1 st1' m1')
        st2 mu m2
-       (MC: MATCH st1 mu st1 m1 st2 m2),
+       (MC: MATCH' st1 mu st1 m1 st2 m2),
 exists st2' m2' mu',
   intern_incr mu mu' /\
    globals_separate ge mu mu' /\
   sm_inject_separated mu mu' m1 m2 /\
   sm_locally_allocated mu mu' m1 m2 m1' m2' /\
-  MATCH st1' mu' st1' m1' st2' m2' /\
+  MATCH' st1' mu' st1' m1' st2' m2' /\
   (exists U2 : Values.block -> Z -> bool,
      (effstep_plus (cmin_eff_sem hf) tge U2 st2 m2 st2' m2' \/
       (MC_measure st1' < MC_measure st1)%nat /\
@@ -3422,30 +3447,49 @@ Proof.
 (*match_genv*)
   apply MATCH_genv.
 (*initial_core*)
-  intros. eapply Match_init_core; try eassumption.
+  intros. eapply MATCH_initial_core; eassumption.
 (*halted*) 
-  { intros. destruct H as [MC [RC [PG [GF [VAL [WD INJ]]]]]]. 
-    eapply MATCH_safely_halted in MC; eauto.
+  { intros. destruct H as [[MC [RC [PG [GF [VAL [WD INJ]]]]]] MRR]. 
+    eapply MatchCores_safely_halted in MC; eauto.
     destruct MC as [v2 [A B]].
     exists v2. intuition. }
 (* at_external*)
   { apply MATCH_atExternal. }
 (* after_external*)
-  { intros.
-    eapply (MATCH_AfterExternal mu st1 st2 m1 e vals1 m2 
-             ef_sig vals2 e' ef_sig') with
-            (pubSrc':=pubSrc') (pubTgt':=pubTgt') 
-            (frgnSrc':=frgnSrc') (frgnTgt':=frgnTgt')
-            (nu:=nu) (nu':=nu') (mu':=mu');
-     try assumption; try reflexivity. }
+  { apply MATCH_afterExternal. }
 (* effcore_diagram*)
-  { intros. 
-    destruct (MATCH_effcore_diagram _ _ _ _ _ H _ _ _ H0)
-      as [st2' [m2' [mu' [INT [SEP [LOCALLOC [MTCH U]]]]]]]. 
+  { intros. destruct H0 as [MTCH [MRR1 MRR2]].
+    destruct (MATCH_effcore_diagram _ _ _ _ _ H _ _ _ MTCH)
+      as [st2' [m2' [mu' [INT [GSEP [SEP [LOCALLOC [MTCH' [U2 [CS2 HU]]]]]]]]]]. 
     exists st2', m2', mu'.
     split; try eassumption.
     split; try eassumption.
-    split; try eassumption. }
+    split; try eassumption.
+    split. split; try eassumption. clear HU.
+      destruct MTCH as [_ [_ [PG [GF [SMV [WD _]]]]]].
+      split. apply effstep_corestep in H.
+             eapply mem_respects_readonly_forward'. eassumption.
+             eapply corestep_fwd; eassumption.
+             eapply cshmin_coop_readonly. apply H.
+         intros b GB. apply GF in GB. eapply SMV.
+         destruct (frgnSrc _ WD _ GB) as [bb [d [Frgn FTgt]]]. eapply foreign_DomRng; eassumption.
+      assert(G2: forall b, isGlobalBlock tge b = true -> Mem.valid_block m2 b).
+         rewrite <- (genvs_domain_eq_isGlobal _ _ GDE_lemma).
+         intros b GB. eapply SMV.
+         apply (meminj_preserves_globals_isGlobalBlock _ _ PG) in GB. 
+         eapply as_inj_DomRng; eassumption.
+      destruct CS2 as [CS2 | [_ CS2]].
+      apply effstep_plus_corestep_plus in CS2.
+             eapply mem_respects_readonly_forward'. eassumption.
+             eapply corestep_plus_fwd; eassumption.
+             eapply SM_simulation.CS2_RDO_plus; try eassumption.
+             apply cmin_coop_readonly. 
+      apply effstep_star_corestep_star in CS2.
+             eapply mem_respects_readonly_forward'. eassumption.
+             eapply corestep_star_fwd; eassumption.
+             eapply SM_simulation.CS2_RDO_star; try eassumption.
+             apply cmin_coop_readonly. 
+    exists U2. split; assumption. }
 Qed.
 
 End TRANSLATION.
