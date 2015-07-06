@@ -111,7 +111,7 @@ Definition transf_rtl_program (f: RTL.program) : res Asm_comp.program :=
   @@@ Inlining.transf_program
    @@ Renumber.transf_program
 (*   @@ print print_RTL_inline*)
-(* (*TODO:*)  @@ Constprop.transf_program*)
+   @@ Constprop.transf_program
    @@ Renumber.transf_program
 (*   @@ print print_RTL_constprop*)
   @@@ CSE.transf_program
@@ -276,8 +276,8 @@ Proof.
   set (p1 := Tailcall.transf_program p) in *.
   destruct (Inlining.transf_program p1) as [p2|] eqn:?; simpl in H; try discriminate.
   set (p3 := Renumber.transf_program p2) in *.
-(*  set (p4 := Constprop.transf_program p3) in *.*)
-  set (p5 := Renumber.transf_program p3) in *.
+  set (p4 := Constprop.transf_program p3) in *.
+  set (p5 := Renumber.transf_program p4) in *.
   destruct (CSE.transf_program p5) as [p6|] eqn:?; simpl in H; try discriminate.
   destruct (Allocation.transf_program p6) as [p7|] eqn:?; simpl in H; try discriminate.
   set (p8 := Tunneling.tunnel_program p7) in *.
@@ -295,12 +295,12 @@ Proof.
   eapply eff_sim_trans.
   eapply Renumberproof_comp.transl_program_correct.
   eapply eff_sim_trans.
-(*  eapply Constpropproof_comp.transl_program_correct.
-  eapply eff_sim_trans.*)
+  eapply Constpropproof_comp.transl_program_correct.
+  eapply eff_sim_trans.
   eapply Renumberproof_comp.transl_program_correct.
   eapply eff_sim_trans.
     eapply CSEproof_comp.transl_program_correct.
-    unfold p5, (*p4,*) p3 in Heqr0. exact Heqr0.
+    unfold p5, p4, p3 in Heqr0. exact Heqr0.
   eapply eff_sim_trans.
     eapply Allocproof_comp.transl_program_correct.
     instantiate (1:=p7). auto. 
@@ -320,7 +320,7 @@ Proof.
     eapply TransformLNR. 
     eapply TransformLNR_partial. 2: eassumption. 
     eapply TransformLNR_partial. 2: eassumption. 
-    (*eapply TransformLNR.*) eapply TransformLNR. eapply TransformLNR.  assumption.
+    eapply TransformLNR. eapply TransformLNR. eapply TransformLNR.  assumption.
 
     apply Asmgenproof_comp.transl_program_correct. 
     eassumption.
@@ -408,8 +408,8 @@ Proof.
   set (p1 := Tailcall.transf_program p) in *.
   destruct (Inlining.transf_program p1) as [p2|] eqn:?; simpl in H; try discriminate.
   set (p3 := Renumber.transf_program p2) in *.
-(*  set (p4 := Constprop.transf_program p3) in *.*)
-  set (p5 := Renumber.transf_program p3) in *.
+  set (p4 := Constprop.transf_program p3) in *.
+  set (p5 := Renumber.transf_program p4) in *.
   destruct (CSE.transf_program p5) as [p6|] eqn:?; simpl in H; try discriminate.
   destruct (Allocation.transf_program p6) as [p7|] eqn:?; simpl in H; try discriminate.
   set (p8 := Tunneling.tunnel_program p7) in *.
@@ -421,8 +421,8 @@ Proof.
   unfold p1 in *.
   erewrite <- (Inliningproof_comp.symbols_preserved); try eauto. clear Heqr.
   erewrite <- (Renumberproof_comp.symbols_preserved); try eauto.
-  unfold p5, (*p4,*) p3 in *.
-(*  erewrite <- (Constpropproof_comp.symbols_preserved); try eauto.*)
+  unfold p5, p4, p3 in *.
+  erewrite <- (Constpropproof_comp.symbols_preserved); try eauto.
   erewrite <- (Renumberproof_comp.symbols_preserved); try eauto.
   erewrite <- (CSEproof_comp.symbols_preserved); try eauto. clear Heqr0.
   erewrite <- (Allocproof_comp.symbols_preserved); try eauto. clear Heqr1.

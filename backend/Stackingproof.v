@@ -1469,6 +1469,7 @@ Lemma stores_in_frame_contents:
 Proof.
   induction 2. auto. 
   rewrite IHstores_in_frame. eapply Mem.load_store_other; eauto.
+  left; intros N; subst; xomega.
 Qed.
 
 (** As a corollary of the previous lemmas, we obtain the following
@@ -2574,7 +2575,7 @@ Proof.
     exploit agree_bounds. eauto. apply Mem.perm_cur_max. eauto. 
     omega.
   apply match_stacks_change_mach_mem with m'; auto.
-  eauto with mem. eauto with mem. intros. rewrite <- H3; eapply Mem.load_store_other; eauto. try apply Plt_ne; auto. 
+  eauto with mem. eauto with mem. intros. rewrite <- H3; eapply Mem.load_store_other; eauto. left; intros N; subst; xomega.
   eauto. eauto. auto. 
   apply agree_regs_set_slot. apply agree_regs_undef_regs; auto. 
   destruct sl.
@@ -2687,8 +2688,8 @@ Proof.
   apply match_stacks_change_linear_mem with m. 
   apply match_stacks_change_mach_mem with m'0.
   auto. 
-  eauto with mem. intros. eapply Mem.perm_free_1; eauto. 
-  intros. rewrite <- H3. eapply Mem.load_free; eauto. 
+  eauto with mem. intros. eapply Mem.perm_free_1; eauto. left; intros N; subst; xomega. 
+  intros. rewrite <- H3. eapply Mem.load_free; eauto. left; intros N; subst; xomega.  
   eauto with mem. intros. eapply Mem.perm_free_3; eauto. 
   apply Plt_Ple. change (Mem.valid_block m' stk). eapply Mem.valid_block_free_1; eauto. eapply agree_valid_linear; eauto. 
   apply Plt_Ple. change (Mem.valid_block m1' sp'). eapply Mem.valid_block_free_1; eauto. eapply agree_valid_mach; eauto. 
@@ -2796,8 +2797,8 @@ Proof.
   apply match_stacks_change_linear_mem with m. 
   apply match_stacks_change_mach_mem with m'0.
   eauto. 
-  eauto with mem. intros. eapply Mem.perm_free_1; eauto. 
-  intros. rewrite <- H1. eapply Mem.load_free; eauto. 
+  eauto with mem. intros. eapply Mem.perm_free_1; eauto.  left; intros N; subst; xomega.  
+  intros. rewrite <- H1. eapply Mem.load_free; eauto. left; intros N; subst; xomega.  
   eauto with mem. intros. eapply Mem.perm_free_3; eauto. 
   apply Plt_Ple. change (Mem.valid_block m' stk). eapply Mem.valid_block_free_1; eauto. eapply agree_valid_linear; eauto. 
   apply Plt_Ple. change (Mem.valid_block m1' sp'). eapply Mem.valid_block_free_1; eauto. eapply agree_valid_mach; eauto. 

@@ -1280,8 +1280,8 @@ Lemma MATCH_afterExternal: forall (mu : SM_Injection) (st1 st2 : RTL_core) (m1 :
   (RetInj: val_inject (as_inj nu') ret1 ret2)
   (FWD1: mem_forward m1 m1')  
   (FWD2: mem_forward m2 m2')
-       (RDO1: RDOnly_fwd m1 m1' (ReadOnlyBlocks ge))
-       (RDO2: RDOnly_fwd m2 m2' (ReadOnlyBlocks tge))
+  (RDO1: RDOnly_fwd m1 m1' (ReadOnlyBlocks ge))
+  (RDO2: RDOnly_fwd m2 m2' (ReadOnlyBlocks tge))
   (frgnSrc' : block -> bool)
   (HfrgnSrc: frgnSrc' = (fun b =>
       DomSrc nu' b &&
