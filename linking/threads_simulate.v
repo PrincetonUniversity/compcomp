@@ -193,8 +193,51 @@ move=> INV SAFE n; move: mu c m d tm z INV SAFE; elim: n.
                   if two angels [x] and [y] are equal at positions [counter d'] 
                   and greater, then [d'] is safe in [x] iff safe in [y]. *) }
     }
-    { admit. (*UNLOCK, symmetric*) }
-    { admit. (*thread_create*) }
+    { admit. (*UNLOCK, symmetric (?)*) }
+    { set (c' := 
+        schedNext
+          (addThread
+             (updThread c
+                (Ordinal (n:=num_threads c) 
+                         (m:= schedule (counter c)) tid0_lt_pf) 
+                (Krun c'0)) (Krun c_new))) in *.
+      case: (ThreadInv.kstage_inv INV _ H)=> d0 []argsT []H' []vinj []at2 []cd MATCH.
+      have [vf' [arg' [inj [vinj' vinj'']]]]:
+        exists vf' arg',
+          argsT = (vf' :: arg' :: nil)
+          /\ val_inject (as_inj mu) vf vf'
+          /\ val_inject (as_inj mu) arg arg'.
+      { admit. }
+      rewrite inj in H'; move {inj vinj}.
+      have tid0'_lt_pf: schedule (counter d) < num_threads d.
+      { admit. }
+      have [d'0 H2']:
+        exists d'0,
+          after_external (Modsem.sem semT) (Some (Vint Int.zero)) d0 = Some d'0.
+      { admit. }
+      have [d_new H0']:
+        exists d_new,
+          initial_core (Modsem.sem semT) (Modsem.ge semT) vf' [:: arg'] 
+          = Some d_new.
+      { admit. }
+      set (d' := 
+        schedNext
+          (addThread
+             (updThread d
+                (Ordinal (n:=num_threads d) 
+                         (m:= schedule (counter d)) tid0'_lt_pf) 
+                (Krun d'0)) (Krun d_new))) in *.
+      have INV': ThreadInv.t c' d' sim mu m' tm.
+      { admit. }
+      have SAFE'': (forall n0 : nat,
+                      safeN (Concur.semantics aggelosS schedule) Espec 
+                            (Modsem.ge semS) n0 z c' m').
+      { admit. }
+      case: (IH _ _ _ _ _ _ INV' SAFE'')=> aggelosT TSAFE'.
+      exists aggelosT, d', tm; split=> //.
+      eapply Concur.step_create; eauto.
+      { admit. (*dependent types stuff*) }
+    }
   }
 }
 Qed. 
