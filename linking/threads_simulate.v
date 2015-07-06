@@ -42,9 +42,9 @@ Notation SIM semS semT geS geT := (SM_simulation_inject semS semT geS geT).
 Variable sim : 
   SIM (Modsem.sem semS) (Modsem.sem semT) (Modsem.ge semS) (Modsem.ge semT). 
 
-Variable aggelosS : nat -> PermMap.t.
-
 Variable schedule : nat -> nat.
+
+Variables aggelosS : nat -> PermMap.t.
 
 Lemma threads_safe Z Espec mu c m d tm (z : Z) :
   @ThreadInv.t semS semT c d sim mu m tm ->
@@ -56,7 +56,7 @@ Lemma threads_safe Z Espec mu c m d tm (z : Z) :
                (Modsem.ge semT) n z d tm).  
 Proof.
 move=> INV SAFE n; move: mu c m d tm z INV SAFE; elim: n.
-{ by move=> /= *; exists (fun _ => aggelosS 0). 
+{ by move=> /= ??????; exists (fun _ => aggelosS 0). 
 }
 { move=> n IH mu c m d tm z INV SAFE /=.
   move: (SAFE)=> SAFE0.
@@ -132,9 +132,69 @@ move=> INV SAFE n; move: mu c m d tm z INV SAFE; elim: n.
       apply: Concur.step_stage=> //.
       move: H'. admit. (*dependent type stuff*)                                     
     }
-    admit.
-    admit.
-    admit.
+    { 
+      set (c' := updThread c
+                  (Ordinal (n:=num_threads c) (m:=schedule (counter c))
+                     tid0_lt_pf) (Krun c'0)) in *.
+      case: (ThreadInv.kstage_inv INV _ H)=> d0 []argsT []H' []vinj []at2 []cd MATCH.
+      have [b' [delta [inj vinj']]]:
+        exists b' delta, 
+          as_inj mu b = Some (b', delta)
+          /\ argsT = [:: Vptr b' (Int.add ofs (Int.repr delta))].
+      { admit. }
+      rewrite vinj' in H'; move {vinj vinj' argsT}.
+      have tid0'_lt_pf: schedule (counter d) < num_threads d.
+      { admit. }
+      have [d'0 H2']:
+        exists d'0,
+          after_external (Modsem.sem semT) (Some (Vint Int.zero)) d0 = Some d'0.
+      { admit. }
+      set (d' := updThread d
+                   (Ordinal (n:=num_threads d) (m:=schedule (counter d)) 
+                      tid0'_lt_pf) (Krun d'0)) in *.
+      have H0': 
+        Mem.load Mint32 tm b' (Int.intval (Int.add ofs (Int.repr delta)))
+          = Some (Vint Int.one).
+      { admit. }
+      have [tm'' H1']:
+        exists tm'', 
+          Mem.store Mint32 tm b' (Int.intval (Int.add ofs (Int.repr delta))) (Vint Int.zero)
+            = Some tm''.
+      { admit. }
+      set (pubSrc' :=
+             (fun b : block =>
+                locBlocksSrc mu b && REACH m' (exportedSrc mu [:: Vptr b ofs]) b)) in *.
+      set (pubTgt' :=
+             (fun b : block =>
+                locBlocksTgt mu b 
+                && REACH tm 
+                   (exportedTgt mu [:: Vptr b' (Int.add ofs (Int.repr delta))]) b)) in *.
+      set (nu := replace_locals mu pubSrc' pubTgt').
+      have [mu' [tm' [pm [H3' inj']]]]: 
+        exists mu' tm' pm,
+          updPermMap tm'' pm = Some tm'
+          /\ Mem.inject (as_inj mu') m' tm'. 
+      { admit. }
+      have INV': ThreadInv.t c' d' sim mu' m' tm'.
+      { admit. }
+      have SAFE'': (forall n0 : nat,
+                      safeN (Concur.semantics aggelosS schedule) Espec 
+                            (Modsem.ge semS) n0 z c' m').
+      { admit. }
+      case: (IH _ _ _ _ _ _ INV' SAFE'')=> aggelosT TSAFE'.
+      set (aggelosT' := fun n => if eq_nat_dec n (counter d) then pm else aggelosT n).
+      exists aggelosT', d', tm'; split=> //.
+      eapply Concur.step_lock; eauto.
+      { admit. (*dependent types stuff*) }
+      { by rewrite /aggelosT'; case: (eq_nat_dec _ _). }
+      { clear - TSAFE'; rewrite /aggelosT'.
+        admit. (*by [counter d' = counter d.+1] and an aux. lemma about 
+                 safety in concurrent machine, namely: 
+                  if two angels [x] and [y] are equal at positions [counter d'] 
+                  and greater, then [d'] is safe in [x] iff safe in [y]. *) }
+    }
+    { admit. (*UNLOCK, symmetric*) }
+    { admit. (*thread_create*) }
   }
 }
 Qed. 
