@@ -164,7 +164,7 @@ CORE=Extensionality.v \
 
 # Linking files
 
-LINKING=cast.v pos.v stack.v seq_lemmas.v pred_lemmas.v \
+LINKING=cast.v pos.v stack.v collection.v seq_lemmas.v pred_lemmas.v \
   sepcomp.v gallina_coresem.v inj_lemmas.v join_sm.v reestablish.v wf_lemmas.v\
   linking_spec.v linking.v compcert_linking.v compcert_linking_lemmas.v \
   disjointness.v reach_lemmas.v rc_semantics.v rc_semantics_lemmas.v \
