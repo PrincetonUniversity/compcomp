@@ -27,7 +27,6 @@ Require Import disjointness.
 Require Import rc_semantics.
 Require Import rc_semantics_lemmas.
 
-
 (* compcert imports *)
 
 Require Import AST.    (*for ident*)
@@ -83,10 +82,11 @@ End typingInv.
 
 Section linkingInv.
 
-  Variable N : pos.
+Variable N : pos.
 
 Variable cores_S cores_T : 'I_N -> Modsem.t. 
-Variable rclosed_S : forall i : 'I_N, RCSem.t (cores_S i).(sem) (cores_S i).(ge).
+Variable rclosed_S : 
+  forall i : 'I_N, RCSem.t (cores_S i).(sem) (cores_S i).(ge).
 Variable nucular_T : forall i : 'I_N, Nuke_sem.t (cores_T i).(sem).
 
 Variable fun_tbl : ident -> option 'I_N.
@@ -109,10 +109,10 @@ Let linker_T := effsem N cores_T fun_tbl.
 
 Let ord := @Lex.ord N types ords.
 
-Notation cast'  pf x := (cast (C \o cores_T) pf x).
-Notation cast'' pf x := (cast (C \o cores_T) (sym_eq pf) x).
-Notation rc_cast'  pf x := (cast (RC.state \o C \o cores_T) pf x).
-Notation rc_cast'' pf x := (cast (RC.state \o C \o cores_T) (sym_eq pf) x).
+Notation castT  pf x := (cast (C \o cores_T) pf x).
+Notation castT' pf x := (cast (C \o cores_T) (sym_eq pf) x).
+Notation rc_castT  pf x := (cast (RC.state \o C \o cores_T) pf x).
+Notation rc_castT' pf x := (cast (RC.state \o C \o cores_T) (sym_eq pf) x).
 
 Section frame_inv.
 
@@ -318,7 +318,9 @@ Section vis_inv.
 Import Core.
 
 Record vis_inv (c : t cores_S) (B : block -> bool) mu : Type :=
-  { vis_sup : {subset (RC.roots (cores_S c.(i)).(ge) (RC.mk c.(Core.c) B)) <= vis mu} }.
+  { vis_sup : 
+      {subset (RC.roots (cores_S c.(i)).(ge) (RC.mk c.(Core.c) B)) <= vis mu} 
+  }.
 
 End vis_inv.
 
@@ -338,12 +340,13 @@ Record frame_inv
   ; frame_inj0  : Mem.inject (as_inj mu0) m10 m20
   ; frame_valid : sm_valid mu0 m10 m20 
   ; frame_match : (sims c.(i)).(match_state) cd0 mu0 
-                   c.(Core.c) m10 (cast'' pf d.(Core.c)) m20 
+                   c.(Core.c) m10 (castT' pf d.(Core.c)) m20 
   ; frame_at1   : at_external (cores_S c.(i)).(sem) c.(Core.c)
                     = Some (e1, ef_sig1, vals1) 
-  ; frame_at2   : at_external (cores_T c.(i)).(sem) (cast'' pf d.(Core.c)) 
+  ; frame_at2   : at_external (cores_T c.(i)).(sem) (castT' pf d.(Core.c)) 
                     = Some (e2, ef_sig2, vals2) 
-  ; frame_vinj  : Forall2 (val_inject (restrict (as_inj mu0) (vis mu0))) vals1 vals2  
+  ; frame_vinj  : Forall2 (val_inject (restrict (as_inj mu0) (vis mu0))) 
+                          vals1 vals2  
 
     (* source state invariants *)
   ; frame_vis   : exists B, 
@@ -359,41 +362,37 @@ Record frame_inv
   ; frame_fwd2  : mem_forward m20 m2
   ; frame_unch1 : Mem.unchanged_on [fun b ofs => 
                     [/\ locBlocksSrc nu0 b & pubBlocksSrc nu0 b=false]] m10 m1
-  ; frame_unch2 : Mem.unchanged_on (local_out_of_reach nu0 m10) m20 m2 }.
+  ; frame_unch2 : Mem.unchanged_on (local_out_of_reach nu0 m10) m20 m2 
+  }.
 
 End frame_inv.
 
-Definition local_inv mu0 mu: Prop :=
-  local_of mu0 = restrict (as_inj mu) (locBlocksSrc mu0).
-
-
-(*The following invariant shall hold amongst cores, not within them*)
 Definition sm_inject_separated' (mu mu' : SM_Injection) (m1 m2 : Memory.mem) :=
-(forall (b1 b2 : block) (d : Z),
- as_inj mu b1 = None ->
- as_inj mu' b1 = Some (b2, d) -> DomSrc mu b1 = false /\ DomTgt mu b2 = false) /\
-(forall b1 : block,
- locBlocksSrc mu' b1 = true -> ~ Mem.valid_block m1 b1) /\
-(forall b2 : block,
- locBlocksTgt mu' b2 = true -> ~ Mem.valid_block m2 b2).
+  (forall (b1 b2 : block) (d : Z),
+     as_inj mu b1 = None ->
+     as_inj mu' b1 = Some (b2, d) -> 
+     DomSrc mu b1 = false /\ DomTgt mu b2 = false) 
+  /\ (forall b1 : block,
+        locBlocksSrc mu' b1 = true -> ~ Mem.valid_block m1 b1) 
+  /\ (forall b2 : block,
+        locBlocksTgt mu' b2 = true -> ~ Mem.valid_block m2 b2).
 
-Record rel_inv mu0 mu m10 m20 m1 (*new*) : Prop :=
+Record rel_inv mu0 mu m10 m20 m1 : Prop :=
   { (* invariants relating mu0,mu *)    
-    frame_incr       : incr mu0 mu
-  ; new_sep          : sm_inject_separated' mu0 mu m10 m20                          
-(*NOTE: my_ge has the same domain as any ge*)
-  ; frame_gsep       : globals_separate my_ge mu0 mu 
-  ; frame_disj       : disjinv mu0 mu 
-  ; frame_rc         : {subset [predI REACH m1 (vis mu) & locBlocksSrc mu0]
-                       <= pubBlocksSrc mu0}
+    frame_incr : incr mu0 mu
+  ; new_sep    : sm_inject_separated' mu0 mu m10 m20    
+  ; frame_gsep : globals_separate my_ge mu0 mu 
+  ; frame_disj : disjinv mu0 mu 
+  ; frame_rc   : {subset [predI REACH m1 (vis mu) & locBlocksSrc mu0]
+                           <= pubBlocksSrc mu0}
   }.
 
 Record frame_pkg : Type := 
   { frame_mu0 :> Inj.t
   ; frame_m10 : Memory.mem
   ; frame_m20 : Memory.mem
-  ; frame_val : sm_valid frame_mu0 frame_m10 frame_m20 }.
-
+  ; frame_val : sm_valid frame_mu0 frame_m10 frame_m20 
+  }.
 
 Definition rel_inv_pred m1 mu pkg := 
   let mu0 := frame_mu0 pkg in
@@ -476,7 +475,6 @@ by apply: (relinv_All_consistent A).
 by apply: IH.
 Qed.
 
-
 End rel_inv_pred_all2_lems.
 
 Lemma All_listsub (T : Type) (P : T -> Prop) (l l' : seq.seq T) :
@@ -502,7 +500,7 @@ Variable  (pf : c.(i)=d.(i)).
 
 Record head_inv cd (mu : Inj.t) mus m1 m2 : Prop :=
   { head_match : (sims c.(i)).(match_state) cd mu 
-                 c.(Core.c) m1 (cast'' pf d.(Core.c)) m2 
+                 c.(Core.c) m1 (castT' pf d.(Core.c)) m2 
   ; head_rel   : All (rel_inv_pred m1 mu) mus 
   ; head_vis   : exists B, 
                  [/\ vis_inv c B mu 
@@ -675,10 +673,12 @@ Context c d pf cd mu mus m1 m2
         (inv : @head_inv c d pf cd mu mus m1 m2).
 
 Context pubS' pubT' vals1 vals2
-        (inj : Mem.inject (as_inj mu) m1 m2)
-        (vinj : Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2)
-        (eq1 : pubS' = fun b => locBlocksSrc mu b && REACH m1 (exportedSrc mu vals1) b)
-        (eq2 : pubT' = fun b => locBlocksTgt mu b && REACH m2 (exportedTgt mu vals2) b).
+  (inj : Mem.inject (as_inj mu) m1 m2)
+  (vinj : Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2)
+  (eq1 : pubS' = fun b => locBlocksSrc mu b 
+                   && REACH m1 (exportedSrc mu vals1) b)
+  (eq2 : pubT' = fun b => locBlocksTgt mu b 
+                   && REACH m2 (exportedTgt mu vals2) b).
 
 Lemma vinj' : Forall2 (val_inject (as_inj mu)) vals1 vals2.
 Proof. by move: vinj; apply: forall_vals_inject_restrictD. Qed.
@@ -716,7 +716,9 @@ Proof. by move=> b H2; apply: (getBlocks_restrict vinj H2). Qed.
 Lemma globs_blocks_in_vis :
   {subset [predU isGlobalBlock (ge (cores_S new_ix)) & getBlocks vals1]
   <= vis mu}.
-Proof. move=> b; case/orP; [by apply: globs_in_vis|by apply: blocks_in_vis]. Qed.
+Proof. 
+move=> b; case/orP; [by apply: globs_in_vis|by apply: blocks_in_vis]. 
+Qed.
 
 Lemma frgnS_sub_vis : {subset frgnS <= vis mu}.
 Proof.
@@ -735,12 +737,8 @@ apply: Build_rel_inv.
 case: rel; case=> H []H2 H3; split.
 by rewrite initial_SM_as_inj.
 split=> b H4; first by apply: (H2 _).
-rewrite /DomTgt /= /domT.
-  by apply: H3.
-(*Edited: Santiago*)
-(* locinv:
-by rewrite /init_mu /initial_SM /local_inv /as_inj join_None_rightneutral /=; apply rel.*)
-case: rel=> _ newsep (*gsep*) _ _; move: newsep.
+by rewrite /DomTgt /= /domT; apply: H3.
+case: rel=> _ newsep _ _; move: newsep.
 rewrite /sm_inject_separated' /init_mu /j initial_SM_as_inj => //=. 
 case => sep1 [seplocS seplocT] //=.
 
@@ -751,7 +749,6 @@ eapply gsep0.
 + by apply H.
 + unfold init_mu, initial_SM, as_inj, join, j in HH; simpl in HH.
   destruct (as_inj mu p) eqn:map1; try (destruct p0); inversion HH. by eauto.
-(*End Edit*)
 apply: Build_disjinv.
 by rewrite predI01.
 by rewrite predI01.
@@ -817,25 +814,26 @@ by move: (head_match inv); apply/match_validblocks.
 by case=> _; case.
 Qed.
 
-Lemma local_asinj_restrict: forall mu,
-                              SM_wd mu ->
-                              local_of mu = restrict (as_inj mu) (locBlocksSrc mu).
-  move => mu0 smwd; extensionality b.
-  rewrite /restrict /as_inj /join.
-  case (disjoint_extern_local _ smwd b).
-  move => extF; rewrite extF.
-  destruct (local_of mu0 b) eqn:locb.
-  + destruct p. apply smwd in locb; case locb => locS locT.
-    rewrite locS; by reflexivity.      
-      by (destruct (locBlocksSrc mu0 b); reflexivity).
-  + move => locF; rewrite locF.
-    destruct (locBlocksSrc mu0 b) eqn:locB.
-    destruct (extern_of mu0 b) eqn:ext. destruct p.
-    apply smwd in ext; case ext.
-    case smwd => locVSext _.
-    case (locVSext b); move => H; move: locB; rewrite H; discriminate.
-    reflexivity.
-    reflexivity.
+Lemma local_asinj_restrict mu0 :
+  SM_wd mu0 ->
+  local_of mu0 = restrict (as_inj mu0) (locBlocksSrc mu0).
+Proof.
+move => smwd; extensionality b.
+rewrite /restrict /as_inj /join.
+case (disjoint_extern_local _ smwd b).
+move => extF; rewrite extF.
+destruct (local_of mu0 b) eqn:locb.
++ destruct p. apply smwd in locb; case locb => locS locT.
+  rewrite locS; by reflexivity.      
+    by (destruct (locBlocksSrc mu0 b); reflexivity).
++ move => locF; rewrite locF.
+  destruct (locBlocksSrc mu0 b) eqn:locB.
+  destruct (extern_of mu0 b) eqn:ext. destruct p.
+  apply smwd in ext; case ext.
+  case smwd => locVSext _.
+  case (locVSext b); move => H; move: locB; rewrite H; discriminate.
+  reflexivity.
+  reflexivity.
 Qed.
 
 Lemma init_rel_inv_mu : rel_inv_pred m1 init_mu $ Build_frame_pkg lo_valid.
@@ -845,22 +843,12 @@ split=> /=.
 by rewrite replace_locals_as_inj initial_SM_as_inj; apply: inject_incr_refl.
 split=> b.
 by rewrite replace_locals_DomSrc initial_SM_DomSrc.
-  by rewrite replace_locals_DomTgt initial_SM_DomTgt.
-  (*Edited: Santiago*)
-  (* locinv 
-rewrite /init_mu /local_inv /as_inj join_None_rightneutral /= /lo'
-          replace_locals_local replace_locals_locBlocksSrc /j.
-  apply: local_asinj_restrict => //=.
-  case mu => //=.*)
-
-  rewrite /sm_inject_separated'  /= replace_locals_as_inj initial_SM_as_inj /j.
-  split; last by auto.
-  by move => b1 b2 d0 H; rewrite H //=.
-
- rewrite /globals_separate /lo' /= replace_locals_as_inj initial_SM_as_inj /j. 
-  by move => b1 b2 d0 H; rewrite H //=.
-  (*End of edited*)
-  
+by rewrite replace_locals_DomTgt initial_SM_DomTgt.
+rewrite /sm_inject_separated'  /= replace_locals_as_inj initial_SM_as_inj /j.
+split; last by auto.
+by move => b1 b2 d0 H; rewrite H //=.
+rewrite /globals_separate /lo' /= replace_locals_as_inj initial_SM_as_inj /j. 
+by move => b1 b2 d0 H; rewrite H //=.
 apply: Build_disjinv=> /=.
 by rewrite predI01.
 by rewrite predI01.
@@ -914,7 +902,7 @@ Qed.
 
 Context (lo_mtch : 
            match_state (sims (Core.i c)) cd lo' (Core.c c) m1 
-           (cast'' pf (Core.c d)) m2).
+           (castT' pf (Core.c d)) m2).
 
 Lemma lo_inj : Mem.inject (as_inj (replace_locals mu pubS' pubT')) m1 m2.
 Proof.
@@ -962,24 +950,22 @@ split=> b H; move: H.
 rewrite lo_DomSrc; case: rel; case=> _; case; move/(_ b)=> H _ _ _ _ H2.
 by apply: H.
 rewrite lo_DomTgt; case: rel; case=> _; case=> _; move/(_ b)=> H _ _ _ H2.
-  by apply: H.
-  (*Edited: Santiago*)
- (*locinv rewrite /lo' /local_inv replace_locals_as_inj.
- by apply rel.*)
- {
- case: rel=> _. move=> newsep (*gsep0*) disj0 sub0.
- by rewrite /lo' /sm_inject_separated'
-         replace_locals_as_inj replace_locals_locBlocksSrc replace_locals_locBlocksTgt //=.  
- }
- {        case: rel=> _. move=> loc gsep0 disj0 sub0.
- move => p b2 d0 H HH.
- unfold globals_separate in gsep0.
- eapply gsep0.
-   by apply H.
-   unfold lo' in HH; rewrite replace_locals_as_inj in HH.
-     by eapply HH. }
-(*End Edit*)
-
+by apply: H.
+{
+  case: rel=> _. move=> newsep (*gsep0*) disj0 sub0.
+  by rewrite /lo' /sm_inject_separated'
+       replace_locals_as_inj replace_locals_locBlocksSrc 
+       replace_locals_locBlocksTgt.
+}
+{
+  case: rel=> _. move=> loc gsep0 disj0 sub0.
+  move => p b2 d0 H HH.
+  unfold globals_separate in gsep0.
+  eapply gsep0.
+  by apply H.
+  unfold lo' in HH; rewrite replace_locals_as_inj in HH.
+  by eapply HH. 
+}
 case: rel=> _ _ _ ; case=> d1 d2 p1 p2 cons rc.
 apply: Build_disjinv.
 by rewrite replace_locals_locBlocksSrc.
@@ -1045,7 +1031,7 @@ Lemma frame_all_match mu0 m10 m20 x mus m1 m2 s1 s2 :
       & exists (pf : c.(Core.i)=d.(Core.i)) 
                (sig_pf : c.(Core.sg)=d.(Core.sg)) cd0,
         (sims c.(Core.i)).(match_state) cd0 mu0 
-        c.(Core.c) m10 (cast'' pf d.(Core.c)) m20].
+        c.(Core.c) m10 (castT' pf d.(Core.c)) m20].
 Proof.
 case: s1=> // c s1'; case: s2=> // d s2' /=.
 move=> [][]pf => [][]sig_pf []cd []ef1 []sig1 []vals1 []ef2 []sig2 []vals2 []A B C.
@@ -1057,8 +1043,8 @@ Lemma frame_all_fwd1 pkg mus m1 m2 s1 s2 :
   frame_all (pkg :: mus) m1 m2 s1 s2 -> 
   mem_forward pkg.(frame_m10) m1.
 Proof.
-case: pkg=> ? ? ? ?.
-move/frame_all_inv=> []? []? []? []? []? ? []? []? []? []? []? []? []? []? []? [].
+case: pkg=> ? ? ? ?; move/frame_all_inv=> 
+  []? []? []? []? []? ? []? []? []? []? []? []? []? []? []? [].
 by case.
 Qed.
 
@@ -1066,8 +1052,8 @@ Lemma frame_all_fwd2 pkg mus m1 m2 s1 s2 :
   frame_all (pkg :: mus) m1 m2 s1 s2 -> 
   mem_forward pkg.(frame_m20) m2.
 Proof.
-case: pkg=> ? ? ? ?.
-move/frame_all_inv=> []? []? []? []? []? ? []? []? []? []? []? []? []? []? []? [].
+case: pkg=> ? ? ? ?; move/frame_all_inv=> 
+  []? []? []? []? []? ? []? []? []? []? []? []? []? []? []? [].
 by case.
 Qed.
 
@@ -1164,7 +1150,7 @@ Lemma tail_inv_match mu0 m10 m20 x mus s1 s2 m1 m2 :
       & exists (pf : c.(Core.i)=d.(Core.i)) 
                (sig_pf : c.(Core.sg)=d.(Core.sg)) cd0,
         (sims c.(Core.i)).(match_state) cd0 mu0 
-        c.(Core.c) m10 (cast'' pf d.(Core.c)) m20].
+        c.(Core.c) m10 (castT' pf d.(Core.c)) m20].
 Proof. by move=> []_; move/frame_all_match. Qed.
 
 Section tail_inv_lems.
@@ -1221,7 +1207,7 @@ Lemma head_tail_inv c d (sig_pf : c.(Core.sg)=d.(Core.sg))
   (atext1 : at_external (sem (cores_S (Core.i c))) (Core.c c) 
             = Some (e,sig,args1))
   (atext2 : at_external (sem (cores_T (Core.i c))) 
-            (cast'' pf (Core.c d)) = Some (e,sig,args2))
+            (castT' pf (Core.c d)) = Some (e,sig,args2))
   (inj : Mem.inject (as_inj mu) m1 m2)
   (vals_inj : Forall2 (val_inject (restrict (as_inj mu) (vis mu))) args1 args2) 
   (inv : @head_inv c d pf cd mu mus m1 m2) :
@@ -1335,7 +1321,8 @@ by rewrite eq in e1; rewrite e1 in e.
 by case: incr; move/(_ _ _ _ L)=> -> _; case=> -> ->.
 Qed.
 
-Lemma globalfunction_ptr_inject_intern_incr F V (mu mu' : Inj.t) (ge : Genv.t F V) :
+Lemma globalfunction_ptr_inject_intern_incr 
+      F V (mu mu' : Inj.t) (ge : Genv.t F V) :
   intern_incr mu mu' -> 
   globalfunction_ptr_inject ge (as_inj mu) ->
   globalfunction_ptr_inject ge (as_inj mu').
@@ -1352,41 +1339,39 @@ Lemma DisjointLS_intern_step mu0 (mu mu' : Inj.t) m1 m2 m1' m2' :
   intern_incr mu mu' -> 
   sm_locally_allocated mu mu' m1 m2 m1' m2'  -> 
   sm_valid mu0 m1 m2 -> 
-  (*sm_valid mu m1 m2 -> *)
   DisjointLS mu0 mu'.
 Proof.
-  move=> disj incr loca val1 (*val2*).
-  have B: Disjoint (locBlocksSrc mu0) [pred b | ~~ validblock m1 b].
-  apply: smvalid_locsrc_disjoint=> //. 
-    by apply: (sm_valid_smvalid_src _ _ _ val1).
-  have C: {subset [predD (locBlocksSrc mu') & locBlocksSrc mu]
-           <= [pred b | ~~ validblock m1 b]}.
-  by apply: (sminj_alloc_locsrc incr loca).
-  have D: Disjoint (locBlocksSrc mu0) 
-                     [predD (locBlocksSrc mu') & locBlocksSrc mu].
-   by apply: (Disjoint_sub1 B C).
+move=> disj incr loca val1.
+have B: Disjoint (locBlocksSrc mu0) [pred b | ~~ validblock m1 b].
+apply: smvalid_locsrc_disjoint=> //. 
+  by apply: (sm_valid_smvalid_src _ _ _ val1).
+have C: {subset [predD (locBlocksSrc mu') & locBlocksSrc mu]
+         <= [pred b | ~~ validblock m1 b]}.
+by apply: (sminj_alloc_locsrc incr loca).
+have D: Disjoint (locBlocksSrc mu0) 
+                 [predD (locBlocksSrc mu') & locBlocksSrc mu].
+by apply: (Disjoint_sub1 B C).
 by apply: (Disjoint_incr disj D).
 Qed.
 
 Lemma DisjointLS_intern_step' mu0 (mu mu' : Inj.t) m1 m2 m1' m2' :
   DisjointLS mu0 mu ->
-    inject_incr (as_inj mu0) (as_inj mu) ->
+  inject_incr (as_inj mu0) (as_inj mu) ->
   sm_locally_allocated mu mu' m1 m2 m1' m2'  -> 
   intern_incr mu mu' -> 
   sm_valid mu0 m1 m2 -> 
-  (*sm_valid mu m1 m2 -> *)
   DisjointLS mu0 mu'.
 Proof.
-  move=> disj incr loca incr' val1 (*val2*).
-  have B: Disjoint (locBlocksSrc mu0) [pred b | ~~ validblock m1 b].
-  apply: smvalid_locsrc_disjoint=> //. 
-    by apply: (sm_valid_smvalid_src _ _ _ val1).
-  have C: {subset [predD (locBlocksSrc mu') & locBlocksSrc mu]
-           <= [pred b | ~~ validblock m1 b]}.
-  by apply: (sminj_alloc_locsrc incr' loca).
-  have D: Disjoint (locBlocksSrc mu0) 
-                     [predD (locBlocksSrc mu') & locBlocksSrc mu].
-   by apply: (Disjoint_sub1 B C).
+move=> disj incr loca incr' val1 (*val2*).
+have B: Disjoint (locBlocksSrc mu0) [pred b | ~~ validblock m1 b].
+apply: smvalid_locsrc_disjoint=> //. 
+  by apply: (sm_valid_smvalid_src _ _ _ val1).
+have C: {subset [predD (locBlocksSrc mu') & locBlocksSrc mu]
+         <= [pred b | ~~ validblock m1 b]}.
+by apply: (sminj_alloc_locsrc incr' loca).
+have D: Disjoint (locBlocksSrc mu0) 
+                   [predD (locBlocksSrc mu') & locBlocksSrc mu].
+by apply: (Disjoint_sub1 B C).
 by apply: (Disjoint_incr disj D).
 Qed.
 
@@ -1395,32 +1380,31 @@ Lemma DisjointLT_intern_step mu0 (mu mu' : Inj.t) m1 m2 m1' m2' :
   intern_incr mu mu' -> 
   sm_locally_allocated mu mu' m1 m2 m1' m2'  -> 
   sm_valid mu0 m1 m2 -> 
-  (*sm_valid mu m1 m2 -> *)
   DisjointLT mu0 mu'.
 Proof.
-  move=> disj incr loca val1 (*val2*).
-  have B: Disjoint (locBlocksTgt mu0) [pred b | ~~ validblock m2 b].
-  apply: smvalid_loctgt_disjoint=> //. 
-    by apply: (sm_valid_smvalid_tgt _ _ _ val1).
-  have C: {subset [predD (locBlocksTgt mu') & locBlocksTgt mu]
-           <= [pred b | ~~ validblock m2 b]}.
-  by apply: (sminj_alloc_loctgt incr loca).
-  have D: Disjoint (locBlocksTgt mu0) 
-                     [predD (locBlocksTgt mu') & locBlocksTgt mu].
-    by apply: (Disjoint_sub1 B C).
-      by apply: (Disjoint_incr disj D).
+move=> disj incr loca val1.
+have B: Disjoint (locBlocksTgt mu0) [pred b | ~~ validblock m2 b].
+apply: smvalid_loctgt_disjoint=> //. 
+  by apply: (sm_valid_smvalid_tgt _ _ _ val1).
+have C: {subset [predD (locBlocksTgt mu') & locBlocksTgt mu]
+        <= [pred b | ~~ validblock m2 b]}.
+by apply: (sminj_alloc_loctgt incr loca).
+have D: Disjoint (locBlocksTgt mu0) 
+                   [predD (locBlocksTgt mu') & locBlocksTgt mu].
+by apply: (Disjoint_sub1 B C).
+by apply: (Disjoint_incr disj D).
 Qed.
 
-  Lemma disjinv_localloc_step (mu0 mu mu' : Inj.t) m10 m20 m1 m2 m1' m2':
-    disjinv mu0 mu ->
-    inject_incr (as_inj mu0) (as_inj mu) ->
-      intern_incr mu mu' ->
-      mem_forward m10 m1 ->
-      mem_forward m20 m2 ->
-      sm_locally_allocated mu mu' m1 m2 m1' m2' ->
-      sm_valid mu0 m10 m20 ->
-      sm_valid mu m1 m2 ->
-      disjinv mu0 mu'.
+Lemma disjinv_localloc_step (mu0 mu mu' : Inj.t) m10 m20 m1 m2 m1' m2':
+  disjinv mu0 mu ->
+  inject_incr (as_inj mu0) (as_inj mu) ->
+  intern_incr mu mu' ->
+  mem_forward m10 m1 ->
+  mem_forward m20 m2 ->
+  sm_locally_allocated mu mu' m1 m2 m1' m2' ->
+  sm_valid mu0 m10 m20 ->
+  sm_valid mu m1 m2 ->
+  disjinv mu0 mu'.
 Proof.
 move=> inv incr' incr mf1 mf2 loca VAL VAL'.
 have VAL2: sm_valid mu0 m1 m2 by apply: (sm_valid_fwd VAL mf1 mf2).
@@ -1444,41 +1428,6 @@ apply: Build_disjinv.
   by apply (consistent_incr incr' incr).
 Qed.
 
-(*Lemma sm_sep_step' (mu0 mu : SM_Injection) (mu' : Inj.t) m10 m20 m1 m2
-  (val : sm_valid mu0 m10 m20)
-  (sep1 : sm_inject_separated' mu0 mu)
-  (sep2 : sm_inject_separated' mu mu')
-  (fwd1 : mem_forward m10 m1)
-  (fwd2 : mem_forward m20 m2)
-  (incr : Values.inject_incr (as_inj mu) (as_inj mu')) :
-  sm_inject_separated' mu0 mu'.
-Proof.
-move=> b1 b2 d Inj1 Inj2; case S: (as_inj mu b1)=> [[b2' d']|].
-move: (incr _ _ _ S); rewrite Inj2; case=> b2b2' dd'; subst b2' d'.
-by apply: (sep1 _ _ _ Inj1 S).
-case: (sep2 _ _ _ S Inj2)=> D E; split.
-+ have D': DomSrc mu' b1. 
-    by case: (as_inj_DomRng _ _ _ _ Inj2)=> //; apply: (Inj_wd mu').
-  move: (B' _ D D')=> V1.
-  have V0: ~Memory.Mem.valid_block m10 b1 
-    by move=> ?; apply: V1; case: (fwd1 b1).
-  by case F: (DomSrc mu0 b1)=> //; case: val; move/(_ b1 F).
-+ have E': DomTgt mu' b2. 
-    by case: (as_inj_DomRng _ _ _ _ H2)=> //; apply: (Inj_wd mu').
-  move: (C' _ E E')=> V2.
-  have V0: ~Memory.Mem.valid_block m20 b2 
-    by move=> ?; apply: V2; case: (fwd2 b2).
-  by case F: (DomTgt mu0 b2)=> //; case: val=> _; move/(_ b2 F).
-case: sep2=> A' []B' C'; split.
-+ move=> b1 D E.
-  case F: (DomSrc mu b1); first by apply: (B _ D F).
-  by move: (B' _ F E)=> V1 V0; apply: V1; case: (fwd1 b1).
-+ move=> b2 D E.
-  case F: (DomTgt mu b2); first by apply: (C _ D F).
-  by move: (C' _ F E)=> V1 V0; apply: V1; case: (fwd2 b2).
-Qed. *)
-
-
 Lemma intern_incr_local mu mu':
   forall b1 p,
     intern_incr mu mu' ->
@@ -1496,7 +1445,8 @@ Lemma localloc_stepSrc mu mu' m1 m2 m1' m2':
   forall b1, locBlocksSrc mu' b1 ->
              locBlocksSrc mu b1 \/ ~Mem.valid_block m1 b1.
 case mu; case mu' =>  /=.
-move => locS locT _ _ _ ? ? _ _ _ locS' locT'? ? ? ? ? _ _ _ [] locs_eq [] loct_eq _.
+move => locS locT _ _ _ ? ? _ _ _ 
+        locS' locT'? ? ? ? ? _ _ _ [] locs_eq [] loct_eq _.
 rewrite locs_eq => b1.
 case/orP; first by auto.
 case/andP. move => H.
@@ -1509,7 +1459,8 @@ Lemma localloc_stepTgt mu mu' m1 m2 m1' m2':
   forall b2, locBlocksTgt mu' b2 ->
              locBlocksTgt mu b2 \/ ~Mem.valid_block m2 b2.
 case mu; case mu' =>  /=.
-move => locS locT _ _ _ ? ? _ _ _ locS' locT'? ? ? ? ? _ _ _ [] locs_eq [] loct_eq _.
+move => locS locT _ _ _ ? ? _ _ _ 
+        locS' locT'? ? ? ? ? _ _ _ [] locs_eq [] loct_eq _.
 rewrite loct_eq => b1.
 case/orP; first by auto.
 case/andP. move => H.
@@ -1525,7 +1476,7 @@ Context
 (unch2 : Memory.Mem.unchanged_on (fun b ofs => Etgt b ofs=false) m2 m2')
 (fwd1 : mem_forward m1 m1')
 (fwd2 : mem_forward m2 m2')
-(val : forall b ofs, Esrc b ofs -> (*Mem.valid_block m1 b ->*) vis mu b) 
+(val : forall b ofs, Esrc b ofs -> vis mu b) 
 (effs : 
    (forall (b0 : block) (ofs : Z),
    Etgt b0 ofs = true ->
@@ -1538,10 +1489,16 @@ Context
 (valid : sm_valid mu m1 m2)
 (incr : intern_incr mu mu')
 (gsep : globals_separate my_ge mu mu')
-(*sep : sm_inject_separated mu mu' m1 m2*) (*Change this! *)
 (alloc : sm_locally_allocated mu mu' m1 m2 m1' m2')
 (visrc : REACH_closed m1' (vis mu')).
 
+Lemma gsep_incr {F V}: forall (ge: Genv.t F V) mu nu nu',
+  globals_separate ge mu nu' ->
+  inject_incr (as_inj nu) (as_inj nu') ->
+  globals_separate ge mu nu.
+Proof.
+clear; move=> ???? gsep incr b1 b2 d0 H HH; eapply gsep; eauto.
+Qed.
 
 Lemma rel_inv_pred_step pkg
   (fwd10 : mem_forward pkg.(frame_m10) m1)
@@ -1583,52 +1540,38 @@ split; first by apply: (incr_trans incr' (intern_incr_incr incr)).
       rewrite map2 in mub1; inversion mub1; by reflexivity.
     + have WD':SM_wd mu' by case mu'=>  //=.
       split.
-      * have locMap: local_of mu' b1 = Some (b2, d) by eapply intern_incr_local; eauto.
+      * have locMap: local_of mu' b1 = Some (b2, d) 
+          by eapply intern_incr_local; eauto.
         case WD'=> _ _ locDom _ _ _ _ _.
         case (locDom _ _ _ locMap) => locS locD.
         case DS:(DomSrc pkg b1); last by reflexivity.
         apply pkg in DS.
         by contradict DS; auto.
 
-      * have locMap: local_of mu' b1 = Some (b2, d) by eapply intern_incr_local; eauto.
+      * have locMap: local_of mu' b1 = Some (b2, d) 
+          by eapply intern_incr_local; eauto.
         case WD'=> _ _ locDom _ _ _ _ _.
         case (locDom _ _ _ locMap) => locS locT.
         case DT:(DomTgt pkg b2); last by reflexivity.
         apply pkg in DT.
         by contradict DT; auto.
   -  by split => //=.
-    }
-
+}
 
 have incr'': inject_incr (as_inj mu) (as_inj mu').
-  apply: intern_incr_as_inj=> /=; first by apply: incr.
-    by generalize dependent mu'; case.
+{ apply: intern_incr_as_inj=> /=; first by apply: incr.
+  by generalize dependent mu'; case.
+}
 
-(*{ move => b1 b2 d map1 map2. eapply gsep'; auto. apply map1.
-  destruct (as_inj mu b1) eqn: mub1.
-+ destruct p. eapply gsep'; eauto.
-  rewrite mub1; apply incr'' in mub1.
-  rewrite HH in mub1; inversion mub1; by reflexivity.
-+ eapply gsep; eauto.
-  
-}*)
-    Lemma gsep_incr {F V}: forall (ge: Genv.t F V) mu nu nu',
-                       globals_separate ge mu nu' ->
-                       inject_incr (as_inj nu) (as_inj nu') ->
-                       globals_separate ge mu nu.
-      clear; intros ? ? ? ? gsep incr.
-      intros b1 b2 d0 H HH.
-      eapply gsep; eauto.
-    Qed.
-  move => b1 b2 d map1 map2.
-  destruct (as_inj mu b1) eqn: mub1.
+move => b1 b2 d map1 map2.
+destruct (as_inj mu b1) eqn: mub1.
 + destruct p. eapply gsep'; eauto.
   rewrite mub1; apply incr'' in mub1.
   rewrite map2 in mub1; inversion mub1; by reflexivity.
 + eapply gsep; by eauto.
-  (*End edit*) 
 + case incr' => inj_incr' dom_incr'.
-  by apply: (disjinv_localloc_step disj inj_incr' incr fwd10 fwd20 alloc (frame_val pkg)).
+by apply: (disjinv_localloc_step disj inj_incr' 
+             incr fwd10 fwd20 alloc (frame_val pkg)).
       
 move=> b; case/andP=> /= H H2; apply: frame_rc0; apply/andP; split=> //=.
 apply visrc in H; case: {H}(orP H)=> H3.
@@ -1667,8 +1610,7 @@ have [T|T]: b \in REACH m1 (vis a)
      \/ b \in REACH m1' (vis mu').
 { case e: (b \in REACH m1 (vis a)); first by left.
   by right; apply: S; apply/andP; split=> //=; rewrite e. }
-
-  by apply: rc'; apply/andP; split.
+by apply: rc'; apply/andP; split.
 by apply: rc; apply/andP; split.
 Qed.
 
@@ -1765,7 +1707,8 @@ Lemma vis_inv_step (c c' : Core.t cores_S) B :
   REACH_closed m1 (vis mu) -> 
   Core.i c = Core.i c' ->
   vis_inv c' (REACH m1' (fun b => structured_injections.freshloc m1 m1' b
-                || RC.reach_set (ge (cores_S (Core.i c))) (RC.mk (Core.c c) B) m1 b)) mu'.
+             || RC.reach_set (ge (cores_S (Core.i c))) (RC.mk (Core.c c) B) 
+             m1 b)) mu'.
 Proof.
 move=> E rc Heq; move: E.
 case=> E; apply: Build_vis_inv=> b F.
@@ -1803,7 +1746,7 @@ Lemma head_inv_step
   mem_welldefined.valid_genv (ge (cores_T (Core.i d))) m2 ->
   match_state (sims (Core.i (Core.upd c c'))) cd' mu'
     (Core.c (Core.upd c c')) m1'
-    (cast'' pf (Core.c (Core.upd d d'))) m2' -> 
+    (castT' pf (Core.c (Core.upd d d'))) m2' -> 
   @head_inv (Core.upd c c') (Core.upd d d') pf cd' mu' mus m1' m2'.
 Proof.
 move=> hdinv frame effstep effstepN vgenv mtch.
@@ -1864,7 +1807,8 @@ Record R (data : sig_data N (fun ix : 'I_N => (sims ix).(core_data)))
            (mu_top : Inj.t) mus, 
     [/\ mu = mu_top
       , exists pf2 : projT1 data = c.(Core.i),
-        @head_inv c d pf (cast_ty (lift_eq _ pf2) (projT2 data)) mu_top mus m1 m2 
+        @head_inv c d pf (cast_ty (lift_eq _ pf2) (projT2 data)) 
+                  mu_top mus m1 m2 
       & tail_inv mus (pop s1) (pop s2) m1 m2] 
 
     (* side conditions *)
@@ -1894,12 +1838,12 @@ Lemma peek_match :
   exists cd mu_top, 
   match_state (sims (Core.i (peekCore x1))) cd mu_top 
   (Core.c (peekCore x1)) m1 
-  (cast'' peek_ieq (Core.c (peekCore x2))) m2.
+  (castT' peek_ieq (Core.c (peekCore x2))) m2.
 Proof.
 move: (R_inv pf)=> []A []pf_sig []mu_top []mus []eq []pf2.
 move/head_match=> MATCH ?.
-have ->: (cast'' peek_ieq (Core.c (peekCore x2)) 
-         = cast'' A (Core.c (peekCore x2)))
+have ->: (castT' peek_ieq (Core.c (peekCore x2)) 
+         = castT' A (Core.c (peekCore x2)))
   by f_equal; f_equal; apply proof_irr.
 exists (cast_ty (lift_eq _ pf2) (projT2 data)). 
 by exists mu_top.
