@@ -1,6 +1,8 @@
 Require Import ssreflect ssrbool ssrnat ssrfun seq eqtype fintype finfun.
 Set Implicit Arguments.
 
+Require Import cast.
+
 Require Import Axioms Arith.
 
 Module FunCollection. Section FunCollection.
@@ -72,7 +74,7 @@ Qed.
 
 Lemma lt_incr n : n < n.+1. Proof. by []. Qed.
 
-Definition add (t : col) (x : T) :=
+Definition push (t : col) (x : T) :=
   let: new_size := (size t).+1 in
   let: new_idx  := Ordinal (lt_incr (size t)) in
   mk (fun i : 'I_new_size =>
@@ -81,9 +83,9 @@ Definition add (t : col) (x : T) :=
           | Some i' => thefun t i'
         end).
 
-Lemma addget t x : get (add t x) t.(size) = Some x.
+Lemma pushget t x : get (push t x) t.(size) = Some x.
 Proof.
-rewrite /get /add /=.
+rewrite /get /push /=.
 case: (lt_dec _ _)=> //.
 { move=> lt_pf /=. 
   have ->: lt_incr (size t) = my_ltP lt_pf by apply: proof_irr.
@@ -92,9 +94,47 @@ case: (lt_dec _ _)=> //.
 by move=> Contra; elimtype False; apply: Contra.
 Qed.
 
-Lemma alladd t p x : all t p -> p x -> all (add t x) p.
+Lemma allpush t p x : all t p -> p x -> all (push t x) p.
 Proof.
-by rewrite /all /add /= => H H2 i0; case: (unlift _ _).
+by rewrite /all /push /= => H H2 i0; case: (unlift _ _).
+Qed.
+
+Definition pop_fun size (f : 'I_(size.+1) -> T) : 'I_size -> T :=
+  fun i : 'I_size => f (lift (Ordinal (lt_incr size)) i).
+
+Definition pop (t : col) : col :=
+  (match size t as n return size t = n -> col with
+    | O => fun pf => t
+    | S n' => fun pf => 
+        @mk n' (pop_fun 
+          (cast_ty (lift_eq (fun idx => 'I_idx -> T) pf) (thefun t)))
+  end) erefl.
+
+Lemma allpop t p : all t p -> all (pop t) p.
+Proof.
+rewrite /all /pop; case: t=> n f /= H.
+by case H: n f H=> //[x] f H2 /= i; apply: H2.
+Qed.
+
+Definition peek (t : col) : option T :=
+  match size t with
+    | O   => None
+    | S n => get t n
+  end.
+
+Lemma allpeek t p x : all t p -> peek t = Some x -> p x.
+Proof.
+rewrite /all /peek; case: t=> n f /= H.
+case: n f H=> // n f H; rewrite /get /=.
+by case H2: (lt_dec _ _)=> // [y]; case=> <-.
+Qed.
+
+Lemma pushpeek t x : peek (push t x) = Some x.
+Proof.
+rewrite /peek /push /get /=; case H: (lt_dec _ _)=> //[pf|pf].
+have ->: lt_incr (size t) = my_ltP pf by apply: proof_irr.
+by rewrite unlift_none.
+by elimtype False; clear H; apply: pf.
 Qed.
 
 End FunCollection. 
@@ -103,14 +143,18 @@ Arguments size {T} _ /.
 Arguments empty / {T}.
 Arguments get {T} _ _ /.
 Arguments set {T} _ _ _ /.
-Arguments add {T} _ _ /.
+Arguments push {T} _ _ /.
+Arguments pop {T} _ /.
+Arguments peek {T} _ /.
 Arguments all {T} _ _ /.
 Arguments gss {T} _ _ _ _ /. 
 Arguments gso {T} _ _ _ _ _ /. 
 Arguments allget {T} _ _ _ _ _ _ /.
 Arguments allset {T} _ _ _ _ _ _ _ /.
-Arguments addget {T} _ _ /.
-Arguments alladd {T} _ _ _ _ _ _ /.
+Arguments pushget {T} _ _ /.
+Arguments allpush {T} _ _ _ _ _ _ /.
+Arguments allpeek {T} _ _ _ _ _ /.
+Arguments pushpeek {T} _ _ /.
 
 End FunCollection.
 
@@ -122,15 +166,19 @@ Record type (T : Type) : Type :=
   ; empty: t
   ; get  : t -> nat -> option T
   ; set  : t -> nat -> T -> t
-  ; add  : t -> T -> t
+  ; push : t -> T -> t
+  ; pop  : t -> t
+  ; peek : t -> option T
   ; all  : t -> pred T -> Prop
 
   ; gss  : forall t i x (pf : i < size t), get (set t i x) i = Some x
   ; gso  : forall t i j x (pf : i != j), get (set t i x) j = get t j
   ; allget : forall t p i x, all t p -> get t i = Some x -> p x
   ; allset : forall t p i x, all t p -> p x -> all (set t i x) p
-  ; addget : forall t x, get (add t x) (size t) = Some x
-  ; alladd : forall t p x, all t p -> p x -> all (add t x) p
+  ; pushget : forall t x, get (push t x) (size t) = Some x
+  ; allpush : forall t p x, all t p -> p x -> all (push t x) p
+  ; allpeek : forall t p x, all t p -> peek t = Some x -> p x
+  ; pushpeek : forall t x, peek (push t x) = Some x
   }.
 
 End COL.
@@ -139,14 +187,17 @@ Arguments COL.empty / {T _}.
 Arguments COL.size {T _} _ /.
 Arguments COL.get {T _} _ _ /.
 Arguments COL.set {T _} _ _ _ /.
-Arguments COL.add {T _} _ _ /.
+Arguments COL.push {T _} _ _ /.
+Arguments COL.peek {T _} _ /.
 Arguments COL.all {T _} _ _ /.
 Arguments COL.gss {T _ _ _ _} _ /. 
 Arguments COL.gso {T _ _ _ _ _} _ /. 
 Arguments COL.allget {T _ _ _ _ _ _ _} /. 
 Arguments COL.allset {T _ _ _ _ _ _ _} /. 
-Arguments COL.addget {T _ _ _} /. 
-Arguments COL.alladd {T _ _ _ _ _ _} /. 
+Arguments COL.pushget {T _ _ _} /. 
+Arguments COL.allpush {T _ _ _ _ _ _} /. 
+Arguments COL.allpeek {T _ _ _ _ _ _} /. 
+Arguments COL.pushpeek {T _ _ _} /. 
 
 Coercion COL.t : COL.type >-> Sortclass.
 
@@ -160,7 +211,8 @@ Variable T : Type.
 
 Definition t : COL.type T := 
   @COL.Build_type T (col T) 
-    size empty get set add all gss gso allget allset addget alladd.
+    size empty get set push pop peek all 
+    gss gso allget allset pushget allpush allpeek pushpeek.
 
 End Collection.
 
