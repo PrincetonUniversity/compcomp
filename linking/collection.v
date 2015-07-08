@@ -1,9 +1,87 @@
 Require Import ssreflect ssrbool ssrnat ssrfun seq eqtype fintype finfun.
 Set Implicit Arguments.
+Unset Strict Implicit.
 
 Require Import cast.
 
 Require Import Axioms Arith.
+
+Definition Pred (T : Type) := T -> Prop.
+
+Module COL. 
+Record class (T t : Type) := Class 
+  { size' : t -> nat
+  ; empty': t
+  ; get'  : t -> nat -> option T
+  ; set'  : t -> nat -> T -> t
+  ; push' : t -> T -> t
+  ; pop'  : t -> t
+  ; peek' : t -> option T
+  ; all'  : t -> Pred T -> Prop
+
+  ; _ : forall t i x (pf : i < size' t), get' (set' t i x) i = Some x
+  ; _ : forall t i j x (pf : i != j), get' (set' t i x) j = get' t j
+  ; _ : forall t p i x, all' t p -> get' t i = Some x -> p x
+  ; _ : forall t p i x, all' t p -> p x -> all' (set' t i x) p
+  ; _ : forall t x, get' (push' t x) (size' t) = Some x
+  ; _ : forall t p x, all' t p -> p x -> all' (push' t x) p
+  ; _ : forall t p x, all' t p -> peek' t = Some x -> p x
+  ; _ : forall t x, peek' (push' t x) = Some x
+  }.
+Structure type := Pack { val : Type; col : Type; class_of : class val col }.
+Definition size (e : type) : col e -> nat :=
+  let 'Pack _ _ (Class the_size _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) := e 
+  in the_size.
+Definition empty (e : type) : col e :=
+  let 'Pack _ _ (Class _ the_empty _ _ _ _ _ _ _ _ _ _ _ _ _ _) := e 
+  in the_empty.
+Definition get (e : type) : col e -> nat -> option (val e) :=
+  let 'Pack _ _ (Class _ _ the_get _ _ _ _ _ _ _ _ _ _ _ _ _) := e 
+  in the_get.
+Definition set (e : type) : col e -> nat -> val e -> col e :=
+  let 'Pack _ _ (Class _ _ _ the_set _ _ _ _ _ _ _ _ _ _ _ _) := e 
+  in the_set.
+Definition push (e : type) : col e -> val e -> col e :=
+  let 'Pack _ _ (Class _ _ _ _ the_push _ _ _ _ _ _ _ _ _ _ _) := e 
+  in the_push.
+Definition pop (e : type) : col e -> col e :=
+  let 'Pack _ _ (Class _ _ _ _ _ the_pop _ _ _ _ _ _ _ _ _ _) := e 
+  in the_pop.
+Definition peek (e : type) : col e -> option (val e) :=
+  let 'Pack _ _ (Class _ _ _ _ _ _ the_peek _ _ _ _ _ _ _ _ _) := e 
+  in the_peek.
+Definition all (e : type) : col e -> Pred (val e) -> Prop :=
+  let 'Pack _ _ (Class _ _ _ _ _ _ _ the_all _ _ _ _ _ _ _ _) := e 
+  in the_all.
+Arguments size {e} _ : simpl never.
+Arguments empty {e} : simpl never.
+Arguments get {e} _ _ : simpl never.
+Arguments set {e} _ _ _ : simpl never.
+Arguments push {e} _ _ : simpl never.
+Arguments pop {e} _ : simpl never.
+Arguments peek {e} _ : simpl never.
+Arguments all {e} _ _ : simpl never.
+Arguments Class {T} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _.
+Module theory.
+  Lemma gss (e : type) (t : col e) i x : i < size t -> get (set t i x) i = Some x. 
+  Proof. rewrite/get/set; case:e t x=>/=??; case=>???????? H ?????????; apply:H. Qed.
+  Lemma gso (e : type) (t : col e) i j x : i != j -> get (set t i x) j = get t j.
+  Proof. rewrite/get/set; case:e t x=>/=??; case=>????????? H ????????; apply:H. Qed.
+  Lemma allget (e : type) (t : col e) p i x : all t p -> get t i = Some x -> p x.
+  Proof. rewrite/get/set; case:e t p x=>/=??; case=>?????????? H ????????; apply:H. Qed.
+  Lemma allset (e : type) (t : col e) p i x : all t p -> p x -> all (set t i x) p.
+  Proof. rewrite/get/set; case:e t p x=>/=??; case=>??????????? H ???????; apply:H. Qed.
+  Lemma pushget (e : type) (t : col e) x : get (push t x) (size t) = Some x.
+  Proof. rewrite/get/set; case:e t x=>/=??; case=>???????????? H ?????; apply:H. Qed.
+  Lemma allpush (e : type) (t : col e) p x : all t p -> p x -> all (push t x) p.
+  Proof. rewrite/get/set; case:e t p x=>/=??; case=>????????????? H ????; apply:H. Qed.
+  Lemma allpeek (e : type) (t : col e) p x : all t p -> peek t = Some x -> p x.
+  Proof. rewrite/get/set; case:e t p x=>/=??; case=>?????????????? H ????; apply:H. Qed.
+  Lemma pushpeek (e : type) (t : col e) x : peek (push t x) = Some x.
+  Proof. rewrite/get/set; case:e t x=>/=??; case=>??????????????? H ??; apply: H. Qed.
+End theory.
+End COL.
+Import COL.theory.
 
 Module FunCollection. Section FunCollection.
 Variable T : Type.
@@ -25,7 +103,7 @@ Definition get (t : col) (i : nat) :=
   match lt_dec i t.(size) with
     | left lt_pf => 
       let: idx := Ordinal (my_ltP lt_pf) 
-      in Some (thefun t idx)
+      in Some (thefun idx)
     | right _ => None
   end.
 
@@ -33,12 +111,12 @@ Definition set (t : col) (i : nat) (x : T) :=
   match lt_dec i t.(size) with
     | left lt_pf => 
       let: idx := Ordinal (my_ltP lt_pf) 
-      in mk (fun j => if idx == j then x else thefun t j)
+      in mk (fun j => if idx == j then x else thefun j)
     | right _ => t
   end.
 
-Definition all (t : col) (p : pred T) := 
-  forall i : 'I_(size t), p (thefun t i).
+Definition all (t : col) (p : Pred T) := 
+  forall i : 'I_(size t), p (thefun i).
 
 Lemma gss t i x (pf : i < t.(size)) : get (set t i x) i = Some x.
 Proof.
@@ -80,7 +158,7 @@ Definition push (t : col) (x : T) :=
   mk (fun i : 'I_new_size =>
         match unlift new_idx i with
           | None => x
-          | Some i' => thefun t i'
+          | Some i' => thefun i'
         end).
 
 Lemma pushget t x : get (push t x) t.(size) = Some x.
@@ -107,7 +185,7 @@ Definition pop (t : col) : col :=
     | O => fun pf => t
     | S n' => fun pf => 
         @mk n' (pop_fun 
-          (cast_ty (lift_eq (fun idx => 'I_idx -> T) pf) (thefun t)))
+          (cast_ty (lift_eq (fun idx => 'I_idx -> T) pf) (@thefun t)))
   end) erefl.
 
 Lemma allpop t p : all t p -> all (pop t) p.
@@ -139,83 +217,30 @@ Qed.
 
 End FunCollection. 
 
-Arguments size {T} _ /.
-Arguments empty / {T}.
-Arguments get {T} _ _ /.
-Arguments set {T} _ _ _ /.
-Arguments push {T} _ _ /.
-Arguments pop {T} _ /.
-Arguments peek {T} _ /.
-Arguments all {T} _ _ /.
-Arguments gss {T} _ _ _ _ /. 
-Arguments gso {T} _ _ _ _ _ /. 
-Arguments allget {T} _ _ _ _ _ _ /.
-Arguments allset {T} _ _ _ _ _ _ _ /.
-Arguments pushget {T} _ _ /.
-Arguments allpush {T} _ _ _ _ _ _ /.
-Arguments allpeek {T} _ _ _ _ _ /.
-Arguments pushpeek {T} _ _ /.
-
 End FunCollection.
 
-Module COL. 
-
-Record type (T : Type) : Type := 
-  { t : Type
-  ; size : t -> nat
-  ; empty: t
-  ; get  : t -> nat -> option T
-  ; set  : t -> nat -> T -> t
-  ; push : t -> T -> t
-  ; pop  : t -> t
-  ; peek : t -> option T
-  ; all  : t -> pred T -> Prop
-
-  ; gss  : forall t i x (pf : i < size t), get (set t i x) i = Some x
-  ; gso  : forall t i j x (pf : i != j), get (set t i x) j = get t j
-  ; allget : forall t p i x, all t p -> get t i = Some x -> p x
-  ; allset : forall t p i x, all t p -> p x -> all (set t i x) p
-  ; pushget : forall t x, get (push t x) (size t) = Some x
-  ; allpush : forall t p x, all t p -> p x -> all (push t x) p
-  ; allpeek : forall t p x, all t p -> peek t = Some x -> p x
-  ; pushpeek : forall t x, peek (push t x) = Some x
-  }.
-
-End COL.
-
-Arguments COL.empty / {T _}.
-Arguments COL.size {T _} _ /.
-Arguments COL.get {T _} _ _ /.
-Arguments COL.set {T _} _ _ _ /.
-Arguments COL.push {T _} _ _ /.
-Arguments COL.peek {T _} _ /.
-Arguments COL.all {T _} _ _ /.
-Arguments COL.gss {T _ _ _ _} _ /. 
-Arguments COL.gso {T _ _ _ _ _} _ /. 
-Arguments COL.allget {T _ _ _ _ _ _ _} /. 
-Arguments COL.allset {T _ _ _ _ _ _ _} /. 
-Arguments COL.pushget {T _ _ _} /. 
-Arguments COL.allpush {T _ _ _ _ _ _} /. 
-Arguments COL.allpeek {T _ _ _ _ _ _} /. 
-Arguments COL.pushpeek {T _ _ _} /. 
-
-Coercion COL.t : COL.type >-> Sortclass.
-
-Module Collection.
+Section FunCollectionClass.
 
 Import FunCollection.
 
-Section Collection.
-
 Variable T : Type.
 
-Definition t : COL.type T := 
-  @COL.Build_type T (col T) 
-    size empty get set push pop peek all 
-    gss gso allget allset pushget allpush allpeek pushpeek.
+Definition fun_COLcl : COL.class T (col T) := 
+  COL.Class (col T) 
+    (@size T) (@empty T) (@get T) (@set T) 
+    (@push T) (@pop T) (@peek T) (@all T)
+    (@gss T) (@gso T) (@allget T) (@allset T) 
+    (@pushget T) (@allpush T) (@allpeek T) (@pushpeek T).
 
-End Collection.
+End FunCollectionClass.
 
-End Collection.
+Section test.
 
-Canonical Structure fun_colTy T : COL.type T := Collection.t T.
+Canonical Structure natfun_COLty : COL.type := COL.Pack (fun_COLcl nat).
+
+Import COL.
+
+Lemma xx : peek (push empty 0) = Some 0.
+Proof. by rewrite pushpeek. Qed.
+
+End test.  
