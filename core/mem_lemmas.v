@@ -1525,11 +1525,20 @@ Axiom ec_readonly_perm:
     forall k p, Mem.perm m1 b ofs' k p <-> Mem.perm m2 b ofs' k p.
 *)
 
-Axiom ec_readonly_strong: forall
+Lemma ec_readonly_strong: forall
   (ef : external_function) (F V : Type) (ge : Genv.t F V)
     (vargs : list val) (m1 : mem) (t : trace) (vres : val) (m2 : mem)
     (EC: external_call ef ge vargs m1 t vres m2)
     b (VB: Mem.valid_block m1 b), readonly m1 b m2.
+Proof. intros.
+destruct ef; simpl in *; inv EC; try apply readonly_refl.
+{ inv H. apply readonly_refl. eapply store_readonly; eassumption. }
+{ inv H0. apply readonly_refl. eapply store_readonly; eassumption. }
+{ eapply readonly_trans. eapply alloc_readonly; eassumption. 
+  eapply store_readonly; try eassumption. eapply alloc_forward; eassumption. }
+{ eapply free_readonly; eassumption. }
+{ eapply storebytes_readonly; eassumption. } 
+Qed.
 
 Lemma external_call_mem_forward:
   forall (ef : external_function) (F V : Type) (ge : Genv.t F V)
