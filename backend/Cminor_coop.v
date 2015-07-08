@@ -306,15 +306,31 @@ Lemma CMin_forward : forall g c m c' m' (CS: CMin_corestep g c m c' m'),
          eapply alloc_forward; eassumption. 
 Qed.
 
+Lemma CMin_rdonly g c m c' m'
+            (CS: CMin_corestep g c m c' m') b 
+            (VB: Mem.valid_block m b):  
+             readonly m b m'.
+  Proof. 
+     inv CS; simpl in *; try apply readonly_refl.
+          eapply free_readonly; eauto.
+          destruct vaddr; inv H1. eapply store_readonly; eauto.
+          eapply free_readonly; eauto.
+          eapply ec_readonly_strong; eauto.
+          eapply free_readonly; eauto.
+          eapply free_readonly; eauto.
+          eapply alloc_readonly; eauto.
+Qed.
+
 Program Definition cmin_coop_sem : 
   CoopCoreSem Cminor.genv CMin_core.
 Proof.
 apply Build_CoopCoreSem with (coopsem := CMin_core_sem).
   apply CMin_forward.
+  apply CMin_rdonly.
 Defined.
 
 End CMINOR_COOP.
-
+(*
 Lemma cmin_coop_readonly hf g c m c' m'
             (CS: CMin_corestep hf g c m c' m')
             (GV: forall b, isGlobalBlock g b = true -> Mem.valid_block m b):  
@@ -334,3 +350,4 @@ Lemma cmin_coop_readonly hf g c m c' m'
           eapply free_readonly; eassumption.
           eapply alloc_readonly; eassumption.
 Qed.
+*)

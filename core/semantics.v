@@ -70,6 +70,9 @@ Record CoopCoreSem {G C} :=
   { coopsem :> CoreSemantics G C mem
   ; corestep_fwd : 
       forall g c m c' m' (CS: corestep coopsem g c m c' m'), 
-      mem_forward m m' }.
+      mem_forward m m'
+  ; corestep_rdonly: 
+      forall g c m c' m' (CS: corestep coopsem g c m c' m') b, 
+      Mem.valid_block m b -> readonly m b m'}.
 
 Implicit Arguments CoopCoreSem [].

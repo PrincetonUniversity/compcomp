@@ -6723,23 +6723,15 @@ Proof.
     split. eapply MU.
     split. 
       split. eapply MU. clear MU.
-      destruct MTCH as [_ [_ [_ [PG [GF [SMV WD]]]]]].
-      split. apply effstep_corestep in H.
-             eapply mem_respects_readonly_forward'. eassumption.
+      split.
+      apply effstep_corestep in H.
+             eapply mem_respects_readonly_fwd. eassumption.
              eapply corestep_fwd; eassumption.
-             eapply linear_coop_readonly. apply H.
-         intros b GB. apply GF in GB. eapply SMV.
-         destruct (frgnSrc _ WD _ GB) as [bb [d [Frgn FTgt]]]. eapply foreign_DomRng; eassumption.
-     assert(G2: forall b, isGlobalBlock tge b = true -> Mem.valid_block m2 b).
-         rewrite <- (genvs_domain_eq_isGlobal _ _ GDE_lemma).
-         intros b GB. eapply SMV.
-         apply (meminj_preserves_globals_isGlobalBlock _ _ PG) in GB. 
-         eapply as_inj_DomRng; eassumption.
-     apply effstep_plus_corestep_plus in CSTgt.
-             eapply mem_respects_readonly_forward'. eassumption.
+             eapply corestep_rdonly; eassumption.
+        apply effstep_plus_corestep_plus in CSTgt.
+             eapply mem_respects_readonly_fwd. eassumption.
              eapply corestep_plus_fwd; eassumption.
-             eapply SM_simulation.CS2_RDO_plus; try eassumption. 
-             eapply mach_coop_readonly.
+             eapply corestep_plus_rdonly. eassumption. 
     exists U2.
     split. left. assumption.
     apply MU. }

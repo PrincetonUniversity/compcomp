@@ -1634,6 +1634,19 @@ Definition mem_respects_readonly {F V} (ge : Genv.t F V) m :=
            Genv.load_store_init_data ge m b 0 (gvar_init gv) /\
            Mem.valid_block m b /\ (forall ofs : Z, ~ Mem.perm m b ofs Max Writable).
 
+Lemma mem_respects_readonly_fwd {F V} (g : Genv.t F V) m m'
+         (MRR: mem_respects_readonly g m)
+         (FWD: mem_forward m m')
+         (RDO: forall b, Mem.valid_block m b -> readonly m b m'):
+         mem_respects_readonly g m'.
+Proof. red; intros. destruct (MRR _ _ H H0) as [LSI [VB NP]]; clear MRR.
+destruct (FWD _ VB) as [VB' Perm].
+split. eapply Genv.load_store_init_data_invariant; try eassumption.
+       intros. eapply readonly_readonlyLD. eapply RDO; try eassumption. intros. apply NP.
+split. trivial.
+intros z N. apply (NP z); eauto.
+Qed.
+
 Lemma mem_respects_readonly_forward {F V} (ge : Genv.t F V) m m'
          (MRR: mem_respects_readonly ge m)
          (FWD: mem_forward m m')

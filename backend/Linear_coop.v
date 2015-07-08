@@ -369,24 +369,11 @@ Lemma Linear_forward : forall g c m c' m' (CS: Linear_step g c m c' m'),
            inv H0. eapply external_call_mem_forward; eassumption.
 Qed.
 
-Program Definition Linear_coop_sem : 
-  CoopCoreSem genv Linear_core.
-Proof.
-apply Build_CoopCoreSem with (coopsem := Linear_core_sem).
-  apply Linear_forward.
-Defined.
-
-End LINEAR_COOP.
-
-Lemma linear_coop_readonly hf g c m c' m'
-            (CS: Linear_step hf g c m c' m')
-            (GV: forall b, isGlobalBlock g b = true -> Mem.valid_block m b):  
-         RDOnly_fwd m m' (ReadOnlyBlocks g).
-  Proof. intros. red; intros.
-     unfold ReadOnlyBlocks in Hb.
-     remember (Genv.find_var_info g b) as d; symmetry in Heqd.
-     destruct d; try discriminate.  
-     apply find_var_info_isGlobal in Heqd. apply GV in Heqd.   
+Lemma Linear_rdonly g c m c' m'
+            (CS: Linear_step g c m c' m') b
+            (VB: Mem.valid_block m b):  
+         readonly m b m'.
+  Proof.
      inv CS; simpl in *; try apply readonly_refl.
           destruct a; inv H0. eapply store_readonly; eassumption.
           eapply free_readonly; eassumption.
@@ -395,3 +382,13 @@ Lemma linear_coop_readonly hf g c m c' m'
           eapply alloc_readonly; eassumption.
           inv H0; eapply ec_readonly_strong; eassumption.
 Qed.
+
+Program Definition Linear_coop_sem : 
+  CoopCoreSem genv Linear_core.
+Proof.
+apply Build_CoopCoreSem with (coopsem := Linear_core_sem).
+  apply Linear_forward.
+  apply Linear_rdonly.
+Defined.
+
+End LINEAR_COOP.

@@ -91,10 +91,15 @@ solve[destruct (at_external_halted_excl sem c0); try congruence; auto].
 Qed.
 
 Program Definition coopsem : CoopCoreSem G (Z*list Event.t*C) :=
-  @Build_CoopCoreSem G (Z*list Event.t*C) coresem _.
+  @Build_CoopCoreSem G (Z*list Event.t*C) coresem _ _.
 Next Obligation.
 destruct CS; auto.
 solve[apply corestep_fwd in H; auto].
+Qed.
+Next Obligation.
+destruct CS; auto. 
+  eapply corestep_rdonly; eassumption.
+  admit. (*TODO: add readonly-assumption on extspecs*)
 Qed.
 
 Lemma corestep_CORESTEP ge c m c' m' z tr :

@@ -276,15 +276,6 @@ Proof. intros.
          eapply alloc_variables_forward; eassumption.
 Qed.
 
-Program Definition csharpmin_coop_sem : 
-  CoopCoreSem Csharpminor.genv CSharpMin_core.
-Proof.
-apply Build_CoopCoreSem with (coopsem := CSharpMin_core_sem).
-  apply CSharpMin_forward.
-Defined.
-
-End CSHARPMINOR_COOP.
-
 Lemma alloc_variables_readonly: forall vars m e e2 m'
       (M: alloc_variables e m vars e2 m') b (VB: Mem.valid_block m b),
       readonly m b m'.
@@ -296,16 +287,10 @@ Proof. intros.
      apply IHM. eapply alloc_forward; eassumption.
 Qed.
 
-Lemma cshmin_coop_readonly hf g c m c' m'
-            (CS: CSharpMin_corestep hf g c m c' m')
-            (GV: forall b, isGlobalBlock g b = true -> Mem.valid_block m b):  
-         RDOnly_fwd m m' (ReadOnlyBlocks g).
-  Proof. intros. red; intros.
-     unfold ReadOnlyBlocks in Hb.
-     remember (Genv.find_var_info g b) as d; symmetry in Heqd.
-     destruct d; try discriminate.
-     apply find_var_info_isGlobal in Heqd. apply GV in Heqd.  
-     (*destruct (MRR _ _ Heqd Hb) as [_ [VB _]].     *)
+Lemma cshmin_coop_readonly g c m c' m'
+            (CS: CSharpMin_corestep g c m c' m') b 
+            (VB: Mem.valid_block m b): readonly m b m'.
+  Proof.
      inv CS; simpl in *; try apply readonly_refl.
           eapply freelist_readonly; eassumption.
           destruct vaddr; inv H1. eapply store_readonly; eassumption.
@@ -314,3 +299,13 @@ Lemma cshmin_coop_readonly hf g c m c' m'
           eapply freelist_readonly; eassumption.
           eapply alloc_variables_readonly; eassumption.
 Qed.
+
+Program Definition csharpmin_coop_sem : 
+  CoopCoreSem Csharpminor.genv CSharpMin_core.
+Proof.
+apply Build_CoopCoreSem with (coopsem := CSharpMin_core_sem).
+  apply CSharpMin_forward.
+  apply cshmin_coop_readonly.
+Defined.
+
+End CSHARPMINOR_COOP.

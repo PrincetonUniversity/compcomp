@@ -1634,22 +1634,15 @@ apply simulations_lemmas.inj_simulation_plus with
     split. assumption.
     split. 
       split. assumption. clear UH.
-      destruct MTCH as [_ [_ [PG [_ [GF [SMV WD]]]]]].
-      split. apply effstep_corestep in H.
-             eapply mem_respects_readonly_forward'. eassumption.
+      split.
+      apply effstep_corestep in H.
+             eapply mem_respects_readonly_fwd. eassumption.
              eapply corestep_fwd; eassumption.
-             eapply rtl_coop_readonly. apply H.
-         intros b GB. apply GF in GB. eapply SMV.
-         destruct (frgnSrc _ WD _ GB) as [bb [d [Frgn FTgt]]]. eapply foreign_DomRng; eassumption.
-      assert(G2: forall b, isGlobalBlock tge b = true -> Mem.valid_block m2 b).
-         rewrite <- (genvs_domain_eq_isGlobal _ _ GDE_lemma).
-         intros b GB. eapply SMV.
-         apply (meminj_preserves_globals_isGlobalBlock _ _ PG) in GB. 
-         eapply as_inj_DomRng; eassumption.
+             eapply corestep_rdonly; eassumption.
       apply effstep_corestep in CS'.
-             eapply mem_respects_readonly_forward'. eassumption.
+             eapply mem_respects_readonly_fwd. eassumption.
              eapply corestep_fwd; eassumption.
-             eapply rtl_coop_readonly. apply CS'. assumption.
+             eapply corestep_rdonly; eassumption.
       exists U2. split. left. apply effstep_plus_one; assumption. assumption.
 
     exists st2, m2, mu.
@@ -1658,14 +1651,11 @@ apply simulations_lemmas.inj_simulation_plus with
     split. assumption.
     split. 
       split. assumption.  
-      destruct MTCH as [_ [_ [PG [_ [GF [SMV WD]]]]]].
       split; trivial.
       apply effstep_corestep in H.
-             eapply mem_respects_readonly_forward'. eassumption.
+             eapply mem_respects_readonly_fwd. eassumption.
              eapply corestep_fwd; eassumption.
-             eapply rtl_coop_readonly. apply H.
-         intros b GB. apply GF in GB. eapply SMV.
-         destruct (frgnSrc _ WD _ GB) as [bb [d [Frgn FTgt]]]. eapply foreign_DomRng; eassumption.
+             eapply corestep_rdonly; eassumption.
     exists EmptyEffect.
       split. right. split; trivial. apply effstep_star_zero.
       intuition.

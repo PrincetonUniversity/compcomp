@@ -261,11 +261,26 @@ Proof. intros.
          eapply external_call_mem_forward; eassumption.
 Qed.
 
+Lemma rtl_coop_rdonly g c m c' m'
+            (CS: RTL_corestep g c m c' m') b 
+            (VB: Mem.valid_block m b):  
+             readonly m b m'.
+  Proof. 
+     inv CS; simpl in *; try apply readonly_refl.
+          destruct a; inv H1. eapply store_readonly; eauto.
+          eapply free_readonly; eauto.
+          eapply ec_readonly_strong; eauto.
+          eapply free_readonly; eauto.
+          eapply alloc_readonly; eauto.
+          eapply ec_readonly_strong; eauto.
+Qed.
+
 Program Definition rtl_coop_sem : 
   CoopCoreSem genv RTL_core.
 Proof.
 apply Build_CoopCoreSem with (coopsem := RTL_core_sem).
   apply rtl_coop_forward.
+  apply rtl_coop_rdonly.
 Defined.
 
 End RELSEM.
@@ -290,7 +305,7 @@ apply andb_true_eq in Heqz. destruct Heqz.
 apply andb_true_eq in H. destruct H. intuition.
 unfold zlt in H0.  destruct (Z_lt_dec l Int.max_unsigned). trivial. inv H0. 
 Qed.
-
+(*
 Lemma rtl_coop_readonly hf g c m c' m'
             (CS: RTL_corestep hf g c m c' m')
             (GV: forall b, isGlobalBlock g b = true -> Mem.valid_block m b):  
@@ -308,6 +323,25 @@ Lemma rtl_coop_readonly hf g c m c' m'
           eapply free_readonly; eassumption.
           eapply alloc_readonly; eassumption.
           eapply ec_readonly_strong; eassumption.
+Qed.
+
+Lemma rtl_coop_readonlyT hf g c m c' m'
+            (CS: RTL_corestep hf g c m c' m') B
+            (GV: forall b, B b = true -> Mem.valid_block m b):  
+         RDOnly_fwd m m' B.
+  Proof. intros. red; intros.
+(*     unfold ReadOnlyBlocks in Hb.
+     remember (Genv.find_var_info g b) as d; symmetry in Heqd.
+     destruct d; try discriminate.
+     apply find_var_info_isGlobal in Heqd. apply GV in Heqd.  
+     (*destruct (MRR _ _ Heqd Hb) as [_ [VB _]].     *)*)
+     inv CS; simpl in *; try apply readonly_refl.
+          destruct a; inv H1. eapply store_readonly; eauto.
+          eapply free_readonly; eauto.
+          eapply ec_readonly_strong; eauto.
+          eapply free_readonly; eauto.
+          eapply alloc_readonly; eauto.
+          eapply ec_readonly_strong; eauto.
 Qed.
 (*
 Require Import semantics_lemmas.
@@ -342,4 +376,4 @@ Proof. intros.
   destruct CS. eapply rtl_coopN_readonly; eassumption.
 Qed.
  *)
-
+*)

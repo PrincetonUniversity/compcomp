@@ -321,64 +321,27 @@ Lemma LTL_forward : forall g c m c' m' (CS: ltl_corestep g c m c' m'),
            inv H0. eapply external_call_mem_forward; eassumption.
 Qed.
 
+Lemma LTL_rdonly g c m c' m'
+            (CS: ltl_corestep g c m c' m') b 
+            (VB: Mem.valid_block m b):  
+             readonly m b m'.
+  Proof. 
+     inv CS; simpl in *; try apply readonly_refl.
+          destruct a; inv H0. eapply store_readonly; eauto.
+          eapply free_readonly; eauto.
+          inv H. eapply ec_readonly_strong; eauto.
+          eapply free_readonly; eauto.
+          eapply alloc_readonly; eauto.
+          inv H0. eapply ec_readonly_strong; eauto.
+Qed.
+
 Program Definition LTL_coop_sem : 
   CoopCoreSem genv LTL_core.
 Proof.
 apply Build_CoopCoreSem with (coopsem := LTL_core_sem).
   apply LTL_forward.
+  apply LTL_rdonly.
 Defined.
 
 End LTL_COOP.
 
-Lemma ltl_coop_readonly hf g c m c' m'
-            (CS: ltl_corestep hf g c m c' m')
-            (GV: forall b, isGlobalBlock g b = true -> Mem.valid_block m b):  
-            (*(MRR: mem_respects_readonly g m)*)
-         RDOnly_fwd m m' (ReadOnlyBlocks g).
-  Proof. intros. red; intros.
-     unfold ReadOnlyBlocks in Hb.
-     remember (Genv.find_var_info g b) as d; symmetry in Heqd.
-     destruct d; try discriminate. 
-     apply find_var_info_isGlobal in Heqd. apply GV in Heqd.   
-(*     destruct (MRR _ _ Heqd Hb) as [_ [VB _]].     *)
-     inv CS; simpl in *; try apply readonly_refl.
-          destruct a; inv H0. eapply store_readonly; eassumption.
-          eapply free_readonly; eassumption.
-          inv H. eapply ec_readonly_strong; eassumption.
-          eapply free_readonly; eassumption.
-          eapply alloc_readonly; eassumption.
-          inv H0; eapply ec_readonly_strong; eassumption.
-Qed.
-(*
-Require Import semantics_lemmas.
-Lemma ltl_coopN_readonly hf g: forall n c m c' m'
-            (CS: corestepN (LTL_coop_sem hf) g n c m c' m')
-            (MRR: mem_respects_readonly g m),
-         RDOnly_fwd m m' (ReadOnlyBlocks g).
-Proof.
-  induction n; simpl; intros; red; intros.
-  inv CS. apply readonly_refl.
-  destruct CS as [cc [mm [CS CSN]]].
-  specialize (LTL_forward _ _ _ _ _ _ CS). intros.
-  apply ltl_coop_readonly in CS; trivial.
-  eapply readonly_trans. eapply CS. eassumption.
-  eapply IHn; try eassumption.
-  eapply mem_respects_readonly_forward'; eassumption.
-Qed.
-
-Lemma ltl_coop_plus_readonly hf g: forall c m c' m'
-            (CS: corestep_plus (LTL_coop_sem hf) g c m c' m')
-            (MRR: mem_respects_readonly g m),
-         RDOnly_fwd m m' (ReadOnlyBlocks g).
-Proof. intros.
-  destruct CS. eapply ltl_coopN_readonly; eassumption.
-Qed.
- 
-Lemma ltl_coop_star_readonly hf g: forall c m c' m'
-            (CS: corestep_star (LTL_coop_sem hf) g c m c' m')
-            (MRR: mem_respects_readonly g m),
-         RDOnly_fwd m m' (ReadOnlyBlocks g).
-Proof. intros.
-  destruct CS. eapply ltl_coopN_readonly; eassumption.
-Qed.
-*)

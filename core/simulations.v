@@ -130,8 +130,8 @@ Context
   (Sem1 : @EffectSem (Genv.t F1 V1) C1)
   (Sem2 : @EffectSem (Genv.t F2 V2) C2)
   (ge1 : Genv.t F1 V1)
-  (ge2 : Genv.t F2 V2)
-  (CS1_RDO: forall c m c' m', corestep Sem1 ge1 c m c' m' ->
+  (ge2 : Genv.t F2 V2).
+ (* (CS1_RDO: forall c m c' m', corestep Sem1 ge1 c m c' m' ->
                   (*mem_respects_readonly ge1 m ->*)
                   (forall b, isGlobalBlock ge1 b = true -> Mem.valid_block m b) ->
                   RDOnly_fwd m m' (ReadOnlyBlocks ge1))
@@ -191,7 +191,7 @@ Lemma CS2_RDO_star: forall c m c' m', corestep_star Sem2 ge2 c m c' m' ->
                   (forall b, isGlobalBlock ge2 b = true -> Mem.valid_block m b) ->
                   RDOnly_fwd m m' (ReadOnlyBlocks ge2).
 Proof. intros. destruct H. eapply CS2_RDO_N; eassumption. Qed.
-
+*)
 Record SM_simulation_inject := { 
   (** The type of auxiliary data used to model stuttering. *)
   core_data : Type
@@ -464,8 +464,8 @@ Lemma effcore_diagram_RDO_fwd (SMI: SM_simulation_inject):
                  foreign_of mu b1 = Some(b,delta1) 
                  /\ U1 b1 (ofs-delta1) = true 
                  /\ Mem.perm m1 b1 (ofs-delta1) Max Nonempty))
-         /\ RDOnly_fwd m1 m1' (ReadOnlyBlocks ge1)
-         /\ RDOnly_fwd m2 m2' (ReadOnlyBlocks ge2)).
+         /\ (forall b, Mem.valid_block m1 b -> readonly m1 b m1')
+         /\ (forall b, Mem.valid_block m2 b -> readonly m2 b m2')).
 Proof. intros.
   exploit effcore_diagram; eauto. 
   intros [st2' [m2' [cd' [mu' [INC [LOCALLOC [GSEP [MTCH' [U2 [Steps2 VIS]]]]]]]]]].
@@ -480,22 +480,12 @@ Proof. intros.
   destruct (match_genv SMI _ _ _ _ _ _ H0).
   specialize (match_sm_wd SMI _ _ _ _ _ _ H0). intros WD.
   apply match_validblocks in H0.
-  split. eapply CS1_RDO. eapply effstep_corestep. eassumption.
-         intros. apply H2 in H3. eapply H0.
-         destruct (frgnSrc _ WD _ H3) as [? [? [? ?]]]. eapply foreign_DomRng; eassumption.
+  split; intros. eapply corestep_rdonly; trivial. eapply effstep_corestep. eassumption.
   destruct Steps2 as [Steps2 | [Steps2 _]].
-  apply effstep_plus_corestep_plus in Steps2.
-    eapply CS2_RDO_plus; try eassumption. 
-         rewrite <- (genvs_domain_eq_isGlobal _ _ (genvs_dom_eq SMI)).
-         intros. eapply H0.
-         apply (meminj_preserves_globals_isGlobalBlock _ _ H1) in H3. 
-         eapply extern_DomRng'; eassumption.
+    apply effstep_plus_corestep_plus in Steps2.
+    eapply corestep_plus_rdonly; eassumption.
   apply effstep_star_corestep_star in Steps2.
-    eapply CS2_RDO_star; try eassumption. 
-         rewrite <- (genvs_domain_eq_isGlobal _ _ (genvs_dom_eq SMI)).
-         intros. eapply H0.
-         apply (meminj_preserves_globals_isGlobalBlock _ _ H1) in H3. 
-         eapply extern_DomRng'; eassumption.
+    eapply corestep_star_rdonly; eassumption.
 Qed.  
 
 End SharedMemory_simulation_inject. 

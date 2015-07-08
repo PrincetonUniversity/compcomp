@@ -16,13 +16,13 @@ Require Import RTL.
 
 Require Import mem_lemmas.
 Require Import semantics.
+Require Import semantics_lemmas.
 Require Import reach.
 Require Import effect_semantics.
 Require Import structured_injections.
 Require Import simulations.
 Require Import effect_properties.
 Require Import simulations_lemmas.
-
 
 Require Export Axioms.
 Require Import RTL_coop.
@@ -299,7 +299,7 @@ Lemma tr_moves_init_regs':
                                       tr_moves f.(fn_code) pc1 (sregs ctx1 rsrcs) (sregs ctx2 rdsts) pc2 ->
                                       (forall r, In r rdsts -> Ple r ctx2.(mreg)) ->
                                       list_forall2 (val_reg_charact F ctx1 rs1) vl rsrcs ->
-                                      exists rs2, semantics_lemmas.corestep_star (rtl_eff_sem hf) tge
+                                      exists rs2, corestep_star (rtl_eff_sem hf) tge
                                                                                       (RTL_State stk f sp pc1 rs1) m
                                                                                       (RTL_State stk f sp pc2 rs2) m
                                                   /\ agree_regs F ctx2 (init_regs vl rdsts) rs2
@@ -307,15 +307,15 @@ Lemma tr_moves_init_regs':
 Proof.
   induction rdsts; simpl; intros.
   (* rdsts = nil *)
-  inv H0. exists rs1; split. apply semantics_lemmas.corestep_star_zero. split. apply agree_regs_init. auto.
+  inv H0. exists rs1; split. apply corestep_star_zero. split. apply agree_regs_init. auto.
   (* rdsts = a :: rdsts *)
   inv H2. inv H0. 
-  exists rs1; split. apply semantics_lemmas.corestep_star_zero. split. apply agree_regs_init. auto.
+  exists rs1; split. apply corestep_star_zero. split. apply agree_regs_init. auto.
   simpl in H0. inv H0.
   exploit IHrdsts; eauto. intros [rs2 [A [B C]]].
   exists (rs2#(sreg ctx2 a) <- (rs2#(sreg ctx1 b1))).
-  split. eapply semantics_lemmas.corestep_star_trans; eauto. 
-  eapply semantics_lemmas.corestep_star_one.
+  split. eapply corestep_star_trans; eauto. 
+  eapply corestep_star_one.
   eapply  rtl_corestep_exec_Iop; eauto.
   split. destruct H3 as [[P Q] | [P Q]].
   subst a1. eapply agree_set_reg_undef; eauto.
@@ -4074,29 +4074,21 @@ Proof.
     split; trivial.
     split; trivial.
     split. 
-      split; trivial. 
-      destruct MTCH as [_ [_ [PG [_ [GF [SMV [WD _]]]]]]].
-      split. apply effstep_corestep in H.
-             eapply mem_respects_readonly_forward'. eassumption.
+      split; trivial.
+      split.
+      apply effstep_corestep in H.
+             eapply mem_respects_readonly_fwd. eassumption.
              eapply corestep_fwd; eassumption.
-             eapply rtl_coop_readonly; try eassumption. apply H.
-         intros b GB. apply GF in GB. eapply SMV.
-         destruct (frgnSrc _ WD _ GB) as [bb [d [Frgn FTgt]]]. eapply foreign_DomRng; eassumption.
-      assert(G2: forall b, isGlobalBlock tge b = true -> Mem.valid_block m2 b).
-         rewrite <- (genvs_domain_eq_isGlobal _ _ GDE_lemma).
-         intros b GB. eapply SMV.
-         apply (meminj_preserves_globals_isGlobalBlock _ _ PG) in GB. 
-         eapply as_inj_DomRng; eassumption.
+             eapply corestep_rdonly; eassumption.
       destruct H0 as [CS2 | [_ CS2]]. 
         apply effstep_plus_corestep_plus in CS2.
-             eapply mem_respects_readonly_forward'. eassumption.
-             eapply  semantics_lemmas.corestep_plus_fwd; eassumption.
-             eapply SM_simulation.CS2_RDO_plus; try eassumption. apply rtl_coop_readonly.
-        apply effstep_star_corestep_star in CS2.
-             eapply mem_respects_readonly_forward'. eassumption.
-             eapply  semantics_lemmas.corestep_star_fwd; eassumption.
-             eapply SM_simulation.CS2_RDO_star; try eassumption. apply rtl_coop_readonly.
-
+             eapply mem_respects_readonly_fwd. eassumption.
+             eapply corestep_plus_fwd; eassumption.
+             eapply corestep_plus_rdonly. eassumption. 
+      apply effstep_star_corestep_star in CS2.
+             eapply mem_respects_readonly_fwd. eassumption.
+             eapply corestep_star_fwd; eassumption.
+             eapply corestep_star_rdonly. eassumption. 
     exists U2; intuition. }
 Qed.
 

@@ -264,10 +264,12 @@ Inductive clight_effstep (ge:genv): (block -> Z -> bool) ->
 Variable FE_FWD: forall f vargs m e le m', FE f vargs m e le m' -> mem_forward m m'.
 Variable FE_UNCH: forall f vargs m e le m', FE f vargs m e le m'->
          Mem.unchanged_on (fun b z => EmptyEffect b z = false) m m'.
+Variable FE_RDonly: forall f vargs m e le m', FE f vargs m e le m'->
+         forall b, Mem.valid_block m b -> readonly m b m'.
 
 Lemma clightstep_effax1: forall (M : block -> Z -> bool) ge c m c' m'
       (H: clight_effstep ge M c m c' m'),
-       corestep (CL_coop_sem hf FE FE_FWD) ge c m c' m' /\
+       corestep (CL_coop_sem hf FE FE_FWD FE_RDonly) ge c m c' m' /\
        Mem.unchanged_on (fun (b : block) (ofs : Z) => M b ofs = false) m m'.
 Proof. 
 intros.
@@ -323,7 +325,7 @@ intros.
 Qed.
 
 Lemma clightstep_effax2: forall ge c m c' m',
-      corestep (CL_coop_sem hf FE FE_FWD) ge c m c' m' ->
+      corestep (CL_coop_sem hf FE FE_FWD FE_RDonly) ge c m c' m' ->
       exists M, clight_effstep ge M c m c' m'.
 Proof.
 intros. inv H.
@@ -387,7 +389,7 @@ Qed.
 Definition clight_eff_sem  
   :  @EffectSem Clight.genv CL_core.
 Proof.
-eapply Build_EffectSem with (sem := CL_coop_sem hf _ FE_FWD)
+eapply Build_EffectSem with (sem := CL_coop_sem hf _ FE_FWD FE_RDonly)
          (effstep:=clight_effstep).
 eapply clightstep_effax1. 
 apply clightstep_effax2. 
@@ -450,6 +452,7 @@ Proof.
   eapply (clight_eff_sem function_entry1).
   apply function_entry1_forward. 
   apply function_entry1_UNCH.
+  apply function_entry1_readonly.
 Defined.
 
 Definition CL_eff_sem2: @EffectSem Clight.genv CL_core.
@@ -457,6 +460,7 @@ Proof.
   eapply (clight_eff_sem function_entry2).
   apply function_entry2_forward. 
   apply function_entry2_UNCH.
+  apply function_entry2_readonly.
 Defined.
 
 End CLIGHT_EFF.

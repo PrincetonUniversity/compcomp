@@ -1818,7 +1818,9 @@ Lemma MATCH_initial: forall v vals1 c1 m1 j vals2 m2 (DomS DomT : block -> bool)
       (FE_UNCH : forall f vargs m e lenv m', FE f vargs m e lenv m' ->
           Mem.unchanged_on
             (fun (b : block) (z : Z) => EmptyEffect b z = false) m m')
-      (Ini: initial_core (clight_eff_sem hf FE FE_FWD FE_UNCH) ge v vals1 = Some c1)
+      (FE_RDO : forall f vargs m e lenv m', FE f vargs m e lenv m' ->
+          forall b, Mem.valid_block m b -> readonly m b m')
+      (Ini: initial_core (clight_eff_sem hf FE FE_FWD FE_UNCH FE_RDO) ge v vals1 = Some c1)
       (Inj: Mem.inject j m1 m2)
       (VInj: Forall2 (val_inject j) vals1 vals2)
       (PG:meminj_preserves_globals ge j)
@@ -1941,10 +1943,12 @@ Lemma MATCH_afterExternal: forall
          FE f vargs m e lenv m' -> 
          Mem.unchanged_on
             (fun (b : block) (z : Z) => EmptyEffect b z = false) m m')
+      (FE_RDO : forall f vargs m e lenv m', FE f vargs m e lenv m' ->
+          forall b, Mem.valid_block m b -> readonly m b m')
        mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
       (MemInjMu : Mem.inject (as_inj mu) m1 m2)
       (MatchMu: MATCH st1 mu st1 m1 st2 m2)
-      (AtExtSrc : at_external (clight_eff_sem hf FE FE_FWD FE_UNCH) st1 = Some (e, ef_sig, vals1))
+      (AtExtSrc : at_external (clight_eff_sem hf FE FE_FWD FE_UNCH FE_RDO) st1 = Some (e, ef_sig, vals1))
       (AtExtTgt : at_external (csharpmin_eff_sem hf) st2 = Some (e', ef_sig', vals2))
       (ValInjMu : Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2)
       (pubSrc' : block -> bool)
@@ -1980,7 +1984,7 @@ Lemma MATCH_afterExternal: forall
                (fun b z => locBlocksSrc nu b = true /\ pubBlocksSrc nu b = false) m1 m1')
        (UnchLOOR: Mem.unchanged_on (local_out_of_reach nu m1) m2 m2'),
   exists (st1' : CL_core) (st2' : CSharpMin_core),
-  after_external (clight_eff_sem hf FE FE_FWD FE_UNCH) (Some ret1) st1 =Some st1' /\
+  after_external (clight_eff_sem hf FE FE_FWD FE_UNCH FE_RDO) (Some ret1) st1 =Some st1' /\
   after_external (csharpmin_eff_sem hf) (Some ret2) st2 = Some st2' /\
   MATCH st1' mu' st1' m1' st2' m2'.
 Proof. intros.
@@ -3237,23 +3241,15 @@ intros.
     split. eapply MU.
     split. 
       split. eapply MU. clear MU HU.
-      destruct MTCH as [_ [_ [PG [_ [GF [SMV [WD _]]]]]]].
-      split. apply effstep_corestep in H.
-             eapply mem_respects_readonly_forward'. eassumption.
+      split.
+      apply effstep_corestep in H.
+             eapply mem_respects_readonly_fwd. eassumption.
              eapply corestep_fwd; eassumption.
-             eapply clight2_coop_readonly. apply H.
-         intros b GB. apply GF in GB. eapply SMV.
-         destruct (frgnSrc _ WD _ GB) as [bb [d [Frgn FTgt]]]. eapply foreign_DomRng; eassumption.
-     assert(G2: forall b, isGlobalBlock tge b = true -> Mem.valid_block m2 b).
-         rewrite <- (genvs_domain_eq_isGlobal _ _ GDE_lemma).
-         intros b GB. eapply SMV.
-         apply (meminj_preserves_globals_isGlobalBlock _ _ PG) in GB. 
-         eapply as_inj_DomRng; eassumption.
-     apply effstep_plus_corestep_plus in CS2.
-             eapply mem_respects_readonly_forward'. eassumption.
+             eapply corestep_rdonly; eassumption.
+        apply effstep_plus_corestep_plus in CS2.
+             eapply mem_respects_readonly_fwd. eassumption.
              eapply corestep_plus_fwd; eassumption.
-             eapply SM_simulation.CS2_RDO_plus; try eassumption.
-             apply cshmin_coop_readonly. 
+             eapply corestep_plus_rdonly. eassumption. 
     exists U2. split. left; assumption. apply HU. }
 Qed.
 

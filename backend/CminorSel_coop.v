@@ -331,31 +331,27 @@ Lemma CMinSel_forward : forall g c m c' m' (CS: CMinSel_corestep g c m c' m'),
          eapply alloc_forward; eassumption.
 Qed.
 
+Lemma CMinSel_rdonly g c m c' m'
+            (CS: CMinSel_corestep g c m c' m') b 
+            (VB: Mem.valid_block m b):  
+             readonly m b m'.
+  Proof. 
+     inv CS; simpl in *; try apply readonly_refl.
+          eapply free_readonly; eauto.
+          destruct vaddr; inv H2. eapply store_readonly; eauto.
+          eapply free_readonly; eauto.
+          eapply ec_readonly_strong; eauto.
+          eapply free_readonly; eauto.
+          eapply free_readonly; eauto.
+          eapply alloc_readonly; eauto.
+Qed.
+
 Program Definition cminsel_coop_sem : 
   CoopCoreSem genv CMinSel_core.
 Proof.
 apply Build_CoopCoreSem with (coopsem := CMinSel_core_sem).
   apply CMinSel_forward.
+  apply CMinSel_rdonly.
 Defined.
 
 End CMINSEL_COOP.
-
-Lemma cminsel_coop_readonly hf g c m c' m'
-            (CS: CMinSel_corestep hf g c m c' m')
-            (GV: forall b, isGlobalBlock g b = true -> Mem.valid_block m b):  
-         RDOnly_fwd m m' (ReadOnlyBlocks g).
-  Proof. intros. red; intros.
-     unfold ReadOnlyBlocks in Hb.
-     remember (Genv.find_var_info g b) as d; symmetry in Heqd.
-     destruct d; try discriminate.
-     apply find_var_info_isGlobal in Heqd. apply GV in Heqd.  
-     (*destruct (MRR _ _ Heqd Hb) as [_ [VB _]].     *)
-     inv CS; simpl in *; try apply readonly_refl.
-          eapply free_readonly; eassumption.
-          destruct vaddr; inv H2. eapply store_readonly; eassumption.
-          eapply free_readonly; eassumption.
-          eapply ec_readonly_strong; eassumption.
-          eapply free_readonly; eassumption.
-          eapply free_readonly; eassumption.
-          eapply alloc_readonly; eassumption.
-Qed.

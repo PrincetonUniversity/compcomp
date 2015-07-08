@@ -363,17 +363,6 @@ Lemma Asm_forward : forall g c m c' m'
      eapply store_args_fwd; eauto.
 Qed.
    
-Program Definition Asm_coop_sem : 
-  CoopCoreSem genv state.
-Proof.
-apply Build_CoopCoreSem with (coopsem := Asm_core_sem).
-  apply Asm_forward.
-Defined.
-
-End ASM_COOPSEM.
-
-End ASM_COOP.
-
 Lemma exec_load_readonly g ch m a rs rd rs' m': forall 
       (EI: exec_load g ch m a rs rd = Next rs' m') b
       (VB: Mem.valid_block m b),
@@ -468,15 +457,11 @@ Proof. intros.
     eapply free_readonly; eassumption. 
 Qed.
 
-Lemma asm_coop_readonly hf g c m c' m'
-            (CS: asm_step hf g c m c' m')
-            (GV: forall b, isGlobalBlock g b = true -> Mem.valid_block m b):  
-         RDOnly_fwd m m' (ReadOnlyBlocks g).
-  Proof. intros. red; intros.
-     unfold ReadOnlyBlocks in Hb.
-     remember (Genv.find_var_info g b) as d; symmetry in Heqd.
-     destruct d; try discriminate.
-     apply find_var_info_isGlobal in Heqd. apply GV in Heqd.  
+Lemma Asm_rdonly g c m c' m'
+            (CS: asm_step g c m c' m') b
+            (VB: Mem.valid_block m b):  
+         readonly m b m'.
+  Proof.
      inv CS; simpl in *; try apply readonly_refl.
           eapply exec_instr_readonly; eassumption. 
           inv H2. eapply ec_readonly_strong; eassumption.
@@ -486,3 +471,17 @@ Lemma asm_coop_readonly hf g c m c' m'
             apply alloc_forward in H0.
             eapply store_args_readonly; try eassumption. apply H0; trivial.
 Qed.
+
+Program Definition Asm_coop_sem : 
+  CoopCoreSem genv state.
+Proof.
+apply Build_CoopCoreSem with (coopsem := Asm_core_sem).
+  apply Asm_forward.
+  apply Asm_rdonly.
+Defined.
+
+End ASM_COOPSEM.
+
+End ASM_COOP.
+
+

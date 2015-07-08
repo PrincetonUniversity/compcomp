@@ -26,14 +26,14 @@ Section Eff_INJ_SIMU_DIAGRAMS.
           {Sem2 : @EffectSem (Genv.t F2 V2) C2}
 
           {ge1: Genv.t F1 V1} 
-          {ge2: Genv.t F2 V2}
-  (CS1_RDO: forall c m c' m', corestep Sem1 ge1 c m c' m' ->
+          {ge2: Genv.t F2 V2}.
+(*  (CS1_RDO: forall c m c' m', corestep Sem1 ge1 c m c' m' ->
                   (forall b, isGlobalBlock ge1 b = true -> Mem.valid_block m b) ->
                   RDOnly_fwd m m' (ReadOnlyBlocks ge1))
   (CS2_RDO: forall c m c' m', corestep Sem2 ge2 c m c' m' ->
                   (forall b, isGlobalBlock ge2 b = true -> Mem.valid_block m b) ->
                   RDOnly_fwd m m' (ReadOnlyBlocks ge2)).
-
+*)
   Let core_data := C1.
 
   Variable match_states: core_data -> SM_Injection -> C1 -> mem -> C2 -> mem -> Prop.
