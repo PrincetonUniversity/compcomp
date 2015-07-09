@@ -72,6 +72,18 @@ Variable my_ge : ge_ty.
 Variable my_ge_S : forall (i : 'I_N), genvs_domain_eq my_ge (cores_S i).(ge).
 Variable my_ge_T : forall (i : 'I_N), genvs_domain_eq my_ge (cores_T i).(ge).
 
+Variable all_gvars_includedS: forall i b,
+     gvars_included (Genv.find_var_info (cores_S i).(ge) b) (Genv.find_var_info my_ge b).
+
+Variable all_gvars_includedT: forall i b,
+     gvars_included (Genv.find_var_info (cores_T i).(ge) b) (Genv.find_var_info my_ge b).
+(*
+ Variable genvs_cohereS: forall m, mem_respects_readonly my_ge m ->
+                        forall i, mem_respects_readonly (cores_S i).(ge) m.
+
+  Variable genvs_cohereT: forall m, mem_respects_readonly my_ge m ->
+                        forall i, mem_respects_readonly (cores_T i).(ge) m.
+*)
 Notation cast'  pf x := (cast (C \o cores_T) pf x).
 Notation cast'' pf x := (cast (C \o cores_T) (sym_eq pf) x).
 Notation rc_cast'  pf x := (cast (RC.state \o C \o cores_T) pf x).
@@ -97,7 +109,7 @@ case hasty: (val_casted.val_has_type_func _ _)=> //.
 case=> Heq; subst rv1.
 case: (core_halted (sims (Core.i (peekCore st1)))
        _ _ _ _ _ _ (head_match hdinv) hlt10)
-       => rv2 []inj12 []vinj hlt2.
+       => rv2 []inj12 []mmr1 []mmr2 []vinj hlt2.
 exists rv2.
 set T := C \o cores_T.
 set P := fun sg ix (x : T ix) => 
@@ -164,7 +176,7 @@ move: (R_tys2 inv); rewrite /s2=> tys2.
 
 case: (core_halted (sims (Core.i (peekCore st1)))
        _ _ _ _ _ _ (head_match hdinv) hlt10)
-       => rv2 []inj12 []vinj hlt2.
+       => rv2 []inj12 []mmr1 []mmr2 []vinj hlt2.
 
 have hasty2: (val_casted.val_has_type_func rv2 (proj_sig_res (Core.sg (peekCore st2)))).
 { move: pf_sig hasty1; rewrite /c /d /s1 /s2 /peekCore /= => ->.
@@ -527,6 +539,19 @@ have [hd2' [pf_eq22' [pf_sig22' [pf_eq12' [pf_sig12' [cd' [aft2' mtch12']]]]]]]:
   { move: nu_nu'_sep; unfold globals_separate; unfold sm_inject_separated.
     intros. destruct (nu_nu'_sep) as [a  [b c]]. 
     destruct (a _ _ _ H H0) as [DSfalse DTfalse]. }*)
+  assert (RDS: RDOnly_fwd m10 m1 (ReadOnlyBlocks (ge (cores_S (Core.i hd1))))).
+        specialize (frame_rdoS fr0); intros RD_S. red; intros. eapply RD_S.
+        unfold ReadOnlyBlocks in Hb. remember (Genv.find_var_info (ge (cores_S (Core.i hd1))) b) as d.
+       destruct d; inv Hb. assert (GV:=all_gvars_includedS  (Core.i hd1) b). rewrite <- Heqd in GV. 
+        red in GV. unfold ReadOnlyBlocks. destruct (Genv.find_var_info my_ge b ); try contradiction.
+       destruct GV as [? [? ?]]. rewrite H1 H2. trivial.
+  assert (RDT: RDOnly_fwd m20 m2 (ReadOnlyBlocks (ge (cores_T (Core.i hd1))))).
+        specialize (frame_rdoT fr0); intros RD_T. red; intros. eapply RD_T.
+        unfold ReadOnlyBlocks in Hb. remember (Genv.find_var_info (ge (cores_T (Core.i hd1))) b) as d.
+       destruct d; inv Hb. assert (GV:=all_gvars_includedT  (Core.i hd1) b). rewrite <- Heqd in GV. 
+        red in GV. unfold ReadOnlyBlocks. destruct (Genv.find_var_info my_ge b ); try contradiction.
+       destruct GV as [? [? ?]]. rewrite H1 H2. trivial.
+
   move: (@eff_after_external
   _ _ _ _ _ _ _ _ 
   _ _  
@@ -540,7 +565,7 @@ have [hd2' [pf_eq22' [pf_sig22' [pf_eq12' [pf_sig12' [cd' [aft2' mtch12']]]]]]]:
 
   hasty_rv1 hasty_rv2 nu_nu'_eincr nu_nu'_gsep
   nu'_wd nu'_valid nu'_inj nu'_vinj
-  fwd1 fwd2
+  fwd1 fwd2 RDS RDT
 
   frgnSrc' erefl frgnTgt' erefl mu' erefl
 
@@ -1075,6 +1100,9 @@ by apply: (R_ge inv).
 by apply: (R_ro1 inv).
 
 by apply: (R_ro2 inv).
+
+by apply: (frame_mmr1 inv).
+by apply: (frame_mmr2 inv).
 
 { rewrite st1'_eq; move: tys1; case: (popCoreE _ pop1); rewrite st1''_eq=> x []_. 
   case=> _; case: st1 x=> y; case=> /=; case=> // a l _ _ /= => <- /=.

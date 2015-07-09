@@ -185,12 +185,15 @@ rewrite e; auto.
 Qed.
 
 Program Definition coopsem : CoopCoreSem (Genv.t F V) state :=
-  Build_CoopCoreSem _ _ coresem _.
+  Build_CoopCoreSem _ _ coresem _ _.
 Next Obligation. 
 destruct (effax1 H) as [X Y].
 revert X; apply corestep_fwd. 
 Qed.
-
+Next Obligation.
+destruct (effax1 H0) as [X Y].
+eapply corestep_rdonly; eauto. 
+Qed.
 (** ** Reach-Closed Effect Semantics *)
 
 Lemma my_effax1 M ge c m c' m' :

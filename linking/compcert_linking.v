@@ -844,6 +844,14 @@ move/effstep0_corestep0; rewrite/LinkerSem.corestep0.
 by move=> []c' []STEP H1; apply: {STEP}(corestep_fwd STEP). 
 Qed.
 
+Lemma effstep0_rdonly U l m l' m' : 
+  effstep0 U l m l' m' -> 
+  forall b, Mem.valid_block m b -> readonly m b m'.
+Proof. 
+move/effstep0_corestep0. rewrite/LinkerSem.corestep0. 
+by move=> []c' []STEP H1 b VB; intros; eapply corestep_rdonly; eauto. 
+Qed.
+
 Definition inner_effstep (ge: ge_ty)
   (l: linker N my_cores) m (l': linker N my_cores) m' := 
   [/\ LinkerSem.corestep l m l' m' 
@@ -893,12 +901,17 @@ by refine ge.
 by move=> -> ->.
 Qed.
 
-Program Definition coopsem := Build_CoopCoreSem _ _ csem _.
+Program Definition coopsem := Build_CoopCoreSem _ _ csem _ _.
 
 Next Obligation. 
 move: CS; case; move=>[H1|[<- [H0 H1]]]. 
 by move/(_ H1)=>{H1} [U EFF]; apply (effstep0_forward EFF).
 by move=> ?; apply mem_forward_refl.
+Qed.
+Next Obligation. 
+move: CS; case; move=>[H1|[<- [H0 H1]]]. 
+ move/(_ H1)=>{H1} [U EFF]. apply (effstep0_rdonly EFF); auto.
+by [].
 Qed.
 
 Program Definition effsem := Build_EffectSem _ _ coopsem effstep _ _ _.

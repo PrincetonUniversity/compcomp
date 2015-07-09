@@ -730,6 +730,20 @@ Lemma var_info_rev_translated:
   exists v, Genv.find_var_info ge b = Some v /\ transf_globvar transl_globvar v = OK tv.
 Proof (Genv.find_var_info_rev_transf_partial2 transl_fundef transl_globvar _ TRANSL).
 
+Lemma Gvar_infos_eq: gvar_infos_eq ge tge. 
+Proof. 
+   red; intros.
+   unfold gvar_info_eq.
+   remember (Genv.find_var_info ge b) as v; symmetry in Heqv.
+   destruct v. 
+     destruct (var_info_translated _ _ Heqv) as [w [W TW]].
+     rewrite W. inv TW; simpl in *. intuition.
+   remember (Genv.find_var_info tge b) as tv; symmetry in Heqtv.
+   destruct tv; trivial. 
+     destruct (var_info_rev_translated _ _ Heqtv) as [w [W TW]].
+     rewrite W in Heqv. discriminate.
+Qed.
+
 Lemma block_is_volatile_preserved:
   forall b, block_is_volatile tge b = block_is_volatile ge b.
 Proof.
@@ -3193,17 +3207,8 @@ intros.
 (*genvs_dom_eq*)
   apply GDE_lemma.
 (*ginfos_preserved*)
- split; red; intros.
-   unfold gvar_info_eq.
-   remember (Genv.find_var_info ge b) as v; symmetry in Heqv.
-   destruct v. 
-     destruct (var_info_translated _ _ Heqv) as [w [W TW]].
-     rewrite W. inv TW; simpl in *. intuition.
-   remember (Genv.find_var_info tge b) as tv; symmetry in Heqtv.
-   destruct tv; trivial. 
-     destruct (var_info_rev_translated _ _ Heqtv) as [w [W TW]].
-     rewrite W in Heqv. discriminate.
-  rewrite symbols_preserved. trivial.
+ split. apply Gvar_infos_eq.
+  red; intros. rewrite symbols_preserved; trivial.  
 (*MATCH_wd*)
   apply MATCH_wd. 
 (*MATCH_reachclosed*)

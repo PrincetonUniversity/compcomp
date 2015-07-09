@@ -18,6 +18,85 @@ Require Import Asm_coop.
 Require Import Asm_nucular.
 Require Import CompositionalCompiler.
 
+Theorem transf_rtl_program_preserves_varinfos:
+  forall p tp, 
+  transf_rtl_program p =  Errors.OK tp ->
+  forall b, 
+  Genv.find_var_info (Genv.globalenv tp) b =
+  Genv.find_var_info (Genv.globalenv p) b.
+Proof.
+  intros. 
+  unfold transf_rtl_program in H.
+  repeat rewrite compose_print_identity in H.
+  simpl in H.
+  
+  set (p1 := Tailcall.transf_program p) in *.
+  destruct (Inlining.transf_program p1) as [p2|] eqn:?; simpl in H; try discriminate.
+  set (p3 := Renumber.transf_program p2) in *.
+  set (p4 := Constprop.transf_program p3) in *.
+  set (p5 := Renumber.transf_program p4) in *.
+  destruct (CSE.transf_program p5) as [p6|] eqn:?; simpl in H; try discriminate.
+  destruct (Allocation.transf_program p6) as [p7|] eqn:?; simpl in H; try discriminate.
+  set (p8 := Tunneling.tunnel_program p7) in *.
+  destruct (Linearize.transf_program p8) as [p9|] eqn:?; simpl in H; try discriminate.
+  set (p10 := CleanupLabels.transf_program p9) in *.
+  destruct (Stacking.transf_program p10) as [p11|] eqn:?; simpl in H; try discriminate.
+  
+  rewrite <- (Tailcallproof_comp.varinfo_preserved p).
+  unfold p1 in *.
+  erewrite <- (Inliningproof_comp.varinfo_preserved); try eauto. clear Heqr.
+  erewrite <- (Renumberproof_comp.varinfo_preserved); try eauto.
+  unfold p5, p4, p3 in *.
+  erewrite <- (Constpropproof_comp.varinfo_preserved); try eauto.
+  erewrite <- (Renumberproof_comp.varinfo_preserved); try eauto.
+  erewrite <- (CSEproof_comp.varinfo_preserved); try eauto. clear Heqr0.
+  erewrite <- (Allocproof_comp.varinfo_preserved); try eauto. clear Heqr1.
+  unfold p8 in *.
+  erewrite <- (Tunnelingproof_comp.varinfo_preserved); try eauto.
+  erewrite <- (Linearizeproof_comp.varinfo_preserved); try eauto. clear Heqr2.
+  erewrite <- (CleanupLabelsproof_comp.varinfo_preserved); try eauto.
+  erewrite <- (Stackingproof_comp.varinfo_preserved); try eauto. 
+  erewrite <- (Asmgenproof_comp.varinfo_preserved); try eauto. 
+Qed.
+
+Theorem transf_cminor_program_preserves_varinfos:
+  forall p tp,
+  transf_cminor_program p =  Errors.OK tp ->
+  forall b,
+  Genv.find_var_info (Genv.globalenv tp) b =
+  Genv.find_var_info (Genv.globalenv p) b.
+Proof.
+  intros.
+  unfold transf_cminor_program in H.
+  repeat rewrite compose_print_identity in H.
+  simpl in H. 
+  destruct (SelectionNEW.sel_program p) as [p1|] eqn:?; simpl in H; try discriminate.
+  destruct (RTLgen.transl_program p1) as [p2|] eqn:?; simpl in H; try discriminate.
+  apply transf_rtl_program_preserves_varinfos with (b:=b) in H; rewrite H.
+  apply RTLgenproof_comp.varinfo_preserved with (b:=b) in Heqr0; rewrite Heqr0.
+  generalize (Selectionproof_comp.varinfo_preserved p hf b); intros H2.
+  revert Heqr; unfold SelectionNEW.sel_program, Errors.bind.
+  rewrite HelpersOK; inversion 1; rewrite H2; auto.
+Qed.
+
+Theorem transf_clight_program_preserves_varinfos:
+  forall p tp,
+  transf_clight_program p = Errors.OK tp ->
+  gvar_infos_eq  (Genv.globalenv p) (Genv.globalenv tp).
+Proof.
+  intros.
+  unfold transf_clight_program in H.
+  repeat rewrite compose_print_identity in H.
+  simpl in H. 
+  destruct (SimplLocals.transf_program p) as [p1|] eqn:?; simpl in H; try discriminate.
+  destruct (Cshmgen.transl_program p1) as [p2|] eqn:?; simpl in H; try discriminate.
+  destruct (Cminorgen.transl_program p2) as [p3|] eqn:?; simpl in H; try discriminate.
+  move=> b. rewrite (transf_cminor_program_preserves_varinfos H). clear H.
+  rewrite <- (SimplLocalsproof_comp.varinfo_preserved _ _ Heqr); clear Heqr.
+  rewrite (CminorgenproofRestructured.varinfo_preserved _ _ Heqr1); clear Heqr1.
+  apply (Cshmgenproof_comp.Gvar_infos_eq _ _ Heqr0). 
+Qed.
+
 (** * Contextual Equivalence for CompCert Clight->x86 Asm *)
 
 (** Notations and convenient definitions: *)
@@ -65,6 +144,10 @@ Lemma compcert_equiv
   explained in Section 3. *)
   forall ge_top : ge_ty,
   forall domeq_S : (forall ix : 'I_N, genvs_domain_eq ge_top (sems_S ix).(Modsem.ge)),
+                                                     
+  forall all_gvars_includedS: forall ix b,
+     gvars_included (Genv.find_var_info ((sems_S ix).(Modsem.ge)) b) (Genv.find_var_info ge_top b),
+(*  forall all_gvar_infos_eq: forall ix, gvar_infos_eq (Modsem.ge (sems_S ix)) (Modsem.ge (sems_T ix)),*)
 
 (** No module defines the same module twice. *)
   forall lnr : (forall ix : 'I_N, list_norepet (map fst (prog_defs (source_modules ix)))),
@@ -80,13 +163,16 @@ Lemma compcert_equiv
   Equiv_ctx ge_top plt prog_S prog_T.
 
 Proof.
-move=> sems_S sems_T prog_S prog_T ge_top deqS lnr transf.
+move=> sems_S sems_T prog_S prog_T ge_top deqS gvarsIncl (*gvarsInfo*) lnr transf.
 have find_syms :
   forall (i : 'I_N) (id : ident) (bf : block),
   Genv.find_symbol (Modsem.ge (sems_S i)) id = Some bf ->
   Genv.find_symbol (Modsem.ge (sems_T i)) id = Some bf.
 { move=> idx id bf; rewrite /sems_S /sems_T /=; move: (transf idx)=> H.
   by apply transf_clight_program_preserves_syms with (s := id) in H; rewrite H. }
+have all_gvar_infos_eq: forall ix, gvar_infos_eq (Modsem.ge (sems_S ix)) (Modsem.ge (sems_T ix)).
+{  move=> idx; rewrite /sems_S /sems_T /=; move: (transf idx)=> H.
+   apply transf_clight_program_preserves_varinfos. assumption. }
 apply: CE.equiv=> //.
 by move=> ix; apply: Clight_RC.
 by move=> ix; apply: Asm_is_nuc.
@@ -109,7 +195,9 @@ Lemma compcert_refines
   let prog_S := Prog.mk sems_S main in
   let prog_T := Prog.mk sems_T main in
   forall ge_top : ge_ty,
-  forall domeq_S : (forall ix : 'I_N, genvs_domain_eq ge_top (sems_S ix).(Modsem.ge)),
+  forall domeq_S : (forall ix : 'I_N, genvs_domain_eq ge_top (sems_S ix).(Modsem.ge)),            
+  forall all_gvars_includedS: forall ix b,
+     gvars_included (Genv.find_var_info ((sems_S ix).(Modsem.ge)) b) (Genv.find_var_info ge_top b),
   forall lnr : (forall ix : 'I_N, list_norepet (map fst (prog_defs (source_modules ix)))),
   forall transf : 
     (forall ix : 'I_N, transf_clight_program (source_modules ix) 
@@ -117,13 +205,16 @@ Lemma compcert_refines
   forall EM : ClassicalFacts.excluded_middle,
   Prog_refines ge_top plt prog_S prog_T.
 Proof.
-move=> sems_S sems_T prog_S prog_T ge_top deqS lnr transf EM.
+move=> sems_S sems_T prog_S prog_T ge_top deqS GvarsIncl lnr transf EM.
 have find_syms :
   forall (i : 'I_N) (id : ident) (bf : block),
   Genv.find_symbol (Modsem.ge (sems_S i)) id = Some bf ->
   Genv.find_symbol (Modsem.ge (sems_T i)) id = Some bf.
 { move=> idx id bf; rewrite /sems_S /sems_T /=; move: (transf idx)=> H.
   by apply transf_clight_program_preserves_syms with (s := id) in H; rewrite H. }
+have all_gvar_infos_eq: forall ix, gvar_infos_eq (Modsem.ge (sems_S ix)) (Modsem.ge (sems_T ix)).
+{  move=> idx; rewrite /sems_S /sems_T /=; move: (transf idx)=> H.
+   apply transf_clight_program_preserves_varinfos. assumption. }
 apply: PR.refines=> //.
 by move=> ix; apply: Clight_RC.
 by move=> ix; apply: Asm_is_nuc.

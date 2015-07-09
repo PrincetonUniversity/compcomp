@@ -105,7 +105,7 @@ have atext1':
 move=> hd_match _.
 case: (core_at_external (sims (Core.i (c inv))) 
       _ _ _ _ _ _ hd_match atext1').
-move=> inj []args2 []valinj []atext2 extends; exists args2.
+move=> inj []mmr1 []mrr2 []args2 []valinj []atext2 extends; exists args2.
 set T := C \o cores_T.
 rewrite /LinkerSem.at_external0.
 set P := fun ix (x : T ix) => 
@@ -182,7 +182,7 @@ have atext2'':
 
 case: (core_at_external (sims (Core.i (c inv))) 
       _ _ _ _ _ _ (head_match hdinv) atext1').
-move=> inj []args2' []vinj []atext2''' extends.
+move=> inj []mrr1 []mrr2 []args2' []vinj []atext2''' extends.
 
 have eq: args2 = args2' by move: atext2'''; rewrite atext2''; case.
 subst args2'.
@@ -334,8 +334,10 @@ have [cd_new [c2 [pf_new [init2 mtch12]]]]:
          args1 _ m1 j args2 m2 domS domT init1 inj vinj')=> //.
   case: hdinv=> ? ? ? ? ? genvs /=; rewrite /j.
   by apply: (genvs_domain_eq_globalptr_inject (my_ge_S c1_i) genvs). 
-  by case: inv=> ????????? Ro1 Ro2 _ _; apply: Ro1.
-  by case: inv=> ????????? Ro1 Ro2 _ _; apply: Ro2.
+  by apply: (R_ro1 inv). 
+  by apply: (R_ro2 inv).
+(*  by case: inv=> ????????? Ro1 Ro2 _ _ _ _; apply: Ro1.
+  by case: inv=> ????????? Ro1 Ro2 _ _; apply: Ro2.*)
   move=> cd' []c2' []init2 mtch_init12.
   exists cd',(Core.mk N cores_T c1_i c2' (ef_sig ef)),erefl.
   move: init2=> /= ->; split=> //=.
@@ -544,6 +546,9 @@ apply: (R_ro1 inv).
 {
 apply: (R_ro2 inv).
 }
+
+{ apply: (frame_mmr1 inv). } 
+{ apply: (frame_mmr2 inv). }
 
 {
 have sigOf1: sig_of (c inv) = Some (Core.sg c1).
