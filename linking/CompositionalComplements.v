@@ -139,8 +139,8 @@ Lemma compcert_equiv
   let prog_S := Prog.mk sems_S main in
   let prog_T := Prog.mk sems_T main in
 
-(** [ge_top] and the two [domeq_*] hypotheses below constrain the source--target
-  global envs. of the modules in [sems_S] and [sems_T] to have equal domain, as
+(** [ge_top] and the [domeq_*] hypothesis below constrains the source
+  global env of the modules in [sems_S] to have equal domain, as
   explained in Section 3. *)
   forall ge_top : ge_ty,
   forall domeq_S : (forall ix : 'I_N, genvs_domain_eq ge_top (sems_S ix).(Modsem.ge)),
