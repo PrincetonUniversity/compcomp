@@ -38,6 +38,9 @@ Record t (ge_top : ge_ty) : Type := {
   ; valid_C : Nuke_sem.t (sem C)
   ; det_C : corestep_fun (sem C)
   ; domeq_C : genvs_domain_eq ge_top (ge C)
+  ; symbols_up_C: forall id b,
+     Genv.find_symbol (ge C) id = Some b ->
+     Genv.find_symbol ge_top id = Some b
   ; gvars_included_C: forall b,
      gvars_included (Genv.find_var_info (ge C) b) (Genv.find_var_info ge_top b)
   }.

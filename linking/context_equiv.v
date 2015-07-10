@@ -220,9 +220,18 @@ Variable sims :
   SM_simulation_inject s.(sem) t.(sem) s.(ge) t.(ge).
 Variable ge_top : ge_ty.                                                     
 Variable domeq_S : forall ix : 'I_N, genvs_domain_eq ge_top (Prog.sems pS ix).(ge).
+
+(*Four new assumptions*)
+Variable symbols_up_S: forall ix id b,
+     Genv.find_symbol ((Prog.sems pS ix).(ge)) id = Some b ->
+     Genv.find_symbol ge_top id = Some b.
+Variable symbols_up_T: forall ix id b,
+     Genv.find_symbol ((Prog.sems pT ix).(ge)) id = Some b ->
+     Genv.find_symbol ge_top id = Some b.
 Variable all_gvars_includedS: forall ix b,
      gvars_included (Genv.find_var_info ((Prog.sems pS ix).(ge)) b) (Genv.find_var_info ge_top b).
 Variable all_gvar_infos_eq: forall ix, gvar_infos_eq (ge (Prog.sems pS ix)) (ge (Prog.sems pT ix)).
+
 Variable find_symbol_ST : 
   forall (ix : 'I_N) id bf, 
   Genv.find_symbol (ge (Prog.sems pS ix)) id = Some bf -> 
@@ -243,6 +252,8 @@ have sim: CompCert_wholeprog_sim
   by case e: (lt_dec ix N)=> [pf|pf] //; apply: (Ctx.sim_C C).
   by case e: (lt_dec ix N)=> [pf|pf] //; apply: (Ctx.domeq_C C).
   by case e: (lt_dec ix N)=> [pf|pf] //; apply: (Ctx.domeq_C C).
+  { move=> ??; case e: (lt_dec ix N)=> [pf|pf]. move=> ?. eapply symbols_up_S. eassumption. apply (Ctx.symbols_up_C). }
+  { move=> ??; case e: (lt_dec ix N)=> [pf|pf]. move=> ?. eapply symbols_up_T. eassumption. apply (Ctx.symbols_up_C). }
   by case e: (lt_dec ix N)=> [pf|pf] //; apply: (Ctx.gvars_included_C C). 
   case e: (lt_dec ix N)=> [pf|pf] //; try apply: (Ctx.gvars_included_C C).
     move=> b; specialize (gvar_infos_eqD2 _ _ (all_gvar_infos_eq (Ordinal (lt_ssrnatlt pf))) b).
@@ -296,8 +307,17 @@ Variable sims :
   SM_simulation_inject s.(sem) t.(sem) s.(ge) t.(ge).
 Variable ge_top : ge_ty.                                                     
 Variable domeq_S : forall ix : 'I_N, genvs_domain_eq ge_top (Prog.sems pS ix).(ge).
+
+(*Four new assumptions*)
+Variable symbols_up_S: forall ix id b,
+     Genv.find_symbol ((Prog.sems pS ix).(ge)) id = Some b ->
+     Genv.find_symbol ge_top id = Some b.
+Variable symbols_up_T: forall ix id b,
+     Genv.find_symbol ((Prog.sems pT ix).(ge)) id = Some b ->
+     Genv.find_symbol ge_top id = Some b.
 Variable all_gvars_includedS: forall ix b,
      gvars_included (Genv.find_var_info ((Prog.sems pS ix).(ge)) b) (Genv.find_var_info ge_top b).
+
 Variable all_gvar_infos_eq: forall ix, gvar_infos_eq (ge (Prog.sems pS ix)) (ge (Prog.sems pT ix)).
 Variable find_symbol_ST : 
   forall (ix : 'I_N) id bf, 
@@ -323,6 +343,8 @@ have sim: CompCert_wholeprog_sim
   by case e: (lt_dec ix N)=> [pf|pf] //; apply: (Ctx.sim_C C).
   by case e: (lt_dec ix N)=> [pf|pf] //; apply: (Ctx.domeq_C C).
   case e: (lt_dec ix N)=> [pf|pf] //; last by apply: (Ctx.domeq_C C). by apply: domeq_T. 
+  { move=> ??; case e: (lt_dec ix N)=> [pf|pf]. move=> ?. eapply symbols_up_S. eassumption. apply (Ctx.symbols_up_C). }
+  { move=> ??; case e: (lt_dec ix N)=> [pf|pf]. move=> ?. eapply symbols_up_T. eassumption. apply (Ctx.symbols_up_C). }
   by case e: (lt_dec ix N)=> [pf|pf] //; apply: (Ctx.gvars_included_C C). 
   case e: (lt_dec ix N)=> [pf|pf] //; try apply: (Ctx.gvars_included_C C).
     move=> b; specialize (gvar_infos_eqD2 _ _ (all_gvar_infos_eq (Ordinal (lt_ssrnatlt pf))) b).
@@ -376,6 +398,8 @@ have sim: CompCert_wholeprog_sim
   by case e: (lt_dec ix N)=> [pf|pf] //; apply: (Ctx.sim_C C).
   by case e: (lt_dec ix N)=> [pf|pf] //; apply: (Ctx.domeq_C C).
   case e: (lt_dec ix N)=> [pf|pf] //; last by apply: (Ctx.domeq_C C). by apply: domeq_T.
+  { move=> ??; case e: (lt_dec ix N)=> [pf|pf]. move=> ?. eapply symbols_up_S. eassumption. apply (Ctx.symbols_up_C). }
+  { move=> ??; case e: (lt_dec ix N)=> [pf|pf]. move=> ?. eapply symbols_up_T. eassumption. apply (Ctx.symbols_up_C). }
   by case e: (lt_dec ix N)=> [pf|pf] //; apply: (Ctx.gvars_included_C C). 
   case e: (lt_dec ix N)=> [pf|pf] //; try apply: (Ctx.gvars_included_C C).
     move=> b; specialize (gvar_infos_eqD2 _ _ (all_gvar_infos_eq (Ordinal (lt_ssrnatlt pf))) b).

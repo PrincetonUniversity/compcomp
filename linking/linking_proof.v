@@ -81,6 +81,15 @@ Variable my_ge : ge_ty.
 Variable my_ge_S : forall (i : 'I_N), genvs_domain_eq my_ge (cores_S i).(ge).
 Variable my_ge_T : forall (i : 'I_N), genvs_domain_eq my_ge (cores_T i).(ge).
 
+(*Four new assumptions*)
+Variable find_symbol_up_S: forall i id b,
+    Genv.find_symbol (cores_S i).(ge) id = Some b ->
+    Genv.find_symbol my_ge id = Some b.
+
+Variable find_symbol_up_T: forall i id b,
+    Genv.find_symbol (cores_T i).(ge) id = Some b ->
+    Genv.find_symbol my_ge id = Some b.
+
 Variable all_gvars_includedS: forall i b,
      gvars_included (Genv.find_var_info (cores_S i).(ge) b) (Genv.find_var_info my_ge b).
 
@@ -238,16 +247,8 @@ eapply Build_Wholeprog_sim
     apply reach; apply: (REACH_mono (fun b' : block =>
       isGlobalBlock (ge (cores_T ix)) b' || getBlocks vals2 b'))=> //. }
 
-  { move=> b' gv Hfind /andP []H2 H3.  
-     destruct (gvars_cohereD _ _ (all_gvars_includedS ix) _ _ Hfind) as [gv2 [Hfind2 [Hfa [Hfb Hfc]]]].
-     move: (ro1 b' (mkglobvar (gvar_info gv2) (gvar_init gv2) (gvar_readonly gv2) (gvar_volatile gv2))); case.
-     rewrite Hfind2; simpl. f_equal. destruct gv2; simpl in *; trivial. simpl. rewrite <- Hfb, <- Hfc, H2, H3. reflexivity. 
-     rewrite Hfa; simpl.
-     move=> X []Y Z. split. 2: split; assumption. 
-     admit. (*Genv.load_store_init_data: mmr for small ge in init_core (Source)*)
-    }
-
-  { (*symmetric to previous - needs Genv.load_store_init_data property: mmr for small ge in init_core (Target)*) admit. }
+  { by eapply mrr_down_S; eassumption. }
+  { by eapply mrr_down_T; eassumption. }
 
   { by apply: valid_dec'. }
 
@@ -354,8 +355,8 @@ eapply Build_Wholeprog_sim
   by move: gfi; rewrite /mu_top /= /mu_top0 initial_SM_as_inj.
   by move=> ix'; move: vgenv; apply: valid_genvs_domain_eq.
 
-  admit. (*ro1: mem_respects_readonly for small ge in init-core (Source)*)
-  admit. (*ro2: mem_respects_readonly for small ge in init-core (Target)*)
+  by move=>ixx; eapply mrr_down_S; eassumption.
+  by move=>ixx; eapply mrr_down_T; eassumption. 
 
   by apply: ord_dec. }(*END [Case: core_initial]*)
     
@@ -725,10 +726,19 @@ Lemma link :
  forall ge_top : ge_ty,
  (forall ix : 'I_N, genvs_domain_eq ge_top (ge (sems_S ix))) ->
  (forall ix : 'I_N, genvs_domain_eq ge_top (ge (sems_T ix))) ->
+
+ (*Four new assumptions*)
+ (forall ix id b,
+    Genv.find_symbol (ge (sems_S ix)) id = Some b ->
+    Genv.find_symbol ge_top id = Some b) ->
+ (forall ix id b,
+    Genv.find_symbol  (ge (sems_T ix)) id = Some b ->
+    Genv.find_symbol ge_top id = Some b) ->
  (forall ix b, gvars_included (Genv.find_var_info (ge (sems_S ix)) b)
                              (Genv.find_var_info ge_top b)) ->
  (forall ix b, gvars_included (Genv.find_var_info (ge (sems_T ix)) b)
                              (Genv.find_var_info ge_top b)) ->
+
  let linker_S := effsem N sems_S plt in
  let linker_T := effsem N sems_T plt in
  forall main : val,

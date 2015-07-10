@@ -144,10 +144,13 @@ Lemma compcert_equiv
   explained in Section 3. *)
   forall ge_top : ge_ty,
   forall domeq_S : (forall ix : 'I_N, genvs_domain_eq ge_top (sems_S ix).(Modsem.ge)),
-                                                     
-  forall all_gvars_includedS: forall ix b,
+               
+(** New assumptions for integration of Constant propagation*)
+  forall symbols_up_S: (forall ix id b,
+     Genv.find_symbol ((sems_S ix).(Modsem.ge)) id = Some b ->
+     Genv.find_symbol ge_top id = Some b),
+  forall gvarinfos_up_S: forall ix b,
      gvars_included (Genv.find_var_info ((sems_S ix).(Modsem.ge)) b) (Genv.find_var_info ge_top b),
-(*  forall all_gvar_infos_eq: forall ix, gvar_infos_eq (Modsem.ge (sems_S ix)) (Modsem.ge (sems_T ix)),*)
 
 (** No module defines the same module twice. *)
   forall lnr : (forall ix : 'I_N, list_norepet (map fst (prog_defs (source_modules ix)))),
@@ -163,11 +166,17 @@ Lemma compcert_equiv
   Equiv_ctx ge_top plt prog_S prog_T.
 
 Proof.
-move=> sems_S sems_T prog_S prog_T ge_top deqS gvarsIncl (*gvarsInfo*) lnr transf.
+move=> sems_S sems_T prog_S prog_T ge_top deqS symbUpS gvarinfosUpS lnr transf.
 have find_syms :
   forall (i : 'I_N) (id : ident) (bf : block),
   Genv.find_symbol (Modsem.ge (sems_S i)) id = Some bf ->
   Genv.find_symbol (Modsem.ge (sems_T i)) id = Some bf.
+{ move=> idx id bf; rewrite /sems_S /sems_T /=; move: (transf idx)=> H.
+  by apply transf_clight_program_preserves_syms with (s := id) in H; rewrite H. }
+have find_syms_inv :
+  forall (i : 'I_N) (id : ident) (bf : block),
+  Genv.find_symbol (Modsem.ge (sems_T i)) id = Some bf ->
+  Genv.find_symbol (Modsem.ge (sems_S i)) id = Some bf.
 { move=> idx id bf; rewrite /sems_S /sems_T /=; move: (transf idx)=> H.
   by apply transf_clight_program_preserves_syms with (s := id) in H; rewrite H. }
 have all_gvar_infos_eq: forall ix, gvar_infos_eq (Modsem.ge (sems_S ix)) (Modsem.ge (sems_T ix)).
@@ -180,6 +189,7 @@ move=> ix; rewrite /Prog.sems/= => m m' m'' ge c c' c'' /= H H2.
 by eapply asm_step_det; eauto.
 move=> ix; move: (transf ix)=> H.
 by eapply transf_clight_program_correct in H; eauto.
+by move=> ix id b GVT; apply find_syms_inv in GVT; eauto.
 Qed.
 
 Module PR := ProgRefines LinkingSimulation.
@@ -195,8 +205,11 @@ Lemma compcert_refines
   let prog_S := Prog.mk sems_S main in
   let prog_T := Prog.mk sems_T main in
   forall ge_top : ge_ty,
-  forall domeq_S : (forall ix : 'I_N, genvs_domain_eq ge_top (sems_S ix).(Modsem.ge)),            
-  forall all_gvars_includedS: forall ix b,
+  forall domeq_S : (forall ix : 'I_N, genvs_domain_eq ge_top (sems_S ix).(Modsem.ge)), 
+  forall symbols_up_S: (forall ix id b,
+     Genv.find_symbol ((sems_S ix).(Modsem.ge)) id = Some b ->
+     Genv.find_symbol ge_top id = Some b),           
+  forall gvarinfos_up_S: forall ix b,
      gvars_included (Genv.find_var_info ((sems_S ix).(Modsem.ge)) b) (Genv.find_var_info ge_top b),
   forall lnr : (forall ix : 'I_N, list_norepet (map fst (prog_defs (source_modules ix)))),
   forall transf : 
@@ -205,11 +218,17 @@ Lemma compcert_refines
   forall EM : ClassicalFacts.excluded_middle,
   Prog_refines ge_top plt prog_S prog_T.
 Proof.
-move=> sems_S sems_T prog_S prog_T ge_top deqS GvarsIncl lnr transf EM.
+move=> sems_S sems_T prog_S prog_T ge_top deqS symbsUpS gvarinfosUpS lnr transf EM. 
 have find_syms :
   forall (i : 'I_N) (id : ident) (bf : block),
   Genv.find_symbol (Modsem.ge (sems_S i)) id = Some bf ->
   Genv.find_symbol (Modsem.ge (sems_T i)) id = Some bf.
+{ move=> idx id bf; rewrite /sems_S /sems_T /=; move: (transf idx)=> H.
+  by apply transf_clight_program_preserves_syms with (s := id) in H; rewrite H. }
+have find_syms_inv :
+  forall (i : 'I_N) (id : ident) (bf : block),
+  Genv.find_symbol (Modsem.ge (sems_T i)) id = Some bf ->
+  Genv.find_symbol (Modsem.ge (sems_S i)) id = Some bf.
 { move=> idx id bf; rewrite /sems_S /sems_T /=; move: (transf idx)=> H.
   by apply transf_clight_program_preserves_syms with (s := id) in H; rewrite H. }
 have all_gvar_infos_eq: forall ix, gvar_infos_eq (Modsem.ge (sems_S ix)) (Modsem.ge (sems_T ix)).
@@ -222,4 +241,5 @@ move=> ix; rewrite /Prog.sems/= => m m' m'' ge c c' c'' /= H H2.
 by eapply asm_step_det; eauto.
 move=> ix; move: (transf ix)=> H.
 by eapply transf_clight_program_correct in H; eauto.
+by move=> ix id b GVT; apply find_syms_inv in GVT; eauto.
 Qed.  

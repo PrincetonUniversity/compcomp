@@ -100,79 +100,21 @@ Variable my_ge : ge_ty.
 Variable my_ge_S : forall (i : 'I_N), genvs_domain_eq my_ge (cores_S i).(ge).
 Variable my_ge_T : forall (i : 'I_N), genvs_domain_eq my_ge (cores_T i).(ge).
 
-(*Maybe add this assumption?
-Variable findsymbs_includeS: forall i id b,
+(*Four new assumptions*)
+Variable find_symbol_up_S: forall i id b,
     Genv.find_symbol (cores_S i).(ge) id = Some b ->
-    exists b', Genv.find_symbol my_ge id = Some b'.
-*)
+    Genv.find_symbol my_ge id = Some b.
+
+Variable find_symbol_up_T: forall i id b,
+    Genv.find_symbol (cores_T i).(ge) id = Some b ->
+    Genv.find_symbol my_ge id = Some b.
 
 Variable all_gvars_includedS: forall i b,
      gvars_included (Genv.find_var_info (cores_S i).(ge) b) (Genv.find_var_info my_ge b).
 
 Variable all_gvars_includedT: forall i b,
      gvars_included (Genv.find_var_info (cores_T i).(ge) b) (Genv.find_var_info my_ge b).  
-(*
-Lemma genvs_cohereS: forall m, mem_respects_readonly my_ge m ->
-                     forall i, mem_respects_readonly (cores_S i).(ge) m.
- Proof. move=> m MRR i b gv FV P. 
-     destruct (@gvars_cohereD _ _ _ _ _ _ (all_gvars_includedS i) _ _ FV) as [gv2 [? [? [? ?]]]].
-     rewrite H1 H2 in P.
-     destruct (MRR _ _ H P) . split; trivial. destruct H4 as [? _].
-     rewrite H0. clear H0. remember (gvar_init gv2) as il; clear Heqil.
-     assert (K: forall il k,  Genv.load_store_init_data my_ge m b k il ->
-                Genv.load_store_init_data (ge (cores_S i)) m b k il).
-        { move: H4 FV H. clear. move=>VB FV FVM.
-          induction il; simpl; intros z LDI; trivial.
-  destruct a.
-  { destruct LDI; split; eauto. }
-  { destruct LDI; split; eauto. }
-  { destruct LDI; split; eauto. }
-  { destruct LDI; split; eauto. }
-  { destruct LDI; split; eauto. }
-  { destruct LDI; split; eauto. }
-  { apply IHil; assumption. }
-  { destruct LDI as [[b' [FS LD]] LSI].
-    split; eauto.  exists b'; split; trivial.
-    
-    destruct (Inj _ _ _ LD) as [v [A B]]. inv B.
-    rewrite J in H1.
-      inv H1. rewrite Int.add_zero in A.
-      exists b2; eauto.
-    eapply find_symbol_isGlobal; eassumption. } 
-     eapply K. assumption.
-Qed.
-Lemma load_store_init_data_Cores m1 ix (*m2 j1 
-       (J: forall b, isGlobalBlock g1 b = true -> j1 b = Some(b,0))
-       (PG1 : meminj_preserves_globals g1 j1) 
-       (Inj12 : Mem.inject j1 m1 m2)
-       (FindVars: forall i b, Genv.find_symbol my_ge i = Some b -> Genv.find_symbol g2 i = Some b)*):
-      forall il k bb
-      (LDI: Genv.load_store_init_data my_ge m1 bb k il)
-      (G: isGlobalBlock (ge (cores_S ix)) bb = true),
-   Genv.load_store_init_data (ge (cores_S ix)) m1 bb k il.
-Proof. 
-  induction il; simpl in *; intros. trivial.
-  destruct a.
-  { destruct LDI; split; eauto. }
-  { destruct LDI; split; eauto. }
-  { destruct LDI; split; eauto. }
-  { destruct LDI; split; eauto. }
-  { destruct LDI; split; eauto. }
-  { destruct LDI; split; eauto. }
-  { apply IHil; assumption. }
-  { destruct LDI as [[b' [FS LD]] LSI].
-    split; eauto. 
-    destruct (Inj _ _ _ LD) as [v [A B]]. inv B.
-    rewrite J in H1.
-      inv H1. rewrite Int.add_zero in A.
-      exists b2; eauto.
-    eapply find_symbol_isGlobal; eassumption. } 
-Qed.
-     *)
-(*
-Variable genvs_cohereT: forall m, mem_respects_readonly my_ge m ->
-                        forall i, mem_respects_readonly (cores_T i).(ge) m.
-*)
+
 Let types := fun i : 'I_N => (sims i).(core_data).
 Let ords : forall i : 'I_N, types i -> types i -> Prop 
   := fun i : 'I_N => (sims i).(core_ord).
@@ -254,7 +196,7 @@ case: H1; first by exists id.
 by move=> x H5; exists x.
 Qed.
 
-Lemma findSym_findSymS' ix id b :
+Lemma findSym_findSym_down_S ix id b :
   Genv.find_symbol my_ge id = Some b -> 
   exists id', Genv.find_symbol (ge (cores_S ix)) id' = Some b.
 Proof.
@@ -272,6 +214,14 @@ case: {H1}(H1 b)=> H1 H3.
 move/Genv.invert_find_symbol=> H4.
 case: H1; first by exists id.
 by move=> x H5; exists x.
+Qed.
+
+Lemma findSym_findSym_down_T ix id b :
+  Genv.find_symbol my_ge id = Some b -> 
+  exists id', Genv.find_symbol (ge (cores_T ix)) id' = Some b.
+Proof.
+  move=> H.
+  eapply invSym_findSymT. apply Genv.find_invert_symbol. apply H. 
 Qed.
 
 Lemma invSym_findSymS_None ix b :
@@ -391,6 +341,68 @@ Proof. by split; rewrite -!isGlob_iffS. Qed.
 Lemma isGlob_iffST' ix1 ix2 b :
   isGlobalBlock (ge (cores_S ix1)) b <-> isGlobalBlock (ge (cores_T ix2)) b. 
 Proof. by split; rewrite -isGlob_iffS -isGlob_iffT. Qed.
+
+Lemma find_symbol_down_S i id b:
+  Genv.find_symbol my_ge id = Some b ->
+  Genv.find_symbol (ge (cores_S i)) id = Some b.
+Proof.
+  move=> GF. destruct (findSym_findSym_down_S i GF).
+  destruct (ident_eq x id); subst; trivial.
+  apply find_symbol_up_S in H.
+  elim (Genv.global_addresses_distinct _ n H GF). trivial. 
+Qed.
+
+Lemma find_symbol_down_T i id b:
+  Genv.find_symbol my_ge id = Some b ->
+  Genv.find_symbol (ge (cores_T i)) id = Some b.
+Proof.
+  move=> GF. destruct (findSym_findSym_down_T i GF).
+  destruct (ident_eq x id); subst; trivial.
+  apply find_symbol_up_T in H.
+  elim (Genv.global_addresses_distinct _ n H GF). trivial. 
+Qed.
+
+Lemma load_store_init_S m b i: forall il k,
+      Genv.load_store_init_data my_ge m b k il ->
+      Genv.load_store_init_data (ge (cores_S i)) m b k il.
+Proof.
+  induction il; simpl; intros z LDI; trivial.
+  destruct a; try destruct LDI; eauto.
+  destruct H as [b' [FS LD]].
+  apply (find_symbol_down_S i) in FS. 
+  split; eauto. 
+Qed.
+
+Lemma load_store_init_T m b i: forall il k,
+      Genv.load_store_init_data my_ge m b k il ->
+      Genv.load_store_init_data (ge (cores_T i)) m b k il.
+Proof.
+  induction il; simpl; intros z LDI; trivial.
+  destruct a; try destruct LDI; eauto.
+  destruct H as [b' [FS LD]].
+  apply (find_symbol_down_T i) in FS. 
+  split; eauto. 
+Qed.
+
+Lemma mrr_down_S: forall m, mem_respects_readonly my_ge m ->
+                     forall i, mem_respects_readonly (cores_S i).(ge) m.
+ Proof. move=> m MRR i b gv FV P. 
+     destruct (@gvars_cohereD _ _ _ _ _ _ (all_gvars_includedS i) _ _ FV) as [gv2 [? [? [? ?]]]].
+     rewrite H1 H2 in P.
+     destruct (MRR _ _ H P) . split; trivial. destruct H4 as [? _].
+     rewrite H0. clear H0. 
+     eapply load_store_init_S; eauto. 
+Qed. 
+
+Lemma mrr_down_T: forall m, mem_respects_readonly my_ge m ->
+                     forall i, mem_respects_readonly (cores_T i).(ge) m.
+ Proof. move=> m MRR i b gv FV P. 
+     destruct (@gvars_cohereD _ _ _ _ _ _ (all_gvars_includedT i) _ _ FV) as [gv2 [? [? [? ?]]]].
+     rewrite H1 H2 in P.
+     destruct (MRR _ _ H P) . split; trivial. destruct H4 as [? _].
+     rewrite H0. clear H0. 
+     eapply load_store_init_T; eauto. 
+Qed. 
 
 End glob_lems.
 
