@@ -24,8 +24,8 @@ Record class (T t : Type) := Class
       forall (r : t) (i : 'I_(size_ r)) x, 
       @get_ (@set_ r i x) (cast_ord (setsize_ i x) i) = x
   ; gso_ : forall (r : t) (i j : 'I_(size_ r)) x, 
-      @get_ (@set_ r i x) (cast_ord (setsize_ i x) j) = 
-      @get_ r j
+      i != j ->       
+      @get_ (@set_ r i x) (cast_ord (setsize_ i x) j) = @get_ r j
 
   ; bump_ : t -> T -> t
   ; bumpoldord_ : forall (r : t) (i : 'I_(size_ r)) x, 'I_(size_ (bump_ r x))
@@ -100,12 +100,13 @@ Arguments unbump {e} _ _ : simpl never.
 Arguments all {e} _ _ : simpl never.
 Arguments Class {T} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _.
 Module theory.
-  Lemma gss e (r : col e) i x : get (set r i x) (cast_ord (setsize r i x) i) = x.
+  Lemma gss e (r : col e) i x : 
+    get (set r i x) (cast_ord (setsize r i x) i) = x.
   Proof. move: r i x; refine (let 'Pack _ _ r := e in _)=> /= r0 i x.
          apply: (@gss_ _ _ r r0 i x). Qed.
   Lemma gso e (r : col e) i j x : 
-    get (set r i x) (cast_ord (setsize r i x) j) =
-    get r j.
+    i != j -> 
+    get (set r i x) (cast_ord (setsize r i x) j) = get r j.
   Proof. move: r i j x; refine (let 'Pack _ _ r := e in _)=> /= r0 i j x.
          apply: (@gso_ _ _ r r0 i j x). Qed.
 
@@ -153,7 +154,8 @@ Module theory.
     rewrite /peek. 
     case: (lastord (e:=e) (bump r x))=> /= x0 H.
     have H2: x0 = bumpneword r x.
-    { suff: nat_of_ord x0 = nat_of_ord (bumpneword r x); first by apply: ord_inj.
+    { suff: nat_of_ord x0 = nat_of_ord (bumpneword r x); 
+        first by apply: ord_inj.
       rewrite (bumpneword_charact r x).
       by move: x0 H; rewrite bumpsize=> x0; case. }
     by subst x0; rewrite bumpgetnew.
@@ -171,135 +173,112 @@ Record col : Type := mk {
   thefun: size.-tuple T
 }.
 
-Definition singl : col := mk [tuple].
+Program Definition singl (v : T) : col := mk _ [tuple v].
 
-Definition get (t : col) (i : 'I_(size t)) :=
+Definition get (r : col) (i : 'I_(size r)) := tnth (thefun r) i.
 
+Program Definition set (r : col) (i : 'I_(size r)) (v : T) :=
+  mk _ [tuple (if i0 == i then v else tnth (thefun r) i0) | i0 < size r].
+Next Obligation. by move {i}; case: r. Qed.
 
-Lemma my_ltP m n : (m < n)%coq_nat -> (m < n).
-Proof. by move/ltP. Qed.
-
-Definition get (t : col) (i : nat) :=
-  match lt_dec i t.(size) with
-    | left lt_pf => 
-      let: idx := Ordinal (my_ltP lt_pf) 
-      in Some (thefun _ idx)
-    | right _ => None
-  end.
-
-Definition set (t : col) (i : nat) (x : T) :=
-  match lt_dec i t.(size) with
-    | left lt_pf => 
-      let: idx := Ordinal (my_ltP lt_pf) 
-      in mk (finfun (fun j => if idx == j then x else thefun _ j))
-    | right _ => t
-  end.
-
-Definition all (t : col) (p : pred T) := 
- [forall i : 'I_(size t), p (thefun _ i)].
-
-Lemma gss t i x (pf : i < t.(size)) : get (set t i x) i = Some x.
-Proof.
-rewrite /get /set; case lt_pf: (lt_dec i (size t))=> [H|H]; rewrite lt_pf /=.
-2: by elimtype False; move {lt_pf}; apply: H; apply/ltP.
-f_equal. 
-
-by f_equal=> /=; rewrite eq_refl.
-Qed.
-
-Lemma gso t i j x (pf : i != j) : get (set t i x) j = get t j.
-Proof.
-rewrite /get /set. 
-case lt_pf: (lt_dec i (size t))=> [/=H|H]. 
-case lt_pf':(lt_dec j (size t))=> [H1|//]. 
-f_equal.
-have H2: (Ordinal (my_ltP H) == Ordinal (my_ltP H1) = false).
-{ by apply/eqP; case=> pf'; rewrite pf' eq_refl in pf. }
-by rewrite H2.
-by case lt_pf':(lt_dec j (size t)).
-Qed.
-
-Lemma allget t p i x : all t p -> get t i = Some x -> p x.
-Proof.
-rewrite /all /get=> H; case pf: (lt_dec _ _)=> [H2|H2]; last by discriminate.
-by case=> <-; apply: H.
-Qed.
-
-Lemma allset t p i x : all t p -> p x -> all (set t i x) p.
-Proof.
-rewrite /all /set=> H; case pf: (lt_dec _ _)=> [H2|//].
-by move=> H3 /= i0; case: (_ == _).
-Qed.
-
-Definition push (t : col) (x : T) :=
-  let: new_size := (size t).+1 in
-  let: new_idx  := Ordinal (lt_incr (size t)) in
-  mk (fun i : 'I_new_size =>
-        match unlift new_idx i with
-          | None => x
-          | Some i' => thefun i'
-        end).
-
-Definition pop_fun size (f : 'I_(size.+1) -> T) : 'I_size -> T :=
-  fun i : 'I_size => f (lift (Ordinal (lt_incr size)) i).
-
-Definition pop (t : col) : col :=
-  (match size t as n return size t = n -> col with
-    | O => fun pf => t
-    | S n' => fun pf => 
-        @mk n' (pop_fun 
-          (cast_ty (lift_eq (fun idx => 'I_idx -> T) pf) (@thefun t)))
-  end) erefl.
-
-Lemma pushpop t x : pop (push t x) = t.
-Proof.
-rewrite /pop /push /=; case: t=> //= y z.
-rewrite /pop_fun cast_ty_erefl; f_equal; extensionality i.
-by rewrite liftK.
-Qed.
-
-Lemma pushget t x : get (push t x) t.(size) = Some x.
-Proof.
-rewrite /get /push /=.
-case: (lt_dec _ _)=> //.
-{ move=> lt_pf /=. 
-  have ->: lt_incr (size t) = my_ltP lt_pf by apply: proof_irr.
-  by rewrite unlift_none.
-}
-by move=> Contra; elimtype False; apply: Contra.
-Qed.
-
-Lemma allpush t p x : all t p -> p x -> all (push t x) p.
-Proof.
-by rewrite /all /push /= => H H2 i0; case: (unlift _ _).
-Qed.
-
-Lemma allpop t p : all t p -> all (pop t) p.
-Proof.
-rewrite /all /pop; case: t=> n f /= H.
-by case H: n f H=> //[x] f H2 /= i; apply: H2.
-Qed.
-
-Lemma getsize t i x : get t i = Some x -> size t > 0.
-Proof. 
-rewrite /get; case: (lt_dec _ _)=> // H; case=> _.
-elim: i H; first by apply: my_ltP.
-by move=> n IH H; apply: IH; omega.
-Qed.
-
-Lemma getsize' t i : size t > i -> isSome (get t i).
-Proof. 
-rewrite /get; case: (lt_dec _ _)=> // H H2.
-by elimtype False; apply: H; apply/ltP.
-Qed.
-
-Lemma pushsize t x : size (push t x) = (size t).+1.
+Lemma setsize r (i : 'I_(size r)) x : size r = size (set i x).
 Proof. by []. Qed.
 
-Lemma popsize t : size t > 0 -> (size (pop t)).+1 = size t.
+Lemma gss r (i : 'I_(size r)) x : get (cast_ord (setsize i x) i) = x.
+Proof. by rewrite /get /= tnth_mktuple cast_ord_id eq_refl. Qed.
+
+Lemma gso r (i j : 'I_(size r)) x : 
+  i != j -> get (cast_ord (setsize i x) j) = get j.
+Proof.
+rewrite /get /= tnth_mktuple cast_ord_id; case H: (j == i)=> //.
+by rewrite eq_sym in H; rewrite H.
+Qed.
+
+Program Definition bump (r : col) (v : T) := 
+  let: new_size := (size r).+1 in
+  let: new_idx  := Ordinal (lt_incr (size r)) in
+  mk _ [ tuple (match unlift new_idx i with
+                  | None => v
+                  | Some i' => tnth (thefun r) i'
+                end)
+       | i < new_size ].
+
+Program Definition bumpoldord r (i : 'I_(size r)) (v : T) : 
+  'I_(size (bump r v)) :=
+  @widen_ord (size r) (size (bump r v)) _ i.
+
+Definition bumpneword r (v : T) : 'I_(size (bump r v)) :=  ord_max.
+
+Lemma bumpneword_charact r x : nat_of_ord (bumpneword r x) = size r.
+Proof. by []. Qed.
+
+Lemma bumpsize r x : size (bump r x) = (size r).+1.
+Proof. by []. Qed.
+
+Lemma bumpgetold r (i : 'I_(size r)) v : get (bumpoldord i v) = get i.
 Proof. 
-rewrite /pop /pop_fun; case: t=> s t /=; destruct s; first by discriminate.
-by simpl.
+rewrite /get /bumpoldord tnth_mktuple /=.
+case: (unliftP 
+  (Ordinal (n:=(size r).+1) (m:=size r) (lt_incr (size r)))
+  (widen_ord (m:=(size r).+1) (bumpoldord_obligation_1 (r:=r) i v) i)).
+{ rewrite /widen_ord /lift /= => j; case=> H.
+  have ->: i = j.
+  { apply: ord_inj; rewrite H /fintype.bump /nat_of_bool.
+    by have ->: (size r <= j) = false
+    by move {H}; case: j=> /= m /ltP=> H; apply/leP; omega.
+  } by [].
+}
+rewrite /widen_ord; case; case: i=> m H /= H2.
+by elimtype False; subst; move: (ltP H)=> H2; omega.
+Qed.
+
+Lemma bumpgetnew r x : get (bumpneword r x) = x.
+Proof.
+rewrite /get /bumpneword /bump /= tnth_mktuple.
+case: (unliftP 
+  (Ordinal (n:=(size r).+1) (m:=size r) (lt_incr (size r))) ord_max)=> //.
+move=> /= j; case; rewrite /fintype.bump /nat_of_bool.
+have H: (size r <= j) = false
+by case: j=> /= m /ltP=> H; apply/leP; omega.
+rewrite H=> H2; elimtype False; rewrite /addn /= in H2.
+by move: H; case: j H2=> m pf; case: r pf=> /= size0 H _ H2 ->; move/leP.
+Qed.
+
+Program Definition unbump (r : col) (pf : 1 < size r) :=
+  mk _ [ tuple (tnth (thefun r) (lift (@ord_max (size r).-1) i)) 
+       | i < (size r).-1 ].
+Next Obligation. move: (ltP pf)=> H; apply/ltP; omega. Qed.
+Next Obligation. 
+rewrite prednK=> //; last by apply/ltP; move: (ltP pf)=> H; omega.
+Qed.
+
+Lemma unbumpsize (r : col) (pf : 1 < size r) : size (unbump pf) = (size r).-1.
+Proof. by []. Qed.
+
+Definition all (r : col) (p : pred T) : bool := all p (thefun r).
+
+Lemma allget r (i : 'I_(size r)) p : all r p -> p (get i).
+Proof. by rewrite /all /get /= -forallb_tnth => /forallP/(_ i). Qed.
+
+Lemma allset r (i : 'I_(size r)) p x : all r p -> p x -> all (set i x) p.
+Proof.
+rewrite /all /set -forallb_tnth=> /forallP=> H H2.
+apply/all_tnthP; rewrite /= => i0; rewrite tnth_mktuple.
+by case H3: (i0 == i).
+Qed.
+
+Lemma allbump r p x : all r p -> p x -> all (bump r x) p.
+Proof.
+rewrite /all /bump -forallb_tnth=> /forallP=> H H2.
+apply/all_tnthP; rewrite /= => i0; rewrite tnth_mktuple.
+by case H3: (unlift _ _).
+Qed.
+
+Lemma allunbump r p (pf : 1 < size r) : all r p -> all (unbump pf) p.
+Proof.
+rewrite /all /unbump -forallb_tnth=> /forallP=> H.
+apply/all_tnthP; rewrite /= => i0; rewrite tnth_mktuple.
+by case H3: (lift _ _).
 Qed.
 
 End FunCollection. 
@@ -314,11 +293,12 @@ Variable T : Type.
 
 Definition fun_COLcl : COL.class T (col T) := 
   COL.Class (col T) 
-    (@size T) (@empty T) (@get T) (@set T) 
-    (@push T) (@pop T) (@all T)
-    (@gss T) (@gso T) (@allget T) (@allset T)  (@allpush T) (@allpop T)
-    (@pushpop T) (@pushget T) (@getsize T) (@getsize' T) 
-    (@pushsize T) (@popsize T).
+    (@size T) (@sizeinv T) (@singl T) (@get T) (@set T) 
+    (@setsize T) (@gss T) (@gso T) 
+    (@bump T) (@bumpoldord T) (@bumpneword T) (@bumpneword_charact T)
+    (@bumpsize T) (@bumpgetold T) (@bumpgetnew T) 
+    (@unbump T) (@unbumpsize T) 
+    (@all T) (@allget T) (@allset T) (@allbump T) (@allunbump T).
 
 End FunCollectionClass.
 
@@ -331,7 +311,7 @@ Section test.
 
 Import COL.
 
-Lemma xx : peek (push empty 0) = Some 0.
+Lemma xx : peek (bump (singl 0) 0) = 0.
 Proof. by rewrite pushpeek. Qed.
 
 End test.  
