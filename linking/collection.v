@@ -7,13 +7,13 @@ Require Import cast.
 Require Import Axioms Arith Omega.
 
 Lemma lt_incr n : n < n.+1. Proof. by []. Qed.
+Lemma le_incr n : n <= n.+1. Proof. by []. Qed.
 
 Module COL. 
 Record class (T t : Type) := Class 
   { size_ : t -> nat
-  ; sizeinv_ : forall (r : t), 0 < size_ r 
-
-  ; singl_: T -> t
+  ; empty_: t
+  ; sizeempty_ : size_ empty_ = 0
 
   ; get_  : forall (r : t), 'I_(size_ r) -> T
   ; set_  : forall (r : t), 'I_(size_ r) -> T -> t
@@ -29,6 +29,9 @@ Record class (T t : Type) := Class
 
   ; bump_ : t -> T -> t
   ; bumpoldord_ : forall (r : t) (i : 'I_(size_ r)) x, 'I_(size_ (bump_ r x))
+  ; bumpoldord_charact_ :
+      forall (r : t) (i : 'I_(size_ r)) x, 
+      nat_of_ord (bumpoldord_ i x) = nat_of_ord i
   ; bumpneword_ : forall (r : t) x, 'I_(size_ (bump_ r x))
   ; bumpneword_charact_ : 
       forall (r : t) x, nat_of_ord (bumpneword_ r x) = size_ r
@@ -37,32 +40,30 @@ Record class (T t : Type) := Class
       forall (r : t) (i : 'I_(size_ r)) x, 
       @get_ (bump_ r x) (bumpoldord_ i x) = @get_ r i
   ; bumpgetnew_ : forall (r : t) x, @get_ (bump_ r x) (bumpneword_ r x) = x
-  ; unbump_ : forall (r : t), 1 < size_ r -> t
-  ; unbumpsize_ :
-      forall (r : t) (pf : 1 < size_ r), 
-      size_ (@unbump_ r pf) = (size_ r).-1
+  ; unbump_ : t -> t
+  ; unbumpsize_ : forall r : t, size_ (@unbump_ r) = (size_ r).-1
+  ; unbumpbump_ : forall (r : t) x, unbump_ (bump_ r x) = r 
 
   ; all_  : t -> pred T -> bool
   ; allget_ : 
-      forall (r : t) (i : 'I_(size_ r)) p, 
-      all_ r p -> p (get_ i)
+      forall (r : t) p, all_ r p = [forall i : 'I_(size_ r), p (get_ i)]
   ; allset_ : 
       forall (r : t) (i : 'I_(size_ r)) p x,
-      all_ r p -> p x -> all_ (set_ i x) p 
+      all_ (set_ i x) p = 
+      p x && [forall i0 : 'I_(size_ r), (i0 == i) || p (get_ i0) ]
   ; allbump_ : 
-      forall (r : t) p x, 
-      all_ r p -> p x -> all_ (bump_ r x) p
+      forall (r : t) p x, all_ (bump_ r x) p = [&& all_ r p & p x]
   ; allunbump_ : 
-      forall (r : t) p (pf : 1 < size_ r), 
-      all_ r p -> all_ (@unbump_ r pf) p
+      forall (r : t) p, 
+      all_ (unbump_ r) p
+      = [forall i : 'I_(size_ r), 
+         (nat_of_ord i == (size_ r).-1) || p (get_ i)]
   }.
 Structure type := Pack { val : Type; col : Type; class_of : class val col }.
 Definition size (e : type) : col e -> nat :=
   let 'Pack _ _ r0 := e in size_ r0.
-Definition sizeinv (e : type) : forall (r : col e), 0 < size r :=
-  let 'Pack _ _ r0 := e in sizeinv_ r0.
-Definition singl (e : type) : val e -> col e :=
-  let 'Pack _ _ r0 := e in singl_ r0.
+Definition empty (e : type) : col e :=
+  let 'Pack _ _ r0 := e in empty_ r0.
 Definition get (e : type) : forall (r : col e), 'I_(size r) -> val e :=
   let 'Pack _ _ r0 := e in @get_ _ _ r0.
 Definition set (e : type) : forall (r : col e), 'I_(size r) -> val e -> col e :=
@@ -75,6 +76,10 @@ Definition bump (e : type) : col e -> val e -> col e :=
 Definition bumpoldord (e : type) : 
   forall r : col e, 'I_(size r) -> forall x : val e, 'I_(size (bump r x)) :=
   let 'Pack _ _ r0 := e in @bumpoldord_ _ _ r0.
+Definition bumpoldord_charact (e : type) : 
+  forall (r : col e) (i : 'I_(size r)) (x : val e), 
+  nat_of_ord (bumpoldord i x) = nat_of_ord i :=
+  let 'Pack _ _ r0 := e in @bumpoldord_charact_ _ _ r0.
 Definition bumpneword (e : type) : 
   forall (r : col e) (x : val e), 'I_(size (bump r x)) :=
   let 'Pack _ _ r0 := e in @bumpneword_ _ _ r0.
@@ -82,24 +87,28 @@ Definition bumpneword_charact (e : type) :
   forall (r : col e) (x : val e), 
   nat_of_ord (bumpneword r x) = size r :=
   let 'Pack _ _ r0 := e in @bumpneword_charact_ _ _ r0.
-Definition unbump (e : type) (r : col e) (pf : 1 < @size_ _ _ (class_of e) r) 
-  : col e := unbump_ pf.
+Definition unbump (e : type) : col e -> col e := 
+  let 'Pack _ _ r0 := e in @unbump_ _ _ r0.
 Definition all (e : type) : col e -> pred (val e) -> bool :=
   let 'Pack _ _ r := e in all_ r.
 Arguments size {e} _ : simpl never.
-Arguments sizeinv {e} _ : simpl never.
-Arguments singl {e} _ : simpl never.
+Arguments empty {e} : simpl never.
 Arguments get {e} _ _ : simpl never.
 Arguments set {e} _ _ _ : simpl never.
 Arguments setsize {e} _ _ _ : simpl never.
 Arguments bump {e} _ _ : simpl never.
 Arguments bumpoldord {e} _ _ _ : simpl never.
+Arguments bumpoldord_charact {e} _ _ _ : simpl never.
 Arguments bumpneword {e} _ _ : simpl never.
 Arguments bumpneword_charact {e} _ _ : simpl never.
-Arguments unbump {e} _ _ : simpl never.
+Arguments unbump {e} _ : simpl never.
 Arguments all {e} _ _ : simpl never.
-Arguments Class {T} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _.
+Arguments Class {T} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _.
 Module theory.
+  Lemma sizeempty e : size (@empty e) = 0.
+  Proof. refine (let 'Pack _ _ r := e in _)=> /=.
+         apply: (@sizeempty_ _ _ r). Qed.
+
   Lemma gss e (r : col e) i x : 
     get (set r i x) (cast_ord (setsize r i x) i) = x.
   Proof. move: r i x; refine (let 'Pack _ _ r := e in _)=> /= r0 i x.
@@ -120,39 +129,52 @@ Module theory.
   Lemma bumpgetnew e (r : col e) x : get (bump r x) (bumpneword r x) = x.
   Proof. move: r x; refine (let 'Pack _ _ r := e in _)=> /= r0 x.
          apply: (@bumpgetnew_ _ _ r r0 x). Qed.
-  Lemma unbumpsize e (r : col e) pf : size (unbump r pf) = (size r).-1.
-  Proof. move: r pf; refine (let 'Pack _ _ r := e in _)=> /= r0 pf.
-         apply: (@unbumpsize_ _ _ r r0 pf). Qed.
+  Lemma unbumpsize e (r : col e) : size (unbump r) = (size r).-1.
+  Proof. move: r; refine (let 'Pack _ _ r := e in _)=> /= r0.
+         apply: (@unbumpsize_ _ _ r r0). Qed.
+  Lemma unbumpbump e (r : col e) x : unbump (bump r x) = r.
+  Proof. move: r x; refine (let 'Pack _ _ r := e in _)=> /= r0 x.
+         apply (@unbumpbump_ _ _ r r0). Qed.
 
-  Lemma allget e (r : col e) p i : all r p -> p (get r i).
-  Proof. move: r p i; refine (let 'Pack _ _ r := e in _)=> /= r0 p i.
-         apply: (@allget_ _ _ r r0 i). Qed.
+  Lemma allget e (r : col e) p : 
+    all r p = [forall i : 'I_(size r), p (get r i)].
+  Proof. move: r p; refine (let 'Pack _ _ r := e in _)=> /= r0 p.
+         apply: (@allget_ _ _ r r0). Qed.
   Lemma allset e (r : col e) (p : pred (val e)) i x : 
-    all r p -> p x -> all (set r i x) p.
+    all (set r i x) p 
+    = p x && [forall i0 : 'I_(size r), (i0 == i) || p (get r i0)].
   Proof. move: r p i x; refine (let 'Pack _ _ r := e in _)=> /= r0 p i x.
          apply: (@allset_ _ _ r r0 i p x). Qed.
-  Lemma allbump e (r : col e) p x : all r p -> p x -> all (bump r x) p.
+  Lemma allbump e (r : col e) p x : all (bump r x) p = [&& all r p & p x].
   Proof. move: r p x; refine (let 'Pack _ _ r := e in _)=> /= r0 p x.
          apply: (@allbump_ _ _ r r0 p x). Qed.
-  Lemma allunbump e (r : col e) p pf : all r p -> all (unbump r pf) p.
-  Proof. move: r p pf; refine (let 'Pack _ _ r := e in _)=> /= r0 p pf.
-         apply: (@allunbump_ _ _ r r0 p pf). Qed.
+  Lemma allunbump e (r : col e) p : 
+    all (unbump r) p
+    = [forall i : 'I_(size r), 
+       (nat_of_ord i == (size r).-1) || p (get r i)].
+  Proof. move: r p; refine (let 'Pack _ _ r := e in _)=> /= r0 p.
+         apply: (@allunbump_ _ _ r r0 p). Qed.
 
   (* derived operations *)
 
-  Lemma lastord (e : type) (r : col e) : {i : 'I_(size r) | i.+1 = size r}.
+  Lemma lastord (e : type) (r : col e) (sizeinv : 0 < size r) : 
+    {i : 'I_(size r) | i.+1 = size r}.
   Proof.
-    move: (sizeinv r)=> lt0.
-    have ltpf : (size r).-1 < size r by case: (size r) lt0.
+    have ltpf : (size r).-1 < size r by case: (size r) sizeinv.
     by exists (Ordinal ltpf)=> /=; rewrite prednK.
   Qed.
 
-  Definition peek (e : type) (r : col e) : val e := get r (projT1 (lastord r)).
+  Definition peek (e : type) (r : col e) (sizeinv : 0 < size r) : val e := 
+    get r (projT1 (lastord sizeinv)).
 
-  Lemma pushpeek (e : type) (r : col e) x : peek (bump r x) = x.
+  Lemma bumpsize' e (r : col e) (x : val e) : 0 < size (bump r x).
+  Proof. by rewrite bumpsize. Qed.
+
+  Lemma bumppeek (e : type) (r : col e) x : 
+    @peek _ (bump r x) (bumpsize' r x) = x.
   Proof. 
     rewrite /peek. 
-    case: (lastord (e:=e) (bump r x))=> /= x0 H.
+    case: (lastord _)=> /= x0 H.
     have H2: x0 = bumpneword r x.
     { suff: nat_of_ord x0 = nat_of_ord (bumpneword r x); 
         first by apply: ord_inj.
@@ -169,17 +191,18 @@ Variable T : Type.
 
 Record col : Type := mk { 
   size  : nat;
-  sizeinv : 0 < size;
   thefun: size.-tuple T
 }.
 
-Program Definition singl (v : T) : col := mk _ [tuple v].
+Definition empty : col := mk [tuple].
+
+Lemma sizeempty : size empty = 0.
+Proof. by []. Qed.
 
 Definition get (r : col) (i : 'I_(size r)) := tnth (thefun r) i.
 
-Program Definition set (r : col) (i : 'I_(size r)) (v : T) :=
-  mk _ [tuple (if i0 == i then v else tnth (thefun r) i0) | i0 < size r].
-Next Obligation. by move {i}; case: r. Qed.
+Definition set (r : col) (i : 'I_(size r)) (v : T) :=
+  mk [tuple (if i0 == i then v else tnth (thefun r) i0) | i0 < size r].
 
 Lemma setsize r (i : 'I_(size r)) x : size r = size (set i x).
 Proof. by []. Qed.
@@ -194,18 +217,22 @@ rewrite /get /= tnth_mktuple cast_ord_id; case H: (j == i)=> //.
 by rewrite eq_sym in H; rewrite H.
 Qed.
 
-Program Definition bump (r : col) (v : T) := 
+Definition bump (r : col) (v : T) := 
   let: new_size := (size r).+1 in
   let: new_idx  := Ordinal (lt_incr (size r)) in
-  mk _ [ tuple (match unlift new_idx i with
-                  | None => v
-                  | Some i' => tnth (thefun r) i'
-                end)
-       | i < new_size ].
+  mk [ tuple (match unlift new_idx i with
+                | None => v
+                | Some i' => tnth (thefun r) i'
+              end)
+     | i < new_size ].
 
 Program Definition bumpoldord r (i : 'I_(size r)) (v : T) : 
   'I_(size (bump r v)) :=
   @widen_ord (size r) (size (bump r v)) _ i.
+
+Lemma bumpoldord_charact r (i : 'I_(size r)) x : 
+  nat_of_ord (bumpoldord i x) = nat_of_ord i.
+Proof. by []. Qed.
 
 Definition bumpneword r (v : T) : 'I_(size (bump r v)) :=  ord_max.
 
@@ -241,44 +268,130 @@ move=> /= j; case; rewrite /fintype.bump /nat_of_bool.
 have H: (size r <= j) = false
 by case: j=> /= m /ltP=> H; apply/leP; omega.
 rewrite H=> H2; elimtype False; rewrite /addn /= in H2.
-by move: H; case: j H2=> m pf; case: r pf=> /= size0 H _ H2 ->; move/leP.
+by move: H; case: j H2=> m pf; case: r pf=> /= size0 H H2 ->; move/leP.
 Qed.
 
-Program Definition unbump (r : col) (pf : 1 < size r) :=
-  mk _ [ tuple (tnth (thefun r) (lift (@ord_max (size r).-1) i)) 
-       | i < (size r).-1 ].
-Next Obligation. move: (ltP pf)=> H; apply/ltP; omega. Qed.
+Program Definition unbump (r : col) :=
+  mk [ tuple (tnth (thefun r) (@Ordinal (size r) i _))
+     | i < (size r).-1 ].
 Next Obligation. 
-rewrite prednK=> //; last by apply/ltP; move: (ltP pf)=> H; omega.
+by case: (size r) i=> //= n; case=> /= m /ltP H; apply/ltP; omega.
 Qed.
-
-Lemma unbumpsize (r : col) (pf : 1 < size r) : size (unbump pf) = (size r).-1.
+ 
+Lemma unbumpsize (r : col) : size (unbump r) = (size r).-1.
 Proof. by []. Qed.
+
+Lemma unbumpbump (r : col) x : unbump (bump r x) = r.
+Proof.
+case: r=> sz fn; rewrite /unbump /bump /=; f_equal.
+Admitted. (*TODO*)
 
 Definition all (r : col) (p : pred T) : bool := all p (thefun r).
 
-Lemma allget r (i : 'I_(size r)) p : all r p -> p (get i).
-Proof. by rewrite /all /get /= -forallb_tnth => /forallP/(_ i). Qed.
+Lemma allget r p : 
+  all r p = [forall i : 'I_(size r), p (get i)].
+Proof. by rewrite /all /get /= -forallb_tnth. Qed.
 
-Lemma allset r (i : 'I_(size r)) p x : all r p -> p x -> all (set i x) p.
+Lemma allset r (i : 'I_(size r)) p x : 
+  all (set i x) p 
+  = p x && [forall i0 : 'I_(size r), (i0 == i) || p (get i0)]. 
 Proof.
-rewrite /all /set -forallb_tnth=> /forallP=> H H2.
-apply/all_tnthP; rewrite /= => i0; rewrite tnth_mktuple.
-by case H3: (i0 == i).
+rewrite /all /set -forallb_tnth /=; case H: (p x)=> /=. 
+{ f_equal; extensionality y; do 2 f_equal; rewrite tnth_mktuple.
+  by case H2: (y == i).
+}
+rewrite forallb_tnth; case: (@all_tnthP _ T p [tuple _ | i0 < size r])=> //.
+by move/(_ i); rewrite tnth_mktuple eqxx H. 
 Qed.
 
-Lemma allbump r p x : all r p -> p x -> all (bump r x) p.
+Lemma allbump r p x : all (bump r x) p = [&& all r p & p x].
 Proof.
-rewrite /all /bump -forallb_tnth=> /forallP=> H H2.
-apply/all_tnthP; rewrite /= => i0; rewrite tnth_mktuple.
-by case H3: (unlift _ _).
+rewrite !allget.
+rewrite andbC.
+case H: (p x)=> /=.
+rewrite !forallb_tnth.
+case: (@all_tnthP _ _ p (thefun _)).
+{ move=> H2; apply/all_tnthP=> i. 
+  case H3: (i == bumpneword r x).
+  - by move: (eqP H3)=> ->; move: (bumpgetnew r x); rewrite /get => ->.
+  - have lt: i < size r. 
+    { move: H3; rewrite /bumpneword=> /eqP H3.
+      have H4: (i < (size r).+1)%coq_nat.
+      { move {H3}; case: i=> m H3; move: (ltP H3)=> H4 /=; omega. }
+      have H5: nat_of_ord (@ord_max (size r)) = size r by [].
+      have H6: nat_of_ord i <> nat_of_ord (@ord_max (size r)).
+      { move=> H6; apply: H3; apply: ord_inj; rewrite H6=> //. }
+      apply/ltP; omega.
+    }
+    set i0 := Ordinal lt.
+    move: (bumpgetold i0 x); rewrite /get.
+    have H4: bumpoldord i0 x = i.
+    { apply: ord_inj; apply: bumpoldord_charact. }
+    by rewrite H4 => ->.
+}
+{
+  move=> H2; apply/all_tnthP=> C; apply: H2=> i.
+  by move: (C (bumpoldord i x)); move: (bumpgetold i x); rewrite /get => ->.
+}
+rewrite forallb_tnth.
+case: (@all_tnthP _ _ p (thefun (bump r x)))=> // H2.
+move: (H2 (bumpneword r x)). 
+by move: (bumpgetnew r x); rewrite /get => ->; rewrite H.
 Qed.
 
-Lemma allunbump r p (pf : 1 < size r) : all r p -> all (unbump pf) p.
+Lemma allunbump r p : all r p -> all (unbump r) p.
 Proof.
-rewrite /all /unbump -forallb_tnth=> /forallP=> H.
-apply/all_tnthP; rewrite /= => i0; rewrite tnth_mktuple.
-by case H3: (lift _ _).
+rewrite /all /set /unbump /thefun.
+case: r=> sz fn.
+case: (@all_tnthP _ _ p _)=> // H _.
+case: (@all_tnthP _ _ p _)=> // H2; elimtype False; apply: H2.
+move=> /= i; rewrite tnth_mktuple.
+have lt: i < sz by apply/ltP; move: (ltn_ord i)=> /ltP H2; omega.
+move: (H (Ordinal lt)); move {H}.
+generalize (unbump_obligation_1 (r:={| size := sz; thefun := fn |}) i)=> /=.
+by move=> lt'; have ->: lt = lt' by apply: proof_irr.
+Qed.
+
+Lemma allunbump' r p : 
+  all (unbump r) p
+  = [forall i : 'I_(size r), (nat_of_ord i == (size r).-1) || p (get i)].
+Proof.
+rewrite /all /set /unbump /thefun.
+case: (@all_tnthP _ _ p _)=> //= H.
+suff H2: [forall i, (nat_of_ord i == (size r).-1) || p (get (r:=r) i)].
+by rewrite H2.
+apply/forallP=> i.
+case H2: (nat_of_ord i == (size r).-1)=> //=.
+have lt: i < (size r).-1. 
+{ move: (negbT H2)=> /negP; clear.
+  case: i=> m lt /= H; suff: m <> (size r).-1.
+  by move=> H2; move: {lt}(ltP lt)=> lt; apply/ltP; omega.
+  by move=> H2; apply: H; apply/eqP.
+}
+move: (H (Ordinal lt)).
+rewrite tnth_mktuple.
+move: (unbump_obligation_1 _)=> pf.
+rewrite /get.
+generalize dependent r.
+case=> /= sz fn _; case=> m pf' _ _ pf /=.
+by have ->: pf = pf' by apply: proof_irr.
+suff H2: ~~ [forall i, (nat_of_ord i == (size r).-1) || p (get (r:=r) i)].
+by apply: sym_eq; apply: negbTE.
+apply/negP=> H2.
+apply: H.
+move: {H2} (forallP H2)=> H2 i.
+generalize dependent r.
+case=> sz fn /= H i.
+have lt: i < sz. 
+{ case: i=> m H2; move: (ltP H2)=> H3 /=; apply/ltP; omega.
+}
+move: {H} (H (Ordinal lt))=> /=; case/orP.
+{ move=> /eqP H; elimtype False. 
+  by case: i lt H=> m H; move: (ltP H)=> H2 /= ? H3; rewrite H3 in H2; omega.
+}
+{ rewrite /get /= tnth_mktuple; move: (unbump_obligation_1 _)=> pf.
+  by have ->: pf = lt by apply: proof_irr.
+}
 Qed.
 
 End FunCollection. 
@@ -293,12 +406,13 @@ Variable T : Type.
 
 Definition fun_COLcl : COL.class T (col T) := 
   COL.Class (col T) 
-    (@size T) (@sizeinv T) (@singl T) (@get T) (@set T) 
+    (@size T) (@empty T) (@sizeempty T) (@get T) (@set T) 
     (@setsize T) (@gss T) (@gso T) 
-    (@bump T) (@bumpoldord T) (@bumpneword T) (@bumpneword_charact T)
+    (@bump T) (@bumpoldord T) (@bumpoldord_charact T) 
+    (@bumpneword T) (@bumpneword_charact T)
     (@bumpsize T) (@bumpgetold T) (@bumpgetnew T) 
-    (@unbump T) (@unbumpsize T) 
-    (@all T) (@allget T) (@allset T) (@allbump T) (@allunbump T).
+    (@unbump T) (@unbumpsize T) (@unbumpbump T)
+    (@all T) (@allget T) (@allset T) (@allbump T) (@allunbump' T).
 
 End FunCollectionClass.
 
@@ -311,7 +425,7 @@ Section test.
 
 Import COL.
 
-Lemma xx : peek (bump (singl 0) 0) = 0.
-Proof. by rewrite pushpeek. Qed.
+Lemma xx : @peek _ (bump empty 0) (bumpsize' empty 0) = 0.
+Proof. by rewrite bumppeek. Qed.
 
 End test.  
