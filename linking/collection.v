@@ -201,6 +201,17 @@ Proof. by []. Qed.
 
 Definition get (r : col) (i : 'I_(size r)) := tnth (thefun r) i.
 
+Lemma extensionality (r1 r2 : col) (pf : size r1 = size r2) :
+  (forall i, @get r1 i = @get r2 (cast_ord pf i)) ->
+  r1 = r2.
+Proof.
+rewrite /get => H.
+case: r1 pf H=> sz1 fn1 /=; case: r2=> sz2 fn2 /= pf; subst=> H.
+have H2: tnth fn1 =1 tnth fn2.
+{ by move=> i; move: (H i); rewrite cast_ord_id. }
+by move: (eq_from_tnth H2)=> H3; subst.
+Qed.
+
 Definition set (r : col) (i : 'I_(size r)) (v : T) :=
   mk [tuple (if i0 == i then v else tnth (thefun r) i0) | i0 < size r].
 
@@ -277,14 +288,27 @@ Program Definition unbump (r : col) :=
 Next Obligation. 
 by case: (size r) i=> //= n; case=> /= m /ltP H; apply/ltP; omega.
 Qed.
- 
+
 Lemma unbumpsize (r : col) : size (unbump r) = (size r).-1.
 Proof. by []. Qed.
 
+Lemma unbumpgetold (r : col) (i : 'I_(size (unbump r))) (pf : i < size r) : 
+  @get (unbump r) i = @get r (Ordinal pf).
+Proof.
+rewrite /get /unbump /= tnth_mktuple.
+by do 2 f_equal; apply: proof_irr.
+Qed.
+ 
 Lemma unbumpbump (r : col) x : unbump (bump r x) = r.
 Proof.
-case: r=> sz fn; rewrite /unbump /bump /=; f_equal.
-Admitted. (*TODO*)
+apply: extensionality=> i; rewrite cast_ord_id unbumpgetold.
+by move: (ltn_ord i); move: i; rewrite unbumpsize=> i /ltP H; apply/ltP; omega.
+move=> lt; have ->: Ordinal (m:=i) _ = bumpoldord i x.
+{ move=> pf; rewrite /bumpoldord /widen_ord /=; f_equal.
+  by apply: proof_irr.
+}
+by rewrite bumpgetold.
+Qed.
 
 Definition all (r : col) (p : pred T) : bool := all p (thefun r).
 
