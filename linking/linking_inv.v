@@ -12,7 +12,7 @@ Require Import sepcomp. Import SepComp.
 Require Import arguments.
 
 Require Import pos.
-Require Import stack.
+Require Import collection.
 Require Import cast.
 Require Import pred_lemmas.
 Require Import seq_lemmas.
@@ -986,8 +986,12 @@ End head_inv_leakout.
 Import seq.
 
 Fixpoint frame_all (mus : seq frame_pkg) m1 m2 s1 s2 :=
-  match mus, s1, s2 with
-    | Build_frame_pkg mu0 m10 m20 _ :: mus', c :: s1', d :: s2' => 
+  match mus with
+    | Build_frame_pkg mu0 m10 m20 _ :: mus' => 
+      let: c   := COL.theory.peek s1 in
+      let: s1' := COL.unbump s1 in
+      let: d   := COL.theory.peek s2 in
+      let: s2' := COL.unbump s2 in
       [/\ exists (pf : c.(Core.i)=d.(Core.i)) 
                  (sig_pf : c.(Core.sg)=d.(Core.sg)) cd0,
           exists e1 ef_sig1 vals1,
@@ -995,8 +999,7 @@ Fixpoint frame_all (mus : seq frame_pkg) m1 m2 s1 s2 :=
             @frame_inv c d pf cd0 mu0 
               m10 m1 e1 ef_sig1 vals1 m20 m2 e2 ef_sig2 vals2
         & frame_all mus' m1 m2 s1' s2']
-    | nil,nil,nil => True
-    | _,_,_ => False
+    | _ => False
   end.
 
 Definition tail_inv mus s1 s2 m1 m2 :=
@@ -1059,7 +1062,7 @@ Qed.
 
 Lemma frame_all_tail pkg mus m1 m2 s1 s2 :
   frame_all (pkg :: mus) m1 m2 s1 s2 -> 
-  frame_all mus m1 m2 (STACK.pop s1) (STACK.pop s2).
+  frame_all mus m1 m2 (COL.bump s1) (COL.unbump s2).
 Proof.
 case: pkg=> ? ? ? ?.
 move/frame_all_inv=> []? []? []? []? []-> ->. 
@@ -1797,8 +1800,8 @@ Record R (data : sig_data N (fun ix : 'I_N => (sims ix).(core_data)))
   ; s2  := x2.(stack) 
   ; pf1 := CallStack.callStack_nonempty s1 
   ; pf2 := CallStack.callStack_nonempty s2 
-  ; c   := STACK.head _ pf1 
-  ; d   := STACK.head _ pf2 
+  ; c   := COL.peek _ pf1 
+  ; d   := COL.head _ pf2 
 
     (* main invariant *)
   ; R_inv : 

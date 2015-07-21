@@ -126,7 +126,7 @@ Definition atExternal (c: Core.t cores) :=
   else false.
 
 Definition wf_callStack stk :=
-  [/\ COL.all (COL.unbump stk) atExternal & COL.size stk > 0].
+  [/\ COL.allb (COL.unbump stk) atExternal & COL.size stk > 0].
 
 End coreDefs.
 
@@ -146,7 +146,7 @@ Program Definition singl (core: Core.t cores) :=
   @mk (COL.bump COL.empty core) _.
 Next Obligation.
 split=> //.
-rewrite COL.theory.allunbump; apply/forallP=> i.
+rewrite COL.theory.allbunbump; apply/forallP=> i.
 have H: (COL.size (COL.bump COL.empty core)) = 1.
 { by rewrite COL.theory.bumpsize COL.theory.sizeempty. }
 case H2: (nat_of_ord i == 0)=> //.
@@ -163,7 +163,7 @@ Definition callStackSize := COL.size stack.(callStack).
 Lemma callStack_wf : wf_callStack stack.
 Proof. by case: stack. Qed.
 
-Lemma callStack_ext : COL.all (COL.unbump stack) (atExternal cores).
+Lemma callStack_ext : COL.allb (COL.unbump stack) (atExternal cores).
 Proof. by move: callStack_wf=> [H1 H2]. Qed.
 
 Lemma callStack_size : callStackSize > 0.
@@ -234,7 +234,7 @@ Qed.
 (** Succeeds only if all cores are currently at_external.                  *)
 
 Lemma stack_push_wf newCore :
-  COL.all l.(stack).(callStack) (atExternal my_cores) -> 
+  COL.allb l.(stack).(callStack) (atExternal my_cores) -> 
   wf_callStack (COL.bump l.(stack).(callStack) newCore).
 Proof.
 by rewrite/wf_callStack=> H; split=> //; rewrite unbumpbump.
@@ -242,7 +242,7 @@ Qed.
 
 Definition pushCore 
   (newCore: Core.t my_cores) 
-  (pf : COL.all l.(stack).(callStack) (atExternal my_cores)) := 
+  (pf : COL.allb l.(stack).(callStack) (atExternal my_cores)) := 
   updStack (CallStack.mk (COL.bump l.(stack) newCore) (stack_push_wf _ pf)).
 
 (** [popCore]: Pop the top core on the call stack.                         *)
@@ -252,8 +252,8 @@ Lemma inContext_wf (stk : [collection Core.t my_cores]) :
   COL.size stk > 1 -> wf_callStack stk -> wf_callStack (COL.unbump stk).
 Proof.
 rewrite/wf_callStack=> H1 [H2 H3]; split.
-rewrite allunbump; apply/forallP=> i; apply/orP; right.
-by move: H2; rewrite allget; move/forallP/(_ i).
+rewrite allbunbump; apply/forallP=> i; apply/orP; right.
+by move: H2; rewrite allbget; move/forallP/(_ i).
 by rewrite unbumpsize; apply/ltP; move: (ltP H1)=> ?; omega.
 Qed.
 
@@ -324,8 +324,8 @@ move: (popCore_obligation_1 l); move: (popCore_obligation_2 l).
 case: (inContext l)=> pf1 pf2 //; case=> <-.
 have pf: wf_callStack (COL.unbump (CallStack.callStack l)).
 { case: (pf1 erefl)=> A B; split=> //.
-  rewrite COL.theory.allunbump; apply/forallP=> i; apply/orP; right.
-  by rewrite COL.theory.allget in A; move: {A}(forallP A)=>/(_ i).
+  rewrite COL.theory.allbunbump; apply/forallP=> i; apply/orP; right.
+  by rewrite COL.theory.allbget in A; move: {A}(forallP A)=>/(_ i).
   by rewrite COL.theory.unbumpsize; apply/ltP; move: (ltP (pf2 erefl))=> ?; omega.
 }
 exists pf; split=> //.
@@ -352,8 +352,8 @@ Variables (sg: signature) (id: ident) (l: linker N my_cores) (args: list val).
 Import CallStack.
 
 Definition handle :=
-  (match COL.all l.(stack).(callStack) (atExternal my_cores) as pf 
-        return COL.all l.(stack).(callStack) (atExternal my_cores) = pf
+  (match COL.allb l.(stack).(callStack) (atExternal my_cores) as pf 
+        return COL.allb l.(stack).(callStack) (atExternal my_cores) = pf
                -> option (linker N my_cores) with
     | true => fun pf => 
         if l.(fn_tbl) id is Some ix then
@@ -372,7 +372,7 @@ Import CallStack.
 
 Lemma handleP sg id l args l' :
   handle sg id l args = Some l' <-> 
-  (exists (pf : COL.all l.(stack).(callStack) (atExternal my_cores)) ix bf c,
+  (exists (pf : COL.allb l.(stack).(callStack) (atExternal my_cores)) ix bf c,
      [/\ l.(fn_tbl) id = Some ix 
        , Genv.find_symbol (my_cores ix).(Modsem.ge) id = Some bf
        , initCore my_cores sg ix (Vptr bf Int.zero) args = Some c
@@ -381,9 +381,9 @@ Proof.
 rewrite/handle.
 rewrite /pushCore.
 generalize (stack_push_wf l).
-pattern (COL.all (CallStack.callStack (stack l)) (atExternal my_cores)) 
+pattern (COL.allb (CallStack.callStack (stack l)) (atExternal my_cores)) 
  at 1 2 3 4 5 6 7 8.
-case f: (COL.all _ _); move=> pf.
+case f: (COL.allb _ _); move=> pf.
 case g: (fn_tbl l id)=> [ix|].
 case fnd: (Genv.find_symbol _ _)=> [bf|].
 case h: (initCore _ _ _)=> [c|].
@@ -555,7 +555,7 @@ Inductive Corestep : linker N my_cores -> mem
 
 | Corestep_call :
   forall (l : linker N my_cores) m ef dep_sig args id bf d_ix d
-         (pf : COL.all (CallStack.callStack l) (atExternal my_cores)),
+         (pf : COL.allb (CallStack.callStack l) (atExternal my_cores)),
 
   let: c := peekCore l in
   let: c_ix  := Core.i c in
@@ -615,9 +615,9 @@ rewrite G in H3; case: H3=> ->.
 by rewrite H4; case=> <-; f_equal; apply: proof_irr.
 move: e; rewrite/handle /pushCore.
 generalize (stack_push_wf l).
-pattern (COL.all (CallStack.callStack (stack l)) (atExternal my_cores)) 
+pattern (COL.allb (CallStack.callStack (stack l)) (atExternal my_cores)) 
  at 1 2 3 4 5 6.
-case f: (COL.all _ _)=> pf'.
+case f: (COL.allb _ _)=> pf'.
 rewrite H2 H3 /initCore H4; discriminate.
 by rewrite pf in f.
 right; split=> //.
@@ -746,6 +746,49 @@ have ->: CallStack.callStack_nonempty (CallStack.mk (updCore_obligation_1 l c))
        = COL.theory.bumpsize' (COL.unbump (CallStack.callStack l)) c
   by apply: proof_irr.
 by rewrite COL.theory.bumppeek.
+Qed.
+
+Lemma updPeekCore (l : linker N my_cores) : updCore l (peekCore l) = l.
+Proof.
+rewrite /updCore.
+rewrite /updStack.
+case: l=> fn stk. 
+f_equal.
+case: stk=> stk w.
+move: (updCore_obligation_1 _ _).
+rewrite /CallStack.callStack /stack.
+move=> w'.
+have H: @COL.bump (fun_COLty (@Core.t N my_cores))
+        (@COL.unbump (fun_COLty (@Core.t N my_cores)) stk)
+        (@peekCore N my_cores
+           {| fn_tbl := fn; stack := @CallStack.mk N my_cores stk w |})
+      = stk.
+{ 
+  apply: COL.theory.extensionality.
+  rewrite COL.theory.bumpsize COL.theory.unbumpsize.
+  admit.
+  move=> pf i.
+  set v := peekCore _.
+  case pf': (i < COL.size (COL.unbump stk)).
+  { have H: i = COL.bumpoldord (COL.unbump stk) (Ordinal pf') v.
+    { admit. }
+    rewrite {1}H COL.theory.bumpgetold.
+    admit. 
+  }
+  have H: i = COL.bumpneword (COL.unbump stk) v.
+  { admit. }
+  rewrite {1}H COL.theory.bumpgetnew.
+  rewrite /v /peekCore /COL.theory.peek /=.
+  case: (COL.theory.lastord _)=> x p /=.
+  have ->: x = cast_ord pf i.
+  { rewrite H.
+    move: (COL.bumpneword_charact (COL.unbump stk) v).
+    admit.
+  }
+  by [].
+}
+move: H w' => -> w'.
+by have ->: w = w' by apply: proof_irr.
 Qed.
 
 Lemma after_externalE rv c c' : 

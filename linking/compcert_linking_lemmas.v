@@ -24,19 +24,14 @@ Variable my_ge : ge_ty.
 
 Let linker := effsem N cores fun_tbl.
 
-Lemma peek_upd (st : Linker.t N cores) : 
-  updCore st (peekCore st) = st.
-Proof.
-case: st=> fn_tbl; case; case=> //= a l pf.
-by case: a pf=> ? c sg pf /=; do 2 f_equal=> //=; apply: proof_irr.
-Qed.
-
-Lemma upd_peek (st : Linker.t N cores) c : peekCore (updCore st c) = c.
-Proof. by []. Qed.
-
 Lemma upd_upd (st : Linker.t N cores) c c' :
   updCore (updCore st c) c' = updCore st c'.
-Proof. by case: st=> ? ? /=; do 2 f_equal; apply: proof_irr. Qed.
+Proof. 
+rewrite /updCore /updStack /=; f_equal.
+move: (updCore_obligation_1 _ _); simpl.
+rewrite collection.COL.theory.unbumpbump=> w2.
+by have ->: w2 = updCore_obligation_1 _ _ by apply: proof_irr.
+Qed.
 
 Lemma step_STEP {U st1 m1 c1' m1'} : 
   let: c1 := peekCore st1 in
@@ -58,18 +53,24 @@ Lemma stepN_STEPN {U st1 m1 c1' m1' n} :
     (sem (cores (Core.i c1))) 
     (ge (cores (Core.i c1))) n U (Core.c c1) m1 c1' m1' -> 
   effect_semantics.effstepN linker my_ge 
-  n U st1 m1 (updCore st1 (Core.upd c1 c1')) m1'.
+    n U st1 m1 (updCore st1 (Core.upd c1 c1')) m1'.
 Proof.
 move: st1 c1' m1 U; elim: n.
-case=> ?; case; case=> // a l pf x ? ?; case; case=> /= <- <- <-; split=> //.
-do 3 f_equal. move=> // _ _; case=> <- <-; f_equal=> //.
-by move: pf x; case: a=> //. 
-by apply: proof_irr.
+move=> st1 c1' m1 U /= [][] <- <- <-; split=> //; f_equal. 
+{ have H: Core.upd (peekCore st1) (Core.c (peekCore st1))
+        = peekCore st1.
+  { by clear; rewrite /Core.upd; case: (peekCore st1). }
+  by rewrite H LinkerSem.updPeekCore.
+}
 move=> n IH st1 c1' m1 U /= => [][]c1'' []m1'' []U1 []U2 []B []C D.
 exists (updCore st1 (Core.upd (peekCore st1) c1'')), m1'',U1,U2; split.
 by apply: (step_STEP B).
-move: (IH (updCore st1 (Core.upd (peekCore st1) c1'')) c1' m1'' U2).
-by rewrite upd_upd=> H; split=> //; move: H; apply; apply: C.
+have H: Core.i (peekCore st1)
+      = Core.i (peekCore (updCore st1 (Core.upd (peekCore st1) c1''))).
+{ admit. }
+admit.
+(*move: (IH (updCore st1 (Core.upd (peekCore st1) c1'')) c1' m1'' U2).
+by rewrite upd_upd=> H; split=> //; move: H; apply; apply: C.*)
 Qed.
 
 Lemma stepPLUS_STEPPLUS {U st1 m1 c1' m1'} :
