@@ -52,7 +52,7 @@ Import Wholeprog_sim.
 Import SM_simulation.
 Import Linker. 
 Import Modsem.
-
+ 
 Section typingInv.
 
 Variable N : pos.
@@ -99,6 +99,21 @@ Variable sims : forall i : 'I_N,
 Variable my_ge : ge_ty.
 Variable my_ge_S : forall (i : 'I_N), genvs_domain_eq my_ge (cores_S i).(ge).
 Variable my_ge_T : forall (i : 'I_N), genvs_domain_eq my_ge (cores_T i).(ge).
+
+(*Four new assumptions*)
+Variable find_symbol_up_S: forall i id b,
+    Genv.find_symbol (cores_S i).(ge) id = Some b ->
+    Genv.find_symbol my_ge id = Some b.
+
+Variable find_symbol_up_T: forall i id b,
+    Genv.find_symbol (cores_T i).(ge) id = Some b ->
+    Genv.find_symbol my_ge id = Some b.
+
+Variable all_gvars_includedS: forall i b,
+     gvars_included (Genv.find_var_info (cores_S i).(ge) b) (Genv.find_var_info my_ge b).
+
+Variable all_gvars_includedT: forall i b,
+     gvars_included (Genv.find_var_info (cores_T i).(ge) b) (Genv.find_var_info my_ge b).  
 
 Let types := fun i : 'I_N => (sims i).(core_data).
 Let ords : forall i : 'I_N, types i -> types i -> Prop 
@@ -181,6 +196,14 @@ case: H1; first by exists id.
 by move=> x H5; exists x.
 Qed.
 
+Lemma findSym_findSym_down_S ix id b :
+  Genv.find_symbol my_ge id = Some b -> 
+  exists id', Genv.find_symbol (ge (cores_S ix)) id' = Some b.
+Proof.
+  move=> H.
+  eapply invSym_findSymS. apply Genv.find_invert_symbol. apply H. 
+Qed.
+
 Lemma invSym_findSymT ix id b :
   Genv.invert_symbol my_ge b = Some id -> 
   exists id', Genv.find_symbol (ge (cores_T ix)) id' = Some b.
@@ -191,6 +214,14 @@ case: {H1}(H1 b)=> H1 H3.
 move/Genv.invert_find_symbol=> H4.
 case: H1; first by exists id.
 by move=> x H5; exists x.
+Qed.
+
+Lemma findSym_findSym_down_T ix id b :
+  Genv.find_symbol my_ge id = Some b -> 
+  exists id', Genv.find_symbol (ge (cores_T ix)) id' = Some b.
+Proof.
+  move=> H.
+  eapply invSym_findSymT. apply Genv.find_invert_symbol. apply H. 
 Qed.
 
 Lemma invSym_findSymS_None ix b :
@@ -217,7 +248,7 @@ case: H6; first by exists id.
 by move=> x; move/Genv.find_invert_symbol; rewrite H3.
 Qed.
 
-Lemma findVar_findSymS ix inf b :
+Lemma findVar_findVarS ix inf b :
   Genv.find_var_info my_ge b = Some inf -> 
   exists inf', Genv.find_var_info (ge (cores_S ix)) b = Some inf'.
 Proof.
@@ -228,7 +259,7 @@ case: H2; first by exists inf.
 by move=> x H6; exists x.
 Qed.
 
-Lemma findVar_findSymT ix inf b :
+Lemma findVar_findVarT ix inf b :
   Genv.find_var_info my_ge b = Some inf -> 
   exists inf', Genv.find_var_info (ge (cores_T ix)) b = Some inf'.
 Proof.
@@ -239,7 +270,7 @@ case: H2; first by exists inf.
 by move=> x H6; exists x.
 Qed.
 
-Lemma findVar_findSymS_None ix b :
+Lemma findVar_findVarS_None ix b :
   Genv.find_var_info my_ge b = None -> 
   Genv.find_var_info (ge (cores_S ix)) b = None.
 Proof.
@@ -251,7 +282,7 @@ case: H4; first by exists gv.
 by move=> x; rewrite H5.
 Qed.
 
-Lemma findVar_findSymT_None ix b :
+Lemma findVar_findVarT_None ix b :
   Genv.find_var_info my_ge b = None -> 
   Genv.find_var_info (ge (cores_T ix)) b = None.
 Proof.
@@ -272,14 +303,14 @@ case: (invSym_findSymS ix i)=> x fnd.
 rewrite (Genv.find_invert_symbol _ _ fnd).
 by split.
 case j: (Genv.find_var_info my_ge b)=> [inf|].
-case: (findVar_findSymS ix j)=> x=> ->; split=> //=.
+case: (findVar_findVarS ix j)=> x=> ->; split=> //=.
 by move=> _; apply/orP; right.
 move: (@invSym_findSymS_None ix _ i)=> H1.
 case k: (Genv.invert_symbol _ _)=> [id|].
 move: (Genv.invert_find_symbol _ _ k)=> H2. 
 by elimtype False; apply: (H1 _ H2).
 case l: (Genv.find_var_info _ _)=> [inf|].
-by rewrite (findVar_findSymS_None _ j) in l.
+by rewrite (findVar_findVarS_None _ j) in l.
 by [].
 Qed.
 
@@ -292,14 +323,14 @@ case: (invSym_findSymT ix i)=> x fnd.
 rewrite (Genv.find_invert_symbol _ _ fnd).
 by split.
 case j: (Genv.find_var_info my_ge b)=> [inf|].
-case: (findVar_findSymT ix j)=> x=> ->; split=> //=.
+case: (findVar_findVarT ix j)=> x=> ->; split=> //=.
 by move=> _; apply/orP; right.
 move: (@invSym_findSymT_None ix _ i)=> H1.
 case k: (Genv.invert_symbol _ _)=> [id|].
 move: (Genv.invert_find_symbol _ _ k)=> H2. 
 by elimtype False; apply: (H1 _ H2).
 case l: (Genv.find_var_info _ _)=> [inf|].
-by rewrite (findVar_findSymT_None _ j) in l.
+by rewrite (findVar_findVarT_None _ j) in l.
 by [].
 Qed.
 
@@ -310,6 +341,68 @@ Proof. by split; rewrite -!isGlob_iffS. Qed.
 Lemma isGlob_iffST' ix1 ix2 b :
   isGlobalBlock (ge (cores_S ix1)) b <-> isGlobalBlock (ge (cores_T ix2)) b. 
 Proof. by split; rewrite -isGlob_iffS -isGlob_iffT. Qed.
+
+Lemma find_symbol_down_S i id b:
+  Genv.find_symbol my_ge id = Some b ->
+  Genv.find_symbol (ge (cores_S i)) id = Some b.
+Proof.
+  move=> GF. destruct (findSym_findSym_down_S i GF).
+  destruct (ident_eq x id); subst; trivial.
+  apply find_symbol_up_S in H.
+  elim (Genv.global_addresses_distinct _ n H GF). trivial. 
+Qed.
+
+Lemma find_symbol_down_T i id b:
+  Genv.find_symbol my_ge id = Some b ->
+  Genv.find_symbol (ge (cores_T i)) id = Some b.
+Proof.
+  move=> GF. destruct (findSym_findSym_down_T i GF).
+  destruct (ident_eq x id); subst; trivial.
+  apply find_symbol_up_T in H.
+  elim (Genv.global_addresses_distinct _ n H GF). trivial. 
+Qed.
+
+Lemma load_store_init_S m b i: forall il k,
+      Genv.load_store_init_data my_ge m b k il ->
+      Genv.load_store_init_data (ge (cores_S i)) m b k il.
+Proof.
+  induction il; simpl; intros z LDI; trivial.
+  destruct a; try destruct LDI; eauto.
+  destruct H as [b' [FS LD]].
+  apply (find_symbol_down_S i) in FS. 
+  split; eauto. 
+Qed.
+
+Lemma load_store_init_T m b i: forall il k,
+      Genv.load_store_init_data my_ge m b k il ->
+      Genv.load_store_init_data (ge (cores_T i)) m b k il.
+Proof.
+  induction il; simpl; intros z LDI; trivial.
+  destruct a; try destruct LDI; eauto.
+  destruct H as [b' [FS LD]].
+  apply (find_symbol_down_T i) in FS. 
+  split; eauto. 
+Qed.
+
+Lemma mrr_down_S: forall m, mem_respects_readonly my_ge m ->
+                     forall i, mem_respects_readonly (cores_S i).(ge) m.
+ Proof. move=> m MRR i b gv FV P. 
+     destruct (@gvars_cohereD _ _ _ _ _ _ (all_gvars_includedS i) _ _ FV) as [gv2 [? [? [? ?]]]].
+     rewrite H1 H2 in P.
+     destruct (MRR _ _ H P) . split; trivial. destruct H4 as [? _].
+     rewrite H0. clear H0. 
+     eapply load_store_init_S; eauto. 
+Qed. 
+
+Lemma mrr_down_T: forall m, mem_respects_readonly my_ge m ->
+                     forall i, mem_respects_readonly (cores_T i).(ge) m.
+ Proof. move=> m MRR i b gv FV P. 
+     destruct (@gvars_cohereD _ _ _ _ _ _ (all_gvars_includedT i) _ _ FV) as [gv2 [? [? [? ?]]]].
+     rewrite H1 H2 in P.
+     destruct (MRR _ _ H P) . split; trivial. destruct H4 as [? _].
+     rewrite H0. clear H0. 
+     eapply load_store_init_T; eauto. 
+Qed. 
 
 End glob_lems.
 
@@ -357,6 +450,10 @@ Record frame_inv
     (* invariants relating m10,m20 to active memories m1,m2*)
   ; frame_fwd1  : mem_forward m10 m1
   ; frame_fwd2  : mem_forward m20 m2
+
+  ; frame_rdoS: RDOnly_fwd m10 m1 (ReadOnlyBlocks my_ge)
+  ; frame_rdoT: RDOnly_fwd m20 m2 (ReadOnlyBlocks my_ge)
+
   ; frame_unch1 : Mem.unchanged_on [fun b ofs => 
                     [/\ locBlocksSrc nu0 b & pubBlocksSrc nu0 b=false]] m10 m1
   ; frame_unch2 : Mem.unchanged_on (local_out_of_reach nu0 m10) m20 m2 }.
@@ -1525,6 +1622,8 @@ Context
 (unch2 : Memory.Mem.unchanged_on (fun b ofs => Etgt b ofs=false) m2 m2')
 (fwd1 : mem_forward m1 m1')
 (fwd2 : mem_forward m2 m2')
+(rdo1: forall b, Mem.valid_block m1 b -> readonly m1 b m1')
+(rdo2: forall b, Mem.valid_block m2 b -> readonly m2 b m2')
 (val : forall b ofs, Esrc b ofs -> (*Mem.valid_block m1 b ->*) vis mu b) 
 (effs : 
    (forall (b0 : block) (ofs : Z),
@@ -1710,11 +1809,27 @@ split.
 exists pf,sig_pf,cd,e1,sig1,vals1,e2,sig2,vals2.
 
 case: inv=> ? ? ? ? val'' frmatch ? ?. 
-move=> frvinj visinv domt nuke fwd1' fwd2' ? ?. 
+move=> frvinj visinv domt nuke fwd1' fwd2' rdo1' rdo2' ? ?. 
 apply: Build_frame_inv=> //.
 
 by apply: (mem_forward_trans _ _ _ fwd1' fwd1). 
 by apply: (mem_forward_trans _ _ _ fwd2' fwd2). 
+
+ move=> b RDO. eapply readonly_trans. apply (rdo1' _ RDO). apply rdo1. eapply fwd1'.
+   assert (WDmu0:= match_sm_wd frmatch).
+   apply match_genv in frmatch; destruct frmatch as [PG_b Glob_b].
+   apply  ReadOnlyBlocks_global in RDO. rewrite <- (genvs_domain_eq_isGlobal _ _ (my_ge_S _ )) in Glob_b. 
+   destruct (frgnSrcAx _ WDmu0 _ (Glob_b _ RDO)) as [? [? [? ?]]].
+   eapply Mem.valid_block_inject_1.  apply extern_in_all; eauto.  eassumption. 
+
+ move=> b RDO. eapply readonly_trans. apply (rdo2' _ RDO). apply rdo2. eapply fwd2'.
+   assert (WDmu0:= match_sm_wd frmatch).
+   apply match_genv in frmatch; destruct frmatch as [PG_b Glob_b].
+   apply  ReadOnlyBlocks_global in RDO.
+   specialize (meminj_preserves_globals_isGlobalBlock _ _ PG_b b);   
+   rewrite <- (genvs_domain_eq_isGlobal _ _ (my_ge_S _ )); intros. 
+   eapply Mem.valid_block_inject_2.  apply extern_in_all; eauto.  eassumption. 
+
 
 apply: (mem_lemmas.unchanged_on_trans m10 m1 m1')=> //.
 set pubSrc' := [predI locBlocksSrc mu0 & REACH m10 (exportedSrc mu0 vals1)].
@@ -1872,6 +1987,10 @@ Record R (data : sig_data N (fun ix : 'I_N => (sims ix).(core_data)))
   ; R_ge    : forall ix : 'I_N, valid_genv (ge (cores_T ix)) m2 
   ; R_ro1  : forall ix : 'I_N, mem_respects_readonly (ge (cores_S ix)) m1
   ; R_ro2  : forall ix : 'I_N, mem_respects_readonly (ge (cores_T ix)) m2
+
+  ; frame_mmr1: mem_respects_readonly my_ge m1
+  ; frame_mmr2: mem_respects_readonly my_ge m2
+
 
     (* typing conditions *)
   ; R_tys1  : tys_agree (callStack s1)

@@ -81,6 +81,21 @@ Variable my_ge : ge_ty.
 Variable my_ge_S : forall (i : 'I_N), genvs_domain_eq my_ge (cores_S i).(ge).
 Variable my_ge_T : forall (i : 'I_N), genvs_domain_eq my_ge (cores_T i).(ge).
 
+(*Four new assumptions*)
+Variable find_symbol_up_S: forall i id b,
+    Genv.find_symbol (cores_S i).(ge) id = Some b ->
+    Genv.find_symbol my_ge id = Some b.
+
+Variable find_symbol_up_T: forall i id b,
+    Genv.find_symbol (cores_T i).(ge) id = Some b ->
+    Genv.find_symbol my_ge id = Some b.
+
+Variable all_gvars_includedS: forall i b,
+     gvars_included (Genv.find_var_info (cores_S i).(ge) b) (Genv.find_var_info my_ge b).
+
+Variable all_gvars_includedT: forall i b,
+     gvars_included (Genv.find_var_info (cores_T i).(ge) b) (Genv.find_var_info my_ge b).  
+
 Let types := fun i : 'I_N => (sims i).(core_data).
 Let ords : forall i : 'I_N, types i -> types i -> Prop 
   := fun i : 'I_N => (sims i).(core_ord).
@@ -232,15 +247,8 @@ eapply Build_Wholeprog_sim
     apply reach; apply: (REACH_mono (fun b' : block =>
       isGlobalBlock (ge (cores_T ix)) b' || getBlocks vals2 b'))=> //. }
 
-  { move=> b' gv Hfind /andP []H2 H3.  
-     move: (ro1 b' (mkglobvar tt (gvar_init gv) (gvar_readonly gv) (gvar_volatile gv))); case.
-     admit. (*find_var_info (ge (cores_S ix)) <= find_var_info my_ge*)
-     by apply/andP; split.
-     simpl=> H4; case=> H5 H6; split=> //.
-     admit. (*Genv.load_store_init_data*)
-    }
-
-  { (*symmetric to previous*) admit. }
+  { by eapply mrr_down_S; eassumption. }
+  { by eapply mrr_down_T; eassumption. }
 
   { by apply: valid_dec'. }
 
@@ -347,8 +355,8 @@ eapply Build_Wholeprog_sim
   by move: gfi; rewrite /mu_top /= /mu_top0 initial_SM_as_inj.
   by move=> ix'; move: vgenv; apply: valid_genvs_domain_eq.
 
-  admit. (*ro1*)
-  admit. (*ro2*)
+  by move=>ixx; eapply mrr_down_S; eassumption.
+  by move=>ixx; eapply mrr_down_T; eassumption. 
 
   by apply: ord_dec. }(*END [Case: core_initial]*)
     
@@ -475,6 +483,9 @@ split.
  { eapply tail_inv_step with (Esrc := U1) (Etgt := U2) (mu' := mu_top'); eauto.
    by apply: (effstep_unchanged _ _ _ _ _ _ _ ESTEP0).
    by move: STEPN; apply: effect_semantics.effstepN_unchanged.
+   by move: STEP0; apply corestep_rdonly.
+   by apply effstepN_corestepN in STEPN; move: STEPN; 
+      apply semantics_lemmas.corestepN_rdonly.
    move=> ? ? X; move: (PERM U1_DEF' _ _ X)=> []Y Z; split=> //.
    by eapply effstepN_valid in STEPN; eauto.
      by apply: (head_valid hdinv).
@@ -494,12 +505,28 @@ split.
 
  (* mem_respects_readonly ... m1' *)
  { move=> ix; move: (R_ro1 INV); move/(_ ix)=> RO1.
-    by apply: (mem_respects_readonly_forward _ _ _ RO1 fwd1).
+   apply (mem_respects_readonly_fwd _ _ _ RO1 fwd1).
+   move: STEP0; apply corestep_rdonly.
  }
 
  (* mem_respects_readonly ... m2' *)
  { move=> ix; move: (R_ro2 INV); move/(_ ix)=> RO2.
-    by apply: (mem_respects_readonly_forward _ _ _ RO2 fwd2).
+   apply (mem_respects_readonly_fwd _ _ _ RO2 fwd2).
+   apply effstepN_corestepN in STEPN; move: STEPN.
+   apply semantics_lemmas.corestepN_rdonly.
+ }
+
+ (* mem_respects_readonly ... m1' *)
+ { move: (frame_mmr1 INV); move=> RO1.
+   apply (mem_respects_readonly_fwd _ _ _ RO1 fwd1).
+   move: STEP0; apply corestep_rdonly.
+ }
+
+ (* mem_respects_readonly ... m2' *)
+ { move: (frame_mmr2 INV); move=> RO2.
+   apply (mem_respects_readonly_fwd _ _ _ RO2 fwd2).
+   apply effstepN_corestepN in STEPN; move: STEPN.
+   apply semantics_lemmas.corestepN_rdonly.
  }
     
  unfold c1 in *; rewrite ST1'; move: (R_tys1 INV). 
@@ -595,7 +622,7 @@ have mu_wd: SM_wd mu.
 have INV': R data (Inj.mk mu_wd) st1 m1 st2 m2.
 { by apply: INV. }
 
-case: (aft2 my_ge_T HLT1 POP1 INV' AFT1)=> 
+case: (aft2 my_ge_T all_gvars_includedS all_gvars_includedT HLT1 POP1 INV' AFT1)=> 
   rv2 []st2'' []st2' []cd' []mu' []HLT2 CTX2 POP2 AFT2 INV''.
 exists st2',m2,cd',mu'.
 split=> //; first by rewrite eq1.
@@ -641,7 +668,7 @@ have hlt10:
   case hasty: (val_casted.val_has_type_func _ _)=> //. }
 
 case: (core_halted (sims (Core.i (c inv'))) _ _ _ _ _ _ mtch0 hlt10).
-move=> v2' []inj []vinj hlt2'.
+move=> v2' []inj []mrr1 []mrr2 []vinj hlt2'.
 
 exists mupkg,v2'; split.
 
@@ -699,6 +726,19 @@ Lemma link :
  forall ge_top : ge_ty,
  (forall ix : 'I_N, genvs_domain_eq ge_top (ge (sems_S ix))) ->
  (forall ix : 'I_N, genvs_domain_eq ge_top (ge (sems_T ix))) ->
+
+ (*Four new assumptions*)
+ (forall ix id b,
+    Genv.find_symbol (ge (sems_S ix)) id = Some b ->
+    Genv.find_symbol ge_top id = Some b) ->
+ (forall ix id b,
+    Genv.find_symbol  (ge (sems_T ix)) id = Some b ->
+    Genv.find_symbol ge_top id = Some b) ->
+ (forall ix b, gvars_included (Genv.find_var_info (ge (sems_S ix)) b)
+                             (Genv.find_var_info ge_top b)) ->
+ (forall ix b, gvars_included (Genv.find_var_info (ge (sems_T ix)) b)
+                             (Genv.find_var_info ge_top b)) ->
+
  let linker_S := effsem N sems_S plt in
  let linker_T := effsem N sems_T plt in
  forall main : val,

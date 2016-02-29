@@ -2097,3 +2097,9 @@ Proof. intros.
       destruct (local_DomRng _ WD _ _ _ Heqq).
       rewrite H in L; discriminate.
 Qed.
+
+Definition RDOnly_inj (m1 m2:mem) mu B :=
+  forall b (Hb: B b = true),
+            extern_of mu b = Some(b,0) /\ (forall b' d, as_inj mu b' = Some(b,d) -> b'=b) /\ 
+            forall ofs, ~ Mem.perm m1 b ofs Max Writable /\
+                        ~ Mem.perm m2 b ofs Max Writable.

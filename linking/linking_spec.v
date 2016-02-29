@@ -68,7 +68,19 @@ Axiom link : forall
     SM_simulation_inject s.(sem) t.(sem) s.(ge) t.(ge))
   (ge_top : ge_ty)
   (domeq_S : forall ix : 'I_N, genvs_domain_eq ge_top (sems_S ix).(ge))
-  (domeq_T : forall ix : 'I_N, genvs_domain_eq ge_top (sems_T ix).(ge)),
+  (domeq_T : forall ix : 'I_N, genvs_domain_eq ge_top (sems_T ix).(ge))
+
+  (*Four new assumptions*)
+  (symbols_up_S: forall ix id b,
+     Genv.find_symbol (ge (sems_S ix)) id = Some b ->
+     Genv.find_symbol ge_top id = Some b) 
+  (symbols_up_T: forall ix id b,
+     Genv.find_symbol  (ge (sems_T ix)) id = Some b ->
+     Genv.find_symbol ge_top id = Some b)
+  (gvarinfos_S: forall ix b, gvars_included (Genv.find_var_info (ge (sems_S ix)) b)
+                             (Genv.find_var_info ge_top b))
+  (gvarinfos_T: forall ix b, gvars_included (Genv.find_var_info (ge (sems_T ix)) b)
+                             (Genv.find_var_info ge_top b)),
   let linker_S := effsem N sems_S plt in
   let linker_T := effsem N sems_T plt in forall
   (main : val), 

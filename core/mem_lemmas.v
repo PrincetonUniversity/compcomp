@@ -1647,6 +1647,14 @@ Definition ReadOnlyBlocks {F V} (ge: Genv.t F V) (b:block): bool :=
         | Some gv => gvar_readonly gv && negb (gvar_volatile gv)
   end.
 
+Lemma ReadOnlyBlocks_global {F V} (g:Genv.t F V) b: 
+      ReadOnlyBlocks g b = true -> isGlobalBlock g b = true.
+Proof.
+   unfold ReadOnlyBlocks; intros.
+   remember (Genv.find_var_info g b) as d. destruct d; try discriminate.
+   eapply find_var_info_isGlobal. rewrite <- Heqd; reflexivity.
+Qed.
+
 Definition RDOnly_fwd (m1 m1':mem) B :=
   forall b (Hb: B b = true), readonly m1 b m1'.
 
@@ -1704,3 +1712,82 @@ split. eapply Genv.load_store_init_data_invariant; try eassumption.
 split. trivial.
 intros z N. apply (NP z); eauto.
 Qed.
+
+Definition gvar_info_eq {V1 V2} (v1: option (globvar V1)) (v2: option (globvar V2)) :=
+  match v1, v2 with
+    None, None => True
+  | Some i1, Some i2 => gvar_init i1 = gvar_init i2 /\
+                        gvar_readonly i1 = gvar_readonly i2 /\ gvar_volatile i1 = gvar_volatile i2
+  | _, _ => False
+  end. 
+
+Definition gvar_infos_eq {F1 V1 F2 V2} 
+  (g1 : Genv.t F1 V1) (g2 : Genv.t F2 V2) :=
+  forall b, gvar_info_eq (Genv.find_var_info g1 b) (Genv.find_var_info g2 b).
+
+Lemma gvar_info_refl V v: @gvar_info_eq V V v v. 
+  destruct v; simpl; intuition. Qed.
+
+Lemma gvar_infos_eqD {F1 V1 F2 V2} (ge1 : Genv.t F1 V1) (ge2 : Genv.t F2 V2)
+         (G: gvar_infos_eq ge1 ge2) b v1 (Hb: Genv.find_var_info ge1 b = Some v1): 
+      exists v2, Genv.find_var_info ge2 b = Some v2 /\ gvar_init v1 = gvar_init v2 /\
+                 gvar_readonly v1 = gvar_readonly v2 /\ gvar_volatile v1 = gvar_volatile v2.
+Proof. specialize (G b); rewrite Hb in G. red in G.
+  destruct (Genv.find_var_info ge2 b); try contradiction.
+  exists g. intuition.
+Qed.
+
+Lemma gvar_infos_eqD2 {F1 V1 F2 V2} (ge1 : Genv.t F1 V1) (ge2 : Genv.t F2 V2)
+         (G: gvar_infos_eq ge1 ge2) b v2 (Hb: Genv.find_var_info ge2 b = Some v2): 
+      exists v1, Genv.find_var_info ge1 b = Some v1 /\ gvar_init v1 = gvar_init v2 /\
+                 gvar_readonly v1 = gvar_readonly v2 /\ gvar_volatile v1 = gvar_volatile v2.
+Proof. specialize (G b); rewrite Hb in G. red in G.
+  destruct (Genv.find_var_info ge1 b); try contradiction.
+  exists g. intuition.
+Qed.
+
+Lemma gvar_infos_eq_ReadOnlyBlocks {F1 V1 F2 V2} (g1: Genv.t F1 V1) (g2:Genv.t F2 V2):
+      gvar_infos_eq g1 g2 -> ReadOnlyBlocks g1 = ReadOnlyBlocks g2.
+Proof. intros.
+  unfold ReadOnlyBlocks. extensionality b.
+  remember (Genv.find_var_info g1 b) as d1.
+  destruct d1; symmetry in Heqd1. 
+    apply (gvar_infos_eqD _ _ H) in Heqd1. destruct Heqd1 as [gv2 [? [? [? ?]]]].
+       rewrite H0, H2, H3. trivial.
+  remember (Genv.find_var_info g2 b) as q.
+  destruct q; symmetry in Heqq. 
+    apply (gvar_infos_eqD2 _ _ H) in Heqq. destruct Heqq as [gv1 [? [? [? ?]]]].
+    rewrite H0 in Heqd1. discriminate.
+  trivial.
+Qed.
+
+(*****************The following variant is used in the linker***********)
+Definition gvars_included {V1 V2} (gv1:option (globvar V1)) (gv2: option (globvar V2)): Prop :=
+  match gv1, gv2 with
+   None, None => True
+ | None, Some x2 => True
+ | Some x1, None => False
+ | Some x1, Some x2 => gvar_init x1 = gvar_init x2 /\ 
+                       gvar_readonly x1 = gvar_readonly x2 /\
+                       gvar_volatile x1 = gvar_volatile x2
+ end.
+
+Lemma gvars_cohereD {F1 V1 F2 V2} (ge1:Genv.t F1 V1) (ge2:Genv.t F2 V2)
+    (HG: forall b, gvars_included (Genv.find_var_info ge1 b) 
+                   (Genv.find_var_info ge2 b))
+    b gv1 (GV: Genv.find_var_info ge1 b = Some gv1):
+     exists gv2, Genv.find_var_info ge2 b = Some gv2 /\
+                 gvar_init gv1 = gvar_init gv2 /\ 
+                 gvar_readonly gv1 = gvar_readonly gv2 /\
+                 gvar_volatile gv1 = gvar_volatile gv2.
+Proof.  
+ specialize (HG b); rewrite GV in HG. simpl in HG.
+ destruct (Genv.find_var_info ge2 b); try contradiction.
+ exists g; eauto.
+Qed.
+
+(****************************************************************************)
+
+Definition findsymbols_preserved {F1 V1 F2 V2} 
+           (g1 : Genv.t F1 V1) (g2 : Genv.t F2 V2) := 
+  forall i b, Genv.find_symbol g1 i = Some b -> Genv.find_symbol g2 i = Some b.
