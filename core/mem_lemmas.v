@@ -196,7 +196,7 @@ Definition readonly {F V} (ge: Genv.t F V) m1 b m2 :=
 Definition readonlyLD m1 b m2 :=
     forall chunk ofs
     (NWR: forall ofs', ofs <= ofs' < ofs + size_chunk chunk ->
-                          ~(Mem.perm m1 b ofs' Max Writable)),
+                          ~(Mem.perm m1 b ofs' Cur Writable)),
      Mem.load chunk m2 b ofs = Mem.load chunk m1 b ofs /\
      (forall ofs', ofs <= ofs' < ofs + size_chunk chunk -> 
         (forall k p, Mem.perm m1 b ofs' k p <-> Mem.perm m2 b ofs' k p)).
@@ -204,10 +204,38 @@ Definition readonlyLD m1 b m2 :=
 Definition readonly m1 b m2 :=
     forall n ofs
     (NWR: forall i, 0 <= i < n ->
+                          ~(Mem.perm m1 b (ofs + i) Cur Writable)),
+     Mem.loadbytes m2 b ofs n = Mem.loadbytes m1 b ofs n /\
+     (forall i, 0 <= i < n -> 
+        (forall k p, Mem.perm m1 b (ofs+i) k p <-> Mem.perm m2 b (ofs+i) k p)).
+
+Definition max_readonlyLD m1 b m2 :=
+    forall chunk ofs
+    (NWR: forall ofs', ofs <= ofs' < ofs + size_chunk chunk ->
+                          ~(Mem.perm m1 b ofs' Max Writable)),
+     Mem.load chunk m2 b ofs = Mem.load chunk m1 b ofs /\
+     (forall ofs', ofs <= ofs' < ofs + size_chunk chunk -> 
+        (forall k p, Mem.perm m1 b ofs' k p <-> Mem.perm m2 b ofs' k p)).
+
+Definition max_readonly m1 b m2 :=
+    forall n ofs
+    (NWR: forall i, 0 <= i < n ->
                           ~(Mem.perm m1 b (ofs + i) Max Writable)),
      Mem.loadbytes m2 b ofs n = Mem.loadbytes m1 b ofs n /\
      (forall i, 0 <= i < n -> 
         (forall k p, Mem.perm m1 b (ofs+i) k p <-> Mem.perm m2 b (ofs+i) k p)).
+
+Lemma readonlyLD_max_readonlyLD m1 b m2: readonlyLD m1 b m2 -> max_readonlyLD m1 b m2.
+Proof. red; intros. destruct (H chunk ofs).
+  intros; intros N. apply Mem.perm_max in N. apply (NWR _ H0 N).
+  split; trivial.
+Qed. 
+
+Lemma readonly_max_readonly m1 b m2: readonly m1 b m2 -> max_readonly m1 b m2.
+Proof. red; intros. destruct (H n ofs).
+  intros; intros N. apply Mem.perm_max in N. apply (NWR _ H0 N).
+  split; trivial. 
+Qed.
 
 Lemma readonly_readonlyLD m1 b m2: readonly m1 b m2 -> readonlyLD m1 b m2.
 Proof.
@@ -791,9 +819,9 @@ Proof.
     exfalso.
     destruct (zle ofs0 ofs).
       apply (NWR ofs). omega.
-                      eapply Mem.perm_max. apply M. simpl. specialize (Zle_0_nat (length bytes)); intros; xomega.
+                      (*eapply Mem.perm_max.*) apply M. simpl. specialize (Zle_0_nat (length bytes)); intros; xomega.
       elim (NWR ofs0). specialize (size_chunk_pos chunk); intros; omega.
-                      eapply Mem.perm_max. apply M. omega.
+                      (*eapply Mem.perm_max.*) apply M. omega.
   split; intros. eapply Mem.perm_storebytes_1; eassumption. eapply Mem.perm_storebytes_2; eassumption.
 Qed.
 
@@ -815,9 +843,9 @@ Proof.
     exfalso. remember (Z.of_nat (length (m0 :: bytes))) as l. assert (0 < l). simpl in Heql. xomega. clear Heql. 
     destruct (zle ofs0 ofs).
       apply (NWR (ofs-ofs0)). omega.
-                  eapply Mem.perm_max. apply M. rewrite Zplus_minus. omega.
+                  (*eapply Mem.perm_max.*) apply M. rewrite Zplus_minus. omega.
       elim (NWR 0). omega.
-                    eapply Mem.perm_max. apply M. omega.
+                  (*eapply Mem.perm_max.*) apply M. omega.
   split; intros. eapply Mem.perm_storebytes_1; eassumption. eapply Mem.perm_storebytes_2; eassumption.
 Qed.
 
@@ -1015,11 +1043,11 @@ split.
   destruct (zle hi ofs); trivial. exfalso.
   destruct (zle ofs lo).
     eapply (NWR lo); clear NWR. omega.
-    eapply Mem.perm_max.
+    (*eapply Mem.perm_max.*)
     eapply Mem.perm_implies. 
       eapply Mem.free_range_perm; try eassumption. omega. constructor.
   eapply (NWR ofs); clear NWR. specialize (size_chunk_pos chunk). intros; omega.
-    eapply Mem.perm_max.
+    (*eapply Mem.perm_max.*)
     eapply Mem.perm_implies. 
       eapply Mem.free_range_perm; try eassumption. omega. constructor.
 intros. specialize (Mem.free_range_perm _ _ _ _ _ M); intros F. red in F.
@@ -1027,7 +1055,7 @@ intros. specialize (Mem.free_range_perm _ _ _ _ _ M); intros F. red in F.
       destruct (eq_block b0 b); try subst b0. 2: left; trivial. right. 
       destruct (zlt ofs' lo). left; trivial. right. destruct (zle hi ofs'). trivial.
       elim (NWR _ H0). (* specialize (size_chunk_pos chunk). intros; omega.*)
-      eapply Mem.perm_max. eapply Mem.perm_implies. apply F. omega. constructor.
+      (*eapply Mem.perm_max.*) eapply Mem.perm_implies. apply F. omega. constructor.
     eapply Mem.perm_free_3; try eassumption.
 Qed.
 
@@ -1046,11 +1074,11 @@ split.
   destruct (zle hi ofs); trivial. exfalso.
   destruct (zle lo ofs).
     eapply (NWR 0); clear NWR. omega.
-    eapply Mem.perm_max.
+    (*eapply Mem.perm_max.*)
     eapply Mem.perm_implies. 
       eapply Mem.free_range_perm; try eassumption. omega. constructor.
   eapply (NWR (lo - ofs)); clear NWR. omega. rewrite Zplus_minus.
-    eapply Mem.perm_max.
+    (*eapply Mem.perm_max.*)
     eapply Mem.perm_implies. 
       eapply Mem.free_range_perm; try eassumption. omega. constructor.
 intros. specialize (Mem.free_range_perm _ _ _ _ _ M); intros F. red in F.
@@ -1058,7 +1086,7 @@ intros. specialize (Mem.free_range_perm _ _ _ _ _ M); intros F. red in F.
       destruct (eq_block b0 b); try subst b0. 2: left; trivial. right. 
       destruct (zlt (ofs + i) lo). left; trivial. right. destruct (zle hi (ofs+i)). trivial.
       elim (NWR _ H0). (* specialize (size_chunk_pos chunk). intros; omega.*)
-      eapply Mem.perm_max. eapply Mem.perm_implies. apply F. omega. constructor.
+      (*eapply Mem.perm_max.*) eapply Mem.perm_implies. apply F. omega. constructor.
     eapply Mem.perm_free_3; try eassumption.
 Qed.
 
@@ -1642,7 +1670,8 @@ Lemma mem_respects_readonly_fwd {F V} (g : Genv.t F V) m m'
 Proof. red; intros. destruct (MRR _ _ H H0) as [LSI [VB NP]]; clear MRR.
 destruct (FWD _ VB) as [VB' Perm].
 split. eapply Genv.load_store_init_data_invariant; try eassumption.
-       intros. eapply readonly_readonlyLD. eapply RDO; try eassumption. intros. apply NP.
+       intros. eapply readonly_readonlyLD. eapply RDO; try eassumption.
+       intros. intros N. apply (NP ofs'). eapply Mem.perm_max; eassumption. (* apply NP.*)
 split. trivial.
 intros z N. apply (NP z); eauto.
 Qed.
@@ -1656,7 +1685,8 @@ Lemma mem_respects_readonly_forward {F V} (ge : Genv.t F V) m m'
 Proof. red; intros. destruct (MRR _ _ H H0) as [LSI [VB NP]]; clear MRR.
 destruct (FWD _ VB) as [VB' Perm].
 split. eapply Genv.load_store_init_data_invariant; try eassumption.
-       intros. eapply readonly_readonlyLD. eapply RDO; try eassumption. intros. apply NP.
+       intros. eapply readonly_readonlyLD. eapply RDO; try eassumption.
+       intros. intros N. apply (NP ofs'). eapply Mem.perm_max; eassumption. (* apply NP.*)
 split. trivial.
 intros z N. apply (NP z); eauto.
 Qed.
@@ -1669,7 +1699,8 @@ Lemma mem_respects_readonly_forward' {F V} (ge : Genv.t F V) m m'
 Proof. red; intros. destruct (MRR _ _ H H0) as [LSI [VB NP]]; clear MRR.
 destruct (FWD _ VB) as [VB' Perm].
 split. eapply Genv.load_store_init_data_invariant; try eassumption.
-       intros. eapply readonly_readonlyLD. eapply RDO; try eassumption. unfold ReadOnlyBlocks. rewrite H; trivial. intros. apply NP.
+       intros. eapply readonly_readonlyLD. eapply RDO; try eassumption. unfold ReadOnlyBlocks. rewrite H; trivial.
+       intros. intros N. apply (NP ofs'). eapply Mem.perm_max; eassumption. (* apply NP.*)
 split. trivial.
 intros z N. apply (NP z); eauto.
 Qed.

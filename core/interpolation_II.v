@@ -2954,7 +2954,9 @@ Lemma RDOnly_fwd_Dperm m1 m1' B b ofs:
      Mem.perm m1 b ofs Cur Readable = Mem.perm m1' b ofs Cur Readable.
 Proof. intros. apply prop_ext.
        destruct (H_fwd _ HeqisB 1 ofs) as [_ P].
-                     intros. assert (i=0) by omega. subst i; rewrite Zplus_0_r. apply NPerm12.
+                     intros. assert (i=0) by omega. subst i; rewrite Zplus_0_r. 
+          (*apply NPerm12.*)
+          intros N. apply (NPerm12 ofs). eapply Mem.perm_max; eassumption.
        specialize (P 0); rewrite Zplus_0_r in P. apply P. omega. 
 Qed. 
 
@@ -2966,8 +2968,10 @@ Lemma RDOnly_fwd_Dcont' m1 m1' B b ofs:
      ZMap.get ofs (Mem.mem_contents m1') !! b = ZMap.get ofs (Mem.mem_contents m1) !! b.
 Proof. intros.
         destruct (H_fwd _ HeqisB 1 ofs) as [LD1 _].
-                     intros. assert (i=0) by omega. subst i; rewrite Zplus_0_r. apply NPerm12.
-                   destruct (Mem.range_perm_loadbytes m1' b ofs 1) as [bytes HBytes].
+                     intros. assert (i=0) by omega. subst i; rewrite Zplus_0_r. 
+                (*apply NPerm12.*)
+                intros N. apply (NPerm12 ofs). eapply Mem.perm_max; eassumption. 
+        destruct (Mem.range_perm_loadbytes m1' b ofs 1) as [bytes HBytes].
                      red; intros. assert (ofs0=ofs) by omega. subst ofs0. assumption.
                    rewrite HBytes in *. symmetry in LD1.
                    specialize (Mem.loadbytes_length _ _ _ _ _ HBytes); intros LEN.
@@ -3463,7 +3467,8 @@ Proof. intros.
            destruct (RDOnly12 _ Hb) as [Map12 [J12b Perm12]].
            destruct (RDOnly23 _ Hb) as [Map23 [J23b Perm23]].
            destruct (RDOnly_fwd1 _ Hb n ofs) as [LD1 Perm1]. 
-              intros. apply Perm12. (*
+              intros. (*apply Perm12.*) intros N; apply Mem.perm_max in N. destruct (Perm12 (ofs + i)) as [X _]; contradiction.
+            (*
            destruct (RDOnly_fwd3 _ Hb n ofs) as [LD3 Perm3].
               intros. apply Perm23.*)
            assert (VB2: Mem.valid_block m2 b).
@@ -3673,7 +3678,7 @@ Proof. intros.
                    apply extern_in_all in AIb. rewrite jmap in AIb; inversion AIb. subst delta; clear AIb. 
                  eapply Mem.perm_inject; try eassumption.
                  destruct (RDOnly_fwd1 _ HeqisB 1 ofs) as [LDBeq PERMeq]; clear RDOnly_fwd1.
-                   intros. apply Perm12.
+                   intros. (*apply Perm12.*) intros N; apply Mem.perm_max in N. destruct (Perm12 (ofs + i)) as [X _]; contradiction.
                  specialize (PERMeq 0). rewrite Zplus_0_r in PERMeq.
                    apply PERMeq; trivial. omega. }
                assert (locF: locBlocksSrc nu23 b2 = false).
@@ -4173,7 +4178,10 @@ Proof. intros.
                      rewrite kmap in AIb; inversion AIb. subst b2 delta; clear AIb.
                    apply extern_in_all in kmap.
                    eapply (RDOnly_fwd3 _ HeqisB 1 ofs); simpl.
-                     intros. assert (i = 0) by omega. subst i. apply Perm23. (* rewrite Perm12.*) omega.
+                     intros. assert (i = 0) by omega. subst i. 
+                     (*apply Perm23.*) intros N; apply Mem.perm_max in N. destruct (Perm23 (ofs + 0)) as [_ X]; contradiction.
+                     (* rewrite Perm12.*)
+                     omega.
                      eapply Mem.perm_inject; eassumption. }
 
                  assert (locS: locBlocksSrc nu23 b1 = false) by (subst k; auto_sm).

@@ -306,6 +306,7 @@ Proof.
   intros; red; intros. exploit H; eauto. intros [A [B [C D]]].
   split. apply Genv.load_store_init_data_invariant with m; auto.
   intros. eapply external_call_readonlyLD; eauto. 
+    intros; intros N. apply Mem.perm_max in N. eapply (C ofs'); trivial.
   split. eapply external_call_valid_block; eauto.
   split; trivial. intros; red; intros. elim (C ofs). eapply external_call_max_perm; eauto. 
 Qed.
@@ -1357,7 +1358,7 @@ split.
         eapply Genv.load_store_init_data_invariant ; try eassumption. (* apply Genv.load_store_init_data_invariant with m1; auto.*)
         intros. eapply readonly_readonlyLD. apply RDO1.
                 unfold ReadOnlyBlocks. rewrite Heqv; eapply D.
-        intros. eapply C.
+        intros. (*eapply C.*) intros N. apply Mem.perm_max in N. eapply (C ofs'); trivial.
       split. apply FwdSrc; trivial.
       split. intros. intros N. apply FwdSrc in N. apply (C _ N). trivial.
       split; assumption. }
