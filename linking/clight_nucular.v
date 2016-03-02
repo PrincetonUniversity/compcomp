@@ -625,9 +625,9 @@ Lemma cl_cont_inv_fwd k m m' :
   mem_forward m m' -> 
   cl_cont_inv k m'.
 Proof.
-elim: k=> // o f e te c IH /= [] A B C; split.
-by apply: cl_state_inv_fwd.
-by apply: IH.
+  elim: k=> // o f e te c IH /= [] A B C; split.
+  eapply cl_state_inv_fwd; eassumption.
+    by apply: IH.
 Qed.
 
 Lemma create_undef_temps_undef l x v : 
@@ -819,11 +819,13 @@ Proof.
 case; move {c m c' m'}.
 
 { move=> f a1 a2 k e le m0 loc ofs v2 v m0' H H2 H3 H4 H5 H6.
-  by apply: (assign_loc_valid (m:=m0)(v2:=v2)(a1:=a1)). }
+  eapply (assign_loc_valid (m:=m0)(v2:=v2)(a1:=a1));
+  try eassumption. }
 
 { move=> f id a k e le m' v Heval Hginv; case; case=> A B C D; split=> //. 
-  split=> // x v0; case: (eq_block x id)=> eq; 
-    first by subst id; rewrite PTree.gss; case=> <-; apply: eval_expr_valid'.
+  split=> // x v0; case: (eq_block x id)=> eq.
+  subst id.  rewrite PTree.gss; case=> <-; apply: eval_expr_valid'; eauto.
+  rewrite /cl_state_inv. constructor; auto.
   by rewrite PTree.gso=> //; apply: B. }   
 
 { move=> f optid a a1 k e te m0 tyargs tyres vf vargs fd H H2 H3 H4 H5 H6.
@@ -832,11 +834,12 @@ case; move {c m c' m'}.
 
 { move=> f optid ef tyargs a1 k e te m0 vargs t vres m0' H2 H3 H4 H5.
   case; case=> A B C D; split=> //. 
-  split=> //; first by move=> *; apply: (external_call_valid_block _ _ _ _ _ _ H3); apply: A.
+  split=> //.
+  move=> *; apply: (external_call_valid_block _ _ _ _ _ _ H3); apply: A; eauto.
   move=> x v; case: optid=> /=.
   move=> a; case: (eq_block x a).
   move=> ?; subst a; rewrite PTree.gss; case=> <-.
-  by apply: (vals_valid_nonobservables (m:=m0) (ge:=ge)).
+  apply: (vals_valid_nonobservables (m:=m0) (ge:=ge)); eauto.
   move=> Hneq; rewrite PTree.gso=> //; case: v=> // b ? Hte.
   by apply: (external_call_valid_block _ _ _ _ _ _ H3); apply: (B _ _ Hte).
   by case: v=> // b ? Hte; apply: (external_call_valid_block _ _ _ _ _ _ H3); apply: (B _ _ Hte).

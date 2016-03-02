@@ -710,7 +710,7 @@ Lemma eval_lvalue_reach c m e te a b ofs :
 Proof.
 move=> H Hclosed H2 b'; case/getBlocksP=> ofs'; case=> //; case=> <- _; case: H2=> //.
 
-{ by case: H=> H ? ? ? ? ?; apply: H. }
+{ case: H=> H ? ? ? ? ?; apply: H. eassumption. }
 
 { move=> id l ty H5 H6 H7.
   apply/orP; left.
@@ -1614,7 +1614,7 @@ case: c=> /= core locs; case.
     rewrite /in_mem /= /is_true /= in X; apply REACH_split in X; case: X.
     by apply: REACH_mono'=> ? ?; apply/orP; right; apply: REACH_nil; apply/orP; left.
     by apply: REACH_is_closed. }
-  by move: Hk; apply: cont_inv_freshlocs. }
+    by move: Hk; apply: cont_inv_freshlocs. }
 
 { move=> f s1 s2 k e te m0 Hmeq Hmeq' Inv.
   set (c'' := CL_State f (Sloop s1 s2) k e te).
@@ -1703,7 +1703,9 @@ case: c=> /= core locs; case.
     first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
   split=> //.
   case: Inv=> Inv Hsub Hk.
-  by move=> b ofs Hfree'; rewrite -Hmeq; apply: (freelist_effect_reach Hfree' Inv).
+  move=> b ofs Hfree'.
+  rewrite -Hmeq. apply (freelist_effect_reach(k:=k)(f:=f) Hfree' Inv). assumption.
+     
   by rewrite -Hmeq -Hmeq'.
   move: Inv; case=> Hs Hsub Hk; split. 
   move=> b Hget; move: (sem_cast_getBlocks Hcast Hget)=> Hget'.
@@ -1726,11 +1728,11 @@ case: c=> /= core locs; case.
     first by rewrite -Hmeq -Hmeq'; econstructor; eauto.
   split=> //.
   case: Inv=> Inv Hsub Hk.
-  by move=> b ofs Hfree'; rewrite -Hmeq; apply: (freelist_effect_reach Hfree' Inv).
+  by move=> b ofs Hfree'; rewrite -Hmeq; apply: (freelist_effect_reach(k:=k)(f:=f) Hfree' Inv).
   by rewrite -Hmeq -Hmeq'.
   split; first by move=> ?; move/getBlocksP; case=> ?; case.
   move: Inv; case=> Hs Hsub Hk; apply cont_inv_freshlocs.
-  by move: Hk; apply: cont_inv_ext1. }
+    by move: Hk; apply: cont_inv_ext1. }
 
 { move=> f s1 s2 k e te m0 n0 Heval Hmeq Hmeq' Inv.
   set (c'' := CL_State f (seq_of_labeled_statement (select_switch n0 s2))

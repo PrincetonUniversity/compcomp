@@ -164,9 +164,10 @@ Definition Prog_refines2 (ge : ge_ty) (N : pos) plt (p1 p2 : Prog.t N) :=
 Lemma Prog_refines_implies2 ge N plt (p1 p2 : Prog.t N) :
   Prog_refines ge plt p1 p2 -> Prog_refines2 ge plt p1 p2.
 Proof.
-move=> H1 C args m Hok; apply: H1=> //.
-by refine (Mem.flat_inj (Mem.nextblock m)).
-by [].
+  move=> H1 C args m Hok; apply: H1=> //.
+  eassumption.
+(*refine (Mem.flat_inj (Mem.nextblock m)); auto.
+by []. *)
 Qed. 
 
 Lemma behavior_refines_refl beh : behavior_refines beh beh.
