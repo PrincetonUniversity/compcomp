@@ -76,6 +76,21 @@ Proof.
   split; trivial.
   rewrite (Mem.nextblock_drop _ _ _ _ _ _ H0). 
   rewrite (Mem.nextblock_drop _ _ _ _ _ _ D). assumption.
+(*spill*)
+  intros. specialize (Mem.perm_drop_4 _ _ _ _ _ _ D _ _ _ _ H); intros.
+  destruct (mext_spill _ _ _ _ H1).
+  + left.
+    destruct (eq_block b0 b); subst.
+    - destruct (zle lo ofs).
+      * destruct (zlt ofs hi).
+        { eapply Mem.perm_implies.
+            eapply Mem.perm_drop_1. eassumption. omega.
+          eapply (Mem.perm_drop_2 _ _ _ _ _ _ D). 2: eassumption. omega. }
+        { eapply Mem.perm_drop_3; try eassumption. right. omega. }
+      * eapply Mem.perm_drop_3; try eassumption. right. omega. 
+    - eapply Mem.perm_drop_3; try eassumption. left; trivial.
+  + right. intros N. elim H2; clear H2.
+    eapply Mem.perm_drop_4; eassumption.
 Qed.  
 
 Lemma mem_inj_id_trans: forall m1 m2 (Inj12: Mem.mem_inj inject_id m1 m2) m3 
@@ -120,7 +135,13 @@ Qed.
 Lemma extends_trans: forall m1 m2 
   (Ext12: Mem.extends m1 m2) m3 (Ext23: Mem.extends m2 m3), Mem.extends m1 m3.
 Proof. intros. inv Ext12. inv Ext23.
-  split. rewrite mext_next. assumption. eapply mem_inj_id_trans; eauto. 
+  split. rewrite mext_next. assumption. eapply mem_inj_id_trans; eauto.
+(*spill*)
+  intros. destruct (mext_spill0 _ _ _ _ H).
+  + apply (mext_spill _ _ _ _ H0).
+  + right. intros N. elim H0; clear H0.
+    specialize (Mem.mi_perm _ _ _ mext_inj b b 0 ofs Max Nonempty); intros.
+    rewrite Zplus_0_r in H0; apply H0; trivial.
 Qed.  
 
 Lemma memval_inject_id_refl: forall v, memval_inject inject_id v v. 
@@ -136,6 +157,8 @@ Proof. intros.
      inv H.  rewrite Zplus_0_r. assumption.
      inv H. apply Z.divide_0_r. (*rewrite Zplus_0_r. assumption.*)
      inv H.  rewrite Zplus_0_r. apply memval_inject_id_refl.
+(*spill*)
+  intros. left; trivial.
 Qed.
 
 Lemma compose_meminj_idR: forall j, j = compose_meminj j inject_id.

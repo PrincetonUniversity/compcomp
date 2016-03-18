@@ -649,6 +649,8 @@ split; intros.
      eapply Inj12; eassumption.
    apply INC in H.
      eapply Inj12; eassumption.
+(*spill*)
+  eapply Inj12; eauto.
 Qed.
 
 Lemma restrict_val_inject: forall j val1 val2

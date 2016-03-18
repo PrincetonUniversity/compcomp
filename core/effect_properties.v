@@ -954,7 +954,14 @@ Proof. intros. eexists; eexists; eexists.
             eapply MInj; eassumption.
     rewrite replace_locals_shared; intros.
             apply halted_loc_check_aux in H; trivial.
-            eapply MInj; eassumption. 
+            eapply MInj; eassumption.
+  (*spill*)
+    intros. eapply MInj. 2: eassumption.
+    unfold locvisible_of. rewrite replace_locals_shared in H.
+    apply joinD_Some in H. destruct H.
+    + apply joinI. left; trivial.
+    + destruct H. apply joinI; right; split; trivial.
+      destruct (locBlocksSrc mu b1 && REACH m1 (exportedSrc mu (v1 :: nil)) b1); trivial; discriminate.
 Qed.
 
   
@@ -1913,23 +1920,24 @@ Proof.
     rewrite alloc_left_sm_as_inj_other in H8; trivial.
       apply memval_inject_incr with (as_inj mu); auto.
       apply alloc_left_sm_inject_incr; assumption. 
-  exists mu'. split. constructor.
-(* inj *)
+  exists mu'. split.
+{ constructor.
+  + (* inj *)
   eapply Mem.alloc_left_mapped_inj; eauto. 
   unfold mu'; simpl. rewrite alloc_left_sm_as_inj_same; trivial.
-(* freeblocks *)
+  + (* freeblocks *)
   unfold mu'; simpl; intros. destruct (eq_block b b1). subst b. 
   elim H9. eauto with mem.
   rewrite alloc_left_sm_as_inj_other; trivial.
   eauto with mem.
-(* mappedblocks *)
+  + (* mappedblocks *)
   unfold mu'; simpl; intros.
   destruct (eq_block b b1). 
     subst. rewrite alloc_left_sm_as_inj_same in H9; trivial.
      congruence. eauto.
   rewrite alloc_left_sm_as_inj_other in H9; trivial.
     eauto.
-(* overlap *)
+  + (* overlap *)
   unfold mu'; red; intros.
   exploit Mem.perm_alloc_inv. eauto. eexact H12. intros P1.
   exploit Mem.perm_alloc_inv. eauto. eexact H13. intros P2.
@@ -1949,7 +1957,7 @@ Proof.
   rewrite alloc_left_sm_as_inj_other in H10; trivial.
   rewrite alloc_left_sm_as_inj_other in H11; trivial.
   eauto.
-(* representable *)
+  + (* representable *)
   unfold mu'; intros.
   destruct (eq_block b b1).
    subst. 
@@ -1964,6 +1972,28 @@ Proof.
   rewrite alloc_left_sm_as_inj_other in H9; trivial.
   eapply mi_representable; try eassumption.
   destruct H10; eauto using Mem.perm_alloc_4.
+  + (*spill*)
+  unfold mu'; intros.
+(*  destruct (eq_block b0 b1).
+   subst. 
+    rewrite alloc_left_sm_as_inj_same in H9; trivial.
+    inversion H9. subst b3 delta0. clear H9.*)
+    specialize (Mem.fresh_block_alloc _ _ _ _ _ H0); intros.
+    assert (FB:= mi_freeblocks _ H11).
+    destruct (eq_block b0 b1).
+    - subst b0. rewrite alloc_left_sm_as_inj_same in H9; trivial.
+      inversion H9. subst b3 delta0. clear H9.
+      specialize (Mem.perm_alloc_2 _ _ _ _ _ H0); intros.
+      destruct (Mem.perm_dec m1' b1 ofs k p).
+      left; trivial.
+      right. intros N. specialize (Mem.perm_alloc_3 _ _ _ _ _ H0 _ _ _ N). intros.
+                elim n; clear n. eapply Mem.perm_implies. apply H9. eassumption. constructor.
+    - rewrite alloc_left_sm_as_inj_other in H9; trivial.
+      destruct (mi_spill _ _ _ _ _ _ H9 H10).
+      * left. eapply Mem.perm_alloc_1; eassumption.
+      * right.
+        intros N. apply H12; clear H12. eapply Mem.perm_alloc_4; eassumption.
+ }
 (* incr *)
   split. auto.
 (* image of b1 *)

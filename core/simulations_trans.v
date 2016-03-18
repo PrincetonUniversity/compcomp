@@ -56,6 +56,9 @@ Proof.
     intros.
       destruct (flatinj_E _ _ _ _ H) as [? [? ?]]. subst.
          exfalso. xomega.
+ (*spill*)
+  intros. apply flatinj_E in H. destruct H as [? [? ?]]; subst. rewrite Zplus_0_r in H0.
+  left; trivial.
 Qed.
 
 Lemma empty_fwd: forall m, mem_forward Mem.empty m.
@@ -141,7 +144,11 @@ Proof.
      subst. left; exact H.
    + subst; intros. unfold filter_id in H. destruct (l b) eqn: lmap; inversion H.
      subst. split; try omega. replace (Int.unsigned ofs + 0) with (Int.unsigned ofs) by omega.
-     apply Int.unsigned_range_2. }
+     apply Int.unsigned_range_2.
+   + (*spill*) intros.
+     unfold filter_id in Heqj; subst j. remember (k b1). destruct o; inv H.
+     rewrite Zplus_0_r in H0. left; trivial.
+   }
   split.
   (*Mem.inject k m2 m3*)
   { exact Inj. }

@@ -891,18 +891,19 @@ assert (Mem.mem_inj (as_inj (alloc_left_unmapped_sm mu b1)) m1 m2).
             rewrite (AIother _ n) in H1.
             apply memval_inject_incr with (as_inj mu); auto.
             eapply alloc_left_unmapped_sm_inject_incr; eassumption. 
-split. (*Mem.inject*)
-split.
-(* inj *)
+split. 
+{ (*Mem.inject*)
+  split.
+  + (* inj *)
   eapply Mem.alloc_left_unmapped_inj; eauto. 
-(* freeblocks *)
+  + (* freeblocks *)
   intros. destruct (eq_block b b1); subst; eauto.
           rewrite (AIother _ n).
   apply mi_freeblocks. red; intro; elim H3. eauto with mem. 
-(* mappedblocks *)
+  + (* mappedblocks *)
   intros. destruct (eq_block b b1); subst. congruence. 
           rewrite (AIother _ n) in H2. eauto. 
-(* no overlap *)
+  + (* no overlap *)
   red; intros.
   destruct (eq_block b0 b1); destruct (eq_block b2 b1); try congruence.
   eapply mi_no_overlap. eexact H2.
@@ -910,14 +911,22 @@ split.
     rewrite (AIother _ n0) in *. eauto.
   exploit Mem.perm_alloc_inv. eauto. eexact H5. rewrite dec_eq_false; auto.  
   exploit Mem.perm_alloc_inv. eauto. eexact H6. rewrite dec_eq_false; auto. 
-(* representable *)
+  + (* representable *)
   intros.
   destruct (eq_block b b1); subst.
     rewrite AIB1 in *; discriminate.
   rewrite (AIother _ n) in H2.
   eapply mi_representable; try eassumption.
   destruct H3; eauto using Mem.perm_alloc_4.
-
+  + (*spill -- same proof as in Clight_selft_simulates.v*)
+  intros.
+  destruct (eq_block b0 b1).
+  - subst. rewrite alloc_left_unmapped_sm_as_inj_same in H2; trivial. inv H2.
+  - rewrite alloc_left_unmapped_sm_as_inj_other in H2; trivial.
+    destruct (mi_spill _ _ _ _ _ _ H2 H3).
+    left. eapply Mem.perm_alloc_1; eassumption.
+    right. intros N. elim H4; clear H4. eapply Mem.perm_alloc_4; eassumption.
+}
 intuition.
 (* SM_wd*)
   eapply alloc_left_unmapped_sm_wd; eassumption.
