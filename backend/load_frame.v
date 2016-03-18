@@ -984,3 +984,14 @@ intros m0 EQ. specialize (store_stack_readonly _ _ _ _ _ _ EQ); intros RD.
   eapply IHtys. eassumption. apply EQ. eassumption. 
   intros; congruence.
 Qed.
+
+Lemma store_args_decay m stk args tys m':
+  store_args m stk args tys = Some m' -> decay m m'.
+Proof. intros. unfold store_args in H.
+  apply store_args_rec_only_stores in H.
+  remember (encode_longs tys args). clear Heql.
+  induction H. apply decay_refl.
+  eapply decay_trans; try eassumption.
+  eapply store_forward; eassumption.
+  eapply store_decay; eassumption.
+Qed.
