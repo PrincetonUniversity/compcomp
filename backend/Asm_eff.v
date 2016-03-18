@@ -424,6 +424,109 @@ eapply asm_step_det in step1; eauto.
 destruct step1; subst; auto.
 Qed.
 
+Lemma exec_store_curWR ge ch m1 a rs1 rs rs2 m2 b z l:
+   exec_store ge ch m1 a rs1 rs l = Next rs2 m2 ->
+    StoreEffect (eval_addrmode ge a rs1)
+         (encode_val ch (rs1 rs)) b z = true ->
+   Mem.perm m1 b z Cur Writable.
+Proof.
+intros. apply StoreEffectD in H0. destruct H0 as [i [? [? ?]]].
+  unfold exec_store in H. rewrite H0 in *. simpl in H. 
+  remember (Mem.store ch m1 b (Int.unsigned i) (rs1 rs)) as q.
+  destruct q; inv H. symmetry in Heqq. 
+  eapply (Mem.store_valid_access_3 _ _ _ _ _ _ Heqq). 
+  rewrite encode_val_length, <- size_chunk_conv in H2. omega.
+Qed.
+
+Lemma free_curWR bb lo hi b z: forall m m',
+      Mem.free m bb lo hi = Some m' ->
+      FreeEffect m lo hi bb b z = true ->
+      Mem.perm m b z Cur Writable.
+Proof. clear.
+  intros.
+  apply FreeEffectD in H0. destruct H0 as [? [? ?]]; subst bb.
+  eapply Mem.perm_implies. 
+  eapply Mem.free_range_perm; eassumption. constructor.
+Qed.
+
+Lemma exec_instr_curWR ge fn i rs1 m1 rs2 m2: forall
+      (EI: exec_instr ge fn i rs1 m1 = Next rs2 m2) b z
+      (EFFI: effect_instr ge fn i rs1 m1 b z = true),
+      Mem.perm m1 b z Cur Writable.
+Proof. intros.
+  destruct i; simpl in *; try discriminate.
++ eapply exec_store_curWR; eauto. 
++ eapply exec_store_curWR; eauto. 
++ eapply exec_store_curWR; eauto. 
++ eapply exec_store_curWR; eauto. 
++ eapply exec_store_curWR; eauto. 
++ eapply exec_store_curWR; eauto. 
++ remember (Mem.loadv Mint32 m1 (Val.add (rs1 ESP) (Vint ofs_ra))) as q.
+  destruct q; try discriminate.
+  remember (Mem.loadv Mint32 m1 (Val.add (rs1 ESP) (Vint ofs_link))) as p. 
+  destruct p; try discriminate. 
+  remember (rs1 ESP) as u.
+  destruct u; try discriminate.
+  remember (Mem.free m1 b0 0 sz) as d.
+  destruct d; try discriminate. 
+  symmetry in Heqd. eapply free_curWR; eassumption.
+Qed.
+
+Lemma asm_effstep_curWR: forall (M : block -> Z -> bool) g c m c' m',
+      asm_effstep g M c m c' m' ->
+      forall b z, M b z = true -> Mem.perm m b z Cur Writable.
+Proof.
+  intros.
+  induction H; try (solve [inv H0]).
++ eapply exec_instr_curWR; eauto.
++ unfold effect_instr in H0.
+  destruct ef; simpl in *; try discriminate.
+  - inv H3. simpl in *.
+    destruct args; simpl in *. discriminate.
+    inv H6. rewrite <- H3 in *.
+    remember (Mem.load Mint32 m b1 (Int.unsigned lo - 4)) as u. 
+    destruct u; try discriminate.
+    destruct v; try discriminate. inv H5.
+    destruct (eq_block b b1); simpl in *; try discriminate. subst b1.
+    destruct (zlt 0 (Int.unsigned sz)); simpl in *; try discriminate.
+    destruct (zle (Int.unsigned lo - 4) z); simpl in *; try discriminate.
+    destruct (zlt z (Int.unsigned lo + Int.unsigned sz)); simpl in *; try discriminate.
+    eapply Mem.perm_implies. 
+    eapply Mem.free_range_perm. eassumption. omega. constructor.
+  - inv H3. simpl in *.
+    destruct args; simpl in *. discriminate.
+    inv H6. rewrite <- H3 in *.
+    destruct args; simpl in *. discriminate. inv H5. rewrite <- H14 in *.
+    destruct (eq_block b bdst); simpl in *; try discriminate. subst bdst.
+    destruct (zle (Int.unsigned odst) z); simpl in *; try discriminate.
+    destruct (zlt z (Int.unsigned odst + sz)); simpl in *; try discriminate.
+    eapply Mem.storebytes_range_perm. eassumption. 
+    apply Mem.loadbytes_length in H13. rewrite H13, nat_of_Z_eq; omega.
++ unfold BuiltinEffect in H0. 
+  destruct callee; try discriminate.
+  - inv H2. inv H4. eapply free_curWR. eassumption.
+    destruct args; inv H2.
+    unfold free_Effect in H0. unfold FreeEffect. destruct args; try discriminate.
+    rewrite H3 in *.
+    destruct (eq_block b b1); subst; simpl in *; try discriminate.
+        destruct (zlt 0 (Int.unsigned sz)); simpl in *; try discriminate.
+        destruct (zle (Int.unsigned lo - 4) z); simpl in *; try discriminate. 
+        destruct (zlt z (Int.unsigned lo + Int.unsigned sz)); simpl in *; try discriminate.
+    apply Mem.load_valid_access in H3.
+    destruct (valid_block_dec m b1); trivial. 
+    elim n. eapply Mem.valid_access_valid_block. eapply Mem.valid_access_implies. eassumption. constructor.
+  - clear - H0 H2. inv H2. inv H. 
+    unfold memcpy_Effect in H0.
+    destruct args; inv H1. 
+    destruct args; inv H0. inv H11.
+    destruct args; inv H1.
+    destruct (eq_block b bdst); subst; simpl in *; try discriminate.
+    destruct (zle (Int.unsigned odst) z); simpl in *; try discriminate.
+    destruct (zlt z (Int.unsigned odst + sz)); simpl in *; try discriminate. 
+    eapply Mem.storebytes_range_perm. eassumption. 
+    apply Mem.loadbytes_length in H8. rewrite H8, nat_of_Z_eq; omega.
+Qed.
+
 End ASM_EFFSEM.
 
 End ASM_EFF.
