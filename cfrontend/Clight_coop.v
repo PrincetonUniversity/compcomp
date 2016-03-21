@@ -320,6 +320,36 @@ apply Build_CoopCoreSem with (coopsem := CL_core_sem FE).
   intros. eapply CL_rdonly; eassumption.
 Defined.
 
+Lemma CL_decay g
+            (FE: function -> list val -> mem -> env -> temp_env -> mem -> Prop)
+            (HFE: forall f vargs m e le m', FE f vargs m e le m' -> decay m m')
+             c m c' m'
+            (CS: clight_corestep FE g c m c' m'):
+         decay m m'.
+  Proof.
+     inv CS; simpl in *; try apply decay_refl.
+          remember (typeof a1) as t; clear Heqt.
+            inv H2. eapply store_decay; eassumption.
+                    eapply storebytes_decay; eassumption.
+          eapply ec_decay; eassumption. 
+          eapply freelist_decay; eassumption.
+          eapply freelist_decay; eassumption.
+          eapply freelist_decay; eassumption.
+          eauto.
+  Qed.
+
+Definition CL_decay_sem
+           (FE:function -> list val -> mem -> env -> temp_env -> mem -> Prop)
+           (HFE_fwd: forall f vargs m e le m', FE f vargs m e le m'-> mem_forward m m')
+           (HFE_rdo: forall f vargs m e le m', FE f vargs m e le m' -> 
+                     forall b, Mem.valid_block m b -> readonly m b m')
+           (HFE_dec: forall f vargs m e le m', FE f vargs m e le m'-> decay m m')
+           : @DecayCoreSem genv CL_core.
+Proof.
+eapply Build_DecayCoreSem with (decaysem := @CL_coop_sem FE HFE_fwd HFE_rdo).
+  intros. eapply CL_decay; eassumption.
+Defined.
+
 (** The two semantics for function parameters.  First, parameters as local variables. *)
 
 Inductive function_entry1 (f: function) (vargs: list val) (m: mem) (e: env) (le: temp_env) (m': mem) : Prop :=
@@ -374,6 +404,40 @@ Proof. intros. inv H.
 Qed.
 
 
+Lemma alloc_variables_decay: forall vars m e e2 m'
+      (M: alloc_variables e m vars e2 m'), decay m m'.
+Proof. intros.
+  induction M.
+  apply decay_refl.
+  eapply decay_trans.
+    eapply alloc_forward; eassumption. 
+    eapply alloc_decay; try eassumption.
+    apply IHM.
+Qed.
+
+Lemma bind_parameter_decay: forall e m pars vargs m'
+      (M: bind_parameters e m pars vargs m'), decay m m'.
+Proof. intros.
+  induction M.
+  apply decay_refl.
+  inv H0.
++ eapply decay_trans; try eassumption.
+  eapply store_forward; eassumption.  
+  eapply store_decay; eassumption.
++ eapply decay_trans; try eassumption.
+  eapply storebytes_forward; eassumption.  
+  eapply storebytes_decay; eassumption.
+Qed.
+
+Lemma function_entry1_decay: forall f vargs m e le m',
+      function_entry1 f vargs m e le m'-> decay m m'.
+Proof. intros. inv H.
+  eapply decay_trans.
+    eapply alloc_variables_forward; try eassumption.
+    eapply alloc_variables_decay; try eassumption.
+    eapply bind_parameter_decay; try eassumption.
+Qed.
+
 (*Definition clight_corestep1 (ge: genv) := clight_corestep function_entry1 ge.*)
 
 Definition CL_core_sem1 := CL_core_sem function_entry1.
@@ -381,6 +445,12 @@ Definition CL_coop_sem1 : CoopCoreSem genv CL_core.
   eapply (CL_coop_sem function_entry1).
   apply function_entry1_forward. 
   apply function_entry1_readonly.
+Defined.
+Definition CL_decay_sem1 : @DecayCoreSem genv CL_core. 
+  eapply (CL_decay_sem function_entry1).
+  apply function_entry1_forward. 
+  apply function_entry1_readonly.
+  apply function_entry1_decay. 
 Defined.
 
 Inductive function_entry2 (f: function) (vargs: list val) (m: mem) (e: env) (le: temp_env) (m': mem) : Prop :=
@@ -405,6 +475,12 @@ Proof. intros. inv H.
   eapply alloc_variables_readonly; try eassumption.
 Qed.
 
+Lemma function_entry2_decay: forall f vargs m e le m',
+      function_entry2 f vargs m e le m'-> decay m m'.
+Proof. intros. inv H.
+    eapply alloc_variables_decay; try eassumption.
+Qed.
+
 (*Definition clight_corestep2 (ge: genv) := clight_corestep function_entry2 ge.*)
 
 Definition CL_core_sem2 := CL_core_sem function_entry2.
@@ -412,6 +488,13 @@ Definition CL_coop_sem2 : CoopCoreSem genv CL_core.
   eapply (CL_coop_sem function_entry2).
   apply function_entry2_forward.
   apply function_entry2_readonly.
+Defined.
+
+Definition CL_decay_sem2 : @DecayCoreSem genv CL_core. 
+  eapply (CL_decay_sem function_entry2).
+  apply function_entry2_forward. 
+  apply function_entry2_readonly.
+  apply function_entry2_decay. 
 Defined.
 
 End CLIGHT_COOP.

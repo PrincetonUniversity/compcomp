@@ -496,4 +496,43 @@ apply Build_CoopCoreSem with (coopsem := Mach_core_sem).
   apply mach_coop_readonly.
 Defined.
 
+Lemma store_stack_decay: forall m m' sp ty ofs v, 
+  store_stack m sp ty ofs v = Some m' -> decay m m'.
+Proof.
+intros. unfold store_stack, Mem.storev in H.
+remember (Val.add sp (Vint ofs)) as u; destruct u; inv H.
+eapply store_decay. eassumption.
+Qed.  
+
+Lemma mach_decay g c m c' m'
+            (CS: mach_step g c m c' m'): decay m m'.
+  Proof.
+     inv CS; simpl in *; try apply decay_refl.
+          eapply store_stack_decay; eassumption.
+          destruct a; inv H0. eapply store_decay; eassumption.
+          eapply decay_trans. 
+            eapply alloc_forward; eassumption.
+            eapply alloc_decay; eassumption.
+            eapply store_args_decay; try eassumption. 
+            eapply free_decay; eassumption.
+          eapply free_decay; eassumption.
+          inv H. eapply ec_decay; eassumption.
+          eapply free_decay; eassumption.
+          eapply decay_trans. 
+            eapply alloc_forward; eassumption.
+            eapply alloc_decay; eassumption.
+            eapply decay_trans. 
+            apply store_stack_fwd in H1. eassumption.
+              eapply store_stack_decay; try eassumption.
+              eapply store_stack_decay; try eassumption.
+          inv H0. eapply ec_decay; eassumption.
+Qed.
+
+Program Definition Mach_decay_sem : 
+  @DecayCoreSem genv Mach_core.
+Proof.
+apply Build_DecayCoreSem with (decaysem := Mach_coop_sem).
+  apply mach_decay.
+Defined.
+
 End MACH_COOPSEM.

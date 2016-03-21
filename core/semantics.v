@@ -139,6 +139,17 @@ Proof. intros.
 + eapply Mem.perm_free_3; eassumption.
 Qed.
 
+Lemma freelist_decay: forall l m m', Mem.free_list m l = Some m' -> decay m m'.
+Proof. induction l; simpl; intros.
+  inv H. apply decay_refl.
+  destruct a. destruct p. remember (Mem.free m b z0 z) as d.
+  destruct d; inv H; symmetry in Heqd. 
+  eapply decay_trans. 
+  eapply free_forward; eassumption.
+  eapply free_decay; eassumption.
+  auto.
+Qed.
+
 Lemma storebytes_decay m b ofs bytes m': Mem.storebytes m b ofs bytes = Some m' -> decay m m'.
 Proof. intros.
   repeat split; intros.

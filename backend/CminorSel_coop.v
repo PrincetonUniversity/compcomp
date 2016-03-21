@@ -354,4 +354,23 @@ apply Build_CoopCoreSem with (coopsem := CMinSel_core_sem).
   apply CMinSel_rdonly.
 Defined.
 
+Lemma CMinSel_decay g c m c' m'
+            (CS: CMinSel_corestep g c m c' m'): decay m m'.
+  Proof. 
+     inv CS; simpl in *; try apply decay_refl.
+          eapply free_decay; eauto.
+          destruct vaddr; inv H2. eapply store_decay; eauto.
+          eapply free_decay; eauto.
+          eapply ec_decay; eauto.
+          eapply free_decay; eauto.
+          eapply free_decay; eauto.
+          eapply alloc_decay; eauto.
+Qed.
+
+Program Definition cminsel_decay_sem : 
+  @DecayCoreSem genv CMinSel_core.
+Proof.
+apply Build_DecayCoreSem with (decaysem := cminsel_coop_sem).
+  apply CMinSel_decay.
+Defined.
 End CMINSEL_COOP.

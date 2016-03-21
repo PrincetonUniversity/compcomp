@@ -308,4 +308,34 @@ apply Build_CoopCoreSem with (coopsem := CSharpMin_core_sem).
   apply cshmin_coop_readonly.
 Defined.
 
+Lemma alloc_variables_decay: forall vars m e e2 m'
+      (M: alloc_variables e m vars e2 m'), decay m m'.
+Proof. intros.
+  induction M.
+  apply decay_refl.
+  eapply decay_trans.
+    eapply alloc_forward; eassumption. 
+    eapply alloc_decay; try eassumption.
+    apply IHM.
+Qed.
+
+Lemma cshmin_decay g c m c' m'
+            (CS: CSharpMin_corestep g c m c' m'): decay m m'.
+  Proof.
+     inv CS; simpl in *; try apply decay_refl.
+          eapply freelist_decay; eassumption.
+          destruct vaddr; inv H1. eapply store_decay; eassumption.
+          eapply ec_decay; eassumption.
+          eapply freelist_decay; eassumption.
+          eapply freelist_decay; eassumption.
+          eapply alloc_variables_decay; eassumption.
+Qed.
+
+Program Definition csharpmin_decay_sem : 
+  @DecayCoreSem Csharpminor.genv CSharpMin_core.
+Proof.
+apply Build_DecayCoreSem with (decaysem := csharpmin_coop_sem).
+  apply cshmin_decay.
+Defined.
+
 End CSHARPMINOR_COOP.

@@ -391,4 +391,23 @@ apply Build_CoopCoreSem with (coopsem := Linear_core_sem).
   apply Linear_rdonly.
 Defined.
 
+Lemma Linear_decay g c m c' m'
+            (CS: Linear_step g c m c' m'): decay m m'.
+  Proof.
+     inv CS; simpl in *; try apply decay_refl.
+          destruct a; inv H0. eapply store_decay; eassumption.
+          eapply free_decay; eassumption.
+          inv H. eapply ec_decay; eassumption.
+          eapply free_decay; eassumption.
+          eapply alloc_decay; eassumption.
+          inv H0; eapply ec_decay; eassumption.
+Qed.
+
+Program Definition Linear_decay_sem : 
+  @DecayCoreSem genv Linear_core.
+Proof.
+apply Build_DecayCoreSem with (decaysem := Linear_coop_sem).
+  apply Linear_decay.
+Defined.
+
 End LINEAR_COOP.

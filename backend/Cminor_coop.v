@@ -329,25 +329,24 @@ apply Build_CoopCoreSem with (coopsem := CMin_core_sem).
   apply CMin_rdonly.
 Defined.
 
-End CMINOR_COOP.
-(*
-Lemma cmin_coop_readonly hf g c m c' m'
-            (CS: CMin_corestep hf g c m c' m')
-            (GV: forall b, isGlobalBlock g b = true -> Mem.valid_block m b):  
-         RDOnly_fwd m m' (ReadOnlyBlocks g).
-  Proof. intros. red; intros.
-     unfold ReadOnlyBlocks in Hb.
-     remember (Genv.find_var_info g b) as d; symmetry in Heqd.
-     destruct d; try discriminate.
-     apply find_var_info_isGlobal in Heqd. apply GV in Heqd.  
-     (*destruct (MRR _ _ Heqd Hb) as [_ [VB _]].     *)
-     inv CS; simpl in *; try apply readonly_refl.
-          eapply free_readonly; eassumption.
-          destruct vaddr; inv H1. eapply store_readonly; eassumption.
-          eapply free_readonly; eassumption.
-          eapply ec_readonly_strong; eassumption.
-          eapply free_readonly; eassumption.
-          eapply free_readonly; eassumption.
-          eapply alloc_readonly; eassumption.
+Lemma CMin_decay g c m c' m'
+            (CS: CMin_corestep g c m c' m'): decay m m'.
+  Proof.
+     inv CS; simpl in *; try apply decay_refl.
+          eapply free_decay; eassumption.
+          destruct vaddr; inv H1. eapply store_decay; eassumption.
+          eapply free_decay; eassumption.
+          eapply ec_decay; eassumption.
+          eapply free_decay; eassumption.
+          eapply free_decay; eassumption.
+          eapply alloc_decay; eassumption.
 Qed.
-*)
+
+Program Definition cmin_decay_sem : 
+  @DecayCoreSem Cminor.genv CMin_core.
+Proof.
+apply Build_DecayCoreSem with (decaysem := cmin_coop_sem).
+  apply CMin_decay. 
+Defined.
+
+End CMINOR_COOP.

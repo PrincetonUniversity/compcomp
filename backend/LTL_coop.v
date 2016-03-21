@@ -343,5 +343,24 @@ apply Build_CoopCoreSem with (coopsem := LTL_core_sem).
   apply LTL_rdonly.
 Defined.
 
+Lemma LTL_decay g c m c' m'
+            (CS: ltl_corestep g c m c' m'): decay m m'.
+  Proof. 
+     inv CS; simpl in *; try apply decay_refl.
+          destruct a; inv H0. eapply store_decay; eauto.
+          eapply free_decay; eauto.
+          inv H. eapply ec_decay; eauto.
+          eapply free_decay; eauto.
+          eapply alloc_decay; eauto.
+          inv H0. eapply ec_decay; eauto.
+Qed.
+
+Program Definition LTL_decay_sem : 
+  @DecayCoreSem genv LTL_core.
+Proof.
+apply Build_DecayCoreSem with (decaysem := LTL_coop_sem).
+  apply LTL_decay.
+Defined.
+
 End LTL_COOP.
 

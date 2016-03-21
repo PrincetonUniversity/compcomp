@@ -283,6 +283,25 @@ apply Build_CoopCoreSem with (coopsem := RTL_core_sem).
   apply rtl_coop_rdonly.
 Defined.
 
+Lemma rtl_coop_decay g c m c' m'
+            (CS: RTL_corestep g c m c' m'): decay m m'.
+  Proof. 
+     inv CS; simpl in *; try apply decay_refl.
+          destruct a; inv H1. eapply store_decay; eauto.
+          eapply free_decay; eauto.
+          eapply ec_decay; eauto.
+          eapply free_decay; eauto.
+          eapply alloc_decay; eauto.
+          eapply ec_decay; eauto.
+Qed.
+
+Program Definition rtl_decay_sem : 
+  @DecayCoreSem genv RTL_core.
+Proof.
+apply Build_DecayCoreSem with (decaysem := rtl_coop_sem).
+  apply rtl_coop_decay.
+Defined.
+
 End RELSEM.
 
 Lemma RTL_initial_coreD (g: genv) (v:val)(args: list val) c:
