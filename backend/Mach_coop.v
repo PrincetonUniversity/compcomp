@@ -535,4 +535,34 @@ apply Build_DecayCoreSem with (decaysem := Mach_coop_sem).
   apply mach_decay.
 Defined.
 
+Lemma store_stack_mem_step: forall m m' sp ty ofs v, 
+  store_stack m sp ty ofs v = Some m' -> mem_step m m'.
+Proof.
+intros. unfold store_stack, Mem.storev in H.
+remember (Val.add sp (Vint ofs)) as u; destruct u; inv H.
+eapply mem_step_store. eassumption.
+Qed.  
+
+Program Definition Mach_memsem : @MemSem genv Mach_core.
+Proof.
+eapply Build_MemSem with (csem := Mach_core_sem).
+  intros.
+  destruct CS; try apply mem_step_refl.
+  + eapply store_stack_mem_step; eassumption.
+  + destruct a; inv H0. eapply mem_step_store; eassumption.
+  + eapply mem_step_trans.
+    eapply mem_step_alloc; eassumption.
+    eapply store_args_mem_step; eassumption.
+  + eapply mem_step_free; eassumption.
+  + eapply mem_step_free; eassumption.
+  + inv H. eapply extcall_mem_step; eassumption.
+  + eapply mem_step_free; eassumption.
+  + eapply mem_step_trans.
+    eapply mem_step_alloc; eassumption. 
+    eapply mem_step_trans.
+    eapply store_stack_mem_step; eassumption.
+    eapply store_stack_mem_step; eassumption.
+  + inv H0. eapply extcall_mem_step; eassumption.
+Defined.
+
 End MACH_COOPSEM.

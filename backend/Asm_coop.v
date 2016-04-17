@@ -596,6 +596,113 @@ apply Build_DecayCoreSem with (decaysem := Asm_coop_sem).
   apply asm_decay.
 Defined.
 
+Lemma exec_load_mem_step g ch m a rs rd rs' m': forall 
+      (EI: exec_load g ch m a rs rd = Next rs' m'),
+      mem_step m m'.
+Proof. intros.
+  unfold exec_load in EI.
+  remember (Mem.loadv ch m (eval_addrmode g a rs) ).
+  symmetry in Heqo; destruct o; inv EI. apply mem_step_refl.
+Qed.
+
+Lemma exec_store_mem_step g ch m a rs rs0 vals rs' m': forall
+      (ES: exec_store g ch m a rs rs0 vals = Next rs' m'),
+      mem_step m m'.
+Proof. intros.
+  unfold exec_store in ES.
+  remember (Mem.storev ch m (eval_addrmode g a rs) (rs rs0)).
+  symmetry in Heqo; destruct o; inv ES.
+  remember (eval_addrmode g a rs). destruct v; inv Heqo.
+  eapply mem_step_store; eassumption.
+Qed.
+
+Lemma goto_label_mem_step c0 l rs m rs' m': forall
+      (G: goto_label c0 l rs m = Next rs' m'),
+      mem_step m m'.
+Proof. intros.
+   unfold goto_label in G. 
+   destruct (label_pos l 0 c0); inv G.
+   destruct (rs PC); inv H0. 
+   apply mem_step_refl.
+Qed.
+
+Lemma exec_instr_mem_step g c i rs m rs' m': forall 
+      (EI: exec_instr g c i rs m = Next rs' m'),
+      mem_step m m'.
+Proof. intros.
+   destruct i; simpl in *; inv EI; try apply mem_step_refl;
+   try (eapply exec_load_mem_step; eassumption);
+   try (eapply exec_store_mem_step; eassumption).
+
+   destruct (Val.divu (rs EAX) (rs # EDX <- Vundef r1)); inv H0.
+   destruct (Val.modu (rs EAX) (rs # EDX <- Vundef r1)); inv H1.
+   apply mem_step_refl.
+
+   destruct (Val.divs (rs EAX) (rs # EDX <- Vundef r1)); inv H0.
+   destruct (Val.mods (rs EAX) (rs # EDX <- Vundef r1)); inv H1.
+   apply mem_step_refl.
+
+   destruct (eval_testcond c0 rs); inv H0.
+   destruct b; inv H1; apply mem_step_refl.
+   apply mem_step_refl.
+
+   eapply goto_label_mem_step; eassumption. 
+
+   destruct (eval_testcond c0 rs); inv H0.
+   destruct b; inv H1.
+   eapply goto_label_mem_step; eassumption. 
+   apply mem_step_refl.
+
+   destruct (eval_testcond c1 rs); inv H0.
+   destruct b. 
+     destruct (eval_testcond c2 rs); inv H1.
+     destruct b; inv H0. 
+     eapply goto_label_mem_step; eassumption.
+   apply mem_step_refl.
+
+     destruct (eval_testcond c2 rs); inv H1.
+     apply mem_step_refl.
+     destruct (rs r); inv H0.
+     destruct (list_nth_z tbl (Int.unsigned i)); inv H1. 
+     eapply goto_label_mem_step; eassumption.
+  remember (Mem.alloc m 0 sz) as d; apply eq_sym in Heqd.
+    destruct d; inv H0.
+    remember (Mem.store Mint32 m0 b (Int.unsigned (Int.add Int.zero ofs_link))
+         (rs ESP)) as q.
+    apply eq_sym in Heqq; destruct q; inv H1.
+    remember (Mem.store Mint32 m1 b (Int.unsigned (Int.add Int.zero ofs_ra))
+         (rs RA)) as w.
+    destruct w; apply eq_sym in Heqw; inv H0.
+    eapply mem_step_trans.
+      eapply mem_step_alloc; eassumption.
+    eapply mem_step_trans.
+      eapply mem_step_store; eassumption.
+      eapply mem_step_store; eassumption.
+  destruct (Mem.loadv Mint32 m (Val.add (rs ESP) (Vint ofs_ra))); inv H0.  
+    destruct (Mem.loadv Mint32 m (Val.add (rs ESP) (Vint ofs_link))); inv H1.  
+    destruct (rs ESP); inv H0.
+    remember (Mem.free m b 0 sz) as t.
+    destruct t; inv H1; apply eq_sym in Heqt. 
+    eapply mem_step_free; eassumption. 
+Qed.
+
+Lemma asm_mem_step : forall g c m c' m' (CS: asm_step g c m c' m'), mem_step m m'.
+Proof. intros.
+  inv CS; simpl in *; try apply mem_step_refl.
+          eapply exec_instr_mem_step; eassumption. 
+          inv H2. eapply extcall_mem_step; eassumption.
+          inv H1. eapply extcall_mem_step; eassumption.
+          eapply mem_step_trans. 
+            eapply mem_step_alloc; eassumption.
+            eapply store_args_mem_step; try eassumption.
+Qed.
+
+Program Definition Asm_mem_step_sem : @MemSem genv state.
+Proof.
+apply Build_MemSem with (csem := Asm_coop_sem).
+  apply asm_mem_step.
+Defined.
+
 End ASM_DECAYSEM.
 
 End ASM_COOP.

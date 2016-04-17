@@ -362,5 +362,18 @@ apply Build_DecayCoreSem with (decaysem := LTL_coop_sem).
   apply LTL_decay.
 Defined.
 
+Program Definition LTL_memsem : @MemSem genv LTL_core.
+Proof.
+eapply Build_MemSem with (csem := LTL_core_sem).
+  intros.
+  destruct CS; try apply mem_step_refl.
+  + destruct a; inv H0. eapply mem_step_store; eassumption.
+  + eapply mem_step_free; eassumption.
+  + inv H. eapply extcall_mem_step; eassumption.
+  + eapply mem_step_free; eassumption.
+  + eapply mem_step_alloc; eassumption.
+  + inv H0. eapply extcall_mem_step; eassumption.
+Defined.
+
 End LTL_COOP.
 

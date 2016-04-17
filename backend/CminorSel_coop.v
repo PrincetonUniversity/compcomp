@@ -373,4 +373,20 @@ Proof.
 apply Build_DecayCoreSem with (decaysem := cminsel_coop_sem).
   apply CMinSel_decay.
 Defined.
+
+Definition cminsel_memsem: @MemSem genv CMinSel_core.
+Proof.
+eapply Build_MemSem with (csem := CMinSel_core_sem).
+  intros.
+  destruct CS; try apply mem_step_refl.
+  + eapply mem_step_free; eassumption.
+  + destruct vaddr; inv H2. eapply mem_step_store; eassumption.
+  + eapply mem_step_free; eassumption.
+  + eapply extcall_mem_step; eassumption.
+  + eapply mem_step_free; eassumption.
+  + eapply mem_step_free; eassumption.
+  + eapply mem_step_alloc; eassumption.
+Defined.
+
+
 End CMINSEL_COOP.

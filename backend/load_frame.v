@@ -995,3 +995,13 @@ Proof. intros. unfold store_args in H.
   eapply store_forward; eassumption.
   eapply store_decay; eassumption.
 Qed.
+
+Lemma store_args_mem_step m stk args tys m':
+  store_args m stk args tys = Some m' -> mem_step m m'.
+Proof. intros. unfold store_args in H.
+  apply store_args_rec_only_stores in H.
+  remember (encode_longs tys args). clear Heql.
+  induction H. apply mem_step_refl.
+  eapply mem_step_trans; try eassumption.
+  eapply mem_step_store; eassumption.
+Qed.

@@ -302,6 +302,18 @@ apply Build_DecayCoreSem with (decaysem := rtl_coop_sem).
   apply rtl_coop_decay.
 Defined.
 
+Program Definition RTL_memsem : @MemSem genv RTL_core.
+Proof.
+eapply Build_MemSem with (csem := RTL_core_sem).
+  intros.
+  destruct CS; try apply mem_step_refl.
+  + destruct a; inv H1. eapply mem_step_store; eassumption.
+  + eapply mem_step_free; eassumption.
+  + eapply extcall_mem_step; eassumption.
+  + eapply mem_step_free; eassumption.
+  + eapply mem_step_alloc; eassumption.
+  + eapply extcall_mem_step; eassumption.
+Defined.
 End RELSEM.
 
 Lemma RTL_initial_coreD (g: genv) (v:val)(args: list val) c:

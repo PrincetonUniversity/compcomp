@@ -410,4 +410,17 @@ apply Build_DecayCoreSem with (decaysem := Linear_coop_sem).
   apply Linear_decay.
 Defined.
 
+Program Definition Linear_memsem : @MemSem genv Linear_core.
+Proof.
+eapply Build_MemSem with (csem := Linear_core_sem).
+  intros.
+  destruct CS; try apply mem_step_refl.
+  + destruct a; inv H0. eapply mem_step_store; eassumption.
+  + eapply mem_step_free; eassumption.
+  + inv H. eapply extcall_mem_step; eassumption.
+  + eapply mem_step_free; eassumption.
+  + eapply mem_step_alloc; eassumption.
+  + inv H0. eapply extcall_mem_step; eassumption.
+Defined.
+
 End LINEAR_COOP.

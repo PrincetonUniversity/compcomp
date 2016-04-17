@@ -179,3 +179,279 @@ Record DecayCoreSem {G C} :=
        (CS: corestep decaysem g c m c' m'), decay m m'}.
 
 Implicit Arguments CoopCoreSem [].
+
+Inductive mem_step m m' : Prop :=
+    mem_step_storebytes: forall b ofs bytes,
+       Mem.storebytes m b ofs bytes = Some m' -> mem_step m m'
+  | mem_step_alloc: forall lo hi b',
+       Mem.alloc m lo hi = (m',b') -> mem_step m m'
+  | mem_step_freelist: forall l,
+       Mem.free_list m l = Some m' -> mem_step m m'
+  (*Some non-observable external calls do alloc;store, so are not a single mem-step*)
+  | mem_step_trans: forall m'',
+       mem_step m m'' -> mem_step m'' m' -> mem_step m m'.
+
+Lemma mem_step_refl m: mem_step m m.
+  apply (mem_step_freelist _ _ nil); trivial.
+Qed. 
+ 
+Lemma mem_step_free: 
+      forall m b lo hi m', Mem.free m b lo hi = Some m' -> mem_step m m'.
+Proof.
+ intros. eapply (mem_step_freelist _ _ ((b,lo,hi)::nil)). 
+ simpl. rewrite H; reflexivity.
+Qed.
+
+Lemma mem_step_store: 
+      forall m ch b a v m', Mem.store ch m b a v = Some m' -> mem_step m m'.
+Proof.
+ intros. eapply mem_step_storebytes. eapply Mem.store_storebytes; eassumption. 
+Qed.
+
+Record memstep_preserve (P:mem -> mem -> Prop) :=
+  { 
+    preserve_trans: forall m1 m2 m3, P m1 m2 -> P m2 m3 -> P m1 m3;
+    preserve_mem: forall m m', mem_step m m' -> P m m'
+  }.
+
+Lemma preserve_refl {P} (HP: memstep_preserve P): forall m, P m m.
+Proof. intros. eapply (preserve_mem _ HP). apply mem_step_refl. Qed.
+
+Lemma preserve_free {P} (HP: memstep_preserve P): 
+      forall m b lo hi m', Mem.free m b lo hi = Some m' -> P m m'.
+Proof.
+ intros. eapply (preserve_mem _ HP). eapply mem_step_free; eauto. Qed.
+
+Theorem preserve_conj {P Q} (HP:memstep_preserve P) (HQ: memstep_preserve Q):
+        memstep_preserve (fun m m' => P m m' /\ Q m m').
+Proof.
+intros. constructor.
++ intros. destruct H; destruct H0. split. eapply HP; eauto. eapply HQ; eauto.
++ intros; split. apply HP; trivial. apply HQ; trivial. 
+Qed.
+
+(*opposite direction appears not to hold*)
+Theorem preserve_impl {A} (P:A -> mem -> mem -> Prop) (Q:A->Prop):
+        (forall a, Q a -> memstep_preserve (P a)) -> memstep_preserve (fun m m' => forall a, Q a -> P a m m').
+Proof.
+intros.
+constructor; intros.
++ eapply H; eauto. 
++ apply H; eauto.
+Qed.
+
+Lemma preserve_exensional {P Q} (HP:memstep_preserve P) (PQ:P=Q): memstep_preserve Q.
+subst; trivial. Qed.
+
+(*opposite direction appears not to hold*)
+Theorem preserve_univ {A} (P:A -> mem -> mem -> Prop):
+        (forall a, memstep_preserve (P a)) -> memstep_preserve (fun m m' => forall a, P a m m').
+Proof. intros.
+eapply preserve_exensional.
+eapply (@preserve_impl A (fun a m m'=> P a m m') (fun a=>True)). 
+intros. apply H. extensionality m. extensionality m'. apply prop_ext. intuition.
+Qed.
+
+Theorem mem_forward_preserve: memstep_preserve mem_forward.
+Proof.
+constructor.
++ apply mem_forward_trans.
++ intros. induction H.
+  eapply storebytes_forward; eassumption. 
+  eapply alloc_forward; eassumption. 
+  eapply freelist_forward; eassumption.
+  eapply mem_forward_trans; eassumption.
+Qed.
+
+Theorem decay_preserve: memstep_preserve (fun m m' => mem_forward m m' /\ decay m m').
+Proof.
+constructor.
++ intros; split. eapply mem_forward_trans. apply H. apply H0.
+  eapply decay_trans. apply H. apply H. apply H0.
++ intros; induction H. 
+  split; intros. eapply storebytes_forward; eassumption.
+    eapply storebytes_decay; eassumption.
+  split; intros. eapply alloc_forward; eassumption.
+    eapply alloc_decay; eassumption.
+  intros; split. eapply freelist_forward; eassumption.
+    eapply freelist_decay; eassumption.
+  destruct IHmem_step1; destruct IHmem_step2.
+    split. eapply mem_forward_trans; eassumption.
+    eapply decay_trans; eassumption.
+Qed.
+
+Theorem readonly_preserve b: memstep_preserve (fun m m' => mem_forward m m' /\ (Mem.valid_block m b -> readonly m b m')).
+Proof.
+constructor.
++ intros. destruct H; destruct H0. 
+  split; intros. eapply mem_forward_trans; eassumption.
+  eapply readonly_trans; eauto. apply H2. apply H. eassumption.
++ intros; induction H. 
+  - split; intros. eapply storebytes_forward; eassumption.
+    eapply storebytes_readonly; eassumption.
+  - intros. 
+    split; intros. eapply alloc_forward; eassumption.
+    eapply alloc_readonly; eassumption.
+  - intros.
+    split; intros. eapply freelist_forward; eassumption.
+    eapply freelist_readonly; eassumption.
+  - destruct IHmem_step1; destruct IHmem_step2.
+    split. eapply mem_forward_trans; eassumption.
+    intros. eapply readonly_trans. eauto. apply H4. apply H1; eassumption.
+Qed.
+
+Theorem readonly_preserve': 
+   memstep_preserve (fun m m' => mem_forward m m' /\ (forall b, Mem.valid_block m b -> readonly m b m')).
+Proof. 
+eapply preserve_exensional.
+eapply preserve_univ; intros. apply (readonly_preserve a).
+  extensionality m. extensionality m'. apply prop_ext.
+  split; intros. split. eapply H. apply xH. intros. eapply (H b). trivial. 
+  destruct H. split; eauto. 
+Qed.
+
+Record MemSem {G C} :=
+  { csem :> @CoreSemantics G C mem
+
+  ; corestep_mem : forall g c m c' m' (CS: corestep csem g c m c' m'), mem_step m m'
+  }.
+
+Lemma memsem_preserves {G C} (s: @MemSem G C) P (HP:memstep_preserve P):
+      forall g c m c' m', corestep s g c m c' m'-> P m m'.
+Proof. intros.
+  apply corestep_mem in H.
+  eapply preserve_mem; eassumption.
+Qed.
+
+(*
+
+Lemma coalg_preserves {G C} (s: @CoalgSem G C) P (HP:step_preserve P):
+      forall n  c m c' m', corestepN n s g c m c' m'-> P m m'.
+Proof. intros.
+  apply corestepD in H.
+  destruct H as [? | [[? [? [? ?]]] | [[? [? [? ?]]]| [? ?]]]]; subst; trivial.
+  apply HP.
+  eapply (preserve_storebytes _ HP); eassumption. 
+  eapply (preserve_alloc _ HP); eassumption.
+  generalize dependent m. rename x into l.
+  induction l; simpl; intros. 
+  + inv H. apply HP.
+  + destruct a. destruct p. remember (Mem.free m b z0 z) as q.
+    symmetry in Heqq; destruct q; inv H. 
+    eapply (preserve_trans _ HP).  eapply (preserve_free _ HP); eassumption. apply IHl. eassumption.
+Qed.
+eapply HPA; eassumption. 
+eapply HPFL; eassumption.
+  des
+
+Definition mkPsem {G C} (P:mem -> Prop) (s: @CoalgSem G C) (HP:step_preserve P): @PreserveSem G C P.
+destruct s as [SEM HSEM].
+eapply Build_PreserveSem with (psem:=SEM); intros.
+specialize (freelist_preserve HP); intros HPFL.
+apply HSEM in CS; clear HSEM. destruct HP as [HPS HPA _].
+destruct CS as [? | [[? [? [? ?]]] | [[? [? [? ?]]]| [? ?]]]]; subst; trivial.
+eapply HPS; eassumption. 
+eapply HPA; eassumption. 
+eapply HPFL; eassumption.
+Defined. 
+
+
+Record PreserveSem' {G C P} (HP: step_preserve P):=
+  { qsem :> @CoopCoreSem G C 
+  ; corestep_pres : forall g c m c' m'
+       (CS: corestep qsem g c m c' m'), P m -> P m'}.
+
+Definition mkQsem {G C} (P:mem -> Prop) (s: @CoalgSem G C) (HP:step_preserve P): @PreserveSem' G C _ HP.
+destruct s as [SEM HSEM].
+eapply Build_PreserveSem' with (qsem:=SEM); intros.
+specialize (freelist_preserve HP); intros HPFL.
+apply HSEM in CS; clear HSEM. destruct HP as [HPS HPA _].
+destruct CS as [? | [[? [? [? ?]]] | [[? [? [? ?]]]| [? ?]]]]; subst; trivial.
+eapply HPS; eassumption. 
+eapply HPA; eassumption. 
+eapply HPFL; eassumption.
+Defined. 
+
+Record step_preserve (P:mem -> Prop) :=
+  { storebytes_preserve: forall m b ofs bytes m',
+       Mem.storebytes m b ofs bytes = Some m' -> P m -> P m';
+    alloc_preserve: forall m lo hi m' b',
+       Mem.alloc m lo hi = (m',b') -> P m -> P m';
+    free_preserve: forall m b lo hi m',
+       Mem.free m b lo hi = Some m' -> P m -> P m'
+  }.
+
+Lemma store_preserve {P} (HP: step_preserve P) m1 b ofs ch v m2:
+   Mem.store ch m1 b ofs v = Some m2 -> P m1 -> P m2.
+Proof. intros. apply Mem.store_storebytes in H. destruct HP. eauto. Qed.
+
+Lemma freelist_preserve {P} (HP: step_preserve P):
+  forall l m1 m2, Mem.free_list m1 l = Some m2 -> P m1 -> P m2.
+Proof.
+  induction l; simpl; intros. inv H; trivial. 
+  destruct a. destruct p. 
+  remember (Mem.free m1 b z0 z) as q.
+  destruct q; inv H. symmetry in Heqq. apply (IHl _ _ H2).
+  destruct HP. eauto. 
+Qed. 
+
+Record PreserveSem {G C} P :=
+  { psem :> @CoopCoreSem G C 
+  ; corestep_preserve : forall g c m c' m'
+       (CS: corestep psem g c m c' m'), P m -> P m'}.
+
+Record CoalgSem {G C} :=
+  { coalgsem :> @CoopCoreSem G C 
+  ; corestepD : forall g c m c' m' (CS: corestep coalgsem g c m c' m'),
+      m = m' \/
+      (exists b ofs bytes, Mem.storebytes m b ofs bytes = Some m') \/
+      (exists lo hi b', Mem.alloc m lo hi = (m',b')) \/
+      (exists l, Mem.free_list m l = Some m') }.
+
+Definition mkPsem {G C} (P:mem -> Prop) (s: @CoalgSem G C) (HP:step_preserve P): @PreserveSem G C P.
+destruct s as [SEM HSEM].
+eapply Build_PreserveSem with (psem:=SEM); intros.
+specialize (freelist_preserve HP); intros HPFL.
+apply HSEM in CS; clear HSEM. destruct HP as [HPS HPA _].
+destruct CS as [? | [[? [? [? ?]]] | [[? [? [? ?]]]| [? ?]]]]; subst; trivial.
+eapply HPS; eassumption. 
+eapply HPA; eassumption. 
+eapply HPFL; eassumption.
+Defined. 
+
+
+Record PreserveSem' {G C P} (HP: step_preserve P):=
+  { qsem :> @CoopCoreSem G C 
+  ; corestep_pres : forall g c m c' m'
+       (CS: corestep qsem g c m c' m'), P m -> P m'}.
+
+Definition mkQsem {G C} (P:mem -> Prop) (s: @CoalgSem G C) (HP:step_preserve P): @PreserveSem' G C _ HP.
+destruct s as [SEM HSEM].
+eapply Build_PreserveSem' with (qsem:=SEM); intros.
+specialize (freelist_preserve HP); intros HPFL.
+apply HSEM in CS; clear HSEM. destruct HP as [HPS HPA _].
+destruct CS as [? | [[? [? [? ?]]] | [[? [? [? ?]]]| [? ?]]]]; subst; trivial.
+eapply HPS; eassumption. 
+eapply HPA; eassumption. 
+eapply HPFL; eassumption.
+Defined. 
+*)
+
+Lemma extcall_mem_step fundef type g ef vargs m t vres m': 
+      @external_call ef fundef type g vargs m t vres m' ->
+      mem_step m m'.
+Proof. 
+intros. destruct ef; simpl in *; inv H; try apply mem_step_refl.
+    inv H0. try apply mem_step_refl.
+      eapply mem_step_storebytes.
+      apply Mem.store_storebytes; eassumption.
+    inv H1. try apply mem_step_refl.
+      eapply mem_step_storebytes.
+      apply Mem.store_storebytes; eassumption.
+    eapply mem_step_trans.
+    eapply mem_step_alloc. eassumption.
+      eapply mem_step_storebytes.
+      apply Mem.store_storebytes; eassumption.
+    eapply mem_step_free; eassumption. 
+    eapply mem_step_storebytes; eassumption.
+Qed.

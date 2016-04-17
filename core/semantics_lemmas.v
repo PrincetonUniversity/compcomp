@@ -129,6 +129,30 @@ Section corestepN.
 
 End corestepN.
 
+Lemma memsem_preservesN {G C} (s: @MemSem G C) P (HP: memstep_preserve P):
+      forall g n c m c' m', corestepN s g n c m c' m'-> P m m'.
+Proof.
+ intros g; induction n; intros.
+ inv H. apply (preserve_refl HP).
+ inv H. destruct H0 as [mm [? ?]].
+ eapply (preserve_trans _ HP).
+ eapply (memsem_preserves _ _ HP); eassumption.
+ apply IHn in H0; trivial.
+Qed. 
+
+Lemma memsem_preserves_plus {G C} (s: @MemSem G C) P (HP:memstep_preserve P):
+      forall g c m c' m', corestep_plus s g c m c' m'-> P m m'.
+Proof.
+ intros. destruct H. apply (memsem_preservesN _ _ HP) in H; trivial.
+Qed.
+
+Lemma coalg_preserves_star {G C} (s: @MemSem G C) P (HP:memstep_preserve P):
+      forall g c m c' m', corestep_star s g c m c' m'-> P m m'.
+Proof.
+ intros. destruct H. apply (memsem_preservesN _ _ HP) in H; trivial.
+Qed.
+
+
 Section CoopCoreSemLemmas.
 Context {G C: Type}.
 Variable coopsem: CoopCoreSem G C.

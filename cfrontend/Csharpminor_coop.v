@@ -338,4 +338,26 @@ apply Build_DecayCoreSem with (decaysem := csharpmin_coop_sem).
   apply cshmin_decay.
 Defined.
 
+Lemma alloc_variables_mem_step: forall vars m e e2 m'
+      (M: alloc_variables e m vars e2 m'), mem_step m m'.
+Proof. intros.
+  induction M.
+  apply mem_step_refl.
+  eapply mem_step_trans.
+    eapply mem_step_alloc; eassumption. eassumption. 
+Qed.
+
+Definition csharpmin__memsem: @MemSem Csharpminor.genv CSharpMin_core.
+Proof.
+eapply Build_MemSem with (csem := CSharpMin_core_sem).
+  intros.
+  destruct CS; try apply mem_step_refl.
+  + eapply mem_step_freelist; eassumption.
+  + destruct vaddr; inv H1. eapply mem_step_store; eassumption.
+  + eapply extcall_mem_step; eassumption.
+  + eapply mem_step_freelist; eassumption.
+  + eapply mem_step_freelist; eassumption.
+  + eapply alloc_variables_mem_step; eassumption.
+Defined.
+
 End CSHARPMINOR_COOP.
