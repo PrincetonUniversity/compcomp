@@ -208,6 +208,25 @@ Proof.
  intros. eapply mem_step_storebytes. eapply Mem.store_storebytes; eassumption. 
 Qed.
 
+Lemma extcall_mem_step fundef type g ef vargs m t vres m': 
+      @external_call ef fundef type g vargs m t vres m' ->
+      mem_step m m'.
+Proof. 
+intros. destruct ef; simpl in *; inv H; try apply mem_step_refl.
+    inv H0. try apply mem_step_refl.
+      eapply mem_step_storebytes.
+      apply Mem.store_storebytes; eassumption.
+    inv H1. try apply mem_step_refl.
+      eapply mem_step_storebytes.
+      apply Mem.store_storebytes; eassumption.
+    eapply mem_step_trans.
+    eapply mem_step_alloc. eassumption.
+      eapply mem_step_storebytes.
+      apply Mem.store_storebytes; eassumption.
+    eapply mem_step_free; eassumption. 
+    eapply mem_step_storebytes; eassumption.
+Qed.
+
 Record memstep_preserve (P:mem -> mem -> Prop) :=
   { 
     preserve_trans: forall m1 m2 m3, P m1 m2 -> P m2 m3 -> P m1 m3;
@@ -310,6 +329,135 @@ eapply preserve_univ; intros. apply (readonly_preserve a).
   destruct H. split; eauto. 
 Qed.
 
+(*From Compcert2.6*)
+Definition loc_not_writable (m: mem) (b: block) (ofs: Z) : Prop :=
+  ~Mem.perm m b ofs Max Writable.
+
+Lemma storebytes_unch_loc_unwritable b ofs: forall l m m' (L: Mem.storebytes m b ofs l = Some m'),
+      Mem.unchanged_on (loc_not_writable m) m m'.
+Proof.
+intros.
+split; intros.
++ split; intros. 
+  eapply Mem.perm_storebytes_1; eassumption.
+  eapply Mem.perm_storebytes_2; eassumption.
++ rewrite (Mem.storebytes_mem_contents _ _ _ _ _ L).
+  apply Mem.storebytes_range_perm in L.
+  destruct (eq_block b0 b); subst.
+  - destruct (zle ofs ofs0).
+      destruct (zlt ofs0 (ofs + Z.of_nat (length l))).
+        elim H. eapply Mem.perm_max. apply L. omega. 
+      rewrite PMap.gss. apply Mem.setN_other. intros. omega.
+    rewrite PMap.gss. apply Mem.setN_other. intros. omega.
+  - rewrite PMap.gso; trivial.
+Qed.
+
+Lemma unch_on_loc_not_writable_trans m1 m2 m3 
+        (Q : Mem.unchanged_on (loc_not_writable m1) m1 m2)
+        (W : Mem.unchanged_on (loc_not_writable m2) m2 m3)
+        (F:mem_forward m1 m2):
+     Mem.unchanged_on (loc_not_writable m1) m1 m3.
+Proof.
+  destruct Q as [Q1 Q2]. destruct W as [W1 W2].
+  split; intros.
+  - cut (Mem.perm m2 b ofs k p <-> Mem.perm m3 b ofs k p).
+      specialize (Q1 _ _ k p H H0). intuition.
+    apply W1; clear W1. intros N. apply H. apply Q1; trivial. apply F; trivial.
+  -  rewrite W2; clear W2.
+       apply Q2; trivial.
+     intros N; apply H. apply F; trivial. eapply Mem.perm_valid_block; eassumption.
+     apply Q1; trivial. eapply Mem.perm_valid_block; eassumption.
+Qed.
+
+Theorem loc_not_writable_preserve: 
+   memstep_preserve (fun m m' => mem_forward m m' /\ Mem.unchanged_on (loc_not_writable m) m m').
+Proof.
+constructor.
++ intros. destruct H as [F1 Q]; destruct H0 as [F2 W].
+  split; intros. eapply mem_forward_trans; eassumption. clear F2.
+  eapply unch_on_loc_not_writable_trans; eassumption.
++ intros; induction H. 
+  - split; intros. eapply storebytes_forward; eassumption.
+    eapply storebytes_unch_loc_unwritable; eassumption.
+  - split; intros. eapply alloc_forward; eassumption.
+    eapply Mem.alloc_unchanged_on; eassumption. 
+  - split; intros. eapply freelist_forward; eassumption.
+    generalize dependent m.
+    induction l; simpl; intros. inv H. apply Mem.unchanged_on_refl.
+    destruct a. destruct p. 
+    remember (Mem.free m b z0 z) as w. destruct w; inv H. symmetry in Heqw.
+    eapply unch_on_loc_not_writable_trans.
+      eapply Mem.free_unchanged_on. eassumption. 
+        intros i I N. elim N; clear N. 
+        eapply Mem.perm_max. eapply Mem.perm_implies. eapply Mem.free_range_perm; eassumption. constructor.
+      apply IHl; eassumption.
+      eapply free_forward; eassumption.
+  - destruct IHmem_step1; destruct IHmem_step2.
+    split. eapply mem_forward_trans; eassumption.
+    intros. clear H H0 H3. eapply unch_on_loc_not_writable_trans; eassumption. 
+Qed.
+
+Lemma freelist_perm: forall l m m' (L : Mem.free_list m l = Some m') b (B: Mem.valid_block m b)
+      ofs (P': Mem.perm m' b ofs Max Nonempty) k p,
+      Mem.perm m b ofs k p <-> Mem.perm m' b ofs k p.
+Proof. induction l; simpl; intros.
++ inv L; split; trivial.
++ destruct a. destruct p0.
+  remember (Mem.free m b0 z0 z) as w. symmetry in Heqw.
+  destruct w; inv L.
+  specialize (IHl _ _  H0 _ (Mem.valid_block_free_1 _ _ _ _ _ Heqw _ B) _ P' k p).
+  assert (P: Mem.perm m b ofs k p <-> Mem.perm m0 b ofs k p).
+  { clear IHl. destruct (Mem.perm_free_list _ _ _ _ _ _ _ H0 P') as [P ?]; clear H0 P'.
+    destruct (eq_block b0 b); subst.
+    - destruct (zlt ofs z0).
+      * split; intros. apply (Mem.perm_free_1 _ _ _ _ _ Heqw) in H0; eauto.
+        eapply Mem.perm_free_3; eassumption.
+      * destruct (zle z ofs).
+        split; intros. apply (Mem.perm_free_1 _ _ _ _ _ Heqw) in H0; eauto.
+                       eapply Mem.perm_free_3; eassumption.
+        split; intros.
+          eelim (Mem.perm_free_2 _ _ _ _ _ Heqw ofs Max Nonempty); clear Heqw; trivial. omega. 
+        eelim (Mem.perm_free_2 _ _ _ _ _ Heqw ofs Max Nonempty); clear Heqw. omega.
+          eapply Mem.perm_implies. eapply Mem.perm_max. eassumption. constructor.
+    - split; intros.
+      * eapply (Mem.perm_free_1 _ _ _ _ _ Heqw); trivial. intuition.
+      * eapply (Mem.perm_free_3 _ _ _ _ _ Heqw); trivial.
+  }
+  intuition.
+Qed.
+
+Theorem perm_preserve: 
+   memstep_preserve (fun m m' =>  mem_forward m m' /\ forall b, Mem.valid_block m b -> forall ofs, Mem.perm m' b ofs Max Nonempty -> 
+                                  forall k p, Mem.perm m b ofs k p <-> Mem.perm m' b ofs k p).
+Proof. 
+constructor.
++ intros; split. eapply mem_forward_trans. apply H. apply H0.
+  destruct H; destruct H0. intros.
+  assert (M: Mem.perm m1 b ofs k p <-> Mem.perm m2 b ofs k p).
+  - clear H2. apply H1; trivial. apply H0; trivial. apply H; trivial.
+  - clear H1.
+    assert (VB2: Mem.valid_block m2 b). apply H; trivial. 
+    destruct (H2 _ VB2 _ H4 k p); destruct M. split; intros; eauto.
++ intros; induction H. 
+  - split; intros. eapply storebytes_forward; eassumption.
+    split; intros. eapply Mem.perm_storebytes_1; eassumption.
+    eapply Mem.perm_storebytes_2; eassumption.
+  - split; intros. eapply alloc_forward; eassumption.
+    split; intros. eapply Mem.perm_alloc_1; eassumption.
+    eapply Mem.perm_alloc_4; try eassumption.
+    intros N; subst b'. elim (Mem.fresh_block_alloc _ _ _ _ _ H H0).
+  - intros; split. eapply freelist_forward; eassumption. 
+    apply (freelist_perm _ _ _ H).
+  - clear H H0. destruct IHmem_step1; destruct IHmem_step2. 
+    split. eapply mem_forward_trans; eassumption.
+    intros. 
+    assert (M: Mem.perm m b ofs k p <-> Mem.perm m'' b ofs k p).
+    * clear H2. apply H0; trivial. apply H1; trivial. apply H; trivial.
+    * clear H0.
+      assert (VB2: Mem.valid_block m'' b). apply H; trivial.   
+      destruct (H2 _ VB2 _ H4 k p); destruct M. split; intros; eauto.
+Qed.
+
 Record MemSem {G C} :=
   { csem :> @CoreSemantics G C mem
 
@@ -323,135 +471,99 @@ Proof. intros.
   eapply preserve_mem; eassumption.
 Qed.
 
-(*
-
-Lemma coalg_preserves {G C} (s: @CoalgSem G C) P (HP:step_preserve P):
-      forall n  c m c' m', corestepN n s g c m c' m'-> P m m'.
-Proof. intros.
-  apply corestepD in H.
-  destruct H as [? | [[? [? [? ?]]] | [[? [? [? ?]]]| [? ?]]]]; subst; trivial.
-  apply HP.
-  eapply (preserve_storebytes _ HP); eassumption. 
-  eapply (preserve_alloc _ HP); eassumption.
-  generalize dependent m. rename x into l.
-  induction l; simpl; intros. 
-  + inv H. apply HP.
-  + destruct a. destruct p. remember (Mem.free m b z0 z) as q.
-    symmetry in Heqq; destruct q; inv H. 
-    eapply (preserve_trans _ HP).  eapply (preserve_free _ HP); eassumption. apply IHl. eassumption.
-Qed.
-eapply HPA; eassumption. 
-eapply HPFL; eassumption.
-  des
-
-Definition mkPsem {G C} (P:mem -> Prop) (s: @CoalgSem G C) (HP:step_preserve P): @PreserveSem G C P.
-destruct s as [SEM HSEM].
-eapply Build_PreserveSem with (psem:=SEM); intros.
-specialize (freelist_preserve HP); intros HPFL.
-apply HSEM in CS; clear HSEM. destruct HP as [HPS HPA _].
-destruct CS as [? | [[? [? [? ?]]] | [[? [? [? ?]]]| [? ?]]]]; subst; trivial.
-eapply HPS; eassumption. 
-eapply HPA; eassumption. 
-eapply HPFL; eassumption.
-Defined. 
-
-
-Record PreserveSem' {G C P} (HP: step_preserve P):=
-  { qsem :> @CoopCoreSem G C 
-  ; corestep_pres : forall g c m c' m'
-       (CS: corestep qsem g c m c' m'), P m -> P m'}.
-
-Definition mkQsem {G C} (P:mem -> Prop) (s: @CoalgSem G C) (HP:step_preserve P): @PreserveSem' G C _ HP.
-destruct s as [SEM HSEM].
-eapply Build_PreserveSem' with (qsem:=SEM); intros.
-specialize (freelist_preserve HP); intros HPFL.
-apply HSEM in CS; clear HSEM. destruct HP as [HPS HPA _].
-destruct CS as [? | [[? [? [? ?]]] | [[? [? [? ?]]]| [? ?]]]]; subst; trivial.
-eapply HPS; eassumption. 
-eapply HPA; eassumption. 
-eapply HPFL; eassumption.
-Defined. 
-
-Record step_preserve (P:mem -> Prop) :=
-  { storebytes_preserve: forall m b ofs bytes m',
-       Mem.storebytes m b ofs bytes = Some m' -> P m -> P m';
-    alloc_preserve: forall m lo hi m' b',
-       Mem.alloc m lo hi = (m',b') -> P m -> P m';
-    free_preserve: forall m b lo hi m',
-       Mem.free m b lo hi = Some m' -> P m -> P m'
-  }.
-
-Lemma store_preserve {P} (HP: step_preserve P) m1 b ofs ch v m2:
-   Mem.store ch m1 b ofs v = Some m2 -> P m1 -> P m2.
-Proof. intros. apply Mem.store_storebytes in H. destruct HP. eauto. Qed.
-
-Lemma freelist_preserve {P} (HP: step_preserve P):
-  forall l m1 m2, Mem.free_list m1 l = Some m2 -> P m1 -> P m2.
+Lemma memsem_forward {C G} (s:@MemSem G C) g c m c' m'
+   (CS:corestep s g c m c' m' ): mem_forward m m'.
 Proof.
-  induction l; simpl; intros. inv H; trivial. 
-  destruct a. destruct p. 
-  remember (Mem.free m1 b z0 z) as q.
-  destruct q; inv H. symmetry in Heqq. apply (IHl _ _ H2).
-  destruct HP. eauto. 
-Qed. 
-
-Record PreserveSem {G C} P :=
-  { psem :> @CoopCoreSem G C 
-  ; corestep_preserve : forall g c m c' m'
-       (CS: corestep psem g c m c' m'), P m -> P m'}.
-
-Record CoalgSem {G C} :=
-  { coalgsem :> @CoopCoreSem G C 
-  ; corestepD : forall g c m c' m' (CS: corestep coalgsem g c m c' m'),
-      m = m' \/
-      (exists b ofs bytes, Mem.storebytes m b ofs bytes = Some m') \/
-      (exists lo hi b', Mem.alloc m lo hi = (m',b')) \/
-      (exists l, Mem.free_list m l = Some m') }.
-
-Definition mkPsem {G C} (P:mem -> Prop) (s: @CoalgSem G C) (HP:step_preserve P): @PreserveSem G C P.
-destruct s as [SEM HSEM].
-eapply Build_PreserveSem with (psem:=SEM); intros.
-specialize (freelist_preserve HP); intros HPFL.
-apply HSEM in CS; clear HSEM. destruct HP as [HPS HPA _].
-destruct CS as [? | [[? [? [? ?]]] | [[? [? [? ?]]]| [? ?]]]]; subst; trivial.
-eapply HPS; eassumption. 
-eapply HPA; eassumption. 
-eapply HPFL; eassumption.
-Defined. 
-
-
-Record PreserveSem' {G C P} (HP: step_preserve P):=
-  { qsem :> @CoopCoreSem G C 
-  ; corestep_pres : forall g c m c' m'
-       (CS: corestep qsem g c m c' m'), P m -> P m'}.
-
-Definition mkQsem {G C} (P:mem -> Prop) (s: @CoalgSem G C) (HP:step_preserve P): @PreserveSem' G C _ HP.
-destruct s as [SEM HSEM].
-eapply Build_PreserveSem' with (qsem:=SEM); intros.
-specialize (freelist_preserve HP); intros HPFL.
-apply HSEM in CS; clear HSEM. destruct HP as [HPS HPA _].
-destruct CS as [? | [[? [? [? ?]]] | [[? [? [? ?]]]| [? ?]]]]; subst; trivial.
-eapply HPS; eassumption. 
-eapply HPA; eassumption. 
-eapply HPFL; eassumption.
-Defined. 
-*)
-
-Lemma extcall_mem_step fundef type g ef vargs m t vres m': 
-      @external_call ef fundef type g vargs m t vres m' ->
-      mem_step m m'.
-Proof. 
-intros. destruct ef; simpl in *; inv H; try apply mem_step_refl.
-    inv H0. try apply mem_step_refl.
-      eapply mem_step_storebytes.
-      apply Mem.store_storebytes; eassumption.
-    inv H1. try apply mem_step_refl.
-      eapply mem_step_storebytes.
-      apply Mem.store_storebytes; eassumption.
-    eapply mem_step_trans.
-    eapply mem_step_alloc. eassumption.
-      eapply mem_step_storebytes.
-      apply Mem.store_storebytes; eassumption.
-    eapply mem_step_free; eassumption. 
-    eapply mem_step_storebytes; eassumption.
+eapply memsem_preserves; try eassumption. apply mem_forward_preserve.
 Qed.
+
+Lemma memsem_readonly {C G} (s:@MemSem G C) g c m c' m'
+   (CS:corestep s g c m c' m') b (VB:Mem.valid_block m b): readonly m b m'.
+Proof.
+eapply (memsem_preserves s _ readonly_preserve'); eassumption.
+Qed.
+
+Definition myCoopCoreSem {G C} (s:@MemSem G C): @CoopCoreSem G C.
+Proof.
+eapply Build_CoopCoreSem with (coopsem := s).
+apply memsem_forward.
+apply memsem_readonly.
+Defined.
+
+Definition myDecaySem {G C} (s:@MemSem G C): @DecayCoreSem G C.
+Proof.
+eapply Build_DecayCoreSem with (decaysem := myCoopCoreSem s).
+simpl. eapply (memsem_preserves s _ decay_preserve); eassumption.
+Defined.
+
+Inductive e_step m m' : Prop :=
+    mem_step_estep: mem_step m m' -> e_step m m'
+  | drop_perm_estep: forall b lo hi p, 
+      Mem.drop_perm m b lo hi p = Some m' -> e_step m m'
+  | change_cur_estep: 
+      (forall b ofs, (Mem.mem_access m) !! b ofs Max = (Mem.mem_access m') !! b ofs Max) ->
+      Mem.unchanged_on (loc_not_writable m) m m' ->
+      (Mem.mem_contents m = Mem.mem_contents m') ->
+      Mem.nextblock m = Mem.nextblock m' -> e_step m m'
+  | estep_trans: forall m'',
+       e_step m m'' -> e_step m'' m' -> e_step m m'.
+
+Lemma e_step_refl m: e_step m m.
+Proof. apply mem_step_estep. apply mem_step_refl. Qed.
+
+Lemma estep_forward m m' (E:e_step m m'): mem_forward m m'.
+Proof.
+induction E.
+apply mem_forward_preserve; eassumption.
++ split; intros.
+    eapply Mem.drop_perm_valid_block_1; eassumption.
+    eapply Mem.perm_drop_4; eassumption.
++ split; intros.
+  unfold Mem.valid_block in *. rewrite H2 in *; assumption.
+  unfold Mem.perm. rewrite H. apply H4.
++ eapply mem_forward_trans; eassumption.
+Qed.
+
+Lemma estep_unch_on_loc_not_writable m m' (E:e_step m m'): Mem.unchanged_on (loc_not_writable m) m m'.
+Proof.
+induction E.
++ apply loc_not_writable_preserve in H. apply H. 
++ unfold Mem.drop_perm in H. 
+  destruct (Mem.range_perm_dec m b lo hi Cur Freeable); inv H; simpl in *.
+  split; simpl; trivial.
+  intros. red in H.
+  unfold Mem.perm; simpl. rewrite PMap.gsspec.
+  destruct (peq b0 b); subst; simpl. 2: intuition.
+  destruct (zle lo ofs); simpl. 2: intuition.
+  destruct (zlt ofs hi); simpl. 2: intuition.
+  elim H. eapply Mem.perm_max. eapply Mem.perm_implies. apply r. omega. constructor.
++ trivial. 
++ eapply unch_on_loc_not_writable_trans; try eassumption. eapply estep_forward; eassumption.
+Qed.
+
+(*
+Theorem loadbytes_drop m b lo hi p m' (D:Mem.drop_perm m b lo hi p = Some m'):
+  forall b' ofs, 
+  b' <> b \/ ofs < lo \/ hi <= ofs \/ perm_order p Readable ->
+  Mem.loadbytes m' b' ofs 1 = Mem.loadbytes m b' ofs 1.
+Proof.
+  intros.
+Transparent Mem.loadbytes.
+  unfold Mem.loadbytes.
+  destruct (Mem.range_perm_dec m b' ofs (ofs + 1) Cur Readable). 
+  rewrite pred_dec_true.
+  unfold Mem.drop_perm in D. destruct (Mem.range_perm_dec m b lo hi Cur Freeable); inv D. simpl. auto.
+  red; intros. specialize (Mem.perm_drop_1 _ _ _ _ _ _ D ofs0 Cur); intros.
+    destruct (eq_block b' b); subst.
+      destruct H. eapply Mem.perm_drop_3. eassumption. left; trivial. apply r. trivial.
+      destruct (zlt ofs lo). eapply Mem.perm_drop_3. eassumption. right. omega. apply r. trivial.
+      destruct H. omega. 
+      destruct (zle hi ofs). eapply Mem.perm_drop_3. eassumption. right. omega. apply r. trivial. 
+      destruct H. omega.
+      eapply Mem.perm_implies. apply H1. omega. trivial.
+   eapply Mem.perm_drop_3. eassumption. left; trivial. apply r. omega.
+
+  destruct (Mem.range_perm_dec m' b' ofs (ofs + 1) Cur Readable); trivial.
+  elim n; clear n. red; intros. eapply Mem.perm_drop_4. eassumption. apply r. trivial.
+Qed. 
+*)
