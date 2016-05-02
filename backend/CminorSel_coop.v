@@ -60,7 +60,7 @@ Definition silentEOS hf ge (a: expr + ident) : Prop :=
   | inr x => True 
   end.
 
-Section CMINSEL_COOP.
+Section CMINSEL_MEM.
 
 Variable hf : I64Helpers.helper_functions.
 
@@ -313,6 +313,23 @@ Proof.
     apply CMinSel_at_external_halted_excl.
 Defined.
 
+
+Definition cminsel_memsem: @MemSem genv CMinSel_core.
+Proof.
+eapply Build_MemSem with (csem := CMinSel_core_sem).
+  intros.
+  destruct CS; try apply mem_step_refl.
+  + eapply mem_step_free; eassumption.
+  + destruct vaddr; inv H2. eapply mem_step_store; eassumption.
+  + eapply mem_step_free; eassumption.
+  + eapply extcall_mem_step; eassumption.
+  + eapply mem_step_free; eassumption.
+  + eapply mem_step_free; eassumption.
+  + eapply mem_step_alloc; eassumption.
+Defined.
+
+End CMINSEL_MEM.
+(*
 (************************NOW SHOW THAT WE ALSO HAVE A COOPSEM******)
 
 Lemma CMinSel_forward : forall g c m c' m' (CS: CMinSel_corestep g c m c' m'), 
@@ -374,19 +391,5 @@ apply Build_DecayCoreSem with (decaysem := cminsel_coop_sem).
   apply CMinSel_decay.
 Defined.
 
-Definition cminsel_memsem: @MemSem genv CMinSel_core.
-Proof.
-eapply Build_MemSem with (csem := CMinSel_core_sem).
-  intros.
-  destruct CS; try apply mem_step_refl.
-  + eapply mem_step_free; eassumption.
-  + destruct vaddr; inv H2. eapply mem_step_store; eassumption.
-  + eapply mem_step_free; eassumption.
-  + eapply extcall_mem_step; eassumption.
-  + eapply mem_step_free; eassumption.
-  + eapply mem_step_free; eassumption.
-  + eapply mem_step_alloc; eassumption.
-Defined.
-
-
 End CMINSEL_COOP.
+*)

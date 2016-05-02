@@ -916,84 +916,72 @@ rewrite getBlocksD_nil, orb_comm in H0; simpl in H0.
 rewrite H0; auto.
 Qed.
 
-Lemma store_stack_readonly m sp ty ofs v m'
-        (ST: store_stack m sp ty ofs v = Some m') b: 
-      Mem.valid_block m b-> readonly m b m'.
-Proof. intros. unfold store_stack in ST. destruct sp; simpl in ST; inv ST.
-   eapply store_readonly; eassumption.
+Lemma store_stack_mem m sp ty ofs v m'
+        (ST: store_stack m sp ty ofs v = Some m'): 
+      mem_step m m'.
+Proof. intros. 
+ unfold store_stack in ST. destruct sp; simpl in ST; inv ST.
+ eapply mem_step_store; eassumption.
 Qed.
 
-Lemma store_args_readonly sp ofs args tys m m' :
+Lemma store_args_mem sp ofs args tys m m' :
   store_args_rec m sp ofs args tys = Some m' -> 
-  forall b, Mem.valid_block m b -> readonly m b m'.
+  mem_step m m'.
 Proof.
 revert args ofs m; induction tys.
-simpl. destruct args. intros ofs. inversion 1; subst. 
-solve[intros; apply readonly_refl].
-intros ofs m. simpl. inversion 1. 
-destruct args; try solve[inversion 1]. 
-destruct a; simpl; intros ofs m. 
-- case_eq (store_stack m (Vptr sp Int.zero) Tint
++ destruct args.
+  - intros ofs. inversion 1; subst. apply mem_step_refl.
+  - intros ofs m. simpl. inversion 1.
++ destruct args; try solve[inversion 1]. 
+  destruct a; simpl; intros ofs m. 
+  - case_eq (store_stack m (Vptr sp Int.zero) Tint
            (Int.repr match ofs with | 0 => 0 | Z.pos y' => Z.pos y'~0~0
                                     | Z.neg y' => Z.neg y'~0~0 end) v).
-intros m0 EQ. specialize (store_stack_readonly _ _ _ _ _ _ EQ); intros RD.
-  apply store_stack_fwd in EQ.
-  intros H b VB.
-  eapply readonly_trans; eauto.
-  eapply IHtys. eassumption. apply EQ. eassumption. 
-  intros; congruence.
-- case_eq (store_stack m (Vptr sp Int.zero) Tfloat
+    * intros. 
+      eapply mem_step_trans. 
+       apply (store_stack_mem _ _ _ _ _ _ H).
+       eapply IHtys; eassumption.
+    * intros; congruence.
+  - case_eq (store_stack m (Vptr sp Int.zero) Tfloat
            (Int.repr match ofs with | 0 => 0 | Z.pos y' => Z.pos y'~0~0
                                     | Z.neg y' => Z.neg y'~0~0 end) v).
-intros m0 EQ. specialize (store_stack_readonly _ _ _ _ _ _ EQ); intros RD.
-  apply store_stack_fwd in EQ.
-  intros H b VB.
-  eapply readonly_trans; eauto.
-  eapply IHtys. eassumption. apply EQ. eassumption. 
-  intros; congruence.
-- destruct v; try solve[congruence].
-case_eq (store_stack m (Vptr sp Int.zero) Tint
+    * intros.
+      eapply mem_step_trans. 
+       apply (store_stack_mem _ _ _ _ _ _ H).
+       eapply IHtys; eassumption.
+    * intros; congruence. 
+  - destruct v; try solve[congruence].
+    case_eq (store_stack m (Vptr sp Int.zero) Tint
            (Int.repr match ofs+1 with | 0 => 0 | Z.pos y' => Z.pos y'~0~0
                                       | Z.neg y' => Z.neg y'~0~0 end)
         (Vint (Int64.hiword i))).
-intros m0 EQ. specialize (store_stack_readonly _ _ _ _ _ _ EQ); intros RD.
-  apply store_stack_fwd in EQ.
-  intros H b VB.
-  remember (store_stack m0 (Vptr sp Int.zero) Tint
+    * intros.
+       remember (store_stack m0 (Vptr sp Int.zero) Tint
         (Int.repr
            match ofs with
            | 0 => 0
            | Z.pos y' => Z.pos y'~0~0
            | Z.neg y' => Z.neg y'~0~0
            end) (Vint (Int64.loword i))).
-  symmetry in Heqo; destruct o; inv H. 
-  eapply readonly_trans. eapply RD. assumption.
-  eapply readonly_trans. 
-    apply (store_stack_readonly _ _ _ _ _ _ Heqo).
-    apply EQ. assumption.
-  apply store_stack_fwd in Heqo.
-  eapply IHtys. eassumption. apply Heqo. apply EQ. eassumption. 
-  intros; congruence.
-- case_eq (store_stack m (Vptr sp Int.zero) Tsingle
-           (Int.repr match ofs with | 0 => 0 | Z.pos y' => Z.pos y'~0~0
-                                    | Z.neg y' => Z.neg y'~0~0 end) v).
-intros m0 EQ. specialize (store_stack_readonly _ _ _ _ _ _ EQ); intros RD.
-  apply store_stack_fwd in EQ.
-  intros H b VB.
-  eapply readonly_trans; eauto.
-  eapply IHtys. eassumption. apply EQ. eassumption. 
-  intros; congruence.
-Qed.
-
-Lemma store_args_decay m stk args tys m':
-  store_args m stk args tys = Some m' -> decay m m'.
-Proof. intros. unfold store_args in H.
-  apply store_args_rec_only_stores in H.
-  remember (encode_longs tys args). clear Heql.
-  induction H. apply decay_refl.
-  eapply decay_trans; try eassumption.
-  eapply store_forward; eassumption.
-  eapply store_decay; eassumption.
+       symmetry in Heqo; destruct o; inv H0.
+      eapply mem_step_trans. 
+       apply (store_stack_mem _ _ _ _ _ _ H).
+      eapply mem_step_trans. 
+       apply (store_stack_mem _ _ _ _ _ _ Heqo).
+      eapply IHtys; eassumption.
+    * intros; congruence.
+  - intros.
+    remember (store_stack m (Vptr sp Int.zero) Tsingle
+        (Int.repr
+           match ofs with
+           | 0 => 0
+           | Z.pos y' => Z.pos y'~0~0
+           | Z.neg y' => Z.neg y'~0~0
+           end) v).
+       symmetry in Heqo; destruct o; inv H.
+      eapply mem_step_trans. 
+       apply (store_stack_mem _ _ _ _ _ _ Heqo).
+       eapply IHtys; eassumption.
 Qed.
 
 Lemma store_args_mem_step m stk args tys m':

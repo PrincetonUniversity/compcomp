@@ -148,57 +148,57 @@ Qed.
 
 Lemma rtl_effax1: forall (M : block -> Z -> bool) g c m c' m',
       RTL_effstep g M c m c' m' ->
-      (corestep (rtl_coop_sem hf) g c m c' m' /\
+      (corestep (RTL_memsem hf) g c m c' m' /\
        Mem.unchanged_on (fun (b : block) (ofs : Z) => M b ofs = false) m m').
 Proof. 
 intros.
   induction H.
-  split. unfold corestep, coopsem; simpl.
+  split. unfold corestep; simpl.
          eapply rtl_corestep_exec_Inop; eassumption.
          apply Mem.unchanged_on_refl.
-  split. unfold corestep, coopsem; simpl. 
+  split. unfold corestep; simpl. 
          eapply rtl_corestep_exec_Iop; eassumption. 
          apply Mem.unchanged_on_refl.
-  split. unfold corestep, coopsem; simpl. 
+  split. unfold corestep; simpl. 
          eapply rtl_corestep_exec_Iload; eassumption. 
          apply Mem.unchanged_on_refl.
-  split. unfold corestep, coopsem; simpl. 
+  split. unfold corestep; simpl. 
          eapply rtl_corestep_exec_Istore; eassumption. 
          eapply StoreEffect_Storev; eassumption.
-  split. unfold corestep, coopsem; simpl. 
+  split. unfold corestep; simpl. 
          eapply rtl_corestep_exec_Icall; eassumption. 
          apply Mem.unchanged_on_refl.
-  split. unfold corestep, coopsem; simpl. 
+  split. unfold corestep; simpl. 
          eapply rtl_corestep_exec_Itailcall; eassumption. 
          eapply FreeEffect_free; eassumption. 
-  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+  split. unfold corestep; simpl. econstructor; eassumption.
          eapply BuiltinEffect_unchOn; try eassumption.
-(*  split. unfold corestep, coopsem; simpl. 
+(*  split. unfold corestep; simpl. 
          eapply rtl_corestep_exec_Ibuiltin; eassumption.
          eapply ec_builtinEffectPolymorphic; eassumption.*)
-  split. unfold corestep, coopsem; simpl. 
+  split. unfold corestep; simpl. 
          eapply rtl_corestep_exec_Icond; eassumption. 
          apply Mem.unchanged_on_refl.
-  split. unfold corestep, coopsem; simpl. 
+  split. unfold corestep; simpl. 
          eapply rtl_corestep_exec_Ijumptable; eassumption. 
          apply Mem.unchanged_on_refl.
-  split. unfold corestep, coopsem; simpl. 
+  split. unfold corestep; simpl. 
          eapply rtl_corestep_exec_Ireturn; eassumption. 
          eapply FreeEffect_free; eassumption. 
-  split. unfold corestep, coopsem; simpl. 
+  split. unfold corestep; simpl. 
          eapply rtl_corestep_exec_function_internal; eassumption.
          eapply Mem.alloc_unchanged_on; eassumption. 
-  split. unfold corestep, coopsem; simpl. 
+  split. unfold corestep; simpl. 
          eapply rtl_corestep_exec_function_external; eassumption.
          eapply BuiltinEffect_unchOn; try eassumption. 
          eapply EFhelpers; eassumption.
-  split. unfold corestep, coopsem; simpl.
+  split. unfold corestep; simpl.
          eapply rtl_corestep_exec_return; eassumption.
          apply Mem.unchanged_on_refl.
 Qed.
 
 Lemma rtl_effax2: forall  g c m c' m',
-      corestep (rtl_coop_sem hf) g c m c' m' ->
+      corestep (RTL_memsem hf) g c m c' m' ->
       exists M, RTL_effstep g M c m c' m'.
 Proof.
 intros. inv H.
@@ -244,7 +244,7 @@ Qed.
 Program Definition rtl_eff_sem : 
   @EffectSem genv RTL_core.
 Proof.
-eapply Build_EffectSem with (sem := rtl_coop_sem hf)(effstep:=RTL_effstep).
+eapply Build_EffectSem with (sem := RTL_memsem hf)(effstep:=RTL_effstep).
 apply rtl_effax1.
 apply rtl_effax2.
 apply rtl_effstep_valid.

@@ -190,7 +190,7 @@ intros H fwd. inv H; constructor; intros.
 Qed.
 
 Lemma valid_genv_step F V C (ge : Genv.t F V) 
-    (csem : CoopCoreSem (Genv.t F V) C) c m c' m' : 
+    (csem : MemSem (Genv.t F V) C) c m c' m' : 
   valid_genv ge m -> 
   corestep csem ge c m c' m' -> 
   valid_genv ge m'.
@@ -199,7 +199,7 @@ intros H step; apply corestep_fwd in step; eapply valid_genv_fwd; eauto.
 Qed.
 
 Lemma valid_genv_stepN F V C (ge : Genv.t F V) 
-    (csem : CoopCoreSem (Genv.t F V) C) c m c' m' n : 
+    (csem : MemSem (Genv.t F V) C) c m c' m' n : 
   valid_genv ge m -> 
   corestepN csem ge n c m c' m' -> 
   valid_genv ge m'.
@@ -211,7 +211,7 @@ Section nucular_semantics_lemmas.
 
 Variable F V C : Type.
 
-Variable csem : CoopCoreSem (Genv.t F V) C.
+Variable csem : MemSem (Genv.t F V) C.
 
 Variable nuke : t csem.
 

@@ -2275,7 +2275,7 @@ intros.
   simpl. inversion 1. inv H1. clear H3.
   exploit funct_ptr_translated; eauto. intros [tf [FP TF]].
     unfold tge in FP. rewrite FP. (*monadInv TF. *)
-    unfold rtl_eff_sem, rtl_coop_sem. simpl.
+    (*unfold rtl_eff_sem, rtl_coop_sem. simpl.*)
     case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
 
   assert (Zlength vals2 = Zlength vals1) as ->. 

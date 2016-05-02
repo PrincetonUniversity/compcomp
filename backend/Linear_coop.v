@@ -75,7 +75,7 @@ Definition parent_locset0 (ls0: locset) (stack: list Linear.stackframe) : locset
   | Linear.Stackframe f sp ls c :: stack' => ls
   end.
 
-Section LINEAR_COOP.
+Section LINEAR_MEM.
 Variable hf : I64Helpers.helper_functions.
 
 Inductive Linear_step (ge:genv): Linear_core -> mem -> Linear_core -> mem -> Prop :=
@@ -344,6 +344,21 @@ Proof.
     apply Linear_at_external_halted_excl.
 Defined.
 
+Program Definition Linear_memsem : @MemSem genv Linear_core.
+Proof.
+eapply Build_MemSem with (csem := Linear_core_sem).
+  intros.
+  destruct CS; try apply mem_step_refl.
+  + destruct a; inv H0. eapply mem_step_store; eassumption.
+  + eapply mem_step_free; eassumption.
+  + inv H. eapply extcall_mem_step; eassumption.
+  + eapply mem_step_free; eassumption.
+  + eapply mem_step_alloc; eassumption.
+  + inv H0. eapply extcall_mem_step; eassumption.
+Defined.
+
+End LINEAR_MEM.
+(*
 (************************NOW SHOW THAT WE ALSO HAVE A COOPSEM******)
 
 Lemma Linear_forward : forall g c m c' m' (CS: Linear_step g c m c' m'), 
@@ -424,3 +439,4 @@ eapply Build_MemSem with (csem := Linear_core_sem).
 Defined.
 
 End LINEAR_COOP.
+*)

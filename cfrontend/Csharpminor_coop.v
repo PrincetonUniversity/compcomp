@@ -17,7 +17,7 @@ Require Import semantics.
 Require Import val_casted.
 Require Import BuiltinEffects.
 
-Section CSHARPMINOR_COOP.
+Section CSHARPMINOR_MEM.
 
 Variable hf : I64Helpers.helper_functions.
 
@@ -250,6 +250,36 @@ Proof.
   apply CSharpMin_at_external_halted_excl.
 Defined.
 
+Lemma alloc_variables_mem_step: forall vars m e e2 m'
+      (M: alloc_variables e m vars e2 m'), mem_step m m'.
+Proof. intros.
+  induction M.
+  apply mem_step_refl.
+  eapply mem_step_trans.
+    eapply mem_step_alloc; eassumption. eassumption. 
+Qed.
+
+Lemma alloc_variables_forward: forall vars m e e2 m'
+      (M: alloc_variables e m vars e2 m'),
+      mem_forward m m'.
+Proof. intros.
+  apply mem_forward_preserve.
+  eapply alloc_variables_mem_step; eassumption.
+Qed.
+
+Definition csharpmin_memsem: @MemSem Csharpminor.genv CSharpMin_core.
+Proof.
+eapply Build_MemSem with (csem := CSharpMin_core_sem).
+  intros.
+  destruct CS; try apply mem_step_refl.
+  + eapply mem_step_freelist; eassumption.
+  + destruct vaddr; inv H1. eapply mem_step_store; eassumption.
+  + eapply extcall_mem_step; eassumption.
+  + eapply mem_step_freelist; eassumption.
+  + eapply mem_step_freelist; eassumption.
+  + eapply alloc_variables_mem_step; eassumption.
+Defined.
+(*
 (************************NOW SHOW THAT WE ALSO HAVE A COOPSEM******)
 Lemma alloc_variables_forward: forall vars m e e2 m'
       (M: alloc_variables e m vars e2 m'),
@@ -346,18 +376,5 @@ Proof. intros.
   eapply mem_step_trans.
     eapply mem_step_alloc; eassumption. eassumption. 
 Qed.
-
-Definition csharpmin__memsem: @MemSem Csharpminor.genv CSharpMin_core.
-Proof.
-eapply Build_MemSem with (csem := CSharpMin_core_sem).
-  intros.
-  destruct CS; try apply mem_step_refl.
-  + eapply mem_step_freelist; eassumption.
-  + destruct vaddr; inv H1. eapply mem_step_store; eassumption.
-  + eapply extcall_mem_step; eassumption.
-  + eapply mem_step_freelist; eassumption.
-  + eapply mem_step_freelist; eassumption.
-  + eapply alloc_variables_mem_step; eassumption.
-Defined.
-
-End CSHARPMINOR_COOP.
+*)
+End CSHARPMINOR_MEM.

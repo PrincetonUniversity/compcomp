@@ -242,6 +242,42 @@ Proof.
   eapply external_xor_halted.
 Defined.
 
+Program Definition RTL_memsem : @MemSem genv RTL_core.
+Proof.
+eapply Build_MemSem with (csem := RTL_core_sem).
+  intros.
+  destruct CS; try apply mem_step_refl.
+  + destruct a; inv H1. eapply mem_step_store; eassumption.
+  + eapply mem_step_free; eassumption.
+  + eapply extcall_mem_step; eassumption.
+  + eapply mem_step_free; eassumption.
+  + eapply mem_step_alloc; eassumption.
+  + eapply extcall_mem_step; eassumption.
+Defined.
+End RELSEM.
+
+Lemma RTL_initial_coreD (g: genv) (v:val)(args: list val) c:
+  RTL_initial_core g v args = Some c -> 
+  exists b f, v= Vptr b Int.zero /\ 
+   Genv.find_funct_ptr g b = Some (Internal f) /\ 
+   val_casted.val_has_type_list_func args (sig_args (fn_sig f)) = true /\
+   val_casted.vals_defined args = true /\ Z.lt (4*(2*(Zlength args))) Int.max_unsigned
+  /\ c = RTL_Callstate nil (Internal f) args.
+intros. destruct v; inv H.
+destruct (Int.eq_dec i Int.zero); inv H1. exists b. 
+destruct (Genv.find_funct_ptr g b); inv H0. 
+destruct f; inv H1. exists f. 
+remember (4 * (2 * Zlength args)) as l. simpl in *. rewrite <- Heql in *. clear Heql.
+remember (val_casted.val_has_type_list_func args (sig_args (fn_sig f)) &&
+         val_casted.vals_defined args &&
+        (zlt l Int.max_unsigned)) as z. simpl in *.
+destruct z; inv H0.  
+apply andb_true_eq in Heqz. destruct Heqz.
+apply andb_true_eq in H. destruct H. intuition.
+unfold zlt in H0.  destruct (Z_lt_dec l Int.max_unsigned). trivial. inv H0. 
+Qed.
+
+(*
 (************************NOW SHOW THAT WE ALSO HAVE A COOPSEM******)
 
 Require Import mem_lemmas. (*for mem_forward*)
@@ -301,110 +337,4 @@ Proof.
 apply Build_DecayCoreSem with (decaysem := rtl_coop_sem).
   apply rtl_coop_decay.
 Defined.
-
-Program Definition RTL_memsem : @MemSem genv RTL_core.
-Proof.
-eapply Build_MemSem with (csem := RTL_core_sem).
-  intros.
-  destruct CS; try apply mem_step_refl.
-  + destruct a; inv H1. eapply mem_step_store; eassumption.
-  + eapply mem_step_free; eassumption.
-  + eapply extcall_mem_step; eassumption.
-  + eapply mem_step_free; eassumption.
-  + eapply mem_step_alloc; eassumption.
-  + eapply extcall_mem_step; eassumption.
-Defined.
-End RELSEM.
-
-Lemma RTL_initial_coreD (g: genv) (v:val)(args: list val) c:
-  RTL_initial_core g v args = Some c -> 
-  exists b f, v= Vptr b Int.zero /\ 
-   Genv.find_funct_ptr g b = Some (Internal f) /\ 
-   val_casted.val_has_type_list_func args (sig_args (fn_sig f)) = true /\
-   val_casted.vals_defined args = true /\ Z.lt (4*(2*(Zlength args))) Int.max_unsigned
-  /\ c = RTL_Callstate nil (Internal f) args.
-intros. destruct v; inv H.
-destruct (Int.eq_dec i Int.zero); inv H1. exists b. 
-destruct (Genv.find_funct_ptr g b); inv H0. 
-destruct f; inv H1. exists f. 
-remember (4 * (2 * Zlength args)) as l. simpl in *. rewrite <- Heql in *. clear Heql.
-remember (val_casted.val_has_type_list_func args (sig_args (fn_sig f)) &&
-         val_casted.vals_defined args &&
-        (zlt l Int.max_unsigned)) as z. simpl in *.
-destruct z; inv H0.  
-apply andb_true_eq in Heqz. destruct Heqz.
-apply andb_true_eq in H. destruct H. intuition.
-unfold zlt in H0.  destruct (Z_lt_dec l Int.max_unsigned). trivial. inv H0. 
-Qed.
-(*
-Lemma rtl_coop_readonly hf g c m c' m'
-            (CS: RTL_corestep hf g c m c' m')
-            (GV: forall b, isGlobalBlock g b = true -> Mem.valid_block m b):  
-         RDOnly_fwd m m' (ReadOnlyBlocks g).
-  Proof. intros. red; intros.
-     unfold ReadOnlyBlocks in Hb.
-     remember (Genv.find_var_info g b) as d; symmetry in Heqd.
-     destruct d; try discriminate.
-     apply find_var_info_isGlobal in Heqd. apply GV in Heqd.  
-     (*destruct (MRR _ _ Heqd Hb) as [_ [VB _]].     *)
-     inv CS; simpl in *; try apply readonly_refl.
-          destruct a; inv H1. eapply store_readonly; eassumption.
-          eapply free_readonly; eassumption.
-          eapply ec_readonly_strong; eassumption.
-          eapply free_readonly; eassumption.
-          eapply alloc_readonly; eassumption.
-          eapply ec_readonly_strong; eassumption.
-Qed.
-
-Lemma rtl_coop_readonlyT hf g c m c' m'
-            (CS: RTL_corestep hf g c m c' m') B
-            (GV: forall b, B b = true -> Mem.valid_block m b):  
-         RDOnly_fwd m m' B.
-  Proof. intros. red; intros.
-(*     unfold ReadOnlyBlocks in Hb.
-     remember (Genv.find_var_info g b) as d; symmetry in Heqd.
-     destruct d; try discriminate.
-     apply find_var_info_isGlobal in Heqd. apply GV in Heqd.  
-     (*destruct (MRR _ _ Heqd Hb) as [_ [VB _]].     *)*)
-     inv CS; simpl in *; try apply readonly_refl.
-          destruct a; inv H1. eapply store_readonly; eauto.
-          eapply free_readonly; eauto.
-          eapply ec_readonly_strong; eauto.
-          eapply free_readonly; eauto.
-          eapply alloc_readonly; eauto.
-          eapply ec_readonly_strong; eauto.
-Qed.
-(*
-Require Import semantics_lemmas.
-Lemma rtl_coopN_readonly hf g: forall n c m c' m'
-            (CS: corestepN (rtl_coop_sem hf) g n c m c' m')
-            (MRR: mem_respects_readonly g m),
-         RDOnly_fwd m m' (ReadOnlyBlocks g).
-Proof.
-  induction n; simpl; intros; red; intros.
-  inv CS. apply readonly_refl.
-  destruct CS as [cc [mm [CS CSN]]].
-  specialize (rtl_coop_forward _ _ _ _ _ _ CS). intros.
-  apply rtl_coop_readonly in CS; trivial.
-  eapply readonly_trans. eapply CS. eassumption.
-  eapply IHn; try eassumption.
-  eapply mem_respects_readonly_forward'; eassumption.
-Qed.
-
-Lemma rtl_coop_plus_readonly hf g: forall c m c' m'
-            (CS: corestep_plus (rtl_coop_sem hf) g c m c' m')
-            (MRR: mem_respects_readonly g m),
-         RDOnly_fwd m m' (ReadOnlyBlocks g).
-Proof. intros.
-  destruct CS. eapply rtl_coopN_readonly; eassumption.
-Qed.
- 
-Lemma rtl_coop_star_readonly hf g: forall c m c' m'
-            (CS: corestep_star (rtl_coop_sem hf) g c m c' m')
-            (MRR: mem_respects_readonly g m),
-         RDOnly_fwd m m' (ReadOnlyBlocks g).
-Proof. intros.
-  destruct CS. eapply rtl_coopN_readonly; eassumption.
-Qed.
- *)
 *)

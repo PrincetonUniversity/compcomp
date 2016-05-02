@@ -2474,7 +2474,7 @@ Proof. intros.
                     (Locmap.init Vundef)) (sig_res (funsig tf))). 
  split. 
     subst. inv Heqzz. unfold tge in FP. inv FP. rewrite H2.
-    unfold LTL_eff_sem, LTL_coop_sem. simpl.
+    (*unfold LTL_eff_sem, LTL_coop_sem. simpl.*)
     case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
 
   assert (Zlength vals2 = Zlength vals1) as ->. 

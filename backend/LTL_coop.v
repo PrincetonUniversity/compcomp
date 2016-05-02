@@ -48,7 +48,7 @@ Inductive LTL_core : Type :=
              (retty: option typ),     (**r return type at halted *)
       LTL_core.
 
-Section LTL_COOP.
+Section LTL_MEM.
 Variable hf : I64Helpers.helper_functions.
 
 Definition LTL_at_external (c: LTL_core) 
@@ -213,14 +213,6 @@ Definition LTL_halted (q : LTL_core): option val :=
       | _ => None
     end.
 
-(*Original CompCert has this:
-Inductive final_state: state -> int -> Prop :=
-  | final_state_intro: forall rs m r retcode,
-      loc_result (mksignature nil (Some Tint)) = r :: nil ->
-      rs (R r) = Vint retcode ->
-      final_state (Returnstate nil rs m) retcode.
-*)
-
 Lemma LTL_corestep_not_halted ge m q m' q':
        ltl_corestep ge q m q' m' -> LTL_halted q = None.
   Proof. intros. inv H; reflexivity. Qed.
@@ -296,6 +288,21 @@ Proof.
     apply LTL_at_external_halted_excl.
 Defined.
 
+Program Definition LTL_memsem : @MemSem genv LTL_core.
+Proof.
+eapply Build_MemSem with (csem := LTL_core_sem).
+  intros.
+  destruct CS; try apply mem_step_refl.
+  + destruct a; inv H0. eapply mem_step_store; eassumption.
+  + eapply mem_step_free; eassumption.
+  + inv H. eapply extcall_mem_step; eassumption.
+  + eapply mem_step_free; eassumption.
+  + eapply mem_step_alloc; eassumption.
+  + inv H0. eapply extcall_mem_step; eassumption.
+Defined.
+
+End LTL_MEM.
+(*
 (************************NOW SHOW THAT WE ALSO HAVE A COOPSEM******)
 
 Lemma LTL_forward : forall g c m c' m' (CS: ltl_corestep g c m c' m'), 
@@ -362,18 +369,4 @@ apply Build_DecayCoreSem with (decaysem := LTL_coop_sem).
   apply LTL_decay.
 Defined.
 
-Program Definition LTL_memsem : @MemSem genv LTL_core.
-Proof.
-eapply Build_MemSem with (csem := LTL_core_sem).
-  intros.
-  destruct CS; try apply mem_step_refl.
-  + destruct a; inv H0. eapply mem_step_store; eassumption.
-  + eapply mem_step_free; eassumption.
-  + inv H. eapply extcall_mem_step; eassumption.
-  + eapply mem_step_free; eassumption.
-  + eapply mem_step_alloc; eassumption.
-  + inv H0. eapply extcall_mem_step; eassumption.
-Defined.
-
-End LTL_COOP.
-
+*)

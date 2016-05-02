@@ -19,7 +19,7 @@ Require Import BuiltinEffects.
 
 Require Import val_casted.
 
-Section CLIGHT_COOP.
+Section CLIGHT_MEM.
 
 Variable hf : I64Helpers.helper_functions.
 
@@ -245,6 +245,80 @@ Proof.
     apply CL_at_external_halted_excl.
 Defined.
 
+Definition CL_memsem
+           (FE:function -> list val -> mem -> env -> temp_env -> mem -> Prop)
+           (HFE_mem: forall f vargs m e le m', FE f vargs m e le m'-> mem_step m m')
+           : @MemSem genv CL_core.
+Proof.
+eapply Build_MemSem with (csem := @CL_core_sem FE).
+  intros.
+  destruct CS; try apply mem_step_refl.
+  + destruct H2.
+    - simpl in H3.
+      eapply mem_step_storebytes.
+      apply Mem.store_storebytes; apply H3.
+    - eapply mem_step_storebytes. apply H7.
+  + eapply extcall_mem_step; eassumption.
+  + eapply mem_step_freelist; eassumption.
+  + eapply mem_step_freelist; eassumption.
+  + eapply mem_step_freelist; eassumption.
+  + eauto.
+Defined.
+
+Lemma alloc_variables_mem_step: forall vars m e e2 m'
+      (M: alloc_variables e m vars e2 m'), mem_step m m'.
+Proof. intros.
+  induction M.
+  apply mem_step_refl.
+  eapply mem_step_trans.
+    eapply mem_step_alloc; eassumption. eassumption. 
+Qed.
+
+Lemma bind_parameters_mem_step: forall e m pars vargs m'
+      (M: bind_parameters e m pars vargs m'), mem_step m m'.
+Proof. intros.
+  induction M.
+  apply mem_step_refl.
+  inv H0.
++ eapply mem_step_trans; try eassumption. simpl in H2.
+  eapply mem_step_store; eassumption. 
++ eapply mem_step_trans; try eassumption.
+  eapply mem_step_storebytes; eassumption.  
+Qed.
+
+Lemma function_entry1_mem_step: forall f vargs m e le m', 
+      function_entry1 f vargs m e le m'-> mem_step m m'.
+Proof. intros. inv H.
+  eapply mem_step_trans.
+  eapply alloc_variables_mem_step; try eassumption.
+  eapply bind_parameters_mem_step; eassumption.
+Qed.
+
+Lemma function_entry2_mem_step: forall f vargs m e le m', 
+      function_entry2 f vargs m e le m'-> mem_step m m'.
+Proof. intros. inv H.
+    eapply alloc_variables_mem_step; try eassumption.
+Qed.
+
+Definition CL_memsem1 := CL_memsem _ function_entry1_mem_step.
+Definition CL_memsem2 := CL_memsem _ function_entry2_mem_step.
+
+Lemma alloc_variables_forward vars m e e2 m'
+      (M: alloc_variables e m vars e2 m'): mem_forward m m'.
+Proof.
+  apply alloc_variables_mem_step in M.
+  apply mem_forward_preserve in M. trivial.
+Qed.
+
+Lemma bind_parameter_forward e m pars vargs m'
+      (M: bind_parameters e m pars vargs m'):
+      mem_forward m m'.
+Proof. 
+  apply bind_parameters_mem_step in M.
+  apply mem_forward_preserve in M. trivial. 
+Qed.
+
+(*
 Lemma CL_forward : 
   forall (FE: function -> list val -> mem -> env -> temp_env -> mem -> Prop)
          (HFE: forall f vargs m e le m', FE f vargs m e le m'-> mem_forward m m')
@@ -497,62 +571,5 @@ Definition CL_decay_sem2 : @DecayCoreSem genv CL_core.
   apply function_entry2_decay. 
 Defined.
 
-Definition CL_memsem
-           (FE:function -> list val -> mem -> env -> temp_env -> mem -> Prop)
-           (HFE_mem: forall f vargs m e le m', FE f vargs m e le m'-> mem_step m m')
-           : @MemSem genv CL_core.
-Proof.
-eapply Build_MemSem with (csem := @CL_core_sem FE).
-  intros.
-  destruct CS; try apply mem_step_refl.
-  + destruct H2.
-    - simpl in H3.
-      eapply mem_step_storebytes.
-      apply Mem.store_storebytes; apply H3.
-    - eapply mem_step_storebytes. apply H7.
-  + eapply extcall_mem_step; eassumption.
-  + eapply mem_step_freelist; eassumption.
-  + eapply mem_step_freelist; eassumption.
-  + eapply mem_step_freelist; eassumption.
-  + eauto.
-Defined.
-
-Lemma alloc_variables_mem_step: forall vars m e e2 m'
-      (M: alloc_variables e m vars e2 m'), mem_step m m'.
-Proof. intros.
-  induction M.
-  apply mem_step_refl.
-  eapply mem_step_trans.
-    eapply mem_step_alloc; eassumption. eassumption. 
-Qed.
-
-Lemma bind_parameter_mem_step: forall e m pars vargs m'
-      (M: bind_parameters e m pars vargs m'), mem_step m m'.
-Proof. intros.
-  induction M.
-  apply mem_step_refl.
-  inv H0.
-+ eapply mem_step_trans; try eassumption. simpl in H2.
-  eapply mem_step_store; eassumption. 
-+ eapply mem_step_trans; try eassumption.
-  eapply mem_step_storebytes; eassumption.  
-Qed.
-
-Lemma function_entry1_mem_step: forall f vargs m e le m', 
-      function_entry1 f vargs m e le m'-> mem_step m m'.
-Proof. intros. inv H.
-  eapply mem_step_trans.
-  eapply alloc_variables_mem_step; try eassumption.
-  eapply bind_parameter_mem_step; eassumption.
-Qed.
-
-Lemma function_entry2_mem_step: forall f vargs m e le m', 
-      function_entry2 f vargs m e le m'-> mem_step m m'.
-Proof. intros. inv H.
-    eapply alloc_variables_mem_step; try eassumption.
-Qed.
-
-Definition CL_memsem1 := CL_memsem _ function_entry1_mem_step.
-Definition CL_memsem2 := CL_memsem _ function_entry2_mem_step.
-
-End CLIGHT_COOP.
+End CLIGHT_COOP.*)
+End CLIGHT_MEM.

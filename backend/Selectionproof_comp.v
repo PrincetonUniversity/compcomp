@@ -3408,7 +3408,7 @@ eapply simulations_lemmas.inj_simulation_star with
       split.
       apply effstep_corestep in H.
              eapply mem_respects_readonly_fwd. eassumption.
-             eapply corestep_fwd; eassumption.
+             eapply corestep_fwd. apply H.
              eapply corestep_rdonly; eassumption.
       destruct CS2 as [CS2 | [_ CS2]]. 
         apply effstep_plus_corestep_plus in CS2.

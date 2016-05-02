@@ -144,7 +144,7 @@ CORE=Extensionality.v \
   base.v eq_dec.v Address.v \
   Coqlib2.v \
   mem_lemmas.v mem_welldefined.v \
-  semantics.v semantics_lemmas.v \
+  semantics.v semantics_lemmas.v CoopCoreSem.v \
   extspec.v open_safety.v \
   structured_injections.v \
   effect_semantics.v \

@@ -1532,7 +1532,7 @@ Proof. intros.
             (mk_load_frame (init_locset (sig_args (funsig tf)) vals2) fi)).
   split.
     subst. inv Heqzz. unfold tge in FP. inv FP. rewrite H2.
-    unfold Linear_eff_sem, Linear_coop_sem. simpl.
+    (*unfold Linear_eff_sem, Linear_coop_sem. simpl.*)
     case_eq (Int.eq_dec Int.zero Int.zero). intros ? e. 
   
   assert (Zlength vals2 = Zlength vals1) as ->. 

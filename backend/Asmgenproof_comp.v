@@ -892,7 +892,7 @@ Proof. intros.
   split.
 
   subst. inv Heqzz. unfold tge in FP. inv FP. rewrite H2. inv Ini.
-  unfold Asm_eff_sem, Asm_coop_sem. simpl.
+  (*unfold Asm_eff_sem, Asm_coop_sem. simpl.*)
   case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
 
   assert (val_casted.val_has_type_list_func vals2 (sig_args (funsig tf))=true) as ->.

@@ -1029,8 +1029,8 @@ Proof. intros vars.
     eapply sm_locally_allocated_trans; try eassumption.
       eapply alloc_forward; eassumption.
       eapply Clight_coop.alloc_variables_forward; try eassumption.
-      eapply alloc_forward; eassumption.
-      eapply alloc_variables_forward; try eassumption.
+      eapply alloc_forward; eassumption. 
+      eapply Csharpminor_coop.alloc_variables_forward; try eassumption. 
 Qed.
 
 Definition match_tempenv (j:meminj) (le: temp_env) (tle: Csharpminor.temp_env) :=
@@ -1827,14 +1827,16 @@ Qed.
 
 Lemma MATCH_initial: forall v vals1 c1 m1 j vals2 m2 (DomS DomT : block -> bool)
       (FE : Clight.function -> list val -> mem -> Clight.env -> Clight.temp_env -> mem -> Prop)
-      (FE_FWD : forall f vargs m e lenv m', FE f vargs m e lenv m' ->
-                mem_forward m m')
+(*      (FE_FWD : forall f vargs m e lenv m', FE f vargs m e lenv m' ->
+                mem_forward m m')*)
       (FE_UNCH : forall f vargs m e lenv m', FE f vargs m e lenv m' ->
           Mem.unchanged_on
             (fun (b : block) (z : Z) => EmptyEffect b z = false) m m')
-      (FE_RDO : forall f vargs m e lenv m', FE f vargs m e lenv m' ->
-          forall b, Mem.valid_block m b -> readonly m b m')
-      (Ini: initial_core (clight_eff_sem hf FE FE_FWD FE_UNCH FE_RDO) ge v vals1 = Some c1)
+(*      (FE_RDO : forall f vargs m e lenv m', FE f vargs m e lenv m' ->
+          forall b, Mem.valid_block m b -> readonly m b m')*)
+      (FE_MEM : forall f vargs m e lenv m', FE f vargs m e lenv m' -> mem_step m m')
+      (*(Ini: initial_core (clight_eff_sem hf FE FE_FWD FE_UNCH FE_RDO) ge v vals1 = Some c1)*)
+      (Ini: initial_core (clight_eff_sem hf FE FE_UNCH FE_MEM) ge v vals1 = Some c1)
       (Inj: Mem.inject j m1 m2)
       (VInj: Forall2 (val_inject j) vals1 vals2)
       (PG:meminj_preserves_globals ge j)
@@ -1951,18 +1953,20 @@ Qed.
 Lemma MATCH_afterExternal: forall
       (FE : Clight.function -> list val -> mem -> 
             Clight.env -> Clight.temp_env -> mem -> Prop)
-      (FE_FWD : forall f vargs m e lenv m',
-         FE f vargs m e lenv m' -> mem_forward m m')
+(*      (FE_FWD : forall f vargs m e lenv m',
+         FE f vargs m e lenv m' -> mem_forward m m')*)
       (FE_UNCH : forall f vargs m e lenv m',
          FE f vargs m e lenv m' -> 
          Mem.unchanged_on
             (fun (b : block) (z : Z) => EmptyEffect b z = false) m m')
-      (FE_RDO : forall f vargs m e lenv m', FE f vargs m e lenv m' ->
-          forall b, Mem.valid_block m b -> readonly m b m')
+(*      (FE_RDO : forall f vargs m e lenv m', FE f vargs m e lenv m' ->
+          forall b, Mem.valid_block m b -> readonly m b m')*)
+      (FE_MEM : forall f vargs m e lenv m', FE f vargs m e lenv m' -> mem_step m m')
        mu st1 st2 m1 e vals1 m2 ef_sig vals2 e' ef_sig'
       (MemInjMu : Mem.inject (as_inj mu) m1 m2)
       (MatchMu: MATCH st1 mu st1 m1 st2 m2)
-      (AtExtSrc : at_external (clight_eff_sem hf FE FE_FWD FE_UNCH FE_RDO) st1 = Some (e, ef_sig, vals1))
+(*      (AtExtSrc : at_external (clight_eff_sem hf FE FE_FWD FE_UNCH FE_RDO) st1 = Some (e, ef_sig, vals1))*)
+      (AtExtSrc : at_external (clight_eff_sem hf FE FE_UNCH FE_MEM) st1 = Some (e, ef_sig, vals1))
       (AtExtTgt : at_external (csharpmin_eff_sem hf) st2 = Some (e', ef_sig', vals2))
       (ValInjMu : Forall2 (val_inject (restrict (as_inj mu) (vis mu))) vals1 vals2)
       (pubSrc' : block -> bool)
@@ -1998,7 +2002,8 @@ Lemma MATCH_afterExternal: forall
                (fun b z => locBlocksSrc nu b = true /\ pubBlocksSrc nu b = false) m1 m1')
        (UnchLOOR: Mem.unchanged_on (local_out_of_reach nu m1) m2 m2'),
   exists (st1' : CL_core) (st2' : CSharpMin_core),
-  after_external (clight_eff_sem hf FE FE_FWD FE_UNCH FE_RDO) (Some ret1) st1 =Some st1' /\
+(*  after_external (clight_eff_sem hf FE FE_FWD FE_UNCH FE_RDO) (Some ret1) st1 =Some st1' /\*)
+  after_external (clight_eff_sem hf FE FE_UNCH FE_MEM) (Some ret1) st1 =Some st1' /\
   after_external (csharpmin_eff_sem hf) (Some ret2) st2 = Some st2' /\
   MATCH st1' mu' st1' m1' st2' m2'.
 Proof. intros.

@@ -264,12 +264,13 @@ Inductive clight_effstep (ge:genv): (block -> Z -> bool) ->
 Variable FE_FWD: forall f vargs m e le m', FE f vargs m e le m' -> mem_forward m m'.
 Variable FE_UNCH: forall f vargs m e le m', FE f vargs m e le m'->
          Mem.unchanged_on (fun b z => EmptyEffect b z = false) m m'.
-Variable FE_RDonly: forall f vargs m e le m', FE f vargs m e le m'->
-         forall b, Mem.valid_block m b -> readonly m b m'.
+(*Variable FE_RDonly: forall f vargs m e le m', FE f vargs m e le m'->
+         forall b, Mem.valid_block m b -> readonly m b m'.*)
+Variable HFE_mem: forall f vargs m e le m', FE f vargs m e le m'-> mem_step m m'.
 
 Lemma clightstep_effax1: forall (M : block -> Z -> bool) ge c m c' m'
       (H: clight_effstep ge M c m c' m'),
-       corestep (CL_coop_sem hf FE FE_FWD FE_RDonly) ge c m c' m' /\
+       corestep (CL_memsem hf FE HFE_mem) ge c m c' m' /\
        Mem.unchanged_on (fun (b : block) (ofs : Z) => M b ofs = false) m m'.
 Proof. 
 intros.
@@ -280,7 +281,7 @@ intros.
          apply Mem.unchanged_on_refl.
   split. econstructor; try eassumption.
          apply Mem.unchanged_on_refl.
-  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+  split. unfold corestep; simpl. econstructor; eassumption.
          eapply BuiltinEffect_unchOn; eassumption.
   split. econstructor; try eassumption.
          apply Mem.unchanged_on_refl.
@@ -325,7 +326,7 @@ intros.
 Qed.
 
 Lemma clightstep_effax2: forall ge c m c' m',
-      corestep (CL_coop_sem hf FE FE_FWD FE_RDonly) ge c m c' m' ->
+      corestep (CL_memsem hf FE HFE_mem) ge c m c' m' ->
       exists M, clight_effstep ge M c m c' m'.
 Proof.
 intros. inv H.
@@ -386,10 +387,9 @@ intros.
   eapply FreelistEffect_validblock; eassumption.
 Qed.
 
-Definition clight_eff_sem  
-  :  @EffectSem Clight.genv CL_core.
+Definition clight_eff_sem :  @EffectSem Clight.genv CL_core.
 Proof.
-eapply Build_EffectSem with (sem := CL_coop_sem hf _ FE_FWD FE_RDonly)
+eapply Build_EffectSem with (sem := CL_memsem hf _ HFE_mem)
          (effstep:=clight_effstep).
 eapply clightstep_effax1. 
 apply clightstep_effax2. 
@@ -413,7 +413,7 @@ Proof. intros. inv H.
   specialize (alloc_variables_forward _ _ _ _ _ H1).
   eapply unchanged_on_trans; try eassumption.
     eapply alloc_variables_unchanged_on; eassumption.
-  clear H1. remember (fn_params f) as pars. clear Heqpars.
+  clear H1. remember (fn_params f) as pars. clear Heqpars hf.
   generalize dependent m1. generalize dependent vargs.
   induction pars; simpl; intros.
     inv H2. apply Mem.unchanged_on_refl.
@@ -450,17 +450,15 @@ Qed.
 Definition CL_eff_sem1: @EffectSem Clight.genv CL_core.
 Proof.
   eapply (clight_eff_sem function_entry1).
-  apply function_entry1_forward. 
   apply function_entry1_UNCH.
-  apply function_entry1_readonly.
+  apply function_entry1_mem_step.
 Defined.
 
 Definition CL_eff_sem2: @EffectSem Clight.genv CL_core.
 Proof.
   eapply (clight_eff_sem function_entry2).
-  apply function_entry2_forward. 
   apply function_entry2_UNCH.
-  apply function_entry2_readonly.
+  apply function_entry2_mem_step.
 Defined.
 
 End CLIGHT_EFF.

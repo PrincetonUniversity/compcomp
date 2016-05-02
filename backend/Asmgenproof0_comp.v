@@ -780,8 +780,9 @@ Lemma eff_exec_straight_forward:  forall c1 rs1 m1 c2 rs2 m2 U ,
   eff_exec_straight U c1 rs1 m1 c2 rs2 m2 -> mem_forward m1 m2.
 Proof. intros.
   induction H.
-   eapply exec_instr_forward; eassumption.
-   apply exec_instr_forward in H.
+    apply mem_forward_preserve.
+    eapply exec_instr_mem_step; eassumption.
+  apply exec_instr_mem_step in H. apply mem_forward_preserve in H.
      eapply mem_forward_trans; eassumption.
 Qed.
 

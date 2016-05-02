@@ -1491,7 +1491,7 @@ Proof.
   assert (FF: exists f', tf = Internal f').
   Errors.monadInv TF. eexists; reflexivity.
   destruct FF as [f' ?]. subst tf.
-  unfold rtl_eff_sem, rtl_coop_sem. simpl.
+  unfold rtl_eff_sem, RTL_memsem. simpl.
   case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
   unfold tge in FP; rewrite FP. 
   assert (val_casted.val_has_type_list_func vals2 (sig_args (funsig (Internal f')))=true) as ->.

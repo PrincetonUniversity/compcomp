@@ -32,7 +32,7 @@ Inductive load_frame: Type :=
            (retty: option typ),  (**r return type *)
     load_frame.
 
-Section ASM_COOP.
+Section ASM_MEM.
 Variable hf : I64Helpers.helper_functions.
 
 Section RELSEM.
@@ -259,342 +259,7 @@ Proof.
 Defined.
 End ASM_CORESEM.
 
-(************************NOW SHOW THAT WE ALSO HAVE A COOPSEM******)
-
-Section ASM_COOPSEM.
-
-Lemma exec_load_forward: forall g chunk m a rs rd rs' m',
-   exec_load g chunk m a rs rd = Next rs' m' ->
-   mem_forward m m'.
-Proof. intros. unfold exec_load in H.
-  remember (Mem.loadv chunk m (eval_addrmode g a rs)) as d.
-  destruct d; inv H. apply  mem_forward_refl.
-Qed.
-
-Lemma exec_store_forward: forall g chunk m a rs rs1 pregs rs' m',
-  exec_store g chunk m a rs rs1 pregs = Next rs' m' ->
-  mem_forward m m'.
-Proof. intros. unfold exec_store in H.
-  remember (Mem.storev chunk m (eval_addrmode g a rs) (rs rs1)) as d.
-  destruct d; inv H.
-  remember (eval_addrmode g a rs) as addr.
-  destruct addr; simpl in *; inv Heqd.
-  apply eq_sym in H0. eapply store_forward; eassumption.
-Qed.
-
-Lemma goto_label_forward: forall c0 l rs m rs' m',
-      goto_label c0 l rs m = Next rs' m' -> mem_forward m m'.
-Proof. intros.
-   unfold goto_label in H. 
-   destruct (label_pos l 0 c0); inv H.
-   destruct (rs PC); inv H1. 
-   apply mem_forward_refl.
-Qed.
-
-Lemma exec_instr_forward g c i rs m rs' m': forall 
-      (EI: exec_instr g c i rs m = Next rs' m'),
-      mem_forward m m'.
-Proof. intros.
-   destruct i; simpl in *; inv EI; try apply mem_forward_refl;
-   try (eapply exec_load_forward; eassumption);
-   try (eapply exec_store_forward; eassumption).
-
-   destruct (Val.divu (rs EAX) (rs # EDX <- Vundef r1)); inv H0.
-   destruct (Val.modu (rs EAX) (rs # EDX <- Vundef r1)); inv H1.
-   apply mem_forward_refl.
-
-   destruct (Val.divs (rs EAX) (rs # EDX <- Vundef r1)); inv H0.
-   destruct (Val.mods (rs EAX) (rs # EDX <- Vundef r1)); inv H1.
-   apply mem_forward_refl.
-
-   destruct (eval_testcond c0 rs); inv H0.
-   destruct b; inv H1; apply mem_forward_refl.
-   apply mem_forward_refl.
-
-   eapply goto_label_forward; eassumption. 
-
-   destruct (eval_testcond c0 rs); inv H0.
-   destruct b; inv H1.
-   eapply goto_label_forward; eassumption. 
-   apply mem_forward_refl.
-
-   destruct (eval_testcond c1 rs); inv H0.
-   destruct b. 
-     destruct (eval_testcond c2 rs); inv H1.
-     destruct b; inv H0. 
-     eapply goto_label_forward; eassumption.
-     apply mem_forward_refl.
-
-     destruct (eval_testcond c2 rs); inv H1.
-     apply mem_forward_refl.
-     destruct (rs r); inv H0.
-     destruct (list_nth_z tbl (Int.unsigned i)); inv H1. 
-     eapply goto_label_forward; eassumption.
-  remember (Mem.alloc m 0 sz) as d; apply eq_sym in Heqd.
-    destruct d; inv H0.
-    remember (Mem.store Mint32 m0 b (Int.unsigned (Int.add Int.zero ofs_link)) (rs ESP)) as q.
-    apply eq_sym in Heqq; destruct q; inv H1.
-    remember (Mem.store Mint32 m1 b (Int.unsigned (Int.add Int.zero ofs_ra)) (rs RA)) as w.
-    destruct w; apply eq_sym in Heqw; inv H0.
-    eapply mem_forward_trans.
-      eapply alloc_forward; eassumption. 
-    eapply mem_forward_trans.
-      eapply store_forward; eassumption. 
-      eapply store_forward; eassumption.
-  destruct (Mem.loadv Mint32 m (Val.add (rs ESP) (Vint ofs_ra))); inv H0.  
-    destruct (Mem.loadv Mint32 m (Val.add (rs ESP) (Vint ofs_link))); inv H1.  
-    destruct (rs ESP); inv H0.
-    remember (Mem.free m b 0 sz) as t.
-    destruct t; inv H1; apply eq_sym in Heqt. 
-    eapply free_forward; eassumption. 
-Qed.
-
-Lemma Asm_forward : forall g c m c' m'
-         (CS: asm_step g c m c' m'), 
-         mem_forward m m'.
-  Proof. intros.
-   inv CS; try apply mem_forward_refl. clear - H2.
-   eapply exec_instr_forward; eassumption.
-   inv H2. eapply external_call_mem_forward; eassumption.
-   inv H1. eapply external_call_mem_forward; eassumption.
-   inv H1. unfold store_args in H3. 
-     eapply mem_forward_trans.
-     eapply alloc_forward; eauto.
-     eapply store_args_fwd; eauto.
-Qed.
-   
-Lemma exec_load_readonly g ch m a rs rd rs' m': forall 
-      (EI: exec_load g ch m a rs rd = Next rs' m') b
-      (VB: Mem.valid_block m b),
-      readonly m b m'.
-Proof. intros.
-  unfold exec_load in EI.
-  remember (Mem.loadv ch m (eval_addrmode g a rs) ).
-  symmetry in Heqo; destruct o; inv EI. apply readonly_refl.
-Qed.
-
-Lemma exec_store_readonly g ch m a rs rs0 vals rs' m': forall
-      (ES: exec_store g ch m a rs rs0 vals = Next rs' m') b
-      (VB: Mem.valid_block m b),
-      readonly m b m'.
-Proof. intros.
-  unfold exec_store in ES.
-  remember (Mem.storev ch m (eval_addrmode g a rs) (rs rs0)).
-  symmetry in Heqo; destruct o; inv ES.
-  remember (eval_addrmode g a rs). destruct v; inv Heqo. 
-  eapply store_readonly; eassumption.
-Qed.
-
-Lemma goto_label_readonly c0 l rs m rs' m': forall
-      (G: goto_label c0 l rs m = Next rs' m') b
-      (VB: Mem.valid_block m b), readonly m b m'.
-Proof. intros.
-   unfold goto_label in G. 
-   destruct (label_pos l 0 c0); inv G.
-   destruct (rs PC); inv H0. 
-   apply readonly_refl.
-Qed.
-
-Lemma exec_instr_readonly g c i rs m rs' m': forall 
-      (EI: exec_instr g c i rs m = Next rs' m') b
-      (VB: Mem.valid_block m b),
-      readonly m b m'.
-Proof. intros.
-   destruct i; simpl in *; inv EI; try apply readonly_refl;
-   try (eapply exec_load_readonly; eassumption);
-   try (eapply exec_store_readonly; eassumption).
-
-   destruct (Val.divu (rs EAX) (rs # EDX <- Vundef r1)); inv H0.
-   destruct (Val.modu (rs EAX) (rs # EDX <- Vundef r1)); inv H1.
-   apply readonly_refl.
-
-   destruct (Val.divs (rs EAX) (rs # EDX <- Vundef r1)); inv H0.
-   destruct (Val.mods (rs EAX) (rs # EDX <- Vundef r1)); inv H1.
-   apply readonly_refl.
-
-   destruct (eval_testcond c0 rs); inv H0.
-   destruct b0; inv H1; apply readonly_refl.
-   apply readonly_refl.
-
-   eapply goto_label_readonly; eassumption. 
-
-   destruct (eval_testcond c0 rs); inv H0.
-   destruct b0; inv H1.
-   eapply goto_label_readonly; eassumption. 
-   apply readonly_refl.
-
-   destruct (eval_testcond c1 rs); inv H0.
-   destruct b0. 
-     destruct (eval_testcond c2 rs); inv H1.
-     destruct b0; inv H0. 
-     eapply goto_label_readonly; eassumption.
-   apply readonly_refl.
-
-     destruct (eval_testcond c2 rs); inv H1.
-     apply readonly_refl.
-     destruct (rs r); inv H0.
-     destruct (list_nth_z tbl (Int.unsigned i)); inv H1. 
-     eapply goto_label_readonly; eassumption.
-  remember (Mem.alloc m 0 sz) as d; apply eq_sym in Heqd.
-    destruct d; inv H0.
-    remember (Mem.store Mint32 m0 b0 (Int.unsigned (Int.add Int.zero ofs_link))
-         (rs ESP)) as q.
-    apply eq_sym in Heqq; destruct q; inv H1.
-    remember (Mem.store Mint32 m1 b0 (Int.unsigned (Int.add Int.zero ofs_ra))
-         (rs RA)) as w.
-    destruct w; apply eq_sym in Heqw; inv H0.
-    eapply readonly_trans.
-      eapply alloc_readonly; eassumption.
-    apply alloc_forward in Heqd. 
-    eapply readonly_trans.
-      eapply store_readonly; try eassumption. eapply Heqd; eassumption. 
-      eapply store_readonly; try eassumption. eapply store_forward; try eassumption. eapply Heqd; eassumption. 
-  destruct (Mem.loadv Mint32 m (Val.add (rs ESP) (Vint ofs_ra))); inv H0.  
-    destruct (Mem.loadv Mint32 m (Val.add (rs ESP) (Vint ofs_link))); inv H1.  
-    destruct (rs ESP); inv H0.
-    remember (Mem.free m b0 0 sz) as t.
-    destruct t; inv H1; apply eq_sym in Heqt. 
-    eapply free_readonly; eassumption. 
-Qed.
-
-Lemma Asm_rdonly g c m c' m'
-            (CS: asm_step g c m c' m') b
-            (VB: Mem.valid_block m b):  
-         readonly m b m'.
-  Proof.
-     inv CS; simpl in *; try apply readonly_refl.
-          eapply exec_instr_readonly; eassumption. 
-          inv H2. eapply ec_readonly_strong; eassumption.
-          inv H1. eapply ec_readonly_strong; eassumption.
-          eapply readonly_trans. 
-            eapply alloc_readonly; eassumption.
-            apply alloc_forward in H0.
-            eapply store_args_readonly; try eassumption. apply H0; trivial.
-Qed.
-
-Program Definition Asm_coop_sem : 
-  CoopCoreSem genv state.
-Proof.
-apply Build_CoopCoreSem with (coopsem := Asm_core_sem).
-  apply Asm_forward.
-  apply Asm_rdonly.
-Defined.
-
-End ASM_COOPSEM.
-
-Section ASM_DECAYSEM.
-
-Lemma exec_load_decay g ch m a rs rd rs' m': forall 
-      (EI: exec_load g ch m a rs rd = Next rs' m'),
-      decay m m'.
-Proof. intros.
-  unfold exec_load in EI.
-  remember (Mem.loadv ch m (eval_addrmode g a rs) ).
-  symmetry in Heqo; destruct o; inv EI. apply decay_refl.
-Qed.
-
-Lemma exec_store_decay g ch m a rs rs0 vals rs' m': forall
-      (ES: exec_store g ch m a rs rs0 vals = Next rs' m'),
-      decay m m'.
-Proof. intros.
-  unfold exec_store in ES.
-  remember (Mem.storev ch m (eval_addrmode g a rs) (rs rs0)).
-  symmetry in Heqo; destruct o; inv ES.
-  remember (eval_addrmode g a rs). destruct v; inv Heqo.
-  eapply store_decay; eassumption.
-Qed.
-
-Lemma goto_label_decay c0 l rs m rs' m': forall
-      (G: goto_label c0 l rs m = Next rs' m'),
-      decay m m'.
-Proof. intros.
-   unfold goto_label in G. 
-   destruct (label_pos l 0 c0); inv G.
-   destruct (rs PC); inv H0. 
-   apply decay_refl.
-Qed.
-
-Lemma exec_instr_decay g c i rs m rs' m': forall 
-      (EI: exec_instr g c i rs m = Next rs' m'),
-      decay m m'.
-Proof. intros.
-   destruct i; simpl in *; inv EI; try apply decay_refl;
-   try (eapply exec_load_decay; eassumption);
-   try (eapply exec_store_decay; eassumption).
-
-   destruct (Val.divu (rs EAX) (rs # EDX <- Vundef r1)); inv H0.
-   destruct (Val.modu (rs EAX) (rs # EDX <- Vundef r1)); inv H1.
-   apply decay_refl.
-
-   destruct (Val.divs (rs EAX) (rs # EDX <- Vundef r1)); inv H0.
-   destruct (Val.mods (rs EAX) (rs # EDX <- Vundef r1)); inv H1.
-   apply decay_refl.
-
-   destruct (eval_testcond c0 rs); inv H0.
-   destruct b; inv H1; apply decay_refl.
-   apply decay_refl.
-
-   eapply goto_label_decay; eassumption. 
-
-   destruct (eval_testcond c0 rs); inv H0.
-   destruct b; inv H1.
-   eapply goto_label_decay; eassumption. 
-   apply decay_refl.
-
-   destruct (eval_testcond c1 rs); inv H0.
-   destruct b. 
-     destruct (eval_testcond c2 rs); inv H1.
-     destruct b; inv H0. 
-     eapply goto_label_decay; eassumption.
-   apply decay_refl.
-
-     destruct (eval_testcond c2 rs); inv H1.
-     apply decay_refl.
-     destruct (rs r); inv H0.
-     destruct (list_nth_z tbl (Int.unsigned i)); inv H1. 
-     eapply goto_label_decay; eassumption.
-  remember (Mem.alloc m 0 sz) as d; apply eq_sym in Heqd.
-    destruct d; inv H0.
-    remember (Mem.store Mint32 m0 b (Int.unsigned (Int.add Int.zero ofs_link))
-         (rs ESP)) as q.
-    apply eq_sym in Heqq; destruct q; inv H1.
-    remember (Mem.store Mint32 m1 b (Int.unsigned (Int.add Int.zero ofs_ra))
-         (rs RA)) as w.
-    destruct w; apply eq_sym in Heqw; inv H0.
-    eapply decay_trans.
-      eapply alloc_forward; eassumption.
-      eapply alloc_decay; eassumption.
-    eapply decay_trans.
-      eapply store_forward; eassumption.
-      eapply store_decay; eassumption.
-      eapply store_decay; eassumption.
-  destruct (Mem.loadv Mint32 m (Val.add (rs ESP) (Vint ofs_ra))); inv H0.  
-    destruct (Mem.loadv Mint32 m (Val.add (rs ESP) (Vint ofs_link))); inv H1.  
-    destruct (rs ESP); inv H0.
-    remember (Mem.free m b 0 sz) as t.
-    destruct t; inv H1; apply eq_sym in Heqt. 
-    eapply free_decay; eassumption. 
-Qed.
-
-Lemma asm_decay : forall g c m c' m' (CS: asm_step g c m c' m'), decay m m'.
-Proof. intros.
-  inv CS; simpl in *; try apply decay_refl.
-          eapply exec_instr_decay; eassumption. 
-          inv H2. eapply ec_decay; eassumption.
-          inv H1. eapply ec_decay; eassumption.
-          eapply decay_trans. 
-            eapply alloc_forward; eassumption.
-            eapply alloc_decay; eassumption.
-            apply alloc_forward in H0.
-            eapply store_args_decay; try eassumption.
-Qed.
-
-Program Definition Asm_decay_sem : 
-  @DecayCoreSem genv state.
-Proof.
-apply Build_DecayCoreSem with (decaysem := Asm_coop_sem).
-  apply asm_decay.
-Defined.
+Section ASM_MEMSEM.
 
 Lemma exec_load_mem_step g ch m a rs rd rs' m': forall 
       (EI: exec_load g ch m a rs rd = Next rs' m'),
@@ -697,14 +362,23 @@ Proof. intros.
             eapply store_args_mem_step; try eassumption.
 Qed.
 
-Program Definition Asm_mem_step_sem : @MemSem genv state.
+Program Definition Asm_mem_sem : @MemSem genv state.
 Proof.
-apply Build_MemSem with (csem := Asm_coop_sem).
+apply Build_MemSem with (csem := Asm_core_sem).
   apply asm_mem_step.
 Defined.
 
-End ASM_DECAYSEM.
+Lemma exec_instr_forward g c i rs m rs' m': forall 
+      (EI: exec_instr g c i rs m = Next rs' m'),
+      mem_forward m m'.
+Proof. intros.
+    apply mem_forward_preserve.
+    eapply exec_instr_mem_step; eassumption.
+Qed.
 
-End ASM_COOP.
+End ASM_MEMSEM.
+
+End ASM_MEM.
+
 
 

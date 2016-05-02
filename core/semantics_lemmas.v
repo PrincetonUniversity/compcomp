@@ -21,7 +21,7 @@ Definition corestep_fun {G C M : Type} (sem : CoreSemantics G C M) :=
 (**  Multistepping *)
 
 Section corestepN.
-  Context {G C M E:Type} (Sem:CoreSemantics G C M) (ge:G).
+  Context {G C M:Type} (Sem:CoreSemantics G C M) (ge:G).
 
   Fixpoint corestepN (n:nat) : C -> M -> C -> M -> Prop :=
     match n with
@@ -129,90 +129,71 @@ Section corestepN.
 
 End corestepN.
 
-Lemma memsem_preservesN {G C} (s: @MemSem G C) P (HP: memstep_preserve P):
-      forall g n c m c' m', corestepN s g n c m c' m'-> P m m'.
-Proof.
- intros g; induction n; intros.
- inv H. apply (preserve_refl HP).
- inv H. destruct H0 as [mm [? ?]].
- eapply (preserve_trans _ HP).
- eapply (memsem_preserves _ _ HP); eassumption.
- apply IHn in H0; trivial.
-Qed. 
+Section memstepN.
+  Context {G C:Type} (M:@MemSem G C) (g:G).
 
-Lemma memsem_preserves_plus {G C} (s: @MemSem G C) P (HP:memstep_preserve P):
-      forall g c m c' m', corestep_plus s g c m c' m'-> P m m'.
-Proof.
- intros. destruct H. apply (memsem_preservesN _ _ HP) in H; trivial.
+Lemma corestepN_mem n: forall c m c' m', corestepN M g n c m c' m' -> mem_step m m'.
+induction n; intros; inv H.
+  apply mem_step_refl.
+  destruct H0 as [m'' [CS CSN]]. eapply mem_step_trans. 
+  eapply corestep_mem; eassumption.
+  eapply IHn; eassumption.
 Qed.
 
-Lemma coalg_preserves_star {G C} (s: @MemSem G C) P (HP:memstep_preserve P):
-      forall g c m c' m', corestep_star s g c m c' m'-> P m m'.
+Lemma corestep_plus_mem c m c' m' (H:corestep_plus M g c m c' m'): mem_step m m'.
+destruct H as [n H]. eapply corestepN_mem; eassumption. Qed.
+
+Lemma corestep_star_mem c m c' m' (H:corestep_star M g c m c' m'): mem_step m m'.
+destruct H as [n H]. eapply corestepN_mem; eassumption. Qed.
+
+Lemma memsem_preservesN P (HP: memstep_preserve P)
+      n c m c' m' (H: corestepN M g n c m c' m'): P m m'.
+apply corestepN_mem in H. apply HP; trivial. Qed. 
+
+Lemma memsem_preserves_plus P (HP:memstep_preserve P)
+      c m c' m' (H: corestep_plus M g c m c' m'): P m m'.
+destruct H. apply (memsem_preservesN _ HP) in H; trivial. Qed.
+
+Lemma memsem_preserves_star P (HP:memstep_preserve P)
+      c m c' m' (H: corestep_star M g c m c' m'): P m m'.
+destruct H. apply (memsem_preservesN _ HP) in H; trivial. Qed.
+
+Lemma corestepN_fwd n  c m c' m'
+   (CS:corestepN M g n c m c' m'): mem_forward m m'.
 Proof.
- intros. destruct H. apply (memsem_preservesN _ _ HP) in H; trivial.
+eapply memsem_preservesN; try eassumption. apply mem_forward_preserve.
 Qed.
 
-
-Section CoopCoreSemLemmas.
-Context {G C: Type}.
-Variable coopsem: CoopCoreSem G C.
-
-Lemma corestepN_fwd: forall ge c m c' m' n,
-  corestepN coopsem ge n c m c' m' -> 
-  mem_forward m m'.
+Lemma corestep_plus_fwd c m c' m'
+   (CS:corestep_plus M g c m c' m'): mem_forward m m'.
 Proof.
-intros until n; revert c m.
-induction n; simpl; auto.
-inversion 1; apply mem_forward_refl; auto.
-intros c m [c2 [m2 [? ?]]].
-apply mem_forward_trans with (m2 := m2).
-apply corestep_fwd in H; auto.
-eapply IHn; eauto.
+destruct CS. eapply corestepN_fwd; eassumption.
 Qed.
 
-Lemma corestep_star_fwd: forall g c m c' m'
-  (CS:corestep_star coopsem g c m c' m'), 
-  mem_forward m m'.
-Proof. 
-  intros. destruct CS. 
-  eapply corestepN_fwd. 
-  apply H.
-Qed.
-
-Lemma corestep_plus_fwd: forall g c m c' m'
-  (CS:corestep_plus coopsem g c m c' m'), 
-  mem_forward m m'.
+Lemma corestep_star_fwd c m c' m'
+   (CS:corestep_star M g c m c' m'): mem_forward m m'.
 Proof.
-   intros. destruct CS.
-   eapply corestepN_fwd.
-   apply H.
+destruct CS. eapply corestepN_fwd; eassumption.
 Qed.
-
-Lemma corestepN_rdonly: forall ge c m c' m' n,
-  corestepN coopsem ge n c m c' m' -> forall b
-  (VB: Mem.valid_block m b), readonly m b m'.
+ 
+Lemma corestepN_rdonly n c m c' m'
+    (CS:corestepN M g n c m c' m') b (VB:Mem.valid_block m b): readonly m b m'.
 Proof.
-intros until n; revert c m.
-induction n; simpl; auto.
-inversion 1; intros. apply readonly_refl.
-intros c m [c2 [m2 [? ?]]].
-intros. apply readonly_trans with (m2 := m2).
-eapply corestep_rdonly; eauto.
-eapply IHn; eauto. eapply corestep_fwd; eauto.
+eapply (memsem_preservesN _ readonly_preserve'); eassumption.
 Qed.
 
-Lemma corestep_plus_rdonly ge c m c' m'
-  (CS: corestep_plus coopsem ge c m c' m') b
-  (VB: Mem.valid_block m b): readonly m b m'.
+Lemma corestep_plus_rdonly c m c' m'
+   (CS:corestep_plus M g c m c' m') b (VB:Mem.valid_block m b): readonly m b m'.
 Proof.
-  destruct CS. eapply corestepN_rdonly; eauto. 
+destruct CS. eapply corestepN_rdonly; eassumption.
 Qed.
 
-Lemma corestep_star_rdonly ge c m c' m'
-  (CS: corestep_star coopsem ge c m c' m') b
-  (VB: Mem.valid_block m b): readonly m b m'.
+Lemma corestep_star_rdonly c m c' m'
+   (CS:corestep_star M g c m c' m')b (VB:Mem.valid_block m b): readonly m b m'.
 Proof.
-  destruct CS. eapply corestepN_rdonly; eauto. 
+destruct CS. eapply corestepN_rdonly; eassumption.
 Qed.
+ 
+End memstepN.
 
-End CoopCoreSemLemmas.
+

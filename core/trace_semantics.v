@@ -15,6 +15,7 @@ Require Import effect_semantics.
 Require Import simulations.
 Require Import extspec. 
 Require Import mem_lemmas.
+Require Import CoopCoreSem.
 
 Set Implicit Arguments.
 Unset Strict Implicit.

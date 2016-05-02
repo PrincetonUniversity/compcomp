@@ -15,7 +15,7 @@ Require Import semantics.
 Require Import val_casted.
 Require Import BuiltinEffects.
 
-Section CMINOR_COOP.
+Section CMINOR_MEM.
 
 Variable hf : I64Helpers.helper_functions.
 
@@ -51,13 +51,7 @@ Definition FromState (c: Cminor.state) : CMin_core * mem :=
    | Callstate f args k m => (CMin_Callstate f args k, m)
    | Returnstate v k m => (CMin_Returnstate v k, m)
   end. 
-(*
-Definition CMin_init_mem (ge:genv)  (m:mem) d:  Prop:=
-   Genv.alloc_variables ge Mem.empty d = Some m.
-(*Defined initial memory, by adapting the definition of Genv.init_mem*)
-*)
 
-(* initial_core : G -> val -> list val -> option C;*)
 Definition CMin_initial_core (ge:Cminor.genv) (v: val) (args:list val): option CMin_core :=
    match v with
         Vptr b i => 
@@ -77,30 +71,6 @@ Definition CMin_initial_core (ge:Cminor.genv) (v: val) (args:list val): option C
           else None
       | _ => None
    end.  
-
-(*
-Parameter CMin_MainIdent:ident.
-
-Definition CMin_make_initial_core (ge:genv) (v: val) (args:list val): option CMin_core :=
-   match Genv.find_symbol ge CMin_MainIdent with
-        None => None
-      | Some b => match Genv.find_funct_ptr ge b with
-                    None => None
-                  | Some f => match funsig f with
-                                           {| sig_args := sargs; sig_res := sres |} => 
-                                                   match sargs, sres with 
-                                                      nil, Some Tint => Some (CMin_Callstate f nil Kstop) (*args = nil???*)
-                                                   | _ , _ => None
-                                                   end
-                                       end
-                  end
-   end.  
-*)
-(*Original Cminor_semantics has this for initial states:
-Genv.find_symbol ge p.(prog_main) = Some b ->
-      Genv.find_funct_ptr ge b = Some f ->
-      funsig f = mksignature nil (Some Tint) ->
-      initial_state p (Callstate f nil Kstop m0).*)
 
 Definition CMin_at_external (c: CMin_core) : option (external_function * signature * list val) :=
   match c with
@@ -288,6 +258,20 @@ Proof.
     apply CMin_at_external_halted_excl.
 Defined.
 
+Program Definition cmin_memsem : @MemSem genv CMin_core.
+Proof.
+eapply Build_MemSem with (csem := CMin_core_sem).
+  intros.
+  destruct CS; try apply mem_step_refl.
+  + eapply mem_step_free; eassumption.
+  + destruct vaddr; inv H1. eapply mem_step_store; eassumption.
+  + eapply mem_step_free; eassumption.
+  + eapply extcall_mem_step; eassumption.
+  + eapply mem_step_free; eassumption.
+  + eapply mem_step_free; eassumption.
+  + eapply mem_step_alloc; eassumption.
+Defined.
+(*
 (************************NOW SHOW THAT WE ALSO HAVE A COOPSEM******)
 
 Lemma CMin_forward : forall g c m c' m' (CS: CMin_corestep g c m c' m'), 
@@ -349,18 +333,5 @@ apply Build_DecayCoreSem with (decaysem := cmin_coop_sem).
   apply CMin_decay. 
 Defined.
 
-Program Definition cmin_memsem : @MemSem genv CMin_core.
-Proof.
-eapply Build_MemSem with (csem := CMin_core_sem).
-  intros.
-  destruct CS; try apply mem_step_refl.
-  + eapply mem_step_free; eassumption.
-  + destruct vaddr; inv H1. eapply mem_step_store; eassumption.
-  + eapply mem_step_free; eassumption.
-  + eapply extcall_mem_step; eassumption.
-  + eapply mem_step_free; eassumption.
-  + eapply mem_step_free; eassumption.
-  + eapply mem_step_alloc; eassumption.
-Defined.
-
-End CMINOR_COOP.
+*)
+End CMINOR_MEM.

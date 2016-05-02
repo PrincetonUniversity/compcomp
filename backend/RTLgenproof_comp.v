@@ -2906,7 +2906,7 @@ Proof. intros.
   exists (RTL_Callstate nil tf vals2).
   split.
     subst. inv Heqzz. unfold tge in FP. inv FP. rewrite H2.
-    unfold cminsel_eff_sem, cminsel_coop_sem. simpl.
+    (*unfold cminsel_eff_sem, cminsel_coop_sem. simpl.*)
     case_eq (Int.eq_dec Int.zero Int.zero). intros ? e.
 
   assert (Zlength vals2 = Zlength vals1) as ->. 

@@ -34,67 +34,7 @@ Context
   (Sem2 : @EffectSem (Genv.t F2 V2) C2)
   (ge1 : Genv.t F1 V1)
   (ge2 : Genv.t F2 V2).
- (* (CS1_RDO: forall c m c' m', corestep Sem1 ge1 c m c' m' ->
-                  (*mem_respects_readonly ge1 m ->*)
-                  (forall b, isGlobalBlock ge1 b = true -> Mem.valid_block m b) ->
-                  RDOnly_fwd m m' (ReadOnlyBlocks ge1))
-  (CS2_RDO: forall c m c' m', corestep Sem2 ge2 c m c' m' ->
-                  (*mem_respects_readonly ge2 m ->*)
-                  (forall b, isGlobalBlock ge2 b = true -> Mem.valid_block m b) ->
-                  RDOnly_fwd m m' (ReadOnlyBlocks ge2)).
 
-Require Import semantics_lemmas.
-Lemma CS1_RDO_N: forall n c m c' m', corestepN Sem1 ge1 n c m c' m' ->
-                  (*mem_respects_readonly ge1 m ->*)
-                  (forall b, isGlobalBlock ge1 b = true -> Mem.valid_block m b) ->
-                  RDOnly_fwd m m' (ReadOnlyBlocks ge1).
-Proof.
-  induction n; simpl; intros; red; intros.
-  inv H. apply readonly_refl.
-  destruct H as [cc [mm [CS CSN]]].
-  specialize (corestep_fwd _ _ _ _ _ _ CS). intros.
-  apply CS1_RDO in CS; trivial.
-  eapply readonly_trans. eapply CS. eassumption.
-  eapply IHn; try eassumption.
-  intros. apply H. eauto.
-  (*eapply mem_respects_readonly_forward'; eassumption.*)
-Qed.
-
-Lemma CS1_RDO_plus: forall c m c' m', corestep_plus Sem1 ge1 c m c' m' ->
-                  (forall b, isGlobalBlock ge1 b = true -> Mem.valid_block m b) ->
-                  RDOnly_fwd m m' (ReadOnlyBlocks ge1).
-Proof. intros. destruct H. eapply CS1_RDO_N; eassumption. Qed.
-
-Lemma CS1_RDO_star: forall c m c' m', corestep_star Sem1 ge1 c m c' m' -> 
-                  (forall b, isGlobalBlock ge1 b = true -> Mem.valid_block m b) ->  
-                  RDOnly_fwd m m' (ReadOnlyBlocks ge1).
-Proof. intros. destruct H. eapply CS1_RDO_N; eassumption. Qed.
-
-Lemma CS2_RDO_N: forall n c m c' m', corestepN Sem2 ge2 n c m c' m' ->
-                  (forall b, isGlobalBlock ge2 b = true -> Mem.valid_block m b) ->
-                  RDOnly_fwd m m' (ReadOnlyBlocks ge2).
-Proof.
-  induction n; simpl; intros; red; intros.
-  inv H. apply readonly_refl.
-  destruct H as [cc [mm [CS CSN]]].
-  specialize (corestep_fwd _ _ _ _ _ _ CS). intros.
-  apply CS2_RDO in CS; trivial.
-  eapply readonly_trans. eapply CS. eassumption.
-  eapply IHn; try eassumption.
-  intros. apply H. eauto.
-  (*eapply mem_respects_readonly_forward'; eassumption.*)
-Qed.
-
-Lemma CS2_RDO_plus: forall c m c' m', corestep_plus Sem2 ge2 c m c' m' ->
-                  (forall b, isGlobalBlock ge2 b = true -> Mem.valid_block m b) ->
-                  RDOnly_fwd m m' (ReadOnlyBlocks ge2).
-Proof. intros. destruct H. eapply CS2_RDO_N; eassumption. Qed.
-
-Lemma CS2_RDO_star: forall c m c' m', corestep_star Sem2 ge2 c m c' m' ->
-                  (forall b, isGlobalBlock ge2 b = true -> Mem.valid_block m b) ->
-                  RDOnly_fwd m m' (ReadOnlyBlocks ge2).
-Proof. intros. destruct H. eapply CS2_RDO_N; eassumption. Qed.
-*)
 Record SM_simulation_inject := { 
   (** The type of auxiliary data used to model stuttering. *)
   core_data : Type
@@ -130,16 +70,6 @@ Record SM_simulation_inject := {
     forall d mu c1 m1 c2 m2, 
     match_state d mu c1 m1 c2 m2 -> 
     REACH_closed m1 (vis mu)
-
-  (** [match_state] is closed under restriction to reach-closed supersets of 
-      the visible blocks. REMOVED in jan. 2015*)
-(*; match_restrict:
-    forall d mu c1 m1 c2 m2,
-      match_state d mu c1 m1 c2 m2 ->
-      forall X, (forall b, vis mu b = true -> X b = true) ->
-                REACH_closed m1 X ->
-      match_state d (restrict_sm mu X) c1 m1 c2 m2*)
-
 
   (** The blocks in the domain/range of [mu] are valid in [m1]/[m2]. *)
 ; match_validblocks : 
@@ -382,13 +312,16 @@ Proof. intros.
   split; trivial.
   destruct (match_genv SMI _ _ _ _ _ _ H0).
   specialize (match_sm_wd SMI _ _ _ _ _ _ H0). intros WD.
-  apply match_validblocks in H0.
-  split; intros. eapply corestep_rdonly; trivial. eapply effstep_corestep. eassumption.
+  apply match_validblocks in H0. clear VIS.
+  split; intros.
+    clear - H H3. apply effstep_mem in H. 
+    apply (readonly_preserve b) in H. apply H; trivial.
+  clear - Steps2 H3.
   destruct Steps2 as [Steps2 | [Steps2 _]].
-    apply effstep_plus_corestep_plus in Steps2.
-    eapply corestep_plus_rdonly; eassumption.
-  apply effstep_star_corestep_star in Steps2.
-    eapply corestep_star_rdonly; eassumption.
+    apply effstep_plus_mem in Steps2.
+    apply (readonly_preserve b) in Steps2. apply Steps2; trivial.
+    apply effstep_star_mem in Steps2.
+    apply (readonly_preserve b) in Steps2. apply Steps2; trivial.
 Qed.  
 
 End SharedMemory_simulation_inject. 

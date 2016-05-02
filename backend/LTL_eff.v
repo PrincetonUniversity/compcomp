@@ -125,41 +125,41 @@ Inductive ltl_effstep (g:genv):  (block -> Z -> bool) ->
 
 Lemma ltlstep_effax1: forall (M : block -> Z -> bool) g c m c' m',
       ltl_effstep g M c m c' m' ->
-      (corestep (LTL_coop_sem hf) g c m c' m' /\
+      (corestep (LTL_memsem hf) g c m c' m' /\
        Mem.unchanged_on (fun (b : block) (ofs : Z) => M b ofs = false) m m').
 Proof. 
 intros.
   induction H.
-  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+  split. unfold corestep; simpl. econstructor; eassumption.
          apply Mem.unchanged_on_refl.
-  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+  split. unfold corestep; simpl. econstructor; eassumption.
          apply Mem.unchanged_on_refl.
-  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+  split. unfold corestep; simpl. econstructor; eassumption.
          apply Mem.unchanged_on_refl.
-  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+  split. unfold corestep; simpl. econstructor; eassumption.
          apply Mem.unchanged_on_refl.
-  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+  split. unfold corestep; simpl. econstructor; eassumption.
          apply Mem.unchanged_on_refl.
-  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+  split. unfold corestep; simpl. econstructor; eassumption.
          eapply StoreEffect_Storev; eassumption. 
-  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+  split. unfold corestep; simpl. econstructor; eassumption.
          apply Mem.unchanged_on_refl.
-  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+  split. unfold corestep; simpl. econstructor; eassumption.
          eapply FreeEffect_free; eassumption.
-  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+  split. unfold corestep; simpl. econstructor; eassumption.
          inv H.
          eapply BuiltinEffect_unchOn; eassumption.
-  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+  split. unfold corestep; simpl. econstructor; eassumption.
          apply Mem.unchanged_on_refl.
-  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+  split. unfold corestep; simpl. econstructor; eassumption.
          apply Mem.unchanged_on_refl.
-  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+  split. unfold corestep; simpl. econstructor; eassumption.
          apply Mem.unchanged_on_refl.
-  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+  split. unfold corestep; simpl. econstructor; eassumption.
          eapply FreeEffect_free; eassumption. 
-  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+  split. unfold corestep; simpl. econstructor; eassumption.
          eapply Mem.alloc_unchanged_on; eassumption.
-  split. unfold corestep, coopsem; simpl. 
+  split. unfold corestep; simpl. 
          eapply ltl_exec_function_external; eassumption.
          inv H0.
        exploit @BuiltinEffect_unchOn. 
@@ -167,15 +167,15 @@ intros.
          eapply H2. 
        unfold BuiltinEffect; simpl.
          destruct ef; simpl; trivial; contradiction.
-  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+  split. unfold corestep; simpl. econstructor; eassumption.
          apply Mem.unchanged_on_refl.
 Qed.
 
 Lemma ltlstep_effax2: forall  g c m c' m',
-      corestep (LTL_coop_sem hf) g c m c' m' ->
+      corestep (LTL_memsem hf) g c m c' m' ->
       exists M, ltl_effstep g M c m c' m'.
 Proof.
-intros. unfold corestep, coopsem in H; simpl in H.
+intros. unfold corestep in H; simpl in H.
   inv H.
     eexists. eapply ltl_effstep_start_block; eassumption.
     eexists. eapply ltl_effstep_Lop; try eassumption; trivial.
@@ -216,7 +216,7 @@ Qed.
 Program Definition LTL_eff_sem : 
   @EffectSem genv LTL_core.
 Proof.
-eapply Build_EffectSem with (sem := LTL_coop_sem hf)(effstep:=ltl_effstep).
+eapply Build_EffectSem with (sem := LTL_memsem hf)(effstep:=ltl_effstep).
 apply ltlstep_effax1.
 apply ltlstep_effax2.
 apply ltl_effstep_valid.

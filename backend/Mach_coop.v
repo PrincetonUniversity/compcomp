@@ -35,7 +35,7 @@ Inductive load_frame: Type :=
            (retty: option typ), (**r optional return type *)
     load_frame.
 
-Section MACH_COOPSEM.
+Section MACH_MEMSEM.
 Variable hf : I64Helpers.helper_functions.
 
 Variable return_address_offset: function -> code -> int -> Prop.
@@ -424,117 +424,6 @@ Proof.
     apply Mach_at_external_halted_excl.
 Defined.
 
-(******NOW SHOW THAT WE ALSO HAVE A COOPSEM******)
-
-Lemma Mach_forward ge c m c' m': forall
-      (CS: mach_step ge c m c' m'), mem_forward m m'.
-  Proof. intros.
-   inv CS; try apply mem_forward_refl.
-   (*Msetstack*)
-     unfold store_stack in H; simpl in *.
-     destruct sp; inv H.
-     eapply store_forward; eassumption. 
-   (*Mstore*)
-     destruct a; simpl in H0; inv H0. 
-     eapply store_forward. eassumption. 
-   (*initialize*)
-     eapply store_args_fwd in H1.
-     eapply mem_forward_trans; eauto.
-     solve[eapply alloc_forward; eauto].
-   (*Mtailcall_internal*)
-     eapply free_forward; eassumption.
-   (*Mtailcall_external*)
-     eapply free_forward; eassumption.
-   (*Mbuiltin**)
-      inv H.
-      eapply external_call_mem_forward; eassumption.
-    (*Mannot
-      inv H. 
-      eapply external_call_mem_forward; eassumption.*)
-    (*Mreturn*)
-      eapply free_forward; eassumption.
-    (*internal function*)
-     unfold store_stack in *; simpl in *.
-     eapply mem_forward_trans.
-       eapply alloc_forward; eassumption.
-     eapply mem_forward_trans.
-       eapply store_forward; eassumption. 
-       eapply store_forward; eassumption. 
-    (*external unobservable function*)
-      inv H0. eapply external_call_mem_forward; eassumption.
-Qed.
-
-Lemma mach_coop_readonly g c m c' m'
-            (CS: mach_step g c m c' m') b
-            (VB: Mem.valid_block m b): readonly m b m'.
-  Proof.
-     inv CS; simpl in *; try apply readonly_refl.
-          eapply store_stack_readonly; eassumption.
-          destruct a; inv H0. eapply store_readonly; eassumption.
-          eapply readonly_trans. eapply alloc_readonly; eassumption.
-            apply alloc_forward in H0.
-            eapply store_args_readonly; try eassumption. apply H0; trivial.
-          eapply free_readonly; eassumption.
-          eapply free_readonly; eassumption.
-          inv H. eapply ec_readonly_strong; eassumption.
-          eapply free_readonly; eassumption.
-          eapply readonly_trans. 
-            eapply alloc_readonly; eassumption.
-            apply alloc_forward in H0.
-            eapply readonly_trans. 
-              eapply store_stack_readonly; try eassumption. apply H0; trivial.
-            apply store_stack_fwd in H1.
-              eapply store_stack_readonly; try eassumption. apply H1; apply H0; trivial.
-          inv H0. eapply ec_readonly_strong; eassumption.
-Qed.
-
-Program Definition Mach_coop_sem : 
-  CoopCoreSem genv Mach_core.
-Proof.
-apply Build_CoopCoreSem with (coopsem := Mach_core_sem).
-  apply Mach_forward.
-  apply mach_coop_readonly.
-Defined.
-
-Lemma store_stack_decay: forall m m' sp ty ofs v, 
-  store_stack m sp ty ofs v = Some m' -> decay m m'.
-Proof.
-intros. unfold store_stack, Mem.storev in H.
-remember (Val.add sp (Vint ofs)) as u; destruct u; inv H.
-eapply store_decay. eassumption.
-Qed.  
-
-Lemma mach_decay g c m c' m'
-            (CS: mach_step g c m c' m'): decay m m'.
-  Proof.
-     inv CS; simpl in *; try apply decay_refl.
-          eapply store_stack_decay; eassumption.
-          destruct a; inv H0. eapply store_decay; eassumption.
-          eapply decay_trans. 
-            eapply alloc_forward; eassumption.
-            eapply alloc_decay; eassumption.
-            eapply store_args_decay; try eassumption. 
-            eapply free_decay; eassumption.
-          eapply free_decay; eassumption.
-          inv H. eapply ec_decay; eassumption.
-          eapply free_decay; eassumption.
-          eapply decay_trans. 
-            eapply alloc_forward; eassumption.
-            eapply alloc_decay; eassumption.
-            eapply decay_trans. 
-            apply store_stack_fwd in H1. eassumption.
-              eapply store_stack_decay; try eassumption.
-              eapply store_stack_decay; try eassumption.
-          inv H0. eapply ec_decay; eassumption.
-Qed.
-
-Program Definition Mach_decay_sem : 
-  @DecayCoreSem genv Mach_core.
-Proof.
-apply Build_DecayCoreSem with (decaysem := Mach_coop_sem).
-  apply mach_decay.
-Defined.
-
 Lemma store_stack_mem_step: forall m m' sp ty ofs v, 
   store_stack m sp ty ofs v = Some m' -> mem_step m m'.
 Proof.
@@ -565,4 +454,4 @@ eapply Build_MemSem with (csem := Mach_core_sem).
   + inv H0. eapply extcall_mem_step; eassumption.
 Defined.
 
-End MACH_COOPSEM.
+End MACH_MEMSEM.

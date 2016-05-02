@@ -228,7 +228,7 @@ Inductive mach_effstep (ge:genv): (block -> Z -> bool) ->
 
 Lemma machstep_effax1: forall (M : block -> Z -> bool) ge c m c' m',
       mach_effstep ge M c m c' m' ->
-      (corestep (Mach_coop_sem hf return_address_offset) ge c m c' m' /\
+      (corestep (Mach_memsem hf return_address_offset) ge c m c' m' /\
        Mem.unchanged_on (fun (b : block) (ofs : Z) => M b ofs = false) m m').
 Proof. 
 intros.
@@ -266,7 +266,7 @@ intros.
          eapply FreeEffect_free; eassumption.
   split. eapply Mach_exec_Mtailcall_external; eassumption.
          eapply FreeEffect_free; eassumption.
-  split. unfold corestep, coopsem; simpl. econstructor; eassumption.
+  split. unfold corestep; simpl. econstructor; eassumption.
          inv H.
          eapply BuiltinEffect_unchOn; eassumption.
   split. econstructor; eassumption.
@@ -307,7 +307,7 @@ intros.
         rewrite PMap.gso; trivial. 
         rewrite PMap.gso; trivial. 
         eapply EmptyEffect_alloc; eassumption. }
-  { split. unfold corestep, coopsem; simpl. econstructor; try eassumption.
+  { split. unfold corestep; simpl. econstructor; try eassumption.
          inv H0.
        exploit @BuiltinEffect_unchOn. 
          eapply EFhelpers; eassumption.
@@ -319,10 +319,10 @@ intros.
 Qed.
 
 Lemma  machstep_effax2 ge c m c' m':
-      corestep (Mach_coop_sem hf return_address_offset) ge c m c' m' ->
+      corestep (Mach_memsem hf return_address_offset) ge c m c' m' ->
       exists M, mach_effstep ge M c m c' m'.
 Proof.
-  intros. unfold corestep, coopsem in H; simpl in H.
+  intros. unfold corestep in H; simpl in H.
   inv H.
     eexists. eapply Mach_effexec_Mlabel; eassumption.
     eexists. eapply Mach_effexec_Mgetstack; try eassumption; trivial.
@@ -378,7 +378,7 @@ Program Definition Mach_eff_sem :
   @EffectSem genv Mach_core.
 Proof.
 eapply Build_EffectSem with 
- (sem := Mach_coop_sem hf return_address_offset).
+ (sem := Mach_memsem hf return_address_offset).
 apply machstep_effax1.
 apply machstep_effax2.
 apply mach_effstep_valid. 
