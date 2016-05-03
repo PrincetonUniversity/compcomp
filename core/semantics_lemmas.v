@@ -12,7 +12,7 @@ Require Import Axioms.
 Require Import mem_lemmas.
 Require Import semantics.
 
-(********************* Lemmas and definitions realted to mem_step ********)
+(********************* Lemmas and definitions related to mem_step ********)
 
 Lemma mem_step_refl m: mem_step m m.
   apply (mem_step_freelist _ _ nil); trivial.
@@ -29,25 +29,6 @@ Lemma mem_step_store:
       forall m ch b a v m', Mem.store ch m b a v = Some m' -> mem_step m m'.
 Proof.
  intros. eapply mem_step_storebytes. eapply Mem.store_storebytes; eassumption. 
-Qed.
-
-Lemma extcall_mem_step fundef type g ef vargs m t vres m': 
-      @external_call ef fundef type g vargs m t vres m' ->
-      mem_step m m'.
-Proof. 
-intros. destruct ef; simpl in *; inv H; try apply mem_step_refl.
-    inv H0. try apply mem_step_refl.
-      eapply mem_step_storebytes.
-      apply Mem.store_storebytes; eassumption.
-    inv H1. try apply mem_step_refl.
-      eapply mem_step_storebytes.
-      apply Mem.store_storebytes; eassumption.
-    eapply mem_step_trans.
-    eapply mem_step_alloc. eassumption.
-      eapply mem_step_storebytes.
-      apply Mem.store_storebytes; eassumption.
-    eapply mem_step_free; eassumption. 
-    eapply mem_step_storebytes; eassumption.
 Qed.
 
 Record memstep_preserve (P:mem -> mem -> Prop) :=

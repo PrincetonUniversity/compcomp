@@ -354,7 +354,7 @@ eapply Build_MemSem with (csem := Linear_core_sem).
   + inv H. eapply extcall_mem_step; eassumption.
   + eapply mem_step_free; eassumption.
   + eapply mem_step_alloc; eassumption.
-  + inv H0. eapply extcall_mem_step; eassumption.
+  + inv H0. apply EFhelpers in OBS. eapply extcall_mem_step; eassumption.
 Defined.
 
 End LINEAR_MEM.

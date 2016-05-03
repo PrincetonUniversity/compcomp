@@ -12,6 +12,8 @@ Require Import mem_lemmas. (*needed for definition of valid_block_dec etc*)
 Require Import Axioms.
 Require Import structured_injections.
 Require Import reach. 
+Require Import semantics. 
+Require Import semantics_lemmas. 
 Require Import effect_semantics. 
 Require Import effect_properties.
 Require Import globalSep.
@@ -228,6 +230,20 @@ Lemma obs_efE name sg : is_I64_helper hf name sg ->
      ~ observableEF (EF_external name sg).
 Proof. intros. unfold observableEF. 
   intros N. apply (N H).
+Qed.
+
+Lemma extcall_mem_step fundef type g ef vargs m t vres m'
+      (NOBS: ~observableEF ef):
+      @external_call ef fundef type g vargs m t vres m' ->
+      mem_step m m'.
+Proof. 
+intros. destruct ef; simpl in *; inv H; try apply mem_step_refl;
+    try solve [elim NOBS; trivial].
++ eapply mem_step_trans.
+    eapply mem_step_alloc. eassumption.
+    eapply mem_step_store; eassumption.
++ eapply mem_step_free; eassumption. 
++ eapply mem_step_storebytes; eassumption.
 Qed.
 
 Definition helper_implements 

@@ -354,12 +354,12 @@ Qed.
 Lemma asm_mem_step : forall g c m c' m' (CS: asm_step g c m c' m'), mem_step m m'.
 Proof. intros.
   inv CS; simpl in *; try apply mem_step_refl.
-          eapply exec_instr_mem_step; eassumption. 
-          inv H2. eapply extcall_mem_step; eassumption.
-          inv H1. eapply extcall_mem_step; eassumption.
-          eapply mem_step_trans. 
-            eapply mem_step_alloc; eassumption.
-            eapply store_args_mem_step; try eassumption.
++ eapply exec_instr_mem_step; eassumption. 
++ inv H2. eapply extcall_mem_step; eassumption.
++ inv H1. apply EFhelpers in OBS. eapply extcall_mem_step; eassumption.
++ eapply mem_step_trans. 
+  eapply mem_step_alloc; eassumption.
+  eapply store_args_mem_step; try eassumption.
 Qed.
 
 Program Definition Asm_mem_sem : @MemSem genv state.

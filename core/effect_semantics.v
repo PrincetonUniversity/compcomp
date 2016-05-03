@@ -11,7 +11,6 @@ Require Import Axioms.
 Require Import mem_lemmas. (*needed for definition of mem_forward etc*)
 Require Import semantics.
 Require Import semantics_lemmas.
-Require Import structured_injections.
 
 (** * Effect Semantics *)
 
@@ -20,7 +19,7 @@ Require Import structured_injections.
     step of the semantics. *)
  
 Record EffectSem {G C} :=
-  { (** [sem] is a memory interaaction semantics. *)
+  { (** [sem] is a memory semantics. *)
     sem :> MemSem G C
 
     (** The step relation of the new semantics. *)

@@ -253,7 +253,7 @@ eapply Build_MemSem with (csem := RTL_core_sem).
   + eapply extcall_mem_step; eassumption.
   + eapply mem_step_free; eassumption.
   + eapply mem_step_alloc; eassumption.
-  + eapply extcall_mem_step; eassumption.
+  + apply EFhelpers in OBS. eapply extcall_mem_step; eassumption.
 Defined.
 End RELSEM.
 

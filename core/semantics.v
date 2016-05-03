@@ -71,9 +71,9 @@ Inductive mem_step m m' : Prop :=
        mem_step m m'' -> mem_step m'' m' -> mem_step m m'.
 
 
-(* Memory sematics - CoreSemantics that are specialized to CompCert memories
-   and evolve memory only according to mem_step. Previous notions CoopCoreSem,
-   and DecaySem are deprecated, but for now collected in file CoopCoreSem.v *)
+(* Memory semantics are CoreSemantics that are specialized to CompCert memories
+   and evolve memory according to mem_step. Previous notions CoopCoreSem,
+   and DecaySem are deprecated, but for now retained in file CoopCoreSem.v *)
 Record MemSem {G C} :=
   { csem :> @CoreSemantics G C mem
 

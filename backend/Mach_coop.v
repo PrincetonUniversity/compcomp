@@ -451,7 +451,7 @@ eapply Build_MemSem with (csem := Mach_core_sem).
     eapply mem_step_trans.
     eapply store_stack_mem_step; eassumption.
     eapply store_stack_mem_step; eassumption.
-  + inv H0. eapply extcall_mem_step; eassumption.
+  + inv H0. apply EFhelpers in OBS. eapply extcall_mem_step; eassumption.
 Defined.
 
 End MACH_MEMSEM.
