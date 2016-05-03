@@ -14,6 +14,7 @@ Require Import Csharpminor.
 
 Require Import mem_lemmas. (*for mem_forward*)
 Require Import semantics.
+Require Import semantics_lemmas.
 Require Import val_casted.
 Require Import BuiltinEffects.
 
@@ -279,102 +280,5 @@ eapply Build_MemSem with (csem := CSharpMin_core_sem).
   + eapply mem_step_freelist; eassumption.
   + eapply alloc_variables_mem_step; eassumption.
 Defined.
-(*
-(************************NOW SHOW THAT WE ALSO HAVE A COOPSEM******)
-Lemma alloc_variables_forward: forall vars m e e2 m'
-      (M: alloc_variables e m vars e2 m'),
-      mem_forward m m'.
-Proof. intros.
-  induction M.
-  apply mem_forward_refl.
-  apply alloc_forward in H.
-  eapply mem_forward_trans; eassumption. 
-Qed.
 
-Lemma CSharpMin_forward : forall g c m c' m' (CS: CSharpMin_corestep g c m c' m'), 
-      mem_forward m m'.
-Proof. intros.
-     induction CS; try apply mem_forward_refl.
-         eapply freelist_forward; eassumption.
-         (*Storev*)
-          destruct vaddr; simpl in H1; inv H1. 
-          eapply store_forward; eassumption. 
-         (*builtin*) 
-         eapply external_call_mem_forward; eassumption.
-         eapply freelist_forward; eassumption.
-         eapply freelist_forward; eassumption.
-         eapply alloc_variables_forward; eassumption.
-Qed.
-
-Lemma alloc_variables_readonly: forall vars m e e2 m'
-      (M: alloc_variables e m vars e2 m') b (VB: Mem.valid_block m b),
-      readonly m b m'.
-Proof. intros.
-  induction M.
-  apply readonly_refl.
-  eapply readonly_trans. 
-     eapply alloc_readonly; try eassumption.
-     apply IHM. eapply alloc_forward; eassumption.
-Qed.
-
-Lemma cshmin_coop_readonly g c m c' m'
-            (CS: CSharpMin_corestep g c m c' m') b 
-            (VB: Mem.valid_block m b): readonly m b m'.
-  Proof.
-     inv CS; simpl in *; try apply readonly_refl.
-          eapply freelist_readonly; eassumption.
-          destruct vaddr; inv H1. eapply store_readonly; eassumption.
-          eapply ec_readonly_strong; eassumption.
-          eapply freelist_readonly; eassumption.
-          eapply freelist_readonly; eassumption.
-          eapply alloc_variables_readonly; eassumption.
-Qed.
-
-Program Definition csharpmin_coop_sem : 
-  CoopCoreSem Csharpminor.genv CSharpMin_core.
-Proof.
-apply Build_CoopCoreSem with (coopsem := CSharpMin_core_sem).
-  apply CSharpMin_forward.
-  apply cshmin_coop_readonly.
-Defined.
-
-Lemma alloc_variables_decay: forall vars m e e2 m'
-      (M: alloc_variables e m vars e2 m'), decay m m'.
-Proof. intros.
-  induction M.
-  apply decay_refl.
-  eapply decay_trans.
-    eapply alloc_forward; eassumption. 
-    eapply alloc_decay; try eassumption.
-    apply IHM.
-Qed.
-
-Lemma cshmin_decay g c m c' m'
-            (CS: CSharpMin_corestep g c m c' m'): decay m m'.
-  Proof.
-     inv CS; simpl in *; try apply decay_refl.
-          eapply freelist_decay; eassumption.
-          destruct vaddr; inv H1. eapply store_decay; eassumption.
-          eapply ec_decay; eassumption.
-          eapply freelist_decay; eassumption.
-          eapply freelist_decay; eassumption.
-          eapply alloc_variables_decay; eassumption.
-Qed.
-
-Program Definition csharpmin_decay_sem : 
-  @DecayCoreSem Csharpminor.genv CSharpMin_core.
-Proof.
-apply Build_DecayCoreSem with (decaysem := csharpmin_coop_sem).
-  apply cshmin_decay.
-Defined.
-
-Lemma alloc_variables_mem_step: forall vars m e e2 m'
-      (M: alloc_variables e m vars e2 m'), mem_step m m'.
-Proof. intros.
-  induction M.
-  apply mem_step_refl.
-  eapply mem_step_trans.
-    eapply mem_step_alloc; eassumption. eassumption. 
-Qed.
-*)
 End CSHARPMINOR_MEM.

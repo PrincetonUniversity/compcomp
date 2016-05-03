@@ -11,6 +11,7 @@ Require Import Op.
 Require Import Registers.
 
 Require Import semantics.
+Require Import semantics_lemmas.
 Require Import val_casted.
 
 Require Import RTL.
@@ -276,65 +277,3 @@ apply andb_true_eq in Heqz. destruct Heqz.
 apply andb_true_eq in H. destruct H. intuition.
 unfold zlt in H0.  destruct (Z_lt_dec l Int.max_unsigned). trivial. inv H0. 
 Qed.
-
-(*
-(************************NOW SHOW THAT WE ALSO HAVE A COOPSEM******)
-
-Require Import mem_lemmas. (*for mem_forward*)
-
-Lemma rtl_coop_forward : forall g c m c' m' (CS: RTL_corestep g c m c' m'), 
-      mem_forward m m'.
-Proof. intros.
-       inv CS; try apply mem_forward_refl.
-         (*Storev*)
-          destruct a; simpl in H1; inv H1. 
-          eapply store_forward. eassumption. 
-         eapply free_forward; eassumption.
-         (*builtin*) 
-         eapply external_call_mem_forward; eassumption.
-         eapply free_forward; eassumption.
-         eapply alloc_forward; eassumption.
-         eapply external_call_mem_forward; eassumption.
-Qed.
-
-Lemma rtl_coop_rdonly g c m c' m'
-            (CS: RTL_corestep g c m c' m') b 
-            (VB: Mem.valid_block m b):  
-             readonly m b m'.
-  Proof. 
-     inv CS; simpl in *; try apply readonly_refl.
-          destruct a; inv H1. eapply store_readonly; eauto.
-          eapply free_readonly; eauto.
-          eapply ec_readonly_strong; eauto.
-          eapply free_readonly; eauto.
-          eapply alloc_readonly; eauto.
-          eapply ec_readonly_strong; eauto.
-Qed.
-
-Program Definition rtl_coop_sem : 
-  CoopCoreSem genv RTL_core.
-Proof.
-apply Build_CoopCoreSem with (coopsem := RTL_core_sem).
-  apply rtl_coop_forward.
-  apply rtl_coop_rdonly.
-Defined.
-
-Lemma rtl_coop_decay g c m c' m'
-            (CS: RTL_corestep g c m c' m'): decay m m'.
-  Proof. 
-     inv CS; simpl in *; try apply decay_refl.
-          destruct a; inv H1. eapply store_decay; eauto.
-          eapply free_decay; eauto.
-          eapply ec_decay; eauto.
-          eapply free_decay; eauto.
-          eapply alloc_decay; eauto.
-          eapply ec_decay; eauto.
-Qed.
-
-Program Definition rtl_decay_sem : 
-  @DecayCoreSem genv RTL_core.
-Proof.
-apply Build_DecayCoreSem with (decaysem := rtl_coop_sem).
-  apply rtl_coop_decay.
-Defined.
-*)

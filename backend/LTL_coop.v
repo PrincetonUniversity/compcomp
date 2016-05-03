@@ -13,8 +13,8 @@ Require Import Conventions.
 
 Require Import LTL. 
 
-Require Import mem_lemmas. (*for mem_forward*)
 Require Import semantics.
+Require Import semantics_lemmas.
 Require Import val_casted.
 Require Import BuiltinEffects.
 
@@ -302,71 +302,3 @@ eapply Build_MemSem with (csem := LTL_core_sem).
 Defined.
 
 End LTL_MEM.
-(*
-(************************NOW SHOW THAT WE ALSO HAVE A COOPSEM******)
-
-Lemma LTL_forward : forall g c m c' m' (CS: ltl_corestep g c m c' m'), 
-                    mem_forward m m'.
-  Proof. intros.
-   inv CS; try apply mem_forward_refl.
-         (*Storev*)
-          destruct a; simpl in H0; inv H0. 
-          eapply store_forward. eassumption. 
-         (*Ltailcall*)
-           eapply free_forward; eassumption.
-         (*Lbuiltin*) 
-           inv H. 
-           eapply external_call_mem_forward; eassumption.
-         (*Lannot
-           inv H. 
-           eapply external_call_mem_forward; eassumption.*)
-         (*free*)
-           eapply free_forward; eassumption.
-         (*internal function*)
-           eapply alloc_forward; eassumption.
-         (*external unobservable function*)
-           inv H0. eapply external_call_mem_forward; eassumption.
-Qed.
-
-Lemma LTL_rdonly g c m c' m'
-            (CS: ltl_corestep g c m c' m') b 
-            (VB: Mem.valid_block m b):  
-             readonly m b m'.
-  Proof. 
-     inv CS; simpl in *; try apply readonly_refl.
-          destruct a; inv H0. eapply store_readonly; eauto.
-          eapply free_readonly; eauto.
-          inv H. eapply ec_readonly_strong; eauto.
-          eapply free_readonly; eauto.
-          eapply alloc_readonly; eauto.
-          inv H0. eapply ec_readonly_strong; eauto.
-Qed.
-
-Program Definition LTL_coop_sem : 
-  CoopCoreSem genv LTL_core.
-Proof.
-apply Build_CoopCoreSem with (coopsem := LTL_core_sem).
-  apply LTL_forward.
-  apply LTL_rdonly.
-Defined.
-
-Lemma LTL_decay g c m c' m'
-            (CS: ltl_corestep g c m c' m'): decay m m'.
-  Proof. 
-     inv CS; simpl in *; try apply decay_refl.
-          destruct a; inv H0. eapply store_decay; eauto.
-          eapply free_decay; eauto.
-          inv H. eapply ec_decay; eauto.
-          eapply free_decay; eauto.
-          eapply alloc_decay; eauto.
-          inv H0. eapply ec_decay; eauto.
-Qed.
-
-Program Definition LTL_decay_sem : 
-  @DecayCoreSem genv LTL_core.
-Proof.
-apply Build_DecayCoreSem with (decaysem := LTL_coop_sem).
-  apply LTL_decay.
-Defined.
-
-*)

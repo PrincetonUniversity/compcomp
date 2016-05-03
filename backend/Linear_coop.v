@@ -13,8 +13,8 @@ Require Import Conventions.
 
 Require Import Linear.
 
-Require Import mem_lemmas. (*for mem_forward*)
 Require Import semantics.
+Require Import semantics_lemmas.
 Require Import val_casted.
 Require Import BuiltinEffects.
 
@@ -358,85 +358,3 @@ eapply Build_MemSem with (csem := Linear_core_sem).
 Defined.
 
 End LINEAR_MEM.
-(*
-(************************NOW SHOW THAT WE ALSO HAVE A COOPSEM******)
-
-Lemma Linear_forward : forall g c m c' m' (CS: Linear_step g c m c' m'), 
-                    mem_forward m m'.
-  Proof. intros.
-   inv CS; try apply mem_forward_refl.
-         (*Storev*)
-          destruct a; simpl in H0; inv H0. 
-          eapply store_forward. eassumption. 
-         (*Ltailcall*)
-           eapply free_forward; eassumption.
-         (*Lbuiltin*) 
-           inv H. 
-           eapply external_call_mem_forward; eassumption.
-         (*Lannot
-           inv H. 
-           eapply external_call_mem_forward; eassumption.*)
-         (*free*)
-           eapply free_forward; eassumption.
-         (*internal function*)
-           eapply alloc_forward; eassumption.
-         (*external unobservable function*)
-           inv H0. eapply external_call_mem_forward; eassumption.
-Qed.
-
-Lemma Linear_rdonly g c m c' m'
-            (CS: Linear_step g c m c' m') b
-            (VB: Mem.valid_block m b):  
-         readonly m b m'.
-  Proof.
-     inv CS; simpl in *; try apply readonly_refl.
-          destruct a; inv H0. eapply store_readonly; eassumption.
-          eapply free_readonly; eassumption.
-          inv H. eapply ec_readonly_strong; eassumption.
-          eapply free_readonly; eassumption.
-          eapply alloc_readonly; eassumption.
-          inv H0; eapply ec_readonly_strong; eassumption.
-Qed.
-
-Program Definition Linear_coop_sem : 
-  CoopCoreSem genv Linear_core.
-Proof.
-apply Build_CoopCoreSem with (coopsem := Linear_core_sem).
-  apply Linear_forward.
-  apply Linear_rdonly.
-Defined.
-
-Lemma Linear_decay g c m c' m'
-            (CS: Linear_step g c m c' m'): decay m m'.
-  Proof.
-     inv CS; simpl in *; try apply decay_refl.
-          destruct a; inv H0. eapply store_decay; eassumption.
-          eapply free_decay; eassumption.
-          inv H. eapply ec_decay; eassumption.
-          eapply free_decay; eassumption.
-          eapply alloc_decay; eassumption.
-          inv H0; eapply ec_decay; eassumption.
-Qed.
-
-Program Definition Linear_decay_sem : 
-  @DecayCoreSem genv Linear_core.
-Proof.
-apply Build_DecayCoreSem with (decaysem := Linear_coop_sem).
-  apply Linear_decay.
-Defined.
-
-Program Definition Linear_memsem : @MemSem genv Linear_core.
-Proof.
-eapply Build_MemSem with (csem := Linear_core_sem).
-  intros.
-  destruct CS; try apply mem_step_refl.
-  + destruct a; inv H0. eapply mem_step_store; eassumption.
-  + eapply mem_step_free; eassumption.
-  + inv H. eapply extcall_mem_step; eassumption.
-  + eapply mem_step_free; eassumption.
-  + eapply mem_step_alloc; eassumption.
-  + inv H0. eapply extcall_mem_step; eassumption.
-Defined.
-
-End LINEAR_COOP.
-*)

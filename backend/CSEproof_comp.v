@@ -34,9 +34,9 @@ Require Import Integers.
 
 Require Import Axioms.
 Require Import mem_lemmas.
-(*Require Import core_semantics.
-Require Import core_semantics_lemmas.*)
+
 Require Import semantics.
+Require Import semantics_lemmas.
 Require Import structured_injections.
 Require Import reach.
 Require Import effect_semantics.

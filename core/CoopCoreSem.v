@@ -10,6 +10,7 @@ Require Import Axioms.
 
 Require Import mem_lemmas.
 Require Import semantics.
+Require Import semantics_lemmas.
 
 (** * Cooperating Interaction Semantics *)
 
@@ -32,8 +33,8 @@ Implicit Arguments CoopCoreSem [].
 Definition MemSem2CoopCoreSem {G C} (s:@MemSem G C): @CoopCoreSem G C.
 Proof.
 eapply Build_CoopCoreSem with (coopsem := s).
-apply semantics.corestep_fwd.
-apply semantics.corestep_rdonly.
+apply semantics_lemmas.corestep_fwd.
+apply semantics_lemmas.corestep_rdonly.
 Defined.
 
 (* superseded by MemSem

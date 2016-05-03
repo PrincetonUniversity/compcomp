@@ -15,8 +15,8 @@ Require Import Conventions.
 Require Import Mach. 
 Require Import Stacking.
 
-Require Import mem_lemmas. (*for mem_forward*)
 Require Import semantics.
+Require Import semantics_lemmas.
 Require Import val_casted.
 Require Import BuiltinEffects.
 

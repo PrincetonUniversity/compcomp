@@ -14,9 +14,9 @@ Require Import Conventions.
 
 (*LENB: We don't import CompCert's original Asm.v, but the modified one*)
 Require Import Asm_comp. 
-
-Require Import mem_lemmas. (*for mem_forward*)
+Require Import mem_lemmas.
 Require Import semantics.
+Require Import semantics_lemmas.
 Require Import val_casted.
 Require Import BuiltinEffects.
 Require Import load_frame.

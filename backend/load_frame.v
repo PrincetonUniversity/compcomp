@@ -12,8 +12,9 @@ Require Import Locations.
 Require Import Conventions.
 Require Stacklayout.
 
-Require Import mem_lemmas. (*for mem_forward*)
+Require Import mem_lemmas. 
 Require Import semantics.
+Require Import semantics_lemmas.
 Require Import val_casted.
 Require Import BuiltinEffects.
 Require Import structured_injections.

@@ -13,10 +13,12 @@ Require Import Ctypes.
 Require Import Cop.
 
 Require Import Clight. 
-Require Import mem_lemmas. (*for mem_forward*)
-Require Import semantics.
-Require Import BuiltinEffects.
+Require Import mem_lemmas.
 
+Require Import semantics.
+Require Import semantics_lemmas.
+
+Require Import BuiltinEffects.
 Require Import val_casted.
 
 Section CLIGHT_MEM.

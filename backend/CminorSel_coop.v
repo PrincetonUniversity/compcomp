@@ -11,10 +11,9 @@ Require Import Switch.
 
 Require Import CminorSel. 
 
-Require Import mem_lemmas. (*for mem_forward*)
 Require Import semantics.
+Require Import semantics_lemmas.
 Require Import val_casted.
-Require Import effect_semantics. (*for EmptyEffect*)
 Require Import BuiltinEffects.
 
 Fixpoint silent hf (ge:genv) (a:expr) := 
@@ -329,67 +328,3 @@ eapply Build_MemSem with (csem := CMinSel_core_sem).
 Defined.
 
 End CMINSEL_MEM.
-(*
-(************************NOW SHOW THAT WE ALSO HAVE A COOPSEM******)
-
-Lemma CMinSel_forward : forall g c m c' m' (CS: CMinSel_corestep g c m c' m'), 
-      mem_forward m m'.
-  Proof. intros.
-     inv CS; try apply mem_forward_refl.
-         eapply free_forward; eassumption.
-         (*Storev*)
-          destruct vaddr; simpl in H2; inv H2. 
-          eapply store_forward; eassumption. 
-         eapply free_forward; eassumption.
-         (*builtin*) 
-           eapply external_call_mem_forward; eassumption.
-         eapply free_forward; eassumption.
-         eapply free_forward; eassumption.
-         eapply alloc_forward; eassumption.
-Qed.
-
-Lemma CMinSel_rdonly g c m c' m'
-            (CS: CMinSel_corestep g c m c' m') b 
-            (VB: Mem.valid_block m b):  
-             readonly m b m'.
-  Proof. 
-     inv CS; simpl in *; try apply readonly_refl.
-          eapply free_readonly; eauto.
-          destruct vaddr; inv H2. eapply store_readonly; eauto.
-          eapply free_readonly; eauto.
-          eapply ec_readonly_strong; eauto.
-          eapply free_readonly; eauto.
-          eapply free_readonly; eauto.
-          eapply alloc_readonly; eauto.
-Qed.
-
-Program Definition cminsel_coop_sem : 
-  CoopCoreSem genv CMinSel_core.
-Proof.
-apply Build_CoopCoreSem with (coopsem := CMinSel_core_sem).
-  apply CMinSel_forward.
-  apply CMinSel_rdonly.
-Defined.
-
-Lemma CMinSel_decay g c m c' m'
-            (CS: CMinSel_corestep g c m c' m'): decay m m'.
-  Proof. 
-     inv CS; simpl in *; try apply decay_refl.
-          eapply free_decay; eauto.
-          destruct vaddr; inv H2. eapply store_decay; eauto.
-          eapply free_decay; eauto.
-          eapply ec_decay; eauto.
-          eapply free_decay; eauto.
-          eapply free_decay; eauto.
-          eapply alloc_decay; eauto.
-Qed.
-
-Program Definition cminsel_decay_sem : 
-  @DecayCoreSem genv CMinSel_core.
-Proof.
-apply Build_DecayCoreSem with (decaysem := cminsel_coop_sem).
-  apply CMinSel_decay.
-Defined.
-
-End CMINSEL_COOP.
-*)
