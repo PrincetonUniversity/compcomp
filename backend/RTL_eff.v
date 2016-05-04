@@ -217,29 +217,24 @@ intros. inv H.
     eexists. eapply rtl_effstep_exec_return.
 Qed.
 
-(*
-Definition cmin_effstep ge (E:block -> Z -> bool) 
-   (c : RTL_core) m (c' : RTL_core) m': Prop :=
-   coopstep g c m c' m' /\ Mem.unchanged_on (fun b ofs => E b ofs = false) m m'.
-*)
+Lemma rtl_effstep_curWR: forall (M : block -> Z -> bool) g c m c' m',
+      RTL_effstep g M c m c' m' ->
+      forall b z, M b z = true -> Mem.perm m b z Cur Writable.
+Proof.
+intros.
+induction H; try (solve [inv H0]).
++ eapply storev_curWR; eassumption.
++ eapply free_curWR; eassumption. 
++ inv H. eapply nonobs_extcall_curWR; eassumption.
++ eapply free_curWR; eassumption.  
++ erewrite helpers_EmptyEffect in H0; try eassumption.
+  inv H0.
+Qed.
 
 Lemma rtl_effstep_valid: forall (M : block -> Z -> bool) g c m c' m',
       RTL_effstep g M c m c' m' ->
        forall b z, M b z = true -> Mem.valid_block m b.
-Proof.
-intros.
-  induction H; try (solve [inv H0]).
-
-  apply StoreEffectD in H0. destruct H0 as [ofs [VADDR ARITH]]; subst.
-  inv H2. apply Mem.store_valid_access_3 in H3.
-  eapply Mem.valid_access_valid_block.
-  eapply Mem.valid_access_implies; try eassumption. constructor.
-
-  eapply FreeEffect_validblock; eassumption.
-  eapply BuiltinEffect_valid_block; eassumption.
-  eapply FreeEffect_validblock; eassumption.
-  eapply BuiltinEffect_valid_block; eassumption.
-Qed.
+Proof. intros. eapply Mem.perm_valid_block. eapply rtl_effstep_curWR; eassumption. Qed.
 
 Program Definition rtl_eff_sem : 
   @EffectSem genv RTL_core.
@@ -247,7 +242,7 @@ Proof.
 eapply Build_EffectSem with (sem := RTL_memsem hf)(effstep:=RTL_effstep).
 apply rtl_effax1.
 apply rtl_effax2.
-apply rtl_effstep_valid.
+apply rtl_effstep_curWR.
 Defined.
 
 End RTL_EFF.

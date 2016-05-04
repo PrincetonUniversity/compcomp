@@ -356,36 +356,36 @@ intros. inv H.
   eexists. eapply clight_effstep_returnstate; eassumption.
 Qed.
 
+Lemma clight_effstep_curWR: forall (M : block -> Z -> bool) g c m c' m',
+      clight_effstep g M c m c' m' ->
+      forall b z, M b z = true -> Mem.perm m b z Cur Writable.
+Proof.
+intros.
+induction H; try (solve [inv H0]).
++ unfold assign_loc_Effect in H0.
+  inv H3; rewrite H4 in H0; simpl in *.
+  - destruct (eq_block loc b); subst; try discriminate; simpl in *.
+    destruct (zle (Int.unsigned ofs) z ); try discriminate.
+    destruct (zlt z (Int.unsigned ofs + Z.of_nat (size_chunk_nat chunk))); try discriminate.
+    apply Mem.store_valid_access_3 in H5. apply H5.  clear H0.
+    rewrite <- size_chunk_conv in l0. omega.
+  - destruct (eq_block b loc); try subst loc; try discriminate; simpl in *.
+    destruct (zle (Int.unsigned ofs) z ); try discriminate.
+    destruct (zlt z (Int.unsigned ofs + sizeof (typeof a1))); try discriminate.
+    clear H0. 
+    apply Mem.storebytes_range_perm in H9. apply H9.  clear H9.
+    apply Mem.loadbytes_length in H8. rewrite H8, nat_of_Z_eq. omega. omega. 
++ eapply nonobs_extcall_curWR; eassumption. 
++ eapply freelist_curWR; eassumption. 
++ eapply freelist_curWR; eassumption. 
++ eapply freelist_curWR; eassumption. 
+Qed.
+
 Lemma clight_effstep_valid: forall (M : block -> Z -> bool) g c m c' m',
       clight_effstep g M c m c' m' ->
        forall b z, M b z = true -> Mem.valid_block m b.
 Proof.
-intros.
-  induction H; try (solve [inv H0]).
-
-  inv H3; unfold assign_loc_Effect in H0; rewrite H4 in H0.
-     destruct (eq_block loc b); subst; simpl in *; try discriminate.
-     apply Mem.store_valid_access_3 in H5.
-     eapply Mem.perm_valid_block. eapply H5. 
-       destruct (zle (Int.unsigned ofs) z); simpl in *; try discriminate.
-       destruct (zlt z (Int.unsigned ofs + Z.of_nat (size_chunk_nat chunk))); simpl in *; try discriminate.
-       split. eassumption. rewrite <- size_chunk_conv in l0. trivial.
-
-     destruct (eq_block b loc); subst; simpl in *; try discriminate.
-     apply Mem.loadbytes_length in H8.
-     eapply Mem.perm_valid_block with (ofs:=z). 
-        eapply Mem.storebytes_range_perm. eassumption.
-       destruct (zle (Int.unsigned ofs) z); simpl in *; try discriminate.
-       destruct (zlt z (Int.unsigned ofs + sizeof (typeof a1))); simpl in *; try discriminate.
-       split. eassumption. rewrite H8. rewrite nat_of_Z_eq. trivial. 
-              specialize (sizeof_pos (typeof a1)). omega.
-
-  eapply BuiltinEffect_valid_block; eassumption.
-
-  eapply FreelistEffect_validblock; eassumption.
-  eapply FreelistEffect_validblock; eassumption.
-  eapply FreelistEffect_validblock; eassumption.
-Qed.
+intros. eapply Mem.perm_valid_block. eapply clight_effstep_curWR; eassumption. Qed.
 
 Definition clight_eff_sem :  @EffectSem Clight.genv CL_core.
 Proof.
@@ -393,7 +393,7 @@ eapply Build_EffectSem with (sem := CL_memsem hf _ HFE_mem)
          (effstep:=clight_effstep).
 eapply clightstep_effax1. 
 apply clightstep_effax2. 
-eapply clight_effstep_valid.
+apply clight_effstep_curWR.
 Defined.
 
 End EFFSEM.

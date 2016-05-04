@@ -354,76 +354,6 @@ intros. (*unfold corestep, Asm_coop_sem in H; simpl in H.*)
   eexists. econstructor; eauto.
 Qed.
 
-
-Lemma exec_store_valid: forall g chunk m a rs rs1 pregs rs' m' b z,
-  exec_store g chunk m a rs rs1 pregs = Next rs' m' ->
-  StoreEffect (eval_addrmode g a rs) (encode_val chunk (rs rs1)) b z =
-              true ->
-  Mem.valid_block m b.
-Proof. intros. unfold exec_store in H.
-  apply StoreEffectD in H0. destruct H0 as [i [VADDR ARITH]]; subst.
-  rewrite VADDR in H.
-  remember (Mem.storev chunk m (Vptr b i) (rs rs1)) as d.
-  destruct d; inv H; apply eq_sym in Heqd.
-  simpl in Heqd.
-  apply Mem.store_valid_access_3 in Heqd.
-  eapply Mem.valid_access_valid_block.
-  eapply Mem.valid_access_implies; try eassumption. constructor.
-Qed.
-
-
-Lemma exec_instr_valid_block ge fn i rs1 m1 rs2 m2: forall
-      (EI: exec_instr ge fn i rs1 m1 = Next rs2 m2) b z
-      (EFFI: effect_instr ge fn i rs1 m1 b z = true),
-      Mem.valid_block m1 b.
-Proof. intros.
-  destruct i; simpl in *; try solve [intuition].
-  eapply exec_store_valid; eassumption.
-  eapply exec_store_valid; eassumption.
-  eapply exec_store_valid; eassumption.
-  eapply exec_store_valid; eassumption.
-  eapply exec_store_valid; eassumption.
-  eapply exec_store_valid; eassumption.
-  destruct (Mem.loadv Mint32 m1 (Val.add (rs1 ESP) (Vint ofs_ra))); inv EFFI.
-    destruct (Mem.loadv Mint32 m1 (Val.add (rs1 ESP) (Vint ofs_link))); inv H0.
-    destruct (rs1 ESP); inv H1.
-    remember (Mem.free m1 b0 0 sz) as d. apply eq_sym in Heqd.
-    destruct d; inv H0.
-    eapply FreeEffect_validblock; eassumption.
-  eapply BuiltinEffect_valid_block; eassumption.
-Qed.
-
-Lemma asm_effstep_valid: forall (M : block -> Z -> bool) g c m c' m',
-      asm_effstep g M c m c' m' ->
-       forall b z, M b z = true -> Mem.valid_block m b.
-Proof.
-intros.
-  induction H; try (solve [inv H0]).
-  eapply exec_instr_valid_block; eassumption.
-  inv H0.
-  eapply BuiltinEffect_valid_block; eassumption.
-  eapply BuiltinEffect_valid_block; eassumption.
-Qed.
-
-Program Definition Asm_eff_sem : 
-  @EffectSem genv state.
-Proof.
-eapply Build_EffectSem with (sem := Asm_mem_sem hf).
-apply asmstep_effax1.
-apply asmstep_effax2.
-apply asm_effstep_valid. 
-Defined.
-
-Require Import semantics_lemmas.
-
-Lemma Asm_eff_sem_det : corestep_fun Asm_eff_sem.
-Proof.
-intros m m' m'' ge c c' c'' step1 step2.
-simpl in step1, step2.
-eapply asm_step_det in step1; eauto.
-destruct step1; subst; auto.
-Qed.
-
 Lemma exec_store_curWR ge ch m1 a rs1 rs rs2 m2 b z l:
    exec_store ge ch m1 a rs1 rs l = Next rs2 m2 ->
     StoreEffect (eval_addrmode ge a rs1)
@@ -525,6 +455,41 @@ Proof.
     destruct (zlt z (Int.unsigned odst + sz)); simpl in *; try discriminate. 
     eapply Mem.storebytes_range_perm. eassumption. 
     apply Mem.loadbytes_length in H8. rewrite H8, nat_of_Z_eq; omega.
+Qed.
+
+Lemma exec_store_valid: forall g chunk m a rs rs1 pregs rs' m' b z,
+  exec_store g chunk m a rs rs1 pregs = Next rs' m' ->
+  StoreEffect (eval_addrmode g a rs) (encode_val chunk (rs rs1)) b z =
+              true ->
+  Mem.valid_block m b.
+Proof. intros. eapply Mem.perm_valid_block. eapply exec_store_curWR; eassumption. Qed.
+
+Lemma exec_instr_valid_block ge fn i rs1 m1 rs2 m2: forall
+      (EI: exec_instr ge fn i rs1 m1 = Next rs2 m2) b z
+      (EFFI: effect_instr ge fn i rs1 m1 b z = true),
+      Mem.valid_block m1 b.
+Proof. intros. eapply Mem.perm_valid_block. eapply exec_instr_curWR; eassumption. Qed.
+
+Lemma asm_effstep_valid: forall (M : block -> Z -> bool) g c m c' m',
+      asm_effstep g M c m c' m' ->
+       forall b z, M b z = true -> Mem.valid_block m b.
+Proof. intros. eapply Mem.perm_valid_block. eapply asm_effstep_curWR; eassumption. Qed.
+
+Program Definition Asm_eff_sem : 
+  @EffectSem genv state.
+Proof.
+eapply Build_EffectSem with (sem := Asm_mem_sem hf).
+apply asmstep_effax1.
+apply asmstep_effax2.
+apply asm_effstep_curWR.
+Defined.
+
+Lemma Asm_eff_sem_det : semantics_lemmas.corestep_fun Asm_eff_sem.
+Proof.
+intros m m' m'' ge c c' c'' step1 step2.
+simpl in step1, step2.
+eapply asm_step_det in step1; eauto.
+destruct step1; subst; auto.
 Qed.
 
 End ASM_EFFSEM.

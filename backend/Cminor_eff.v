@@ -229,33 +229,32 @@ intros. inv H.
     eexists. eapply cmin_effstep_return; try eassumption. 
 Qed.
 
+Lemma cmin_effstep_curWR: forall (M : block -> Z -> bool) g c m c' m',
+      cmin_effstep g M c m c' m' ->
+      forall b z, M b z = true -> Mem.perm m b z Cur Writable.
+Proof.
+intros.
+induction H; try (solve [inv H0]).
++ eapply free_curWR; eassumption. 
++ eapply storev_curWR; eassumption.
++ eapply free_curWR; eassumption. 
++ eapply nonobs_extcall_curWR; eassumption.
++ eapply free_curWR; eassumption.  
++ eapply free_curWR; eassumption.  
+Qed.
+
 Lemma cmin_effstep_valid: forall (M : block -> Z -> bool) g c m c' m',
       cmin_effstep g M c m c' m' ->
        forall b z, M b z = true -> Mem.valid_block m b.
-Proof.
-intros.
-  induction H; try (solve [inv H0]).
+Proof. intros. eapply Mem.perm_valid_block. eapply cmin_effstep_curWR; eassumption. Qed.
 
-  eapply FreeEffect_validblock; eassumption.
-
-  apply StoreEffectD in H0. destruct H0 as [ofs [VADDR ARITH]]; subst.
-  inv H2. apply Mem.store_valid_access_3 in H3.
-  eapply Mem.valid_access_valid_block.
-  eapply Mem.valid_access_implies; try eassumption. constructor.
-
-  eapply FreeEffect_validblock; eassumption.
-  eapply BuiltinEffect_valid_block; eassumption.
-  eapply FreeEffect_validblock; eassumption.
-  eapply FreeEffect_validblock; eassumption.
-Qed.
- 
 Program Definition cmin_eff_sem : 
   @EffectSem Cminor.genv CMin_core.
 Proof.
 eapply Build_EffectSem with (sem := cmin_memsem hf)(effstep:=cmin_effstep).
 apply cminstep_effax1.
 apply cminstep_effax2.
-apply cmin_effstep_valid; eassumption.
+apply cmin_effstep_curWR.
 Defined.
 
 End CMINOR_EFF.

@@ -314,6 +314,27 @@ Proof. intros.
     simpl in OBS. intuition.
 Qed.
 
+Lemma nonobs_extcall_curWR {F V} g hf ef vargs m t vres m' (EC: @external_call ef F V g vargs m t vres m')
+      (NOBS: ~ observableEF hf ef) b z (EFF: BuiltinEffect g ef vargs m b z = true):
+     Mem.perm m b z Cur Writable.
+Proof.
+  destruct ef; simpl in *; try discriminate; clear NOBS; inv EC; simpl in *.
+  - destruct (Mem.load Mint32 m b0 (Int.unsigned lo - 4)); inv EFF.
+    destruct v; inv H3. inv H.
+    apply Mem.free_range_perm in H1.
+    destruct (eq_block b b0); try discriminate; subst b0; simpl in *.
+    destruct (zlt 0 (Int.unsigned sz)); try discriminate; simpl in *.
+    destruct (zle (Int.unsigned lo - 4) z); try discriminate; simpl in *.
+    destruct (zlt z (Int.unsigned lo + Int.unsigned sz)); try discriminate; simpl in *.
+    eapply Mem.perm_implies. apply H1. omega. constructor.
+  - destruct (eq_block b bdst); try discriminate; subst bdst; simpl in *.
+    destruct (zle (Int.unsigned odst) z); try discriminate; simpl in *.
+    destruct (zlt z (Int.unsigned odst + sz)); try discriminate; simpl in *.
+    apply Mem.loadbytes_length in H5.
+    eapply Mem.storebytes_range_perm; eauto.
+    rewrite H5, nat_of_Z_eq; omega.
+Qed.
+
 Lemma BuiltinEffect_valid_block:
     forall {F V:Type} ef (g : Genv.t F V) vargs m b z,
      BuiltinEffect g ef vargs m b z = true -> Mem.valid_block m b. 

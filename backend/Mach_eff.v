@@ -348,31 +348,26 @@ Proof.
     eexists. eapply Mach_effexec_return; try eassumption; trivial.
 Qed.
 
-Lemma mach_effstep_valid: forall (M : block -> Z -> bool) ge c m c' m',
-      mach_effstep ge M c m c' m' ->
-       forall b z, M b z = true -> Mem.valid_block m b.
+Lemma mach_effstep_curWR: forall (M : block -> Z -> bool) g c m c' m',
+      mach_effstep g M c m c' m' ->
+      forall b z, M b z = true -> Mem.perm m b z Cur Writable.
 Proof.
 intros.
-  induction H; try (solve [inv H0]).
-
-  unfold store_stack in H.
-  apply StoreEffectD in H0. destruct H0 as [i [VADDR ARITH]]; subst.
-  destruct sp; inv H. unfold Val.add in VADDR. inv VADDR.
-  apply Mem.store_valid_access_3 in H1.
-  eapply Mem.valid_access_valid_block.
-  eapply Mem.valid_access_implies; try eassumption. constructor.
-
-  apply StoreEffectD in H0. destruct H0 as [ofs [VADDR ARITH]]; subst.
-  inv H1. apply Mem.store_valid_access_3 in H2.
-  eapply Mem.valid_access_valid_block.
-  eapply Mem.valid_access_implies; try eassumption. constructor.
-
-  eapply FreeEffect_validblock; eassumption.
-  eapply FreeEffect_validblock; eassumption.
-  eapply BuiltinEffect_valid_block; eassumption.
-  eapply FreeEffect_validblock; eassumption.
-  eapply BuiltinEffect_valid_block; eassumption.
+induction H; try (solve [inv H0]).
++ eapply storev_curWR; eassumption.
++ eapply storev_curWR; eassumption.
++ eapply free_curWR; eassumption. 
++ eapply free_curWR; eassumption. 
++ inv H. eapply nonobs_extcall_curWR; eassumption. 
++ eapply free_curWR; eassumption.
++ erewrite helpers_EmptyEffect in H0; try eassumption.
+  inv H0.
 Qed.
+
+Lemma mach_effstep_valid: forall (M : block -> Z -> bool) g c m c' m',
+      mach_effstep g M c m c' m' ->
+       forall b z, M b z = true -> Mem.valid_block m b.
+Proof. intros. eapply Mem.perm_valid_block. eapply mach_effstep_curWR; eassumption. Qed.
 
 Program Definition Mach_eff_sem : 
   @EffectSem genv Mach_core.
@@ -381,7 +376,7 @@ eapply Build_EffectSem with
  (sem := Mach_memsem hf return_address_offset).
 apply machstep_effax1.
 apply machstep_effax2.
-apply mach_effstep_valid. 
+apply mach_effstep_curWR.
 Defined.
 
 End MACH_EFFSEM.

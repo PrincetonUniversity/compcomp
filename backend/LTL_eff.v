@@ -195,23 +195,24 @@ intros. unfold corestep in H; simpl in H.
     eexists. eapply ltl_effstep_return.
 Qed.
 
+Lemma ltl_effstep_curWR: forall (M : block -> Z -> bool) g c m c' m',
+      ltl_effstep g M c m c' m' ->
+      forall b z, M b z = true -> Mem.perm m b z Cur Writable.
+Proof.
+intros.
+induction H; try (solve [inv H0]).
++ eapply storev_curWR; eassumption.
++ eapply free_curWR; eassumption. 
++ inv H. eapply nonobs_extcall_curWR; eassumption.
++ eapply free_curWR; eassumption.  
++ erewrite helpers_EmptyEffect in H0; try eassumption.
+  inv H0.
+Qed.
+
 Lemma ltl_effstep_valid: forall (M : block -> Z -> bool) g c m c' m',
       ltl_effstep g M c m c' m' ->
        forall b z, M b z = true -> Mem.valid_block m b.
-Proof.
-intros.
-  induction H; try (solve [inv H0]).
-
-  apply StoreEffectD in H0. destruct H0 as [ofs [VADDR ARITH]]; subst.
-  inv H1. apply Mem.store_valid_access_3 in H2.
-  eapply Mem.valid_access_valid_block.
-  eapply Mem.valid_access_implies; try eassumption. constructor.
-
-  eapply FreeEffect_validblock; eassumption.
-  eapply BuiltinEffect_valid_block; eassumption.
-  eapply FreeEffect_validblock; eassumption.
-  eapply BuiltinEffect_valid_block; eassumption.
-Qed.
+Proof. intros. eapply Mem.perm_valid_block. eapply ltl_effstep_curWR; eassumption. Qed.
 
 Program Definition LTL_eff_sem : 
   @EffectSem genv LTL_core.
@@ -219,7 +220,7 @@ Proof.
 eapply Build_EffectSem with (sem := LTL_memsem hf)(effstep:=ltl_effstep).
 apply ltlstep_effax1.
 apply ltlstep_effax2.
-apply ltl_effstep_valid.
+apply ltl_effstep_curWR. 
 Defined.
 
 End LTL_EFF.

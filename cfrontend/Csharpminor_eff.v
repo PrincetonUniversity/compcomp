@@ -230,35 +230,33 @@ intros. inv H.
     eexists. eapply csharpmin_effstep_return.
 Qed.
 
-Lemma csharpmin_effstep_valid: forall (M : block -> Z -> bool) g c m c' m',
+Lemma csharpmin_effstep_curWR: forall (M : block -> Z -> bool) g c m c' m',
       csharpmin_effstep g M c m c' m' ->
-       forall b z, M b z = true -> Mem.valid_block m b.
+      forall b z, M b z = true -> Mem.perm m b z Cur Writable.
 Proof.
 intros.
-  induction H; try (solve [inv H0]).
-
-  eapply FreelistEffect_validblock; eassumption.
-
-  apply StoreEffectD in H0. destruct H0 as [ofs [VADDR ARITH]]; subst.
-  inv H2. apply Mem.store_valid_access_3 in H3.
-  eapply Mem.valid_access_valid_block.
-  eapply Mem.valid_access_implies; try eassumption. constructor.
-
-  eapply BuiltinEffect_valid_block; eassumption.
-
-  eapply FreelistEffect_validblock; eassumption.
-
-  eapply FreelistEffect_validblock; eassumption.
+induction H; try (solve [inv H0]).
++ eapply freelist_curWR; eassumption. 
++ eapply storev_curWR; eassumption.
++ eapply nonobs_extcall_curWR; eassumption. 
++ eapply freelist_curWR; eassumption. 
++ eapply freelist_curWR; eassumption. 
 Qed.
- 
+
+Lemma csharpmin_effstep_valid: forall (M : block -> Z -> bool) g c m c' m',
+      csharpmin_effstep g M c m c' m' ->
+      forall b z, M b z = true -> Mem.valid_block m b.
+Proof.
+intros. eapply Mem.perm_valid_block. eapply csharpmin_effstep_curWR; eassumption. Qed.
+
 Program Definition csharpmin_eff_sem : 
   @EffectSem Csharpminor.genv CSharpMin_core.
 Proof.
 eapply Build_EffectSem with (sem := csharpmin_memsem hf)
        (effstep:=csharpmin_effstep).
 apply csharpminstep_effax1.
-apply csharpminstep_effax2. 
-apply csharpmin_effstep_valid. 
+apply csharpminstep_effax2.
+apply csharpmin_effstep_curWR.
 Defined.
 
 End CSHARPMINOR_EFF.
